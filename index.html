@@ -196,6 +196,10 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 .badge-cat{display:inline-block;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;background:var(--gold);color:var(--purple-dark);padding:2px 8px;border-radius:20px;margin-bottom:6px;}
 .empty-msg{text-align:center;color:#8A8072;padding:40px 10px;font-size:0.9rem;}
 .note{font-size:0.72rem;color:#8A8072;text-align:center;margin-top:6px;}
+#email-status{font-size:0.8rem;text-align:center;padding:10px 12px;border-radius:8px;margin:0 0 6px;}
+#email-status.ok{background:#E8EDE3;color:var(--sage);}
+#email-status.err{background:#F5E3DE;color:#A6432F;}
+#email-status.pending{background:var(--cream);color:#6B6258;}
 .error{color:#A6432F;font-size:0.78rem;margin-top:-8px;margin-bottom:10px;display:none;}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
@@ -266,6 +270,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <table><tr class="tot-row"><td>Total</td><td class="n" id="conf-total"></td></tr></table>
     </div>
     <div class="actions">
+      <p class="note" id="email-status" style="display:none;"></p>
       <button class="btn btn-gold" onclick="descargarPDF()">Descargar comprobante (PDF)</button>
       <button class="btn btn-ghost" id="btn-share" onclick="compartirWhatsApp()">Compartir comprobante por WhatsApp</button>
       <button class="btn btn-ghost" onclick="enviarAOnLineTextil()">Avisar a OnLineTextil por WhatsApp</button>
@@ -642,12 +647,26 @@ function construirParamsEmail(orden, destinatario){
 }
 
 async function enviarEmailsAutomaticos(orden){
+  const statusEl = document.getElementById('email-status');
+  statusEl.style.display = 'block';
+  statusEl.className = 'pending';
+  statusEl.textContent = 'Enviando copia por email...';
+
+  let errorCliente = null, errorNegocio = null;
   try{
     await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, construirParamsEmail(orden, orden.cliente.email));
-  } catch(e){ console.error('Error mail cliente:', e); }
+  } catch(e){ errorCliente = (e && (e.text || e.message)) || JSON.stringify(e); console.error('Error mail cliente:', e); }
   try{
     await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, construirParamsEmail(orden, EMAIL_ONLINETEXTIL));
-  } catch(e){ console.error('Error mail OnLineTextil:', e); }
+  } catch(e){ errorNegocio = (e && (e.text || e.message)) || JSON.stringify(e); console.error('Error mail OnLineTextil:', e); }
+
+  if(!errorCliente && !errorNegocio){
+    statusEl.className = 'ok';
+    statusEl.textContent = '✓ Copia enviada por email a ambos.';
+  } else {
+    statusEl.className = 'err';
+    statusEl.textContent = 'No se pudo enviar el email automático (' + (errorCliente || errorNegocio) + '). Usá los botones de WhatsApp o el PDF descargado.';
+  }
 }
 
 function enviarAOnLineTextil(){
@@ -674,6 +693,7 @@ function nuevoPedido(){
   ordenActual = null;
   ['f-nombre','f-apellido','f-cuit','f-telefono','f-email','f-descuento','f-observaciones'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-transporte').value = '';
+  document.getElementById('email-status').style.display = 'none';
   actualizarCartbar();
   renderCatalogo('');
   mostrarPaso('step-catalogo');
