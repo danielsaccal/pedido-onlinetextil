@@ -404,7 +404,9 @@ function setCantidad(id, valor, sku, desc, nombreProducto, precio){
   if(n === 0){
     delete cart[id];
   } else {
-    cart[id] = {sku, desc, nombreProducto, precio, cantidad: n};
+    const [ci, pi] = id.split('-').map(Number);
+    const imagen = (CATALOGO[ci] && CATALOGO[ci].productos[pi] && CATALOGO[ci].productos[pi].imagen) || null;
+    cart[id] = {sku, desc, nombreProducto, precio, cantidad: n, imagen};
   }
   actualizarCartbar();
 }
@@ -511,7 +513,8 @@ function renderConfirmacion(orden){
   const tabla = document.getElementById('conf-tabla');
   let rows = '';
   orden.items.forEach(i => {
-    rows += `<tr><td>${i.cantidad} × ${i.sku}<br><span style="font-size:0.72rem;color:#8A8072;">${i.nombreProducto} — ${i.desc}</span></td><td class="n">${formatPrice(i.cantidad*i.precio)}</td></tr>`;
+    const foto = i.imagen ? `<img src="${i.imagen}" style="width:34px;height:34px;object-fit:cover;border-radius:6px;border:1px solid var(--line);vertical-align:middle;margin-right:8px;">` : '';
+    rows += `<tr><td>${foto}${i.cantidad} × ${i.sku}<br><span style="font-size:0.72rem;color:#8A8072;padding-left:${i.imagen?'42px':'0'};display:inline-block;">${i.nombreProducto} — ${i.desc}</span></td><td class="n">${formatPrice(i.cantidad*i.precio)}</td></tr>`;
   });
   if(orden.descuentoPct > 0){
     rows += `<tr><td>Subtotal</td><td class="n">${formatPrice(subtotalOrden(orden))}</td></tr>`;
@@ -544,6 +547,7 @@ function generarPDF(orden){
   doc.text('Transporte: ' + orden.cliente.transporte, 14, 60);
 
   const body = orden.items.map(i => [
+    '',
     i.cantidad,
     i.sku,
     i.nombreProducto + ' — ' + i.desc,
@@ -553,11 +557,19 @@ function generarPDF(orden){
 
   doc.autoTable({
     startY: 68,
-    head: [['Cant.', 'SKU', 'Descripción', 'Precio unit.', 'Subtotal']],
+    head: [['Foto', 'Cant.', 'SKU', 'Descripción', 'Precio unit.', 'Subtotal']],
     body: body,
-    styles: {font:'helvetica', fontSize:9},
+    styles: {font:'helvetica', fontSize:9, minCellHeight:16, valign:'middle'},
     headStyles: {fillColor:[61,43,78], textColor:[245,243,239]},
-    columnStyles: {0:{cellWidth:14}, 1:{cellWidth:22}, 3:{cellWidth:26, halign:'right'}, 4:{cellWidth:26, halign:'right'}}
+    columnStyles: {0:{cellWidth:16}, 1:{cellWidth:12}, 2:{cellWidth:20}, 4:{cellWidth:24, halign:'right'}, 5:{cellWidth:24, halign:'right'}},
+    didDrawCell: function(data){
+      if(data.section === 'body' && data.column.index === 0){
+        const item = orden.items[data.row.index];
+        if(item && item.imagen){
+          try{ doc.addImage(item.imagen, 'JPEG', data.cell.x + 2, data.cell.y + 2, 12, 12); } catch(e){ /* ignora si falla */ }
+        }
+      }
+    }
   });
 
   const finalY = doc.lastAutoTable.finalY + 8;
