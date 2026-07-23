@@ -512,9 +512,9 @@ async function confirmarPedido(){
   };
 
   renderConfirmacion(ordenActual);
-  generarPDF(ordenActual); // genera y descarga automáticamente
-  enviarEmailsAutomaticos(ordenActual); // dispara los 2 mails en segundo plano
   mostrarPaso('step-confirmacion');
+  await enviarEmailsAutomaticos(ordenActual); // primero el mail, antes de que el PDF tome pantalla
+  generarPDF(ordenActual); // genera y descarga
 }
 
 function subtotalOrden(orden){
