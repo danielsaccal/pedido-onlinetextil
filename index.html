@@ -2,6 +2,9 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OnLineTextil — Pedido Mayorista</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -86,18 +89,24 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 .producto-comp{font-size:0.78rem;color:#6B6258;margin:0 0 10px;}
 @media (max-width:420px){
   .producto-img{width:60px;height:60px;}
-  .variante{grid-template-columns:1fr auto;grid-template-rows:auto auto;row-gap:6px;}
-  .variante .precio{grid-column:2;grid-row:1;}
-  .variante .qty{grid-column:1/3;grid-row:2;justify-self:start;}
+  .variante-fila{grid-template-columns:1fr auto;grid-template-rows:auto auto;row-gap:6px;}
+  .variante-fila .precio{grid-column:2;grid-row:1;}
+  .variante-fila .qty{grid-column:1/3;grid-row:2;justify-self:start;}
 }
-.variante{
+.variante{padding:7px 0;}
+.variante-fila{
   display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;
-  padding:7px 0;
 }
 .variante + .variante{border-top:1px dashed var(--line);}
 .variante .desc{font-size:0.85rem;}
 .variante .sku{font-family:'IBM Plex Mono';font-size:0.7rem;color:#8A8072;display:block;}
 .variante .precio{font-family:'IBM Plex Mono';font-size:0.85rem;font-weight:500;white-space:nowrap;text-align:right;min-width:92px;}
+.variante-nota{
+  width:100%;margin-top:6px;padding:6px 9px;border:1px solid var(--line);border-radius:6px;
+  font-family:'Work Sans';font-size:0.78rem;background:var(--cream);
+}
+.variante-nota:focus{outline:2px solid var(--gold-dark);outline-offset:1px;background:var(--white);}
+.variante-nota::placeholder{color:#A8A092;}
 .precio.consultar{color:var(--sage);font-style:italic;font-size:0.75rem;}
 .qty{display:flex;align-items:center;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
 .qty button{
@@ -301,7 +310,11 @@ emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
 </script>
 <script>
 // ---------- estado ----------
-const cart = {}; // key: rowId -> {sku, desc, nombreProducto, precio, cantidad}
+const cart = {}; // key: rowId -> {sku, desc, nombreProducto, precio, cantidad, imagen}
+const notas = {}; // key: rowId -> texto de la nota (independiente de si hay cantidad cargada)
+function actualizarNota(id, valor){
+  notas[id] = valor;
+}
 let ordenActual = null;
 
 function parsePrice(str){
@@ -356,16 +369,20 @@ function renderCatalogo(filtro){
         const id = rowId(ci, pi, vi);
         const precioNum = parsePrice(v.precio);
         const enCarrito = cart[id] ? cart[id].cantidad : 0;
+        const notaActual = notas[id] || '';
         variantesHtml += `
           <div class="variante">
-            <div class="desc">${v.desc}<span class="sku">SKU ${v.sku}</span></div>
-            <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioNum)}</div>
-            ${precioNum===null ? '<div></div>' : `
-            <div class="qty">
-              <button type="button" onclick="cambiarCantidad('${id}', -1, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioNum})">−</button>
-              <input type="number" min="0" value="${enCarrito}" id="qty-${id}" onchange="setCantidad('${id}', this.value, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioNum})">
-              <button type="button" onclick="cambiarCantidad('${id}', 1, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioNum})">+</button>
-            </div>`}
+            <div class="variante-fila">
+              <div class="desc">${v.desc}<span class="sku">SKU ${v.sku}</span></div>
+              <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioNum)}</div>
+              ${precioNum===null ? '<div></div>' : `
+              <div class="qty">
+                <button type="button" onclick="cambiarCantidad('${id}', -1, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioNum})">−</button>
+                <input type="number" min="0" value="${enCarrito}" id="qty-${id}" onchange="setCantidad('${id}', this.value, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioNum})">
+                <button type="button" onclick="cambiarCantidad('${id}', 1, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioNum})">+</button>
+              </div>`}
+            </div>
+            ${precioNum===null ? '' : `<input type="text" class="variante-nota" placeholder="Nota para este producto (opcional): surtido, color..." value="${escapeAttr(notaActual)}" oninput="actualizarNota('${id}', this.value)">`}
           </div>
         `;
       });
@@ -488,7 +505,7 @@ async function confirmarPedido(){
     numero: numeroFormateado,
     fecha: new Date(),
     cliente: {nombre, apellido, cuit, telefono, email, transporte},
-    items: Object.values(cart),
+    items: Object.entries(cart).map(([id, item]) => ({...item, nota: (notas[id]||'').trim()})),
     descuentoPct,
     observaciones,
   };
@@ -514,7 +531,8 @@ function renderConfirmacion(orden){
   let rows = '';
   orden.items.forEach(i => {
     const foto = i.imagen ? `<img src="${i.imagen}" style="width:34px;height:34px;object-fit:cover;border-radius:6px;border:1px solid var(--line);vertical-align:middle;margin-right:8px;">` : '';
-    rows += `<tr><td>${foto}${i.cantidad} × ${i.sku}<br><span style="font-size:0.72rem;color:#8A8072;padding-left:${i.imagen?'42px':'0'};display:inline-block;">${i.nombreProducto} — ${i.desc}</span></td><td class="n">${formatPrice(i.cantidad*i.precio)}</td></tr>`;
+    const notaHtml = i.nota ? `<br><span style="font-size:0.72rem;color:var(--sage);padding-left:${i.imagen?'42px':'0'};display:inline-block;">Nota: ${i.nota}</span>` : '';
+    rows += `<tr><td>${foto}${i.cantidad} × ${i.sku}<br><span style="font-size:0.72rem;color:#8A8072;padding-left:${i.imagen?'42px':'0'};display:inline-block;">${i.nombreProducto} — ${i.desc}</span>${notaHtml}</td><td class="n">${formatPrice(i.cantidad*i.precio)}</td></tr>`;
   });
   if(orden.descuentoPct > 0){
     rows += `<tr><td>Subtotal</td><td class="n">${formatPrice(subtotalOrden(orden))}</td></tr>`;
@@ -550,7 +568,7 @@ function generarPDF(orden){
     '',
     i.cantidad,
     i.sku,
-    i.nombreProducto + ' — ' + i.desc,
+    i.nombreProducto + ' — ' + i.desc + (i.nota ? '\nNota: ' + i.nota : ''),
     formatPrice(i.precio),
     formatPrice(i.cantidad * i.precio)
   ]);
@@ -636,8 +654,9 @@ function construirParamsEmail(orden, destinatario){
   const subtotal = subtotalOrden(orden);
   const total = totalOrden(orden);
   const items_texto = orden.items.map(i =>
-    `${i.cantidad} x ${i.sku} — ${i.nombreProducto} (${i.desc}) — ${formatPrice(i.precio)} c/u — subtotal ${formatPrice(i.cantidad*i.precio)}`
-  ).join('\n');
+    `${i.cantidad} x ${i.sku} — ${i.nombreProducto} (${i.desc}) — ${formatPrice(i.precio)} c/u — subtotal ${formatPrice(i.cantidad*i.precio)}` +
+    (i.nota ? ` — <i>Nota: ${i.nota}</i>` : '')
+  ).join('<br><br>');
   const descuento_texto = orden.descuentoPct > 0
     ? `${orden.descuentoPct}% (-${formatPrice(subtotal - total)})`
     : 'Sin descuento';
@@ -654,7 +673,7 @@ function construirParamsEmail(orden, destinatario){
     subtotal: formatPrice(subtotal),
     descuento_texto,
     total: formatPrice(total),
-    observaciones: orden.observaciones || '—',
+    observaciones: (orden.observaciones || '—').replace(/\n/g, '<br>'),
   };
 }
 
@@ -677,7 +696,7 @@ async function enviarEmailsAutomaticos(orden){
     statusEl.textContent = '✓ Copia enviada por email a ambos.';
   } else {
     statusEl.className = 'err';
-    statusEl.textContent = 'No se pudo enviar el email automático (' + (errorCliente || errorNegocio) + '). Usá los botones de WhatsApp o el PDF descargado.';
+    statusEl.innerHTML = 'No se pudo enviar el email automático (' + (errorCliente || errorNegocio) + '). Usá los botones de WhatsApp o el PDF descargado. <button type="button" onclick="enviarEmailsAutomaticos(ordenActual)" style="margin-left:6px;text-decoration:underline;background:none;border:none;color:#A6432F;font-weight:600;cursor:pointer;">Reintentar</button>';
   }
 }
 
@@ -686,7 +705,7 @@ function enviarAOnLineTextil(){
   let texto = `Pedido ${ordenActual.numero}\n`;
   texto += `Cliente: ${ordenActual.cliente.nombre} ${ordenActual.cliente.apellido} (CUIT ${ordenActual.cliente.cuit})\n\n`;
   ordenActual.items.forEach(i => {
-    texto += `${i.cantidad} x ${i.sku} — ${formatPrice(i.precio)}\n`;
+    texto += `${i.cantidad} x ${i.sku} — ${formatPrice(i.precio)}${i.nota ? ' (Nota: ' + i.nota + ')' : ''}\n`;
   });
   if(ordenActual.descuentoPct > 0){
     texto += `\nSubtotal: ${formatPrice(subtotalOrden(ordenActual))}`;
@@ -702,6 +721,7 @@ function enviarAOnLineTextil(){
 
 function nuevoPedido(){
   Object.keys(cart).forEach(k => delete cart[k]);
+  Object.keys(notas).forEach(k => delete notas[k]);
   ordenActual = null;
   ['f-nombre','f-apellido','f-cuit','f-telefono','f-email','f-descuento','f-observaciones'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-transporte').value = '';
