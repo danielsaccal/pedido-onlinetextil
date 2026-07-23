@@ -371,20 +371,20 @@ function renderCatalogo(filtro){
         const precioNum = parsePrice(v.precio);
         const enCarrito = cart[id] ? cart[id].cantidad : 0;
         const notaActual = notas[id] || '';
-        const precioMostrado = (precioNum !== null && p.metros) ? (precioNum / p.metros) : precioNum;
+        const precioEfectivo = (precioNum !== null && p.metros) ? (precioNum * p.metros) : precioNum;
         const rolloNota = (precioNum !== null && p.metros)
-          ? `<span class="sku">Rollo de ${p.metros} m: ${formatPrice(precioNum)}</span>`
+          ? `<span class="sku">Rollo de ${p.metros} m: ${formatPrice(precioEfectivo)}</span>`
           : '';
         variantesHtml += `
           <div class="variante">
             <div class="variante-fila">
               <div class="desc">${v.desc}<span class="sku">SKU ${v.sku}</span>${rolloNota}</div>
-              <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioMostrado) + (p.metros ? ' /m' : '')}</div>
+              <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioNum) + (p.metros ? ' /m' : '')}</div>
               ${precioNum===null ? '<div></div>' : `
               <div class="qty">
-                <button type="button" onclick="cambiarCantidad('${id}', -1, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioNum})">−</button>
-                <input type="number" min="0" value="${enCarrito}" id="qty-${id}" onchange="setCantidad('${id}', this.value, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioNum})">
-                <button type="button" onclick="cambiarCantidad('${id}', 1, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioNum})">+</button>
+                <button type="button" onclick="cambiarCantidad('${id}', -1, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioEfectivo})">−</button>
+                <input type="number" min="0" value="${enCarrito}" id="qty-${id}" onchange="setCantidad('${id}', this.value, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioEfectivo})">
+                <button type="button" onclick="cambiarCantidad('${id}', 1, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioEfectivo})">+</button>
               </div>`}
             </div>
             ${precioNum===null ? '' : `<input type="text" class="variante-nota" placeholder="Nota para este producto (opcional): surtido, color..." value="${escapeAttr(notaActual)}" oninput="actualizarNota('${id}', this.value)">`}
