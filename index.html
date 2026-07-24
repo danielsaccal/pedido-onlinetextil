@@ -55,6 +55,26 @@ header.top::after{
 }
 header.top h1{color:var(--cream);font-size:1.7rem;margin:0 0 4px;font-weight:600;}
 header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-transform:uppercase;}
+header.top .admin-link{
+  margin-top:10px;font-size:0.7rem;opacity:0.55;text-transform:none;letter-spacing:normal;
+  cursor:pointer;text-decoration:underline;
+}
+header.top .admin-link:hover{opacity:0.85;}
+
+.hist-search{margin-bottom:14px;}
+.hist-search input{width:100%;padding:11px 14px;border-radius:8px;border:1px solid var(--line);font-family:'Work Sans';font-size:0.95rem;background:var(--white);}
+.hist-pedido{background:var(--white);border:1px solid var(--line);border-radius:10px;margin-bottom:12px;overflow:hidden;}
+.hist-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;cursor:pointer;}
+.hist-head .num{font-family:'Fraunces',serif;font-weight:600;color:var(--purple);font-size:1.05rem;}
+.hist-head .meta{font-size:0.76rem;color:#6B6258;}
+.hist-head .tot{font-family:'IBM Plex Mono';font-weight:600;color:var(--purple);}
+.hist-body{display:none;border-top:1px dashed var(--line);padding:14px 16px;font-size:0.85rem;}
+.hist-pedido.open .hist-body{display:block;}
+.hist-body table{width:100%;border-collapse:collapse;margin-top:8px;}
+.hist-body td{padding:4px 0;border-bottom:1px dashed var(--line);vertical-align:top;}
+.hist-body td.n{text-align:right;font-family:'IBM Plex Mono';white-space:nowrap;}
+.hist-chev{transition:transform .2s;color:var(--purple);}
+.hist-pedido.open .hist-chev{transform:rotate(180deg);}
 .search-wrap{position:sticky;top:0;z-index:5;background:var(--cream);padding:14px 16px 8px;}
 .search-wrap input{
   width:100%;padding:11px 14px;border-radius:8px;border:1px solid var(--line);
@@ -219,6 +239,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 <header class="top">
   <h1>OnLineTextil</h1>
   <p>Pedido mayorista · onlinetextil.com.ar</p>
+  <p class="admin-link" onclick="abrirHistorial()">Historial de pedidos</p>
 </header>
 
 <div class="app">
@@ -288,6 +309,15 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <p class="note">El comprobante en PDF queda descargado en tu dispositivo — adjuntalo en WhatsApp si el botón de compartir no está disponible en tu navegador.</p>
       <button class="btn btn-outline" style="color:var(--purple);border-color:var(--purple);margin-top:6px;" onclick="nuevoPedido()">Hacer otro pedido</button>
     </div>
+  </div>
+
+  <!-- STEP: HISTORIAL DE PEDIDOS (solo para OnLineTextil) -->
+  <div class="step" id="step-historial">
+    <div class="hist-search">
+      <input type="text" id="hist-buscador" placeholder="Buscar por N° de pedido, nombre o SKU...">
+    </div>
+    <div id="hist-lista"><p class="empty-msg">Cargando pedidos...</p></div>
+    <button class="btn btn-ghost" style="margin-top:10px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
   </div>
 
 </div>
@@ -771,6 +801,76 @@ function enviarAOnLineTextil(){
   const url = 'https://wa.me/' + WHATSAPP_ONLINETEXTIL + '?text=' + encodeURIComponent(texto);
   window.open(url, '_blank');
 }
+
+// ---------- historial de pedidos ----------
+let historialPedidos = null;
+
+function abrirHistorial(){
+  mostrarPaso('step-historial');
+  if(historialPedidos === null){
+    cargarHistorial();
+  }
+}
+
+function cargarHistorial(){
+  document.getElementById('hist-lista').innerHTML = '<p class="empty-msg">Cargando pedidos...</p>';
+  db.collection('pedidos').orderBy('fecha', 'desc').get().then(snap => {
+    historialPedidos = snap.docs.map(d => d.data());
+    renderHistorial('');
+  }).catch(err => {
+    document.getElementById('hist-lista').innerHTML = '<p class="empty-msg">No se pudo cargar el historial: ' + err.message + '</p>';
+  });
+}
+
+function renderHistorial(filtro){
+  filtro = (filtro||'').trim().toLowerCase();
+  const cont = document.getElementById('hist-lista');
+  const pedidos = historialPedidos || [];
+  const filtrados = pedidos.filter(p => {
+    if(!filtro) return true;
+    const haystack = [p.numero, p.cliente?.nombre, p.cliente?.apellido, ...(p.items||[]).map(i => i.sku + ' ' + i.nombreProducto)].join(' ').toLowerCase();
+    return haystack.includes(filtro);
+  });
+
+  if(filtrados.length === 0){
+    cont.innerHTML = '<p class="empty-msg">No hay pedidos que coincidan.</p>';
+    return;
+  }
+
+  cont.innerHTML = filtrados.map(p => {
+    const fecha = p.fecha ? new Date(p.fecha).toLocaleString('es-AR') : '';
+    const itemsRows = (p.items||[]).map(i => `
+      <tr>
+        <td>${i.cantidad} × ${i.sku}<br><span style="color:#8A8072;font-size:0.78rem;">${i.nombreProducto||''} — ${i.desc||''}</span>${i.nota ? `<br><span style="color:var(--sage);font-size:0.75rem;">Nota: ${i.nota}</span>` : ''}</td>
+        <td class="n">${formatPrice(i.cantidad * i.precio)}</td>
+      </tr>`).join('');
+    return `
+      <div class="hist-pedido" id="hp-${p.numero}">
+        <div class="hist-head" onclick="document.getElementById('hp-${p.numero}').classList.toggle('open')">
+          <div>
+            <div class="num">${p.numero}</div>
+            <div class="meta">${p.cliente?.nombre||''} ${p.cliente?.apellido||''} · ${fecha}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="tot">${formatPrice(p.total)}</div>
+            <span class="hist-chev">▾</span>
+          </div>
+        </div>
+        <div class="hist-body">
+          <div style="margin-bottom:8px;line-height:1.5;">
+            <b>CUIT:</b> ${p.cliente?.cuit||''} &nbsp; <b>Tel:</b> ${p.cliente?.telefono||''} &nbsp; <b>Email:</b> ${p.cliente?.email||''}<br>
+            <b>Transporte:</b> ${p.cliente?.transporte||''}
+            ${p.observaciones ? `<br><b>Observaciones:</b> ${p.observaciones}` : ''}
+          </div>
+          <table>${itemsRows}</table>
+          ${p.descuentoPct > 0 ? `<p style="text-align:right;margin:6px 0 0;">Subtotal: ${formatPrice(p.subtotal)} — Descuento ${p.descuentoPct}%</p>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+document.getElementById('hist-buscador').addEventListener('input', e => renderHistorial(e.target.value));
 
 function nuevoPedido(){
   Object.keys(cart).forEach(k => delete cart[k]);
