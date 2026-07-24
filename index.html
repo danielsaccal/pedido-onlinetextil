@@ -280,19 +280,21 @@ header.top .admin-link:hover{opacity:0.85;}
         </div>
         <div class="resumen-linea resumen-total-linea"><span>Total</span><span class="tot" id="resumen-total"></span></div>
       </div>
-      <div class="field-row" style="position:relative;">
-        <div class="field"><label>Nombre</label><input type="text" id="f-nombre" oninput="buscarClienteAutocompletar()" autocomplete="off"></div>
-        <div class="field"><label>Apellido</label><input type="text" id="f-apellido" oninput="buscarClienteAutocompletar()" autocomplete="off"></div>
+      <div style="position:relative;">
+        <div class="field-row">
+          <div class="field"><label>Nombre</label><input type="text" id="f-nombre" oninput="buscarClienteAutocompletar()" autocomplete="off"></div>
+          <div class="field"><label>Apellido</label><input type="text" id="f-apellido" oninput="buscarClienteAutocompletar()" autocomplete="off"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>CUIT</label><input type="text" id="f-cuit" placeholder="20-12345678-9" oninput="buscarClienteAutocompletar()" autocomplete="off"></div>
+          <div class="field"><label>Teléfono</label><input type="text" id="f-telefono" placeholder="11 1234-5678" oninput="buscarClienteAutocompletar()" autocomplete="off"></div>
+        </div>
+        <div class="field"><label>Email</label><input type="email" id="f-email" oninput="buscarClienteAutocompletar()" autocomplete="off"></div>
+        <div class="field-row">
+          <div class="field"><label>Localidad</label><input type="text" id="f-localidad" placeholder="Ej: Goya" oninput="buscarClienteAutocompletar()" autocomplete="off"></div>
+          <div class="field"><label>Provincia</label><input type="text" id="f-provincia" placeholder="Ej: Corrientes"></div>
+        </div>
         <div id="autocomplete-lista" class="autocomplete-lista" style="display:none;"></div>
-      </div>
-      <div class="field-row">
-        <div class="field"><label>CUIT</label><input type="text" id="f-cuit" placeholder="20-12345678-9"></div>
-        <div class="field"><label>Teléfono</label><input type="text" id="f-telefono" placeholder="11 1234-5678"></div>
-      </div>
-      <div class="field"><label>Email</label><input type="email" id="f-email"></div>
-      <div class="field-row">
-        <div class="field"><label>Localidad</label><input type="text" id="f-localidad" placeholder="Ej: Goya"></div>
-        <div class="field"><label>Provincia</label><input type="text" id="f-provincia" placeholder="Ej: Corrientes"></div>
       </div>
       <div class="field">
         <label>Transporte</label>
@@ -1042,6 +1044,7 @@ function precargarClientesParaAutocompletar(){
   if(clientesAutocomplete !== null) return; // ya cargados en esta sesion
   db.collection('clientes').get().then(snap => {
     clientesAutocomplete = snap.docs.map(d => d.data());
+    buscarClienteAutocompletar(); // por si ya habia texto escrito antes de que cargue
   }).catch(e => {
     console.error('Error precargando clientes para autocompletar:', e);
     clientesAutocomplete = [];
@@ -1050,18 +1053,27 @@ function precargarClientesParaAutocompletar(){
 
 function buscarClienteAutocompletar(){
   const cont = document.getElementById('autocomplete-lista');
-  const nombreVal = document.getElementById('f-nombre').value.trim().toLowerCase();
-  const apellidoVal = document.getElementById('f-apellido').value.trim().toLowerCase();
+  const valores = {
+    nombre: document.getElementById('f-nombre').value.trim().toLowerCase(),
+    apellido: document.getElementById('f-apellido').value.trim().toLowerCase(),
+    cuit: document.getElementById('f-cuit').value.trim().toLowerCase(),
+    telefono: document.getElementById('f-telefono').value.trim().toLowerCase(),
+    email: document.getElementById('f-email').value.trim().toLowerCase(),
+    localidad: document.getElementById('f-localidad').value.trim().toLowerCase(),
+  };
+  const hayAlgo = Object.values(valores).some(v => v.length >= 2);
 
-  if((!nombreVal && !apellidoVal) || !clientesAutocomplete || clientesAutocomplete.length === 0){
+  if(!hayAlgo || !clientesAutocomplete || clientesAutocomplete.length === 0){
     cont.style.display = 'none';
     return;
   }
 
   const coincidencias = clientesAutocomplete.filter(c => {
-    const n = (c.nombre||'').toLowerCase();
-    const a = (c.apellido||'').toLowerCase();
-    return (nombreVal && n.includes(nombreVal)) || (apellidoVal && a.includes(apellidoVal));
+    return Object.keys(valores).some(campo => {
+      const val = valores[campo];
+      if(val.length < 2) return false;
+      return (c[campo] || '').toLowerCase().includes(val);
+    });
   }).slice(0, 6);
 
   if(coincidencias.length === 0){
