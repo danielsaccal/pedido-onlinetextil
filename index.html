@@ -79,6 +79,18 @@ header.top .admin-link:hover{opacity:0.85;}
 .hist-body td.n{text-align:right;font-family:'IBM Plex Mono';white-space:nowrap;}
 .hist-chev{transition:transform .2s;color:var(--purple);}
 .hist-pedido.open .hist-chev{transform:rotate(180deg);}
+.hist-acciones{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);}
+.btn-mini{
+  background:var(--cream);border:1px solid var(--line);border-radius:7px;
+  padding:6px 11px;font-size:0.76rem;font-family:'Work Sans';cursor:pointer;color:var(--ink);
+}
+.btn-mini:hover{background:var(--white);border-color:var(--purple);}
+.edit-form{background:var(--cream);border-radius:8px;padding:12px;margin-top:10px;}
+.edit-form .field-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.edit-form label{display:block;font-size:0.7rem;color:#6B6258;margin-bottom:3px;text-transform:uppercase;}
+.edit-form input, .edit-form textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font-size:0.82rem;font-family:'Work Sans';background:var(--white);}
+.edit-item-row{display:grid;grid-template-columns:1fr 60px 32px;gap:6px;align-items:center;margin-bottom:6px;font-size:0.8rem;}
+.edit-item-row input{padding:5px 7px;}
 .search-wrap{position:sticky;top:0;z-index:5;background:var(--cream);padding:14px 16px 8px;}
 .search-wrap input{
   width:100%;padding:11px 14px;border-radius:8px;border:1px solid var(--line);
@@ -737,7 +749,7 @@ async function imagenABase64(url){
   } catch(e){ return null; }
 }
 
-async function generarPDF(orden){
+async function construirDocPDF(orden){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   doc.setFont('helvetica', 'bold');
@@ -868,6 +880,11 @@ async function generarPDF(orden){
   doc.setTextColor(110,100,90);
   doc.text('Pedido ' + orden.numero, 25, 132);
 
+  return doc;
+}
+
+async function generarPDF(orden){
+  const doc = await construirDocPDF(orden);
   ordenActual._pdfDoc = doc;
   doc.save(nombreArchivoPedido(orden));
 }
@@ -977,6 +994,144 @@ function abrirHistorial(){
   cargarHistorial();
 }
 
+function ordenDesdeHistorial(numero){
+  const p = (historialPedidos || []).find(x => x.numero === numero);
+  if(!p) return null;
+  return {
+    numero: p.numero,
+    fecha: p.fecha ? new Date(p.fecha) : new Date(),
+    cliente: p.cliente || {},
+    items: p.items || [],
+    descuentoPct: p.descuentoPct || 0,
+    observaciones: p.observaciones || '',
+    bultos: p.bultos || 1,
+  };
+}
+
+async function reenviarEmailHistorial(numero){
+  const orden = ordenDesdeHistorial(numero);
+  if(!orden) return;
+  try{
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, construirParamsEmail(orden, orden.cliente.email));
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, construirParamsEmail(orden, EMAIL_ONLINETEXTIL));
+    alert('Reenviado por email a ' + orden.cliente.email + ' y a OnLineTextil.');
+  } catch(e){
+    alert('No se pudo reenviar el email: ' + e.message);
+  }
+}
+
+async function compartirHistorial(numero){
+  const orden = ordenDesdeHistorial(numero);
+  if(!orden) return;
+  const doc = await construirDocPDF(orden);
+  try{
+    const blob = doc.output('blob');
+    const file = new File([blob], nombreArchivoPedido(orden), {type:'application/pdf'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:'Pedido ' + orden.numero, text:'Pedido ' + orden.numero + ' — OnLineTextil'});
+      return;
+    }
+  } catch(e){ /* sigue al fallback */ }
+  doc.save(nombreArchivoPedido(orden));
+  alert('Tu navegador no permite compartir directo. Se descargó el PDF — adjuntalo donde lo necesites.');
+}
+
+async function imprimirHistorial(numero){
+  const orden = ordenDesdeHistorial(numero);
+  if(!orden) return;
+  const doc = await construirDocPDF(orden);
+  doc.autoPrint();
+  window.open(doc.output('bloburl'), '_blank');
+}
+
+function mostrarEdicionHistorial(numero){
+  const p = (historialPedidos || []).find(x => x.numero === numero);
+  if(!p) return;
+  const cont = document.getElementById('edit-' + numero);
+  if(cont.style.display === 'block'){
+    cont.style.display = 'none';
+    return;
+  }
+
+  const itemsHtml = (p.items || []).map((i, idx) => `
+    <div class="edit-item-row">
+      <span>${i.sku||''} — ${i.nombreProducto||''} (${formatPrice(i.precio)} c/u)</span>
+      <input type="number" min="0" id="ei-${numero}-${idx}" value="${i.cantidad}">
+      <button class="btn-mini" onclick="this.closest('.edit-item-row').style.display='none';">✕</button>
+    </div>
+  `).join('');
+
+  cont.innerHTML = `
+    <div class="edit-form">
+      <div class="field-row">
+        <div><label>Nombre</label><input type="text" id="em-nombre-${numero}" value="${p.cliente?.nombre||''}"></div>
+        <div><label>Apellido</label><input type="text" id="em-apellido-${numero}" value="${p.cliente?.apellido||''}"></div>
+      </div>
+      <div class="field-row">
+        <div><label>Teléfono</label><input type="text" id="em-telefono-${numero}" value="${p.cliente?.telefono||''}"></div>
+        <div><label>Email</label><input type="text" id="em-email-${numero}" value="${p.cliente?.email||''}"></div>
+      </div>
+      <div class="field-row">
+        <div><label>Transporte</label><input type="text" id="em-transporte-${numero}" value="${p.cliente?.transporte||''}"></div>
+        <div><label>Bultos</label><input type="number" min="1" id="em-bultos-${numero}" value="${p.bultos||1}"></div>
+      </div>
+      <label style="margin-top:4px;">Ítems (cambiar cantidad o tocar ✕ para quitar)</label>
+      ${itemsHtml || '<p class="note">Sin ítems detallados.</p>'}
+      <div class="field-row">
+        <div><label>Descuento %</label><input type="number" min="0" max="100" id="em-descuento-${numero}" value="${p.descuentoPct||0}"></div>
+        <div><label>Observaciones</label><input type="text" id="em-obs-${numero}" value="${p.observaciones||''}"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn-mini" style="background:var(--gold);border-color:var(--gold-dark);" onclick="guardarEdicionHistorial('${numero}')">Guardar cambios</button>
+        <button class="btn-mini" onclick="document.getElementById('edit-${numero}').style.display='none';">Cancelar</button>
+      </div>
+    </div>
+  `;
+  cont.style.display = 'block';
+}
+
+async function guardarEdicionHistorial(numero){
+  const p = (historialPedidos || []).find(x => x.numero === numero);
+  if(!p) return;
+
+  const nuevosItems = (p.items || []).map((i, idx) => {
+    const row = document.getElementById(`ei-${numero}-${idx}`);
+    if(!row) return null; // se quito con la X
+    const cantidad = Math.max(0, parseInt(row.value, 10) || 0);
+    if(cantidad === 0) return null;
+    return {...i, cantidad};
+  }).filter(Boolean);
+
+  const cliente = {
+    nombre: document.getElementById(`em-nombre-${numero}`).value.trim(),
+    apellido: document.getElementById(`em-apellido-${numero}`).value.trim(),
+    cuit: p.cliente?.cuit || '',
+    telefono: document.getElementById(`em-telefono-${numero}`).value.trim(),
+    email: document.getElementById(`em-email-${numero}`).value.trim(),
+    localidad: p.cliente?.localidad || '',
+    provincia: p.cliente?.provincia || '',
+    transporte: document.getElementById(`em-transporte-${numero}`).value.trim(),
+  };
+  const bultos = Math.max(1, parseInt(document.getElementById(`em-bultos-${numero}`).value, 10) || 1);
+  const descuentoPct = Math.min(100, Math.max(0, parseFloat(document.getElementById(`em-descuento-${numero}`).value) || 0));
+  const observaciones = document.getElementById(`em-obs-${numero}`).value.trim();
+
+  const subtotal = nuevosItems.reduce((s,i)=>s+i.cantidad*i.precio, 0);
+  const total = subtotal - (subtotal * descuentoPct / 100);
+
+  try{
+    await db.collection('pedidos').doc(numero).set({
+      numero, fecha: p.fecha, cliente,
+      items: nuevosItems, descuentoPct, observaciones,
+      subtotal, total, bultos
+    });
+    alert('Pedido ' + numero + ' actualizado.');
+    cargarHistorial();
+  } catch(e){
+    alert('No se pudo guardar el cambio: ' + e.message);
+  }
+}
+
 function cargarHistorial(){
   document.getElementById('hist-lista').innerHTML = '<p class="empty-msg">Cargando pedidos...</p>';
   db.collection('pedidos').orderBy('fecha', 'desc').get().then(snap => {
@@ -1029,6 +1184,13 @@ function renderHistorial(filtro){
           </div>
           <table>${itemsRows}</table>
           ${p.descuentoPct > 0 ? `<p style="text-align:right;margin:6px 0 0;">Subtotal: ${formatPrice(p.subtotal)} — Descuento ${p.descuentoPct}%</p>` : ''}
+          <div class="hist-acciones">
+            <button class="btn-mini" onclick="event.stopPropagation(); reenviarEmailHistorial('${p.numero}')">📧 Reenviar email</button>
+            <button class="btn-mini" onclick="event.stopPropagation(); compartirHistorial('${p.numero}')">📤 Compartir</button>
+            <button class="btn-mini" onclick="event.stopPropagation(); imprimirHistorial('${p.numero}')">🖨️ Imprimir</button>
+            <button class="btn-mini" onclick="event.stopPropagation(); mostrarEdicionHistorial('${p.numero}')">✏️ Modificar</button>
+          </div>
+          <div id="edit-${p.numero}" style="display:none;"></div>
         </div>
       </div>
     `;
