@@ -323,7 +323,10 @@ header.top .admin-link:hover{opacity:0.85;}
       <input type="text" id="hist-buscador" placeholder="Buscar por N° de pedido, nombre o SKU...">
     </div>
     <div id="hist-lista"><p class="empty-msg">Cargando pedidos...</p></div>
-    <button class="btn btn-ghost" style="margin-top:10px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    <div style="display:flex;gap:10px;margin-top:10px;">
+      <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" onclick="mostrarPaso('step-manual')">+ Cargar pedido manual</button>
+    </div>
   </div>
 
   <!-- STEP: CLIENTES (solo para OnLineTextil) -->
@@ -333,6 +336,32 @@ header.top .admin-link:hover{opacity:0.85;}
     </div>
     <div id="cli-lista"><p class="empty-msg">Cargando clientes...</p></div>
     <button class="btn btn-ghost" style="margin-top:10px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+  </div>
+
+  <!-- STEP: CARGA MANUAL DE PEDIDO (recuperar pedidos que no quedaron guardados) -->
+  <div class="step" id="step-manual">
+    <div class="form-card">
+      <h2>Cargar pedido manual</h2>
+      <p class="note" style="margin-bottom:14px;">Para asentar un pedido que ya se hizo (por ejemplo, si no quedó guardado solo) sin tener que rehacerlo con el cliente.</p>
+      <div class="field"><label>N° de pedido</label><input type="text" id="m-numero" placeholder="OT-00027"></div>
+      <div class="field-row">
+        <div class="field"><label>Nombre</label><input type="text" id="m-nombre"></div>
+        <div class="field"><label>Apellido</label><input type="text" id="m-apellido"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>CUIT</label><input type="text" id="m-cuit"></div>
+        <div class="field"><label>Teléfono</label><input type="text" id="m-telefono"></div>
+      </div>
+      <div class="field"><label>Email</label><input type="email" id="m-email"></div>
+      <div class="field"><label>Transporte</label><input type="text" id="m-transporte"></div>
+      <div class="field"><label>Detalle del pedido (SKUs, cantidades, lo que tenga a mano)</label><textarea id="m-detalle" rows="4" placeholder="Ej: 3 x SIM171J, 2 x ALD100..."></textarea></div>
+      <div class="field"><label>Total</label><input type="text" id="m-total" placeholder="Ej: 49602,60"></div>
+      <p class="error" id="m-error" style="display:none;">Complete al menos N° de pedido, nombre, apellido y total.</p>
+      <div class="actions">
+        <button class="btn btn-gold" onclick="guardarPedidoManual()">Guardar en historial</button>
+        <button class="btn btn-ghost" onclick="mostrarPaso('step-historial')">Cancelar</button>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -979,6 +1008,51 @@ function renderClientes(filtro){
 }
 
 document.getElementById('cli-buscador').addEventListener('input', e => renderClientes(e.target.value));
+
+// ---------- carga manual de pedido ----------
+async function guardarPedidoManual(){
+  const numero = document.getElementById('m-numero').value.trim();
+  const nombre = document.getElementById('m-nombre').value.trim();
+  const apellido = document.getElementById('m-apellido').value.trim();
+  const cuit = document.getElementById('m-cuit').value.trim();
+  const telefono = document.getElementById('m-telefono').value.trim();
+  const email = document.getElementById('m-email').value.trim();
+  const transporte = document.getElementById('m-transporte').value.trim();
+  const detalle = document.getElementById('m-detalle').value.trim();
+  const totalTexto = document.getElementById('m-total').value.trim();
+  const total = parseFloat(totalTexto.replace(/\./g,'').replace(',','.')) || 0;
+
+  if(!numero || !nombre || !apellido || !total){
+    document.getElementById('m-error').style.display = 'block';
+    return;
+  }
+  document.getElementById('m-error').style.display = 'none';
+
+  const cliente = {nombre, apellido, cuit, telefono, email, transporte};
+  const fechaISO = new Date().toISOString();
+
+  try{
+    await db.collection('pedidos').doc(numero).set({
+      numero, fecha: fechaISO, cliente,
+      items: [{sku:'', desc: detalle, nombreProducto: 'Cargado manualmente', precio: total, cantidad: 1, nota:''}],
+      descuentoPct: 0, observaciones: 'Cargado manualmente por OnLineTextil',
+      subtotal: total, total: total
+    });
+    const cuitLimpio = (cuit || 'sin-cuit').trim().replace(/[\\/\s]/g, '') || 'sin-cuit';
+    await db.collection('clientes').doc(cuitLimpio).set({
+      nombre, apellido, cuit, telefono, email, transporte,
+      ultimoPedido: numero, ultimaFecha: fechaISO,
+      cantidadPedidos: firebase.firestore.FieldValue.increment(1)
+    }, { merge: true });
+
+    alert('Pedido ' + numero + ' guardado en el historial.');
+    ['m-numero','m-nombre','m-apellido','m-cuit','m-telefono','m-email','m-transporte','m-detalle','m-total'].forEach(id => document.getElementById(id).value = '');
+    mostrarPaso('step-historial');
+    cargarHistorial();
+  } catch(e){
+    alert('No se pudo guardar: ' + e.message);
+  }
+}
 
 function nuevoPedido(){
   Object.keys(cart).forEach(k => delete cart[k]);
