@@ -179,6 +179,16 @@ header.top .admin-link:hover{opacity:0.85;}
 .field input:focus,.field select:focus{outline:2px solid var(--gold-dark);outline-offset:1px;background:var(--white);}
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 @media (max-width:520px){.field-row{grid-template-columns:1fr;}}
+.autocomplete-lista{
+  position:absolute;top:100%;left:0;right:0;z-index:15;
+  background:var(--white);border:1px solid var(--line);border-radius:8px;
+  margin-top:2px;box-shadow:0 6px 16px rgba(0,0,0,0.12);overflow:hidden;
+}
+.autocomplete-item{padding:9px 12px;cursor:pointer;font-size:0.85rem;border-bottom:1px solid var(--line);}
+.autocomplete-item:last-child{border-bottom:none;}
+.autocomplete-item:hover{background:var(--cream);}
+.autocomplete-item b{color:var(--purple);}
+.autocomplete-item span{display:block;font-size:0.72rem;color:#8A8072;}
 
 .resumen-mini{background:var(--cream);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:0.85rem;}
 .resumen-linea{display:flex;justify-content:space-between;align-items:center;padding:5px 0;}
@@ -270,9 +280,10 @@ header.top .admin-link:hover{opacity:0.85;}
         </div>
         <div class="resumen-linea resumen-total-linea"><span>Total</span><span class="tot" id="resumen-total"></span></div>
       </div>
-      <div class="field-row">
-        <div class="field"><label>Nombre</label><input type="text" id="f-nombre"></div>
-        <div class="field"><label>Apellido</label><input type="text" id="f-apellido"></div>
+      <div class="field-row" style="position:relative;">
+        <div class="field"><label>Nombre</label><input type="text" id="f-nombre" oninput="buscarClienteAutocompletar()" autocomplete="off"></div>
+        <div class="field"><label>Apellido</label><input type="text" id="f-apellido" oninput="buscarClienteAutocompletar()" autocomplete="off"></div>
+        <div id="autocomplete-lista" class="autocomplete-lista" style="display:none;"></div>
       </div>
       <div class="field-row">
         <div class="field"><label>CUIT</label><input type="text" id="f-cuit" placeholder="20-12345678-9"></div>
@@ -610,6 +621,7 @@ function irADatos(){
   const totalItems = items.reduce((s,i)=>s+i.cantidad,0);
   document.getElementById('resumen-items').textContent = totalItems + ' productos';
   actualizarResumenDatos();
+  precargarClientesParaAutocompletar();
   mostrarPaso('step-datos');
 }
 
@@ -1022,6 +1034,72 @@ function renderHistorial(filtro){
 }
 
 document.getElementById('hist-buscador').addEventListener('input', e => renderHistorial(e.target.value));
+
+// ---------- autocompletar cliente en el formulario de pedido ----------
+let clientesAutocomplete = null;
+
+function precargarClientesParaAutocompletar(){
+  if(clientesAutocomplete !== null) return; // ya cargados en esta sesion
+  db.collection('clientes').get().then(snap => {
+    clientesAutocomplete = snap.docs.map(d => d.data());
+  }).catch(e => {
+    console.error('Error precargando clientes para autocompletar:', e);
+    clientesAutocomplete = [];
+  });
+}
+
+function buscarClienteAutocompletar(){
+  const cont = document.getElementById('autocomplete-lista');
+  const nombreVal = document.getElementById('f-nombre').value.trim().toLowerCase();
+  const apellidoVal = document.getElementById('f-apellido').value.trim().toLowerCase();
+
+  if((!nombreVal && !apellidoVal) || !clientesAutocomplete || clientesAutocomplete.length === 0){
+    cont.style.display = 'none';
+    return;
+  }
+
+  const coincidencias = clientesAutocomplete.filter(c => {
+    const n = (c.nombre||'').toLowerCase();
+    const a = (c.apellido||'').toLowerCase();
+    return (nombreVal && n.includes(nombreVal)) || (apellidoVal && a.includes(apellidoVal));
+  }).slice(0, 6);
+
+  if(coincidencias.length === 0){
+    cont.style.display = 'none';
+    return;
+  }
+
+  cont.innerHTML = coincidencias.map((c, idx) => `
+    <div class="autocomplete-item" onclick="elegirClienteAutocompletado(${idx})">
+      <b>${c.nombre||''} ${c.apellido||''}</b>
+      <span>${c.email||''} · ${c.telefono||''} · ${c.localidad||''}</span>
+    </div>
+  `).join('');
+  cont._matches = coincidencias;
+  cont.style.display = 'block';
+}
+
+function elegirClienteAutocompletado(idx){
+  const cont = document.getElementById('autocomplete-lista');
+  const c = cont._matches[idx];
+  if(!c) return;
+  document.getElementById('f-nombre').value = c.nombre || '';
+  document.getElementById('f-apellido').value = c.apellido || '';
+  document.getElementById('f-cuit').value = c.cuit || '';
+  document.getElementById('f-telefono').value = c.telefono || '';
+  document.getElementById('f-email').value = c.email || '';
+  document.getElementById('f-localidad').value = c.localidad || '';
+  document.getElementById('f-provincia').value = c.provincia || '';
+  document.getElementById('f-transporte').value = c.transporte || '';
+  cont.style.display = 'none';
+}
+
+document.addEventListener('click', (e) => {
+  const cont = document.getElementById('autocomplete-lista');
+  if(cont && !cont.contains(e.target) && e.target.id !== 'f-nombre' && e.target.id !== 'f-apellido'){
+    cont.style.display = 'none';
+  }
+});
 
 // ---------- clientes ----------
 let listaClientes = null;
