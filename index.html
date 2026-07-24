@@ -240,6 +240,7 @@ header.top .admin-link:hover{opacity:0.85;}
   <h1>OnLineTextil</h1>
   <p>Pedido mayorista · onlinetextil.com.ar</p>
   <p class="admin-link" onclick="abrirHistorial()">Historial de pedidos</p>
+  <p class="admin-link" onclick="abrirClientes()">Clientes</p>
 </header>
 
 <div class="app">
@@ -320,6 +321,15 @@ header.top .admin-link:hover{opacity:0.85;}
     <button class="btn btn-ghost" style="margin-top:10px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
   </div>
 
+  <!-- STEP: CLIENTES (solo para OnLineTextil) -->
+  <div class="step" id="step-clientes">
+    <div class="hist-search">
+      <input type="text" id="cli-buscador" placeholder="Buscar por nombre, email o teléfono...">
+    </div>
+    <div id="cli-lista"><p class="empty-msg">Cargando clientes...</p></div>
+    <button class="btn btn-ghost" style="margin-top:10px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+  </div>
+
 </div>
 
 <div class="cartbar" id="cartbar">
@@ -366,6 +376,23 @@ async function guardarPedidoEnHistorial(orden){
       total: totalOrden(orden)
     });
   } catch(e){ console.error('Error guardando historial:', e); }
+}
+
+async function guardarClienteEnBaseDeDatos(orden){
+  try{
+    const cuitLimpio = (orden.cliente.cuit || 'sin-cuit').trim().replace(/[\/\s]/g, '') || 'sin-cuit';
+    await db.collection('clientes').doc(cuitLimpio).set({
+      nombre: orden.cliente.nombre,
+      apellido: orden.cliente.apellido,
+      cuit: orden.cliente.cuit,
+      telefono: orden.cliente.telefono,
+      email: orden.cliente.email,
+      transporte: orden.cliente.transporte,
+      ultimoPedido: orden.numero,
+      ultimaFecha: orden.fecha.toISOString(),
+      cantidadPedidos: firebase.firestore.FieldValue.increment(1)
+    }, { merge: true });
+  } catch(e){ console.error('Error guardando cliente:', e); }
 }
 </script>
 <script>
@@ -577,6 +604,7 @@ async function confirmarPedido(){
   renderConfirmacion(ordenActual);
   mostrarPaso('step-confirmacion');
   guardarPedidoEnHistorial(ordenActual); // guarda en el historial, no bloquea
+  guardarClienteEnBaseDeDatos(ordenActual); // guarda/actualiza el cliente, no bloquea
   await enviarEmailsAutomaticos(ordenActual); // primero el mail, antes de que el PDF tome pantalla
   generarPDF(ordenActual); // genera y descarga
 }
@@ -871,6 +899,65 @@ function renderHistorial(filtro){
 }
 
 document.getElementById('hist-buscador').addEventListener('input', e => renderHistorial(e.target.value));
+
+// ---------- clientes ----------
+let listaClientes = null;
+
+function abrirClientes(){
+  mostrarPaso('step-clientes');
+  if(listaClientes === null){
+    cargarClientes();
+  }
+}
+
+function cargarClientes(){
+  document.getElementById('cli-lista').innerHTML = '<p class="empty-msg">Cargando clientes...</p>';
+  db.collection('clientes').orderBy('ultimaFecha', 'desc').get().then(snap => {
+    listaClientes = snap.docs.map(d => d.data());
+    renderClientes('');
+  }).catch(err => {
+    document.getElementById('cli-lista').innerHTML = '<p class="empty-msg">No se pudo cargar la lista: ' + err.message + '</p>';
+  });
+}
+
+function renderClientes(filtro){
+  filtro = (filtro||'').trim().toLowerCase();
+  const cont = document.getElementById('cli-lista');
+  const clientes = listaClientes || [];
+  const filtrados = clientes.filter(c => {
+    if(!filtro) return true;
+    const haystack = [c.nombre, c.apellido, c.email, c.telefono, c.cuit].join(' ').toLowerCase();
+    return haystack.includes(filtro);
+  });
+
+  if(filtrados.length === 0){
+    cont.innerHTML = '<p class="empty-msg">No hay clientes que coincidan.</p>';
+    return;
+  }
+
+  cont.innerHTML = filtrados.map(c => {
+    const ultimaFecha = c.ultimaFecha ? new Date(c.ultimaFecha).toLocaleString('es-AR') : '';
+    return `
+      <div class="hist-pedido">
+        <div class="hist-head" style="cursor:default;">
+          <div>
+            <div class="num">${c.nombre||''} ${c.apellido||''}</div>
+            <div class="meta">${c.email||''} · ${c.telefono||''} · CUIT ${c.cuit||''}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="tot">${c.cantidadPedidos||1} pedido${(c.cantidadPedidos||1)===1?'':'s'}</div>
+          </div>
+        </div>
+        <div class="hist-body" style="display:block;border-top:1px dashed var(--line);">
+          <b>Transporte habitual:</b> ${c.transporte||''}<br>
+          <b>Último pedido:</b> ${c.ultimoPedido||''} — ${ultimaFecha}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+document.getElementById('cli-buscador').addEventListener('input', e => renderClientes(e.target.value));
 
 function nuevoPedido(){
   Object.keys(cart).forEach(k => delete cart[k]);
