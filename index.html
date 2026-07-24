@@ -411,6 +411,11 @@ function parsePrice(str){
 function formatPrice(n){
   return '$ ' + n.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
+function nombreArchivoPedido(orden){
+  const apellido = (orden.cliente && orden.cliente.apellido ? orden.cliente.apellido : '')
+    .trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '_');
+  return 'Pedido_' + orden.numero + (apellido ? '_' + apellido : '') + '.pdf';
+}
 
 // ---------- render catalogo ----------
 const contCategorias = document.getElementById('categorias');
@@ -730,12 +735,12 @@ async function generarPDF(orden){
   doc.text('ONLINETEXTIL.COM.AR | Precios en pesos argentinos (ARS) | Sujeto a cambios sin previo aviso', 14, 285);
 
   ordenActual._pdfDoc = doc;
-  doc.save('Pedido_' + orden.numero + '.pdf');
+  doc.save(nombreArchivoPedido(orden));
 }
 
 function descargarPDF(){
   if(ordenActual && ordenActual._pdfDoc){
-    ordenActual._pdfDoc.save('Pedido_' + ordenActual.numero + '.pdf');
+    ordenActual._pdfDoc.save(nombreArchivoPedido(ordenActual));
   }
 }
 
@@ -744,7 +749,7 @@ async function compartirWhatsApp(){
   if(!ordenActual) return;
   try{
     const blob = ordenActual._pdfDoc.output('blob');
-    const file = new File([blob], 'Pedido_' + ordenActual.numero + '.pdf', {type:'application/pdf'});
+    const file = new File([blob], nombreArchivoPedido(ordenActual), {type:'application/pdf'});
     if(navigator.canShare && navigator.canShare({files:[file]})){
       await navigator.share({
         files:[file],
