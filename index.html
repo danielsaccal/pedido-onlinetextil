@@ -279,10 +279,15 @@ header.top .admin-link:hover{opacity:0.85;}
         <div class="field"><label>Teléfono</label><input type="text" id="f-telefono" placeholder="11 1234-5678"></div>
       </div>
       <div class="field"><label>Email</label><input type="email" id="f-email"></div>
+      <div class="field-row">
+        <div class="field"><label>Localidad</label><input type="text" id="f-localidad" placeholder="Ej: Goya"></div>
+        <div class="field"><label>Provincia</label><input type="text" id="f-provincia" placeholder="Ej: Corrientes"></div>
+      </div>
       <div class="field">
         <label>Transporte</label>
         <input type="text" id="f-transporte" placeholder="Ej: retiro en local, transporte tal, envío a domicilio...">
       </div>
+      <div class="field"><label>Cantidad de bultos</label><input type="number" id="f-bultos" min="1" value="1"></div>
       <div class="field">
         <label>Observaciones</label>
         <textarea id="f-observaciones" rows="3" placeholder="Aclaraciones sobre el pedido, colores, horarios de entrega, etc. (opcional)"></textarea>
@@ -353,7 +358,12 @@ header.top .admin-link:hover{opacity:0.85;}
         <div class="field"><label>Teléfono</label><input type="text" id="m-telefono"></div>
       </div>
       <div class="field"><label>Email</label><input type="email" id="m-email"></div>
+      <div class="field-row">
+        <div class="field"><label>Localidad</label><input type="text" id="m-localidad"></div>
+        <div class="field"><label>Provincia</label><input type="text" id="m-provincia"></div>
+      </div>
       <div class="field"><label>Transporte</label><input type="text" id="m-transporte"></div>
+      <div class="field"><label>Cantidad de bultos</label><input type="number" id="m-bultos" min="1" value="1"></div>
       <div class="field"><label>Detalle del pedido (SKUs, cantidades, lo que tenga a mano)</label><textarea id="m-detalle" rows="4" placeholder="Ej: 3 x SIM171J, 2 x ALD100..."></textarea></div>
       <div class="field"><label>Total</label><input type="text" id="m-total" placeholder="Ej: 49602,60"></div>
       <p class="error" id="m-error" style="display:none;">Complete al menos N° de pedido, nombre, apellido y total.</p>
@@ -407,7 +417,8 @@ async function guardarPedidoEnHistorial(orden){
       descuentoPct: orden.descuentoPct || 0,
       observaciones: orden.observaciones || '',
       subtotal: subtotalOrden(orden),
-      total: totalOrden(orden)
+      total: totalOrden(orden),
+      bultos: orden.bultos || 1
     });
     return true;
   } catch(e){
@@ -433,6 +444,8 @@ async function guardarClienteEnBaseDeDatos(orden){
       cuit: orden.cliente.cuit,
       telefono: orden.cliente.telefono,
       email: orden.cliente.email,
+      localidad: orden.cliente.localidad || '',
+      provincia: orden.cliente.provincia || '',
       transporte: orden.cliente.transporte,
       ultimoPedido: orden.numero,
       ultimaFecha: orden.fecha.toISOString(),
@@ -633,7 +646,10 @@ async function confirmarPedido(){
   const cuit = document.getElementById('f-cuit').value.trim();
   const telefono = document.getElementById('f-telefono').value.trim();
   const email = document.getElementById('f-email').value.trim();
+  const localidad = document.getElementById('f-localidad').value.trim();
+  const provincia = document.getElementById('f-provincia').value.trim();
   const transporte = document.getElementById('f-transporte').value;
+  const bultos = Math.max(1, parseInt(document.getElementById('f-bultos').value, 10) || 1);
   const descuentoPct = Math.min(100, Math.max(0, parseFloat(document.getElementById('f-descuento').value) || 0));
   const observaciones = document.getElementById('f-observaciones').value.trim();
 
@@ -649,10 +665,11 @@ async function confirmarPedido(){
   ordenActual = {
     numero: numeroFormateado,
     fecha: new Date(),
-    cliente: {nombre, apellido, cuit, telefono, email, transporte},
+    cliente: {nombre, apellido, cuit, telefono, email, localidad, provincia, transporte},
     items: Object.entries(cart).map(([id, item]) => ({...item, nota: (notas[id]||'').trim()})),
     descuentoPct,
     observaciones,
+    bultos,
   };
 
   renderConfirmacion(ordenActual);
@@ -782,6 +799,60 @@ async function generarPDF(orden){
   doc.setTextColor(120,120,120);
   doc.setFont('helvetica','italic');
   doc.text('ONLINETEXTIL.COM.AR | Precios en pesos argentinos (ARS) | Sujeto a cambios sin previo aviso', 14, 285);
+
+  // ---------- pagina 2: etiqueta de envio ----------
+  doc.addPage();
+  doc.setDrawColor(61,43,78);
+  doc.setLineWidth(1.2);
+  doc.rect(15, 15, 180, 130);
+
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(14);
+  doc.setTextColor(61,43,78);
+  doc.text('ETIQUETA DE ENVÍO', 105, 30, {align:'center'});
+  doc.setLineWidth(0.3);
+  doc.line(25, 36, 185, 36);
+
+  doc.setFontSize(10);
+  doc.setTextColor(110,100,90);
+  doc.text('DESTINATARIO', 25, 48);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(20);
+  doc.setTextColor(40,35,32);
+  doc.text((orden.cliente.nombre + ' ' + orden.cliente.apellido).toUpperCase(), 25, 58);
+
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(10);
+  doc.setTextColor(110,100,90);
+  doc.text('LOCALIDAD / PROVINCIA', 25, 74);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(16);
+  doc.setTextColor(40,35,32);
+  const localidadTexto = [orden.cliente.localidad, orden.cliente.provincia].filter(Boolean).join(', ') || '—';
+  doc.text(localidadTexto, 25, 84);
+
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(10);
+  doc.setTextColor(110,100,90);
+  doc.text('TRANSPORTE', 25, 100);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(16);
+  doc.setTextColor(40,35,32);
+  doc.text(orden.cliente.transporte || '—', 25, 110);
+
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(10);
+  doc.setTextColor(110,100,90);
+  doc.text('CANTIDAD DE BULTOS', 120, 100);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(28);
+  doc.setTextColor(61,43,78);
+  doc.text(String(orden.bultos || 1), 120, 118);
+
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(9);
+  doc.setTextColor(110,100,90);
+  doc.text('Pedido ' + orden.numero, 25, 132);
 
   ordenActual._pdfDoc = doc;
   doc.save(nombreArchivoPedido(orden));
@@ -1017,7 +1088,10 @@ async function guardarPedidoManual(){
   const cuit = document.getElementById('m-cuit').value.trim();
   const telefono = document.getElementById('m-telefono').value.trim();
   const email = document.getElementById('m-email').value.trim();
+  const localidad = document.getElementById('m-localidad').value.trim();
+  const provincia = document.getElementById('m-provincia').value.trim();
   const transporte = document.getElementById('m-transporte').value.trim();
+  const bultos = Math.max(1, parseInt(document.getElementById('m-bultos').value, 10) || 1);
   const detalle = document.getElementById('m-detalle').value.trim();
   const totalTexto = document.getElementById('m-total').value.trim();
   const total = parseFloat(totalTexto.replace(/\./g,'').replace(',','.')) || 0;
@@ -1028,7 +1102,7 @@ async function guardarPedidoManual(){
   }
   document.getElementById('m-error').style.display = 'none';
 
-  const cliente = {nombre, apellido, cuit, telefono, email, transporte};
+  const cliente = {nombre, apellido, cuit, telefono, email, localidad, provincia, transporte};
   const fechaISO = new Date().toISOString();
 
   try{
@@ -1036,17 +1110,18 @@ async function guardarPedidoManual(){
       numero, fecha: fechaISO, cliente,
       items: [{sku:'', desc: detalle, nombreProducto: 'Cargado manualmente', precio: total, cantidad: 1, nota:''}],
       descuentoPct: 0, observaciones: 'Cargado manualmente por OnLineTextil',
-      subtotal: total, total: total
+      subtotal: total, total: total, bultos
     });
     const cuitLimpio = (cuit || 'sin-cuit').trim().replace(/[\\/\s]/g, '') || 'sin-cuit';
     await db.collection('clientes').doc(cuitLimpio).set({
-      nombre, apellido, cuit, telefono, email, transporte,
+      nombre, apellido, cuit, telefono, email, localidad, provincia, transporte,
       ultimoPedido: numero, ultimaFecha: fechaISO,
       cantidadPedidos: firebase.firestore.FieldValue.increment(1)
     }, { merge: true });
 
     alert('Pedido ' + numero + ' guardado en el historial.');
-    ['m-numero','m-nombre','m-apellido','m-cuit','m-telefono','m-email','m-transporte','m-detalle','m-total'].forEach(id => document.getElementById(id).value = '');
+    ['m-numero','m-nombre','m-apellido','m-cuit','m-telefono','m-email','m-localidad','m-provincia','m-transporte','m-detalle','m-total'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('m-bultos').value = '1';
     mostrarPaso('step-historial');
     cargarHistorial();
   } catch(e){
@@ -1058,8 +1133,9 @@ function nuevoPedido(){
   Object.keys(cart).forEach(k => delete cart[k]);
   Object.keys(notas).forEach(k => delete notas[k]);
   ordenActual = null;
-  ['f-nombre','f-apellido','f-cuit','f-telefono','f-email','f-descuento','f-observaciones'].forEach(id => document.getElementById(id).value = '');
+  ['f-nombre','f-apellido','f-cuit','f-telefono','f-email','f-localidad','f-provincia','f-descuento','f-observaciones'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-transporte').value = '';
+  document.getElementById('f-bultos').value = '1';
   document.getElementById('email-status').style.display = 'none';
   document.getElementById('db-status').style.display = 'none';
   actualizarCartbar();
