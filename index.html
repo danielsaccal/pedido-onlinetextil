@@ -308,6 +308,7 @@ header.top .admin-link:hover{opacity:0.85;}
     </div>
     <div class="actions">
       <p class="note" id="email-status" style="display:none;"></p>
+      <p class="note" id="db-status" style="display:none;"></p>
       <button class="btn btn-gold" onclick="descargarPDF()">Descargar comprobante (PDF)</button>
       <button class="btn btn-ghost" id="btn-share" onclick="compartirWhatsApp()">Compartir comprobante por WhatsApp</button>
       <button class="btn btn-ghost" onclick="enviarAOnLineTextil()">Avisar a OnLineTextil por WhatsApp</button>
@@ -379,7 +380,19 @@ async function guardarPedidoEnHistorial(orden){
       subtotal: subtotalOrden(orden),
       total: totalOrden(orden)
     });
-  } catch(e){ console.error('Error guardando historial:', e); }
+    return true;
+  } catch(e){
+    console.error('Error guardando historial:', e);
+    mostrarErrorDB('pedido: ' + e.message);
+    return false;
+  }
+}
+
+function mostrarErrorDB(detalle){
+  const el = document.getElementById('db-status');
+  el.style.display = 'block';
+  el.style.color = '#A6432F';
+  el.textContent = 'No se pudo guardar en la base de datos (' + detalle + '). El pedido igual se descargó/envió normalmente.';
 }
 
 async function guardarClienteEnBaseDeDatos(orden){
@@ -396,7 +409,10 @@ async function guardarClienteEnBaseDeDatos(orden){
       ultimaFecha: orden.fecha.toISOString(),
       cantidadPedidos: firebase.firestore.FieldValue.increment(1)
     }, { merge: true });
-  } catch(e){ console.error('Error guardando cliente:', e); }
+  } catch(e){
+    console.error('Error guardando cliente:', e);
+    mostrarErrorDB('cliente: ' + e.message);
+  }
 }
 </script>
 <script>
@@ -844,9 +860,7 @@ let historialPedidos = null;
 
 function abrirHistorial(){
   mostrarPaso('step-historial');
-  if(historialPedidos === null){
-    cargarHistorial();
-  }
+  cargarHistorial();
 }
 
 function cargarHistorial(){
@@ -914,9 +928,7 @@ let listaClientes = null;
 
 function abrirClientes(){
   mostrarPaso('step-clientes');
-  if(listaClientes === null){
-    cargarClientes();
-  }
+  cargarClientes();
 }
 
 function cargarClientes(){
@@ -975,6 +987,7 @@ function nuevoPedido(){
   ['f-nombre','f-apellido','f-cuit','f-telefono','f-email','f-descuento','f-observaciones'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-transporte').value = '';
   document.getElementById('email-status').style.display = 'none';
+  document.getElementById('db-status').style.display = 'none';
   actualizarCartbar();
   renderCatalogo('');
   mostrarPaso('step-catalogo');
