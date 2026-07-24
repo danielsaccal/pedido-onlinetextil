@@ -212,6 +212,8 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 .error{color:#A6432F;font-size:0.78rem;margin-top:-8px;margin-bottom:10px;display:none;}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
 <header class="top">
@@ -308,6 +310,33 @@ const EMAILJS_TEMPLATE_ID = "template_i49dv0a";
 const EMAILJS_PUBLIC_KEY = "aVQ_h-Mdw-oi94WYr";
 const EMAIL_ONLINETEXTIL = "danielsaccal@gmail.com";
 emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCE0N4d-Hn_1S0X1B_LsiEvFtX-93LWn3A",
+  authDomain: "catalogo-onlinetextil.firebaseapp.com",
+  projectId: "catalogo-onlinetextil",
+  storageBucket: "catalogo-onlinetextil.firebasestorage.app",
+  messagingSenderId: "380063692818",
+  appId: "1:380063692818:web:9d3bcfee44bf36c3d780cb",
+  measurementId: "G-RD0FZ7FCS4"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+async function guardarPedidoEnHistorial(orden){
+  try{
+    await db.collection('pedidos').doc(orden.numero).set({
+      numero: orden.numero,
+      fecha: orden.fecha.toISOString(),
+      cliente: orden.cliente,
+      items: orden.items.map(i => ({sku:i.sku, desc:i.desc, nombreProducto:i.nombreProducto, precio:i.precio, cantidad:i.cantidad, nota:i.nota||''})),
+      descuentoPct: orden.descuentoPct || 0,
+      observaciones: orden.observaciones || '',
+      subtotal: subtotalOrden(orden),
+      total: totalOrden(orden)
+    });
+  } catch(e){ console.error('Error guardando historial:', e); }
+}
 </script>
 <script>
 // ---------- estado ----------
@@ -517,6 +546,7 @@ async function confirmarPedido(){
 
   renderConfirmacion(ordenActual);
   mostrarPaso('step-confirmacion');
+  guardarPedidoEnHistorial(ordenActual); // guarda en el historial, no bloquea
   await enviarEmailsAutomaticos(ordenActual); // primero el mail, antes de que el PDF tome pantalla
   generarPDF(ordenActual); // genera y descarga
 }
