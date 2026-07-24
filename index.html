@@ -1044,6 +1044,24 @@ async function imprimirHistorial(numero){
   window.open(doc.output('bloburl'), '_blank');
 }
 
+let contadorItemNuevo = 0;
+function agregarItemNuevo(numero){
+  const cont = document.getElementById('nuevos-' + numero);
+  const id = 'new-' + numero + '-' + (contadorItemNuevo++);
+  const row = document.createElement('div');
+  row.className = 'edit-item-row-nuevo';
+  row.id = id;
+  row.style.cssText = 'display:grid;grid-template-columns:70px 1fr 60px 90px 32px;gap:6px;align-items:center;margin-bottom:6px;';
+  row.innerHTML = `
+    <input type="text" placeholder="SKU" class="ni-sku">
+    <input type="text" placeholder="Descripción / producto" class="ni-desc">
+    <input type="number" min="1" value="1" placeholder="Cant." class="ni-cant">
+    <input type="text" placeholder="Precio unit." class="ni-precio">
+    <button class="btn-mini" onclick="document.getElementById('${id}').remove();">✕</button>
+  `;
+  cont.appendChild(row);
+}
+
 function mostrarEdicionHistorial(numero){
   const p = (historialPedidos || []).find(x => x.numero === numero);
   if(!p) return;
@@ -1077,6 +1095,8 @@ function mostrarEdicionHistorial(numero){
       </div>
       <label style="margin-top:4px;">Ítems (cambiar cantidad o tocar ✕ para quitar)</label>
       ${itemsHtml || '<p class="note">Sin ítems detallados.</p>'}
+      <div id="nuevos-${numero}"></div>
+      <button class="btn-mini" type="button" onclick="agregarItemNuevo('${numero}')" style="margin:6px 0 10px;">+ Agregar producto</button>
       <div class="field-row">
         <div><label>Descuento %</label><input type="number" min="0" max="100" id="em-descuento-${numero}" value="${p.descuentoPct||0}"></div>
         <div><label>Observaciones</label><input type="text" id="em-obs-${numero}" value="${p.observaciones||''}"></div>
@@ -1101,6 +1121,19 @@ async function guardarEdicionHistorial(numero){
     if(cantidad === 0) return null;
     return {...i, cantidad};
   }).filter(Boolean);
+
+  const contNuevos = document.getElementById('nuevos-' + numero);
+  if(contNuevos){
+    contNuevos.querySelectorAll('.edit-item-row-nuevo').forEach(row => {
+      const sku = row.querySelector('.ni-sku').value.trim();
+      const desc = row.querySelector('.ni-desc').value.trim();
+      const cantidad = Math.max(0, parseInt(row.querySelector('.ni-cant').value, 10) || 0);
+      const precio = parseFloat(row.querySelector('.ni-precio').value.replace(/\./g,'').replace(',','.')) || 0;
+      if(cantidad > 0 && (sku || desc) && precio > 0){
+        nuevosItems.push({sku, desc:'', nombreProducto: desc, precio, cantidad, nota:''});
+      }
+    });
+  }
 
   const cliente = {
     nombre: document.getElementById(`em-nombre-${numero}`).value.trim(),
