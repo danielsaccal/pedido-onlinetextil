@@ -89,7 +89,7 @@ header.top .admin-link:hover{opacity:0.85;}
 .edit-form .field-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
 .edit-form label{display:block;font-size:0.7rem;color:#6B6258;margin-bottom:3px;text-transform:uppercase;}
 .edit-form input, .edit-form textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font-size:0.82rem;font-family:'Work Sans';background:var(--white);}
-.edit-item-row{display:grid;grid-template-columns:1fr 60px 32px;gap:6px;align-items:center;margin-bottom:6px;font-size:0.8rem;}
+.edit-item-row{display:grid;grid-template-columns:1fr 55px 55px 32px;gap:6px;align-items:center;margin-bottom:6px;font-size:0.8rem;}
 .edit-item-row input{padding:5px 7px;}
 .search-wrap{position:sticky;top:0;z-index:5;background:var(--cream);padding:14px 16px 8px;}
 .filtro-banner{
@@ -154,6 +154,19 @@ header.top .admin-link:hover{opacity:0.85;}
 }
 .variante-nota:focus{outline:2px solid var(--gold-dark);outline-offset:1px;background:var(--white);}
 .variante-nota::placeholder{color:#A8A092;}
+.variante-extra{display:flex;gap:8px;align-items:center;margin-top:6px;}
+.variante-extra .variante-nota{margin-top:0;flex:1;}
+.variante-desc-item{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+.variante-desc-item input{
+  width:52px;padding:6px 7px;border:1px solid var(--line);border-radius:6px;
+  font-family:'IBM Plex Mono';font-size:0.78rem;text-align:right;background:var(--cream);
+}
+.variante-desc-item input:focus{outline:2px solid var(--gold-dark);outline-offset:1px;background:var(--white);}
+.variante-desc-item span{font-size:0.68rem;color:#8A8072;white-space:nowrap;}
+@media (max-width:420px){
+  .variante-extra{flex-direction:column;align-items:stretch;}
+  .variante-desc-item{justify-content:flex-end;}
+}
 .precio.consultar{color:var(--sage);font-style:italic;font-size:0.75rem;}
 .qty{display:flex;align-items:center;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
 .qty button{
@@ -461,7 +474,7 @@ async function guardarPedidoEnHistorial(orden){
       numero: orden.numero,
       fecha: orden.fecha.toISOString(),
       cliente: orden.cliente,
-      items: orden.items.map(i => ({sku:i.sku, desc:i.desc, nombreProducto:i.nombreProducto, precio:i.precio, cantidad:i.cantidad, nota:i.nota||''})),
+      items: orden.items.map(i => ({sku:i.sku, desc:i.desc, nombreProducto:i.nombreProducto, precio:i.precio, cantidad:i.cantidad, nota:i.nota||'', descuentoItemPct:i.descuentoItemPct||0})),
       descuentoPct: orden.descuentoPct || 0,
       observaciones: orden.observaciones || '',
       subtotal: subtotalOrden(orden),
@@ -511,6 +524,16 @@ const cart = {}; // key: rowId -> {sku, desc, nombreProducto, precio, cantidad, 
 const notas = {}; // key: rowId -> texto de la nota (independiente de si hay cantidad cargada)
 function actualizarNota(id, valor){
   notas[id] = valor;
+}
+const descuentosItem = {}; // key: rowId -> % de descuento particular de ese item
+function actualizarDescuentoItem(id, valor){
+  const n = Math.min(100, Math.max(0, parseFloat(valor) || 0));
+  descuentosItem[id] = n;
+  actualizarCartbar();
+}
+function precioLineaItem(item){
+  const descPct = item.descuentoItemPct || 0;
+  return item.cantidad * item.precio * (1 - descPct/100);
 }
 let ordenActual = null;
 
@@ -572,6 +595,7 @@ function renderCatalogo(filtro){
         const precioNum = parsePrice(v.precio);
         const enCarrito = cart[id] ? cart[id].cantidad : 0;
         const notaActual = notas[id] || '';
+        const descItemActual = descuentosItem[id] || '';
         const precioEfectivo = (precioNum !== null && p.metros) ? (precioNum * p.metros) : precioNum;
         const rolloNota = (precioNum !== null && p.metros)
           ? `<span class="sku">Rollo de ${p.metros} m: ${formatPrice(precioEfectivo)}</span>`
@@ -588,7 +612,14 @@ function renderCatalogo(filtro){
                 <button type="button" onclick="cambiarCantidad('${id}', 1, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioEfectivo})">+</button>
               </div>`}
             </div>
-            ${precioNum===null ? '' : `<input type="text" class="variante-nota" placeholder="Nota para este producto (opcional): surtido, color..." value="${escapeAttr(notaActual)}" oninput="actualizarNota('${id}', this.value)">`}
+            ${precioNum===null ? '' : `
+            <div class="variante-extra">
+              <input type="text" class="variante-nota" placeholder="Nota para este producto (opcional): surtido, color..." value="${escapeAttr(notaActual)}" oninput="actualizarNota('${id}', this.value)">
+              <div class="variante-desc-item">
+                <input type="number" min="0" max="100" step="0.01" placeholder="0" value="${descItemActual}" oninput="actualizarDescuentoItem('${id}', this.value)">
+                <span>% desc. este ítem</span>
+              </div>
+            </div>`}
           </div>
         `;
       });
@@ -635,9 +666,9 @@ function setCantidad(id, valor, sku, desc, nombreProducto, precio){
 }
 
 function actualizarCartbar(){
-  const items = Object.values(cart);
-  const totalItems = items.reduce((s,i)=>s+i.cantidad,0);
-  const totalMonto = items.reduce((s,i)=>s+i.cantidad*i.precio,0);
+  const entries = Object.entries(cart);
+  const totalItems = entries.reduce((s,[,i])=>s+i.cantidad,0);
+  const totalMonto = entries.reduce((s,[id,i])=>s+precioLineaItem({...i, descuentoItemPct: descuentosItem[id]||0}),0);
   document.getElementById('cart-items').textContent = totalItems === 1 ? '1 producto' : totalItems + ' productos';
   document.getElementById('cart-total').textContent = formatPrice(totalMonto);
   document.getElementById('btn-continuar').disabled = totalItems === 0;
@@ -663,8 +694,8 @@ function irADatos(){
 }
 
 function actualizarResumenDatos(){
-  const items = Object.values(cart);
-  const subtotal = items.reduce((s,i)=>s+i.cantidad*i.precio,0);
+  const entries = Object.entries(cart);
+  const subtotal = entries.reduce((s,[id,i])=>s+precioLineaItem({...i, descuentoItemPct: descuentosItem[id]||0}),0);
   const descPct = Math.min(100, Math.max(0, parseFloat(document.getElementById('f-descuento').value) || 0));
   const total = subtotal - (subtotal * descPct / 100);
   document.getElementById('resumen-subtotal').textContent = formatPrice(subtotal);
@@ -715,7 +746,7 @@ async function confirmarPedido(){
     numero: numeroFormateado,
     fecha: new Date(),
     cliente: {nombre, apellido, cuit, telefono, email, localidad, provincia, transporte},
-    items: Object.entries(cart).map(([id, item]) => ({...item, nota: (notas[id]||'').trim()})),
+    items: Object.entries(cart).map(([id, item]) => ({...item, nota: (notas[id]||'').trim(), descuentoItemPct: descuentosItem[id]||0})),
     descuentoPct,
     observaciones,
     bultos,
@@ -730,7 +761,7 @@ async function confirmarPedido(){
 }
 
 function subtotalOrden(orden){
-  return orden.items.reduce((s,i)=>s+i.cantidad*i.precio, 0);
+  return orden.items.reduce((s,i)=>s+precioLineaItem(i), 0);
 }
 
 function totalOrden(orden){
@@ -745,7 +776,8 @@ function renderConfirmacion(orden){
   orden.items.forEach(i => {
     const foto = i.imagen ? `<img src="${i.imagen}" style="width:34px;height:34px;object-fit:cover;border-radius:6px;border:1px solid var(--line);vertical-align:middle;margin-right:8px;">` : '';
     const notaHtml = i.nota ? `<br><span style="font-size:0.72rem;color:var(--sage);padding-left:${i.imagen?'42px':'0'};display:inline-block;">Nota: ${i.nota}</span>` : '';
-    rows += `<tr><td>${foto}${i.cantidad} × ${i.sku}<br><span style="font-size:0.72rem;color:#8A8072;padding-left:${i.imagen?'42px':'0'};display:inline-block;">${i.nombreProducto} — ${i.desc}</span>${notaHtml}</td><td class="n">${formatPrice(i.cantidad*i.precio)}</td></tr>`;
+    const descItemHtml = i.descuentoItemPct > 0 ? `<br><span style="font-size:0.72rem;color:var(--sage);padding-left:${i.imagen?'42px':'0'};display:inline-block;">Desc. ítem: ${i.descuentoItemPct}%</span>` : '';
+    rows += `<tr><td>${foto}${i.cantidad} × ${i.sku}<br><span style="font-size:0.72rem;color:#8A8072;padding-left:${i.imagen?'42px':'0'};display:inline-block;">${i.nombreProducto} — ${i.desc}</span>${notaHtml}${descItemHtml}</td><td class="n">${formatPrice(precioLineaItem(i))}</td></tr>`;
   });
   if(orden.descuentoPct > 0){
     rows += `<tr><td>Subtotal</td><td class="n">${formatPrice(subtotalOrden(orden))}</td></tr>`;
@@ -796,9 +828,9 @@ async function construirDocPDF(orden){
     '',
     i.cantidad,
     i.sku,
-    i.nombreProducto + ' — ' + i.desc + (i.nota ? '\nNota: ' + i.nota : ''),
+    i.nombreProducto + ' — ' + i.desc + (i.nota ? '\nNota: ' + i.nota : '') + (i.descuentoItemPct > 0 ? '\nDesc. ítem: ' + i.descuentoItemPct + '%' : ''),
     formatPrice(i.precio),
-    formatPrice(i.cantidad * i.precio)
+    formatPrice(precioLineaItem(i))
   ]);
 
   doc.autoTable({
@@ -944,7 +976,8 @@ function construirParamsEmail(orden, destinatario){
     const foto = i.imagen
       ? `<img src="${BASE_URL}${i.imagen}" width="44" height="44" style="object-fit:cover;border-radius:6px;vertical-align:middle;margin-right:8px;">`
       : '';
-    return `${foto}${i.cantidad} x ${i.sku} — ${i.nombreProducto} (${i.desc}) — ${formatPrice(i.precio)} c/u — subtotal ${formatPrice(i.cantidad*i.precio)}` +
+    return `${foto}${i.cantidad} x ${i.sku} — ${i.nombreProducto} (${i.desc}) — ${formatPrice(i.precio)} c/u — subtotal ${formatPrice(precioLineaItem(i))}` +
+      (i.descuentoItemPct > 0 ? ` — <i>Desc. ítem: ${i.descuentoItemPct}%</i>` : '') +
       (i.nota ? ` — <i>Nota: ${i.nota}</i>` : '');
   }).join('<br><br>');
   const descuento_texto = orden.descuentoPct > 0
@@ -995,7 +1028,8 @@ function enviarAOnLineTextil(){
   let texto = `Pedido ${ordenActual.numero}\n`;
   texto += `Cliente: ${ordenActual.cliente.nombre} ${ordenActual.cliente.apellido} (CUIT ${ordenActual.cliente.cuit})\n\n`;
   ordenActual.items.forEach(i => {
-    texto += `${i.cantidad} x ${i.sku} — ${formatPrice(i.precio)}${i.nota ? ' (Nota: ' + i.nota + ')' : ''}\n`;
+    const descItemTexto = i.descuentoItemPct > 0 ? ` (Desc. ítem: ${i.descuentoItemPct}%)` : '';
+    texto += `${i.cantidad} x ${i.sku} — ${formatPrice(i.precio)}${descItemTexto}${i.nota ? ' (Nota: ' + i.nota + ')' : ''}\n`;
   });
   if(ordenActual.descuentoPct > 0){
     texto += `\nSubtotal: ${formatPrice(subtotalOrden(ordenActual))}`;
@@ -1074,12 +1108,13 @@ function agregarItemNuevo(numero){
   const row = document.createElement('div');
   row.className = 'edit-item-row-nuevo';
   row.id = id;
-  row.style.cssText = 'display:grid;grid-template-columns:70px 1fr 60px 90px 32px;gap:6px;align-items:center;margin-bottom:6px;';
+  row.style.cssText = 'display:grid;grid-template-columns:70px 1fr 55px 85px 55px 32px;gap:6px;align-items:center;margin-bottom:6px;';
   row.innerHTML = `
     <input type="text" placeholder="SKU" class="ni-sku">
     <input type="text" placeholder="Descripción / producto" class="ni-desc">
-    <input type="number" min="1" value="1" placeholder="Cant." class="ni-cant">
+    <input type="number" min="1" value="1" placeholder="Cant." class="ni-cant" title="Cantidad">
     <input type="text" placeholder="Precio unit." class="ni-precio">
+    <input type="number" min="0" max="100" placeholder="0" class="ni-desc-item" title="Descuento %">
     <button class="btn-mini" onclick="document.getElementById('${id}').remove();">✕</button>
   `;
   cont.appendChild(row);
@@ -1097,7 +1132,8 @@ function mostrarEdicionHistorial(numero){
   const itemsHtml = (p.items || []).map((i, idx) => `
     <div class="edit-item-row">
       <span>${i.sku||''} — ${i.nombreProducto||''} (${formatPrice(i.precio)} c/u)</span>
-      <input type="number" min="0" id="ei-${numero}-${idx}" value="${i.cantidad}">
+      <input type="number" min="0" id="ei-${numero}-${idx}" value="${i.cantidad}" title="Cantidad">
+      <input type="number" min="0" max="100" step="0.01" id="ed-${numero}-${idx}" value="${i.descuentoItemPct||0}" title="Descuento %">
       <button class="btn-mini" onclick="this.closest('.edit-item-row').style.display='none';">✕</button>
     </div>
   `).join('');
@@ -1142,7 +1178,9 @@ async function guardarEdicionHistorial(numero){
     if(!row) return null; // se quito con la X
     const cantidad = Math.max(0, parseInt(row.value, 10) || 0);
     if(cantidad === 0) return null;
-    return {...i, cantidad};
+    const descRow = document.getElementById(`ed-${numero}-${idx}`);
+    const descuentoItemPct = descRow ? Math.min(100, Math.max(0, parseFloat(descRow.value) || 0)) : (i.descuentoItemPct||0);
+    return {...i, cantidad, descuentoItemPct};
   }).filter(Boolean);
 
   const contNuevos = document.getElementById('nuevos-' + numero);
@@ -1152,8 +1190,9 @@ async function guardarEdicionHistorial(numero){
       const desc = row.querySelector('.ni-desc').value.trim();
       const cantidad = Math.max(0, parseInt(row.querySelector('.ni-cant').value, 10) || 0);
       const precio = parseFloat(row.querySelector('.ni-precio').value.replace(/\./g,'').replace(',','.')) || 0;
+      const descuentoItemPct = Math.min(100, Math.max(0, parseFloat(row.querySelector('.ni-desc-item').value) || 0));
       if(cantidad > 0 && (sku || desc) && precio > 0){
-        nuevosItems.push({sku, desc:'', nombreProducto: desc, precio, cantidad, nota:''});
+        nuevosItems.push({sku, desc:'', nombreProducto: desc, precio, cantidad, nota:'', descuentoItemPct});
       }
     });
   }
@@ -1172,7 +1211,7 @@ async function guardarEdicionHistorial(numero){
   const descuentoPct = Math.min(100, Math.max(0, parseFloat(document.getElementById(`em-descuento-${numero}`).value) || 0));
   const observaciones = document.getElementById(`em-obs-${numero}`).value.trim();
 
-  const subtotal = nuevosItems.reduce((s,i)=>s+i.cantidad*i.precio, 0);
+  const subtotal = nuevosItems.reduce((s,i)=>s+precioLineaItem(i), 0);
   const total = subtotal - (subtotal * descuentoPct / 100);
 
   try{
@@ -1217,8 +1256,8 @@ function renderHistorial(filtro){
     const fecha = p.fecha ? new Date(p.fecha).toLocaleString('es-AR') : '';
     const itemsRows = (p.items||[]).map(i => `
       <tr>
-        <td>${i.cantidad} × ${i.sku}<br><span style="color:#8A8072;font-size:0.78rem;">${i.nombreProducto||''} — ${i.desc||''}</span>${i.nota ? `<br><span style="color:var(--sage);font-size:0.75rem;">Nota: ${i.nota}</span>` : ''}</td>
-        <td class="n">${formatPrice(i.cantidad * i.precio)}</td>
+        <td>${i.cantidad} × ${i.sku}<br><span style="color:#8A8072;font-size:0.78rem;">${i.nombreProducto||''} — ${i.desc||''}</span>${i.descuentoItemPct > 0 ? `<br><span style="color:var(--sage);font-size:0.75rem;">Desc. ítem: ${i.descuentoItemPct}%</span>` : ''}${i.nota ? `<br><span style="color:var(--sage);font-size:0.75rem;">Nota: ${i.nota}</span>` : ''}</td>
+        <td class="n">${formatPrice(precioLineaItem(i))}</td>
       </tr>`).join('');
     return `
       <div class="hist-pedido" id="hp-${p.numero}">
@@ -1440,6 +1479,7 @@ async function guardarPedidoManual(){
 function nuevoPedido(){
   Object.keys(cart).forEach(k => delete cart[k]);
   Object.keys(notas).forEach(k => delete notas[k]);
+  Object.keys(descuentosItem).forEach(k => delete descuentosItem[k]);
   ordenActual = null;
   ['f-nombre','f-apellido','f-cuit','f-telefono','f-email','f-localidad','f-provincia','f-descuento','f-observaciones'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-transporte').value = '';
