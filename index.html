@@ -92,6 +92,17 @@ header.top .admin-link:hover{opacity:0.85;}
 .edit-item-row{display:grid;grid-template-columns:1fr 60px 32px;gap:6px;align-items:center;margin-bottom:6px;font-size:0.8rem;}
 .edit-item-row input{padding:5px 7px;}
 .search-wrap{position:sticky;top:0;z-index:5;background:var(--cream);padding:14px 16px 8px;}
+.filtro-banner{
+  background:var(--gold);color:var(--purple-dark);padding:10px 16px;margin:0;
+  font-size:0.85rem;text-align:center;
+}
+.filtro-banner a{color:var(--purple-dark);text-decoration:underline;cursor:pointer;font-weight:600;}
+.rubro-item{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 14px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;background:var(--cream);
+}
+.rubro-item .nombre{font-weight:600;text-transform:capitalize;font-size:0.92rem;}
+.rubro-item .acciones{display:flex;gap:8px;}
 .search-wrap input{
   width:100%;padding:11px 14px;border-radius:8px;border:1px solid var(--line);
   font-family:'Work Sans';font-size:0.95rem;background:var(--white);
@@ -267,17 +278,29 @@ header.top .admin-link:hover{opacity:0.85;}
   <p>Pedido mayorista · onlinetextil.com.ar</p>
   <p class="admin-link" onclick="abrirHistorial()">Historial de pedidos</p>
   <p class="admin-link" onclick="abrirClientes()">Clientes</p>
+  <p class="admin-link" onclick="abrirCompartirRubro()">Compartir catálogo por rubro</p>
 </header>
 
 <div class="app">
 
   <!-- STEP 1: CATALOGO -->
   <div class="step active" id="step-catalogo">
+    <p class="filtro-banner" id="filtro-banner" style="display:none;"></p>
     <div class="search-wrap">
       <input type="text" id="buscador" placeholder="Buscar producto o SKU...">
     </div>
     <div id="categorias"></div>
     <p class="empty-msg" id="sin-resultados" style="display:none;">No se encontraron productos.</p>
+  </div>
+
+  <!-- STEP: COMPARTIR CATALOGO POR RUBRO (solo para OnLineTextil) -->
+  <div class="step" id="step-compartir-rubro">
+    <div class="form-card">
+      <h2>Compartir catálogo por rubro</h2>
+      <p class="note" style="margin-bottom:14px;">Genera un link que abre el catálogo mostrando solo ese rubro, listo para mandar por WhatsApp o email.</p>
+      <div id="rubros-lista"></div>
+      <button class="btn btn-ghost" style="margin-top:12px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
   </div>
 
   <!-- STEP 2: DATOS DEL CLIENTE -->
@@ -1429,8 +1452,43 @@ function nuevoPedido(){
 }
 
 // ---------- init ----------
-renderCatalogo('');
+const rubroURL = new URLSearchParams(location.search).get('rubro');
+if(rubroURL){
+  document.getElementById('buscador').value = rubroURL;
+  renderCatalogo(rubroURL);
+  const banner = document.getElementById('filtro-banner');
+  banner.style.display = 'block';
+  banner.innerHTML = `Mostrando solo: <b>${rubroURL}</b> — <a onclick="quitarFiltroRubro()">Ver catálogo completo</a>`;
+} else {
+  renderCatalogo('');
+}
 actualizarCartbar();
+
+function quitarFiltroRubro(){
+  document.getElementById('buscador').value = '';
+  document.getElementById('filtro-banner').style.display = 'none';
+  renderCatalogo('');
+  history.replaceState(null, '', location.pathname);
+}
+
+function abrirCompartirRubro(){
+  mostrarPaso('step-compartir-rubro');
+  const cont = document.getElementById('rubros-lista');
+  const baseUrl = location.origin + location.pathname;
+  cont.innerHTML = CATALOGO.map(cat => {
+    const link = baseUrl + '?rubro=' + encodeURIComponent(cat.categoria);
+    const mensaje = `Catálogo de ${cat.categoria.toLowerCase()} — OnLineTextil:\n${link}`;
+    return `
+      <div class="rubro-item">
+        <span class="nombre">${cat.categoria.toLowerCase()}</span>
+        <div class="acciones">
+          <button class="btn-mini" onclick="window.open('https://wa.me/?text=' + encodeURIComponent(\`${mensaje}\`), '_blank')">WhatsApp</button>
+          <button class="btn-mini" onclick="navigator.clipboard.writeText(\`${mensaje}\`); alert('Mensaje copiado — pegalo donde quieras (email, etc.)');">Copiar</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
 </script>
 </body>
 </html>
