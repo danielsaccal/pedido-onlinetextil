@@ -1649,9 +1649,8 @@ function guardarFotoProducto(ci, pi){
 async function cargarImagenParaCanvas(src){
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
-    img.onerror = reject;
+    img.onerror = () => reject(new Error('No se pudo cargar la imagen: ' + src));
     img.src = src;
   });
 }
@@ -1690,39 +1689,47 @@ async function generarFlyersNuevoIngreso(){
     return;
   }
 
-  const { ci, pi, producto } = matches[0];
-  const imgSrc = imagenEfectiva(ci, pi, producto);
-  const img = await cargarImagenParaCanvas(imgSrc);
-  const variantesTexto = matches.map(m => ({desc: m.variante.desc, precio: m.variante.precio}));
-
-  await document.fonts.ready;
-
-  const c1 = dibujarFlyerWhatsApp(producto, variantesTexto, img);
-  const c2 = dibujarFlyerIG(producto, img);
-
   const cont = document.getElementById('ni-resultado');
-  cont.innerHTML = '';
-  [{canvas:c1, nombre:'flyer_whatsapp_' + producto.nombre.replace(/\s+/g,'_') + '.png'},
-   {canvas:c2, nombre:'flyer_ig_story_' + producto.nombre.replace(/\s+/g,'_') + '.png'}].forEach(({canvas, nombre}) => {
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'margin-bottom:16px;text-align:center;';
-    const previewImg = document.createElement('img');
-    previewImg.src = canvas.toDataURL('image/png');
-    previewImg.style.cssText = 'max-width:100%;border-radius:10px;border:1px solid var(--line);margin-bottom:8px;';
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-gold';
-    btn.textContent = 'Descargar ' + (nombre.includes('story') ? 'story IG' : 'flyer WhatsApp');
-    btn.onclick = () => {
-      const a = document.createElement('a');
-      a.href = canvas.toDataURL('image/png');
-      a.download = nombre;
-      a.click();
-    };
+  cont.innerHTML = '<p class="note">Generando...</p>';
+
+  try{
+    const { ci, pi, producto } = matches[0];
+    const imgSrc = imagenEfectiva(ci, pi, producto);
+    const img = await cargarImagenParaCanvas(imgSrc);
+    const variantesTexto = matches.map(m => ({desc: m.variante.desc, precio: m.variante.precio}));
+
+    await document.fonts.ready;
+
+    const c1 = dibujarFlyerWhatsApp(producto, variantesTexto, img);
+    const c2 = dibujarFlyerIG(producto, img);
+
+    cont.innerHTML = '';
+    [{canvas:c1, nombre:'flyer_whatsapp_' + producto.nombre.replace(/\s+/g,'_') + '.png'},
+     {canvas:c2, nombre:'flyer_ig_story_' + producto.nombre.replace(/\s+/g,'_') + '.png'}].forEach(({canvas, nombre}) => {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'margin-bottom:16px;text-align:center;';
+      const previewImg = document.createElement('img');
+      previewImg.src = canvas.toDataURL('image/png');
+      previewImg.style.cssText = 'max-width:100%;border-radius:10px;border:1px solid var(--line);margin-bottom:8px;';
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-gold';
+      btn.textContent = 'Descargar ' + (nombre.includes('story') ? 'story IG' : 'flyer WhatsApp');
+      btn.onclick = () => {
+        const a = document.createElement('a');
+        a.href = canvas.toDataURL('image/png');
+        a.download = nombre;
+        a.click();
+      };
     wrap.appendChild(previewImg);
     wrap.appendChild(document.createElement('br'));
     wrap.appendChild(btn);
     cont.appendChild(wrap);
   });
+  } catch(e){
+    cont.innerHTML = '';
+    alert('No se pudo generar el flyer: ' + e.message);
+    console.error('Error generando flyers:', e);
+  }
 }
 
 function dibujarFlyerWhatsApp(producto, variantes, img){
