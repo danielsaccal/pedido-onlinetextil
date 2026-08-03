@@ -1807,25 +1807,20 @@ function dibujarFlyerWhatsApp(producto, variantes, img, textoAdicional, variante
   ctx.fillStyle = PURPLE; ctx.font = "700 26px 'Work Sans'";
   ctx.fillText('NUEVO INGRESO', 540, 209);
 
-  if(descuentoPct > 0){
-    ctx.fillStyle = '#A6432F';
-    dibujarRectRedondeado(ctx, 460, 236, 160, 44, 22); ctx.fill();
-    ctx.fillStyle = '#FFFFFF'; ctx.font = "700 24px 'Work Sans'";
-    ctx.fillText('-' + descuentoPct + '% OFF', 540, 265);
-  }
-
-  const photoW=580, photoH=400, px=(W-photoW)/2, py=descuentoPct > 0 ? 296 : 248;
+  const photoW=580, photoH=400, px=(W-photoW)/2, py=248;
   dibujarFotoContain(ctx, img, px, py, photoW, photoH, "#FFFFFF");
   ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 2;
   dibujarRectRedondeado(ctx, px, py, photoW, photoH, 22); ctx.stroke();
 
   let y = py + photoH + 56;
   ctx.fillStyle = PURPLE; ctx.font = "600 46px 'Fraunces'";
-  ctx.fillText(producto.nombre, 540, y);
-  y += 38;
+  const lineasNombre = envolverTexto(ctx, producto.nombre, 940);
+  lineasNombre.forEach(linea => { ctx.fillText(linea, 540, y); y += 50; });
+  y -= 12;
   ctx.fillStyle = '#6E6459'; ctx.font = "24px 'Work Sans'";
-  ctx.fillText(producto.composicion || '', 540, y);
-  y += 34;
+  const lineasComp = envolverTexto(ctx, producto.composicion || '', 940);
+  lineasComp.forEach(linea => { ctx.fillText(linea, 540, y); y += 30; });
+  y += 4;
 
   if(textoAdicional){
     ctx.font = "italic 700 26px 'Work Sans'";
@@ -1858,28 +1853,15 @@ function dibujarFlyerWhatsApp(producto, variantes, img, textoAdicional, variante
   variantes.forEach(v => {
     const precioNum = parsePrice(v.precio);
     const tieneDescuento = descuentoPct > 0 && precioNum !== null;
-    const filaAlto = tieneDescuento ? 92 : 72;
+    const precioMostrado = tieneDescuento ? formatPrice(precioNum * (1 - descuentoPct/100)) : ('$ ' + v.precio);
     ctx.fillStyle = '#FFFFFF';
-    dibujarRectRedondeado(ctx, 70, y, 940, filaAlto, 12); ctx.fill();
+    dibujarRectRedondeado(ctx, 70, y, 940, 72, 12); ctx.fill();
     ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.font = "28px 'Work Sans'";
-    ctx.fillText(v.desc, 100, y + (tieneDescuento ? 52 : 46));
-
-    if(tieneDescuento){
-      const neto = precioNum * (1 - descuentoPct/100);
-      ctx.textAlign = 'right';
-      ctx.fillStyle = '#A6A296'; ctx.font = "22px 'Work Sans'";
-      const original = '$ ' + v.precio;
-      const ow = ctx.measureText(original).width;
-      ctx.fillText(original, 980, y+30);
-      ctx.beginPath(); ctx.moveTo(980-ow, y+23); ctx.lineTo(980, y+23); ctx.strokeStyle = '#A6A296'; ctx.lineWidth = 2; ctx.stroke();
-      ctx.fillStyle = '#A6432F'; ctx.font = "700 34px 'IBM Plex Mono'";
-      ctx.fillText(formatPrice(neto), 980, y+66);
-    } else {
-      ctx.fillStyle = PURPLE; ctx.textAlign = 'right'; ctx.font = "700 32px 'IBM Plex Mono'";
-      ctx.fillText('$ ' + v.precio, 980, y+46);
-    }
+    ctx.fillText(v.desc, 100, y+46);
+    ctx.fillStyle = PURPLE; ctx.textAlign = 'right'; ctx.font = "700 32px 'IBM Plex Mono'";
+    ctx.fillText(precioMostrado, 980, y+46);
     ctx.textAlign = 'center';
-    y += filaAlto + 12;
+    y += 84;
   });
 
   y += 20;
@@ -1927,11 +1909,13 @@ function dibujarFlyerIG(producto, img, textoAdicional, variantesColor){
 
   let y = py + photoH + 90;
   ctx.fillStyle = GOLD; ctx.font = "600 64px 'Fraunces'";
-  ctx.fillText(producto.nombre, 540, y);
-  y += 50;
+  const lineasNombre = envolverTexto(ctx, producto.nombre, 940);
+  lineasNombre.forEach(linea => { ctx.fillText(linea, 540, y); y += 66; });
+  y -= 16;
   ctx.fillStyle = CREAM; ctx.font = "30px 'Work Sans'";
-  ctx.fillText(producto.composicion || '', 540, y);
-  y += 40;
+  const lineasComp = envolverTexto(ctx, producto.composicion || '', 940);
+  lineasComp.forEach(linea => { ctx.fillText(linea, 540, y); y += 36; });
+  y += 4;
 
   if(textoAdicional){
     ctx.fillStyle = GOLD; ctx.font = "italic 700 34px 'Work Sans'";
@@ -1958,7 +1942,7 @@ function dibujarFlyerIG(producto, img, textoAdicional, variantesColor){
 
   const beneficios = [
     ['CUOTAS SIN INTERÉS', 'Consultá medios de pago'],
-    ['ENVÍOS A TODO EL PAÍS', 'Retiro en local o transporte'],
+    ['ENVÍOS A TODO EL PAÍS', 'Retiro en persona, transporte de cargas o correo'],
     ['DESCUENTOS POR MAYOR', 'Escribinos y te asesoramos'],
   ];
   beneficios.forEach(([tit, sub]) => {
