@@ -1696,6 +1696,19 @@ function dibujarFotoCover(ctx, img, x, y, w, h){
   ctx.restore();
 }
 
+function dibujarFotoContain(ctx, img, x, y, w, h, fondo){
+  ctx.save();
+  dibujarRectRedondeado(ctx, x, y, w, h, 22);
+  ctx.clip();
+  ctx.fillStyle = fondo || '#FFFFFF';
+  ctx.fillRect(x, y, w, h);
+  const ratio = Math.min(w / img.width, h / img.height);
+  const nw = img.width * ratio, nh = img.height * ratio;
+  const nx = x + (w - nw)/2, ny = y + (h - nh)/2;
+  ctx.drawImage(img, nx, ny, nw, nh);
+  ctx.restore();
+}
+
 async function generarFlyersNuevoIngreso(){
   const skusTexto = document.getElementById('ni-skus').value.trim();
   const textoAdicional = document.getElementById('ni-texto').value.trim();
@@ -1794,7 +1807,7 @@ function dibujarFlyerWhatsApp(producto, variantes, img, textoAdicional, variante
   }
 
   const photoW=580, photoH=400, px=(W-photoW)/2, py=descuentoPct > 0 ? 296 : 248;
-  dibujarFotoCover(ctx, img, px, py, photoW, photoH);
+  dibujarFotoContain(ctx, img, px, py, photoW, photoH, "#FFFFFF");
   ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 2;
   dibujarRectRedondeado(ctx, px, py, photoW, photoH, 22); ctx.stroke();
 
@@ -1808,12 +1821,15 @@ function dibujarFlyerWhatsApp(producto, variantes, img, textoAdicional, variante
 
   if(textoAdicional){
     ctx.font = "italic 700 26px 'Work Sans'";
-    const bw = Math.min(980, ctx.measureText(textoAdicional).width + 60);
+    const lineasTxt = envolverTexto(ctx, textoAdicional, 900);
+    const maxLineW = Math.max(...lineasTxt.map(l => ctx.measureText(l).width));
+    const bw = Math.min(1000, maxLineW + 60);
+    const bh = 20 + lineasTxt.length*34;
     ctx.fillStyle = '#EFE0A8';
-    dibujarRectRedondeado(ctx, (W-bw)/2, y, bw, 46, 23); ctx.fill();
+    dibujarRectRedondeado(ctx, (W-bw)/2, y, bw, bh, 20); ctx.fill();
     ctx.fillStyle = PURPLE;
-    ctx.fillText(textoAdicional, 540, y+31);
-    y += 66;
+    lineasTxt.forEach((linea, i) => ctx.fillText(linea, 540, y + 27 + i*34));
+    y += bh + 20;
   } else {
     y += 16;
   }
@@ -1896,10 +1912,10 @@ function dibujarFlyerIG(producto, img, textoAdicional, variantesColor){
   ctx.fillStyle = PURPLE_DARK; ctx.font = "700 34px 'Work Sans'";
   ctx.fillText('NUEVO INGRESO', 540, 307);
 
-  const photoW=820, photoH=820, px=(1080-photoW)/2, py=390;
+  const photoW=780, photoH=720, px=(1080-photoW)/2, py=340;
   ctx.fillStyle = CREAM;
   dibujarRectRedondeado(ctx, px-14, py-14, photoW+28, photoH+28, 36); ctx.fill();
-  dibujarFotoCover(ctx, img, px, py, photoW, photoH);
+  dibujarFotoContain(ctx, img, px, py, photoW, photoH, "#FFFFFF");
 
   let y = py + photoH + 90;
   ctx.fillStyle = GOLD; ctx.font = "600 64px 'Fraunces'";
@@ -1911,8 +1927,9 @@ function dibujarFlyerIG(producto, img, textoAdicional, variantesColor){
 
   if(textoAdicional){
     ctx.fillStyle = GOLD; ctx.font = "italic 700 34px 'Work Sans'";
-    ctx.fillText(textoAdicional, 540, y);
-    y += 48;
+    const lineasTxt = envolverTexto(ctx, textoAdicional, 900);
+    lineasTxt.forEach(linea => { ctx.fillText(linea, 540, y); y += 44; });
+    y += 4;
   }
 
   if(variantesColor){
@@ -1945,11 +1962,11 @@ function dibujarFlyerIG(producto, img, textoAdicional, variantesColor){
     ctx.fillText(tit, 540, y);
     ctx.font = "24px 'Work Sans'"; ctx.fillStyle = '#D2C8D7';
     ctx.fillText(sub, 540, y+38);
-    y += 92;
+    y += 82;
   });
 
   ctx.fillStyle = GOLD; ctx.font = "700 30px 'Work Sans'";
-  ctx.fillText('onlinetextil.com.ar', 540, Math.max(y+40, 1800));
+  ctx.fillText('onlinetextil.com.ar', 540, Math.min(Math.max(y+40, 1800), 1890));
 
   return canvas;
 }
