@@ -550,6 +550,7 @@ async function guardarClienteEnBaseDeDatos(orden){
 <script>
 // ---------- estado ----------
 const cart = {}; // key: rowId -> {sku, desc, nombreProducto, precio, cantidad, imagen}
+let fotosOverride = {}; // key: "ci-pi" -> foto reemplazada en base64 (se carga antes de renderizar el catalogo)
 const notas = {}; // key: rowId -> texto de la nota (independiente de si hay cantidad cargada)
 function actualizarNota(id, valor){
   notas[id] = valor;
@@ -1561,7 +1562,6 @@ function abrirCompartirRubro(){
 }
 
 // ---------- fotos personalizadas (reemplazo por SKU) ----------
-let fotosOverride = {};
 function cargarFotosOverride(){
   return db.collection('fotos').get().then(snap => {
     fotosOverride = {};
