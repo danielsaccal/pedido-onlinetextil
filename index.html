@@ -134,6 +134,11 @@ header.top .admin-link:hover{opacity:0.85;}
 .producto-info{flex:1;min-width:0;}
 .producto-nombre{font-weight:600;font-size:0.98rem;margin:0 0 2px;}
 .producto-comp{font-size:0.78rem;color:#6B6258;margin:0 0 10px;}
+.producto-admin-links{display:flex;gap:14px;margin-top:8px;}
+.producto-admin-links span{
+  font-size:0.68rem;color:#B5AC9E;cursor:pointer;opacity:0.7;user-select:none;
+}
+.producto-admin-links span:hover{opacity:1;color:var(--purple);text-decoration:underline;}
 @media (max-width:420px){
   .producto-img{width:60px;height:60px;}
   .variante-fila{grid-template-columns:1fr auto;grid-template-rows:auto auto;row-gap:6px;}
@@ -668,12 +673,17 @@ function renderCatalogo(filtro){
       const imagenHtml = imgEfectiva
         ? `<img class="producto-img" src="${imgEfectiva}" alt="${escapeAttr(p.nombre)}" loading="lazy">`
         : `<div class="producto-img producto-img-vacia">Sin foto</div>`;
+      const primerSku = p.variantes[0]?.sku || '';
       prodDiv.innerHTML = `
         ${imagenHtml}
         <div class="producto-info">
           <p class="producto-nombre">${p.nombre}</p>
           <p class="producto-comp">${p.composicion || ''}</p>
           ${variantesHtml}
+          <div class="producto-admin-links">
+            <span onclick="irAFotoConSku('${escapeAttr(primerSku)}')">📷 Cambiar foto</span>
+            <span onclick="irAFlyerConSku('${escapeAttr(primerSku)}')">🖼️ Generar flyer</span>
+          </div>
         </div>
       `;
       body.appendChild(prodDiv);
@@ -1600,6 +1610,12 @@ function abrirActualizarFoto(){
   document.getElementById('fs-sku').value = '';
 }
 
+function irAFotoConSku(sku){
+  mostrarPaso('step-foto-sku');
+  document.getElementById('fs-sku').value = sku;
+  buscarProductoParaFoto();
+}
+
 function buscarProductoParaFoto(){
   const sku = document.getElementById('fs-sku').value.trim();
   const cont = document.getElementById('fs-resultado');
@@ -2025,6 +2041,11 @@ function generarTextoConIA(){
   cont.innerHTML = opciones.map(op => `
     <button type="button" class="btn-mini" style="display:block;width:100%;text-align:left;margin-bottom:6px;" onclick="document.getElementById('ni-texto').value = this.textContent; document.getElementById('ni-opciones-texto').innerHTML='';">${op}</button>
   `).join('');
+}
+
+function irAFlyerConSku(sku){
+  abrirNuevoIngreso();
+  document.getElementById('ni-skus').value = sku;
 }
 
 function abrirNuevoIngreso(){
