@@ -1988,33 +1988,43 @@ function generarTextoConIA(){
   const nombreProd = match ? match.producto.nombre : 'este producto';
   const composicion = match ? (match.producto.composicion || '') : '';
   const keywords = keywordsTexto ? keywordsTexto.split(',').map(k => k.trim()).filter(Boolean) : [];
+  function cap(s){ return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
-  // sacar datos tecnicos reales: de la composicion y de las descripciones de cada variante (medidas)
-  let fragmentos = composicion.split(/—|\//).map(f => f.trim()).filter(f => f && f !== '—');
+  // extraer datos tecnicos puntuales: % de material, gramaje, y medidas de las variantes
+  const materiales = [...composicion.matchAll(/(\d+%\s*[A-Za-zÁÉÍÓÚáéíóúñÑ]+)/g)].map(m => m[1]);
+  const gramajeMatch = composicion.match(/(\d+\s*gr(?:s|\/m2)?)/i);
+  const gramaje = gramajeMatch ? gramajeMatch[1].replace(/gr(?!s)/i,'gr') : null;
   const medidas = matches.map(m => m.variante.desc).filter(Boolean);
-  if(fragmentos.length === 0 && medidas.length === 0){
-    fragmentos = ['calidad OnLineTextil'];
-  }
-  const datos = [...fragmentos, ...medidas];
-  const pickDato = () => datos[Math.floor(Math.random()*datos.length)];
-  const pickKw = () => keywords.length ? keywords[Math.floor(Math.random()*keywords.length)] : null;
+  const materialPrincipal = materiales[0] || null;
 
-  const plantillas = [
-    () => `${nombreProd}: ${pickDato()}`,
-    () => `Descubrí ${nombreProd} — ${pickDato()}`,
-    () => `Nuevo ingreso en ${pickDato()}`,
-    () => `${cap(pickDato())}, calidad OnLineTextil`,
-  ];
-  if(keywords.length){
-    plantillas.push(() => `${pickDato()} — pura ${pickKw()}`);
-    plantillas.push(() => `${cap(pickKw())} con ${pickDato()}`);
+  const plantillas = [];
+  if(materialPrincipal){
+    plantillas.push(() => `${nombreProd} — ${materialPrincipal}, suavidad que se siente`);
+    plantillas.push(() => `Tejido en ${materialPrincipal.toLowerCase()}, pensado para durar`);
+    plantillas.push(() => `${materialPrincipal} de calidad, directo para tu hogar`);
   }
-  function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+  if(gramaje){
+    plantillas.push(() => `${nombreProd}: ${gramaje} de puro confort`);
+    plantillas.push(() => `Calidez asegurada — ${gramaje} en cada ${nombreProd.toLowerCase()}`);
+  }
+  if(materialPrincipal && gramaje){
+    plantillas.push(() => `${materialPrincipal}, ${gramaje} — calidad que se nota`);
+  }
+  if(medidas.length){
+    plantillas.push(() => `${nombreProd} en ${medidas[Math.floor(Math.random()*medidas.length)]}`);
+  }
+  if(keywords.length){
+    const pickKw = () => keywords[Math.floor(Math.random()*keywords.length)];
+    plantillas.push(() => `${materialPrincipal || nombreProd} — pura ${pickKw()}`);
+  }
+  if(plantillas.length === 0){
+    plantillas.push(() => `¡Nuevo ingreso! ${nombreProd}`);
+  }
 
   const usadas = new Set();
   const opciones = [];
   let intentos = 0;
-  while(opciones.length < 4 && intentos < 20){
+  while(opciones.length < 4 && intentos < 30 && usadas.size < plantillas.length){
     intentos++;
     const idx = Math.floor(Math.random()*plantillas.length);
     const texto = plantillas[idx]();
@@ -2024,7 +2034,7 @@ function generarTextoConIA(){
   }
 
   const cont = document.getElementById('ni-opciones-texto');
-  if(opciones.length === 0){
+  if(!match){
     cont.innerHTML = '<p class="note">Escribí primero el SKU para poder generar frases con sus datos reales.</p>';
     return;
   }
