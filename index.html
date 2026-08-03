@@ -292,6 +292,8 @@ header.top .admin-link:hover{opacity:0.85;}
   <p class="admin-link" onclick="abrirHistorial()">Historial de pedidos</p>
   <p class="admin-link" onclick="abrirClientes()">Clientes</p>
   <p class="admin-link" onclick="abrirCompartirRubro()">Compartir catálogo por rubro</p>
+  <p class="admin-link" onclick="abrirNuevoIngreso()">Nuevo ingreso (flyers)</p>
+  <p class="admin-link" onclick="abrirActualizarFoto()">Actualizar foto de producto</p>
 </header>
 
 <div class="app">
@@ -313,6 +315,33 @@ header.top .admin-link:hover{opacity:0.85;}
       <p class="note" style="margin-bottom:14px;">Genera un link que abre el catálogo mostrando solo ese rubro, listo para mandar por WhatsApp o email.</p>
       <div id="rubros-lista"></div>
       <button class="btn btn-ghost" style="margin-top:12px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <!-- STEP: NUEVO INGRESO (generar flyers) -->
+  <div class="step" id="step-nuevo-ingreso">
+    <div class="form-card">
+      <h2>Nuevo ingreso — generar flyers</h2>
+      <p class="note" style="margin-bottom:14px;">Escriba el/los SKU que ingresaron (separados por coma si son variantes del mismo producto) y arma el flyer para WhatsApp y la story para Instagram.</p>
+      <div class="field"><label>SKU(s)</label><input type="text" id="ni-skus" placeholder="Ej: TOA171B, TOA171C"></div>
+      <p class="error" id="ni-error" style="display:none;">No encontré ningún producto con esos SKU.</p>
+      <div class="actions">
+        <button class="btn btn-gold" onclick="generarFlyersNuevoIngreso()">Generar flyers</button>
+        <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      </div>
+      <div id="ni-resultado" style="margin-top:18px;"></div>
+    </div>
+  </div>
+
+  <!-- STEP: ACTUALIZAR FOTO DE PRODUCTO -->
+  <div class="step" id="step-foto-sku">
+    <div class="form-card">
+      <h2>Actualizar foto de producto</h2>
+      <p class="note" style="margin-bottom:14px;">Busque el producto por SKU y suba una foto nueva para reemplazar la actual (aplica a todas las variantes de ese producto).</p>
+      <div class="field"><label>SKU</label><input type="text" id="fs-sku" placeholder="Ej: TOA171B"></div>
+      <div class="actions"><button class="btn btn-gold" onclick="buscarProductoParaFoto()">Buscar</button></div>
+      <div id="fs-resultado" style="margin-top:16px;"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
 
@@ -623,8 +652,9 @@ function renderCatalogo(filtro){
           </div>
         `;
       });
-      const imagenHtml = p.imagen
-        ? `<img class="producto-img" src="${p.imagen}" alt="${escapeAttr(p.nombre)}" loading="lazy">`
+      const imgEfectiva = imagenEfectiva(ci, pi, p);
+      const imagenHtml = imgEfectiva
+        ? `<img class="producto-img" src="${imgEfectiva}" alt="${escapeAttr(p.nombre)}" loading="lazy">`
         : `<div class="producto-img producto-img-vacia">Sin foto</div>`;
       prodDiv.innerHTML = `
         ${imagenHtml}
@@ -659,7 +689,7 @@ function setCantidad(id, valor, sku, desc, nombreProducto, precio){
     delete cart[id];
   } else {
     const [ci, pi] = id.split('-').map(Number);
-    const imagen = (CATALOGO[ci] && CATALOGO[ci].productos[pi] && CATALOGO[ci].productos[pi].imagen) || null;
+    const imagen = (CATALOGO[ci] && CATALOGO[ci].productos[pi]) ? imagenEfectiva(ci, pi, CATALOGO[ci].productos[pi]) : null;
     cart[id] = {sku, desc, nombreProducto, precio, cantidad: n, imagen};
   }
   actualizarCartbar();
@@ -973,7 +1003,7 @@ function construirParamsEmail(orden, destinatario){
   const subtotal = subtotalOrden(orden);
   const total = totalOrden(orden);
   const items_texto = orden.items.map(i => {
-    const foto = i.imagen
+    const foto = (i.imagen && !i.imagen.startsWith('data:'))
       ? `<img src="${BASE_URL}${i.imagen}" width="44" height="44" style="object-fit:cover;border-radius:6px;vertical-align:middle;margin-right:8px;">`
       : '';
     return `${foto}${i.cantidad} x ${i.sku} — ${i.nombreProducto} (${i.desc}) — ${formatPrice(i.precio)} c/u — subtotal ${formatPrice(precioLineaItem(i))}` +
@@ -1529,6 +1559,296 @@ function abrirCompartirRubro(){
     `;
   }).join('');
 }
+
+// ---------- fotos personalizadas (reemplazo por SKU) ----------
+let fotosOverride = {};
+function cargarFotosOverride(){
+  return db.collection('fotos').get().then(snap => {
+    fotosOverride = {};
+    snap.docs.forEach(d => { fotosOverride[d.id] = d.data().imagenBase64; });
+  }).catch(e => console.error('Error cargando fotos override:', e));
+}
+function imagenEfectiva(ci, pi, p){
+  return fotosOverride[`${ci}-${pi}`] || p.imagen;
+}
+function buscarProductoPorSku(sku){
+  const skuUpper = sku.trim().toUpperCase();
+  for(let ci=0; ci<CATALOGO.length; ci++){
+    const productos = CATALOGO[ci].productos;
+    for(let pi=0; pi<productos.length; pi++){
+      const v = productos[pi].variantes.find(v => v.sku.toUpperCase() === skuUpper);
+      if(v) return {ci, pi, producto: productos[pi], categoria: CATALOGO[ci].categoria, variante: v};
+    }
+  }
+  return null;
+}
+
+function abrirActualizarFoto(){
+  mostrarPaso('step-foto-sku');
+  document.getElementById('fs-resultado').innerHTML = '';
+  document.getElementById('fs-sku').value = '';
+}
+
+function buscarProductoParaFoto(){
+  const sku = document.getElementById('fs-sku').value.trim();
+  const cont = document.getElementById('fs-resultado');
+  if(!sku){ cont.innerHTML = ''; return; }
+  const match = buscarProductoPorSku(sku);
+  if(!match){
+    cont.innerHTML = '<p class="empty-msg">No encontré ningún producto con ese SKU.</p>';
+    return;
+  }
+  const { ci, pi, producto } = match;
+  const imgActual = imagenEfectiva(ci, pi, producto);
+  cont.innerHTML = `
+    <p style="margin-bottom:8px;"><b>${producto.nombre}</b> (${producto.composicion||''})</p>
+    <img id="fs-preview" src="${imgActual}" style="width:140px;height:140px;object-fit:cover;border-radius:10px;border:1px solid var(--line);margin-bottom:12px;">
+    <div class="field"><label>Nueva foto</label><input type="file" accept="image/*" id="fs-archivo"></div>
+    <button class="btn btn-gold" onclick="guardarFotoProducto(${ci}, ${pi})">Guardar foto nueva</button>
+  `;
+}
+
+function guardarFotoProducto(ci, pi){
+  const input = document.getElementById('fs-archivo');
+  const file = input.files[0];
+  if(!file){ alert('Elegí un archivo primero.'); return; }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = async () => {
+      const maxDim = 480;
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+
+      try{
+        await db.collection('fotos').doc(`${ci}-${pi}`).set({
+          imagenBase64: dataUrl,
+          sku: CATALOGO[ci].productos[pi].variantes[0]?.sku || '',
+          nombreProducto: CATALOGO[ci].productos[pi].nombre,
+          actualizado: new Date().toISOString()
+        });
+        fotosOverride[`${ci}-${pi}`] = dataUrl;
+        document.getElementById('fs-preview').src = dataUrl;
+        renderCatalogo(document.getElementById('buscador').value);
+        alert('Foto actualizada. Ya se ve en el catálogo, en pedidos nuevos y en los flyers.');
+      } catch(err){
+        alert('No se pudo guardar la foto: ' + err.message);
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ---------- nuevo ingreso: generar flyers ----------
+async function cargarImagenParaCanvas(src){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+function dibujarRectRedondeado(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+}
+
+function dibujarFotoCover(ctx, img, x, y, w, h){
+  const ratio = Math.max(w / img.width, h / img.height);
+  const nw = img.width * ratio, nh = img.height * ratio;
+  const nx = x + (w - nw)/2, ny = y + (h - nh)/2;
+  ctx.save();
+  dibujarRectRedondeado(ctx, x, y, w, h, 22);
+  ctx.clip();
+  ctx.drawImage(img, nx, ny, nw, nh);
+  ctx.restore();
+}
+
+async function generarFlyersNuevoIngreso(){
+  const skusTexto = document.getElementById('ni-skus').value.trim();
+  document.getElementById('ni-error').style.display = 'none';
+  if(!skusTexto) return;
+
+  const skus = skusTexto.split(',').map(s => s.trim()).filter(Boolean);
+  const matches = skus.map(sku => buscarProductoPorSku(sku)).filter(Boolean);
+
+  if(matches.length === 0){
+    document.getElementById('ni-error').style.display = 'block';
+    return;
+  }
+
+  const { ci, pi, producto } = matches[0];
+  const imgSrc = imagenEfectiva(ci, pi, producto);
+  const img = await cargarImagenParaCanvas(imgSrc);
+  const variantesTexto = matches.map(m => ({desc: m.variante.desc, precio: m.variante.precio}));
+
+  await document.fonts.ready;
+
+  const c1 = dibujarFlyerWhatsApp(producto, variantesTexto, img);
+  const c2 = dibujarFlyerIG(producto, img);
+
+  const cont = document.getElementById('ni-resultado');
+  cont.innerHTML = '';
+  [{canvas:c1, nombre:'flyer_whatsapp_' + producto.nombre.replace(/\s+/g,'_') + '.png'},
+   {canvas:c2, nombre:'flyer_ig_story_' + producto.nombre.replace(/\s+/g,'_') + '.png'}].forEach(({canvas, nombre}) => {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'margin-bottom:16px;text-align:center;';
+    const previewImg = document.createElement('img');
+    previewImg.src = canvas.toDataURL('image/png');
+    previewImg.style.cssText = 'max-width:100%;border-radius:10px;border:1px solid var(--line);margin-bottom:8px;';
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-gold';
+    btn.textContent = 'Descargar ' + (nombre.includes('story') ? 'story IG' : 'flyer WhatsApp');
+    btn.onclick = () => {
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = nombre;
+      a.click();
+    };
+    wrap.appendChild(previewImg);
+    wrap.appendChild(document.createElement('br'));
+    wrap.appendChild(btn);
+    cont.appendChild(wrap);
+  });
+}
+
+function dibujarFlyerWhatsApp(producto, variantes, img){
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080; canvas.height = 1080;
+  const ctx = canvas.getContext('2d');
+  const PURPLE = '#3D2B4E', GOLD = '#F5D470', CREAM = '#F5F3EF', INK = '#2A2320';
+
+  ctx.fillStyle = CREAM; ctx.fillRect(0,0,1080,1080);
+  ctx.fillStyle = PURPLE; ctx.fillRect(0,0,1080,150);
+  ctx.fillStyle = CREAM; ctx.textAlign = 'center';
+  ctx.font = "600 54px 'Fraunces'";
+  ctx.fillText('OnLineTextil', 540, 92);
+
+  ctx.strokeStyle = GOLD; ctx.lineWidth = 8; ctx.setLineDash([22,14]);
+  ctx.beginPath(); ctx.moveTo(0,150); ctx.lineTo(1080,150); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = GOLD;
+  dibujarRectRedondeado(ctx, 380, 178, 320, 54, 27); ctx.fill();
+  ctx.fillStyle = PURPLE; ctx.font = "700 28px 'Work Sans'";
+  ctx.fillText('NUEVO INGRESO', 540, 213);
+
+  const photoW=620, photoH=460, px=(1080-photoW)/2, py=262;
+  dibujarFotoCover(ctx, img, px, py, photoW, photoH);
+  ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 2;
+  dibujarRectRedondeado(ctx, px, py, photoW, photoH, 22); ctx.stroke();
+
+  ctx.fillStyle = PURPLE; ctx.font = "600 52px 'Fraunces'";
+  ctx.fillText(producto.nombre, 540, py+photoH+68);
+  ctx.fillStyle = '#6E6459'; ctx.font = "26px 'Work Sans'";
+  ctx.fillText(producto.composicion || '', 540, py+photoH+108);
+
+  let y = py+photoH+150;
+  variantes.forEach(v => {
+    ctx.fillStyle = '#FFFFFF';
+    dibujarRectRedondeado(ctx, 70, y, 940, 72, 12); ctx.fill();
+    ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.font = "30px 'Work Sans'";
+    ctx.fillText(v.desc, 100, y+46);
+    ctx.fillStyle = PURPLE; ctx.textAlign = 'right'; ctx.font = "700 34px 'IBM Plex Mono'";
+    ctx.fillText('$ ' + v.precio, 980, y+46);
+    ctx.textAlign = 'center';
+    y += 88;
+  });
+
+  ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 3; ctx.setLineDash([14,10]);
+  ctx.beginPath(); ctx.moveTo(0,1024); ctx.lineTo(1080,1024); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#6E6459'; ctx.font = "22px 'Work Sans'";
+  ctx.fillText('onlinetextil.com.ar · Venta mayorista', 540, 1052);
+
+  return canvas;
+}
+
+function dibujarFlyerIG(producto, img){
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080; canvas.height = 1920;
+  const ctx = canvas.getContext('2d');
+  const PURPLE = '#3D2B4E', PURPLE_DARK = '#2A1D36', GOLD = '#F5D470', GOLD_DARK = '#DFB94A', CREAM = '#F5F3EF';
+
+  ctx.fillStyle = PURPLE; ctx.fillRect(0,0,1080,1920);
+  ctx.fillStyle = CREAM; ctx.textAlign = 'center';
+  ctx.font = "600 62px 'Fraunces'";
+  ctx.fillText('OnLineTextil', 540, 130);
+  ctx.fillStyle = GOLD; ctx.font = "700 30px 'Work Sans'";
+  ctx.fillText('VENTA MAYORISTA', 540, 178);
+
+  ctx.strokeStyle = GOLD; ctx.lineWidth = 6; ctx.setLineDash([20,14]);
+  ctx.beginPath(); ctx.moveTo(90,220); ctx.lineTo(990,220); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = GOLD;
+  dibujarRectRedondeado(ctx, 330, 264, 420, 66, 33); ctx.fill();
+  ctx.fillStyle = PURPLE_DARK; ctx.font = "700 34px 'Work Sans'";
+  ctx.fillText('NUEVO INGRESO', 540, 307);
+
+  const photoW=820, photoH=900, px=(1080-photoW)/2, py=390;
+  ctx.fillStyle = CREAM;
+  dibujarRectRedondeado(ctx, px-14, py-14, photoW+28, photoH+28, 36); ctx.fill();
+  dibujarFotoCover(ctx, img, px, py, photoW, photoH);
+
+  ctx.fillStyle = GOLD; ctx.font = "600 68px 'Fraunces'";
+  ctx.fillText(producto.nombre, 540, py+photoH+108);
+  ctx.fillStyle = CREAM; ctx.font = "32px 'Work Sans'";
+  ctx.fillText(producto.composicion || '', 540, py+photoH+160);
+
+  ctx.strokeStyle = GOLD_DARK; ctx.lineWidth = 4; ctx.setLineDash([16,12]);
+  ctx.beginPath(); ctx.moveTo(90, py+photoH+206); ctx.lineTo(990, py+photoH+206); ctx.stroke();
+  ctx.setLineDash([]);
+
+  const beneficios = [
+    ['CUOTAS SIN INTERÉS', 'Consultá medios de pago'],
+    ['ENVÍOS A TODO EL PAÍS', 'Retiro en local o transporte'],
+    ['DESCUENTOS POR MAYOR', 'Escribinos y te asesoramos'],
+  ];
+  let y = py+photoH+266;
+  beneficios.forEach(([tit, sub]) => {
+    ctx.font = "700 36px 'Work Sans'";
+    const tw = ctx.measureText(tit).width;
+    ctx.fillStyle = GOLD;
+    ctx.beginPath(); ctx.arc(540 - tw/2 - 26, y-10, 7, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = CREAM;
+    ctx.fillText(tit, 540, y);
+    ctx.font = "26px 'Work Sans'"; ctx.fillStyle = '#D2C8D7';
+    ctx.fillText(sub, 540, y+42);
+    y += 105;
+  });
+
+  ctx.fillStyle = GOLD; ctx.font = "700 30px 'Work Sans'";
+  ctx.fillText('onlinetextil.com.ar', 540, 1850);
+
+  return canvas;
+}
+
+function abrirNuevoIngreso(){
+  mostrarPaso('step-nuevo-ingreso');
+  document.getElementById('ni-skus').value = '';
+  document.getElementById('ni-resultado').innerHTML = '';
+  document.getElementById('ni-error').style.display = 'none';
+}
+
+</script>
+<script>
+cargarFotosOverride().then(() => {
+  renderCatalogo(document.getElementById('buscador').value);
+});
 </script>
 </body>
 </html>
