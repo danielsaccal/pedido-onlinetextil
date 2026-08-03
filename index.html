@@ -324,6 +324,7 @@ header.top .admin-link:hover{opacity:0.85;}
       <h2>Nuevo ingreso — generar flyers</h2>
       <p class="note" style="margin-bottom:14px;">Escriba el/los SKU que ingresaron (separados por coma si son variantes del mismo producto) y arma el flyer para WhatsApp y la story para Instagram.</p>
       <div class="field"><label>SKU(s)</label><input type="text" id="ni-skus" placeholder="Ej: TOA171B, TOA171C"></div>
+      <div class="field"><label>Texto adicional (opcional)</label><input type="text" id="ni-texto" placeholder="Ej: ¡Llegó lo nuevo! Stock limitado"></div>
       <p class="error" id="ni-error" style="display:none;">No encontré ningún producto con esos SKU.</p>
       <div class="actions">
         <button class="btn btn-gold" onclick="generarFlyersNuevoIngreso()">Generar flyers</button>
@@ -1678,6 +1679,7 @@ function dibujarFotoCover(ctx, img, x, y, w, h){
 
 async function generarFlyersNuevoIngreso(){
   const skusTexto = document.getElementById('ni-skus').value.trim();
+  const textoAdicional = document.getElementById('ni-texto').value.trim();
   document.getElementById('ni-error').style.display = 'none';
   if(!skusTexto) return;
 
@@ -1700,8 +1702,8 @@ async function generarFlyersNuevoIngreso(){
 
     await document.fonts.ready;
 
-    const c1 = dibujarFlyerWhatsApp(producto, variantesTexto, img);
-    const c2 = dibujarFlyerIG(producto, img);
+    const c1 = dibujarFlyerWhatsApp(producto, variantesTexto, img, textoAdicional);
+    const c2 = dibujarFlyerIG(producto, img, textoAdicional);
 
     cont.innerHTML = '';
     [{canvas:c1, nombre:'flyer_whatsapp_' + producto.nombre.replace(/\s+/g,'_') + '.png'},
@@ -1732,7 +1734,7 @@ async function generarFlyersNuevoIngreso(){
   }
 }
 
-function dibujarFlyerWhatsApp(producto, variantes, img){
+function dibujarFlyerWhatsApp(producto, variantes, img, textoAdicional){
   const canvas = document.createElement('canvas');
   canvas.width = 1080; canvas.height = 1080;
   const ctx = canvas.getContext('2d');
@@ -1749,30 +1751,45 @@ function dibujarFlyerWhatsApp(producto, variantes, img){
   ctx.setLineDash([]);
 
   ctx.fillStyle = GOLD;
-  dibujarRectRedondeado(ctx, 380, 178, 320, 54, 27); ctx.fill();
-  ctx.fillStyle = PURPLE; ctx.font = "700 28px 'Work Sans'";
-  ctx.fillText('NUEVO INGRESO', 540, 213);
+  dibujarRectRedondeado(ctx, 380, 176, 320, 52, 26); ctx.fill();
+  ctx.fillStyle = PURPLE; ctx.font = "700 26px 'Work Sans'";
+  ctx.fillText('NUEVO INGRESO', 540, 209);
 
-  const photoW=620, photoH=460, px=(1080-photoW)/2, py=262;
+  const photoW=580, photoH=400, px=(1080-photoW)/2, py=248;
   dibujarFotoCover(ctx, img, px, py, photoW, photoH);
   ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 2;
   dibujarRectRedondeado(ctx, px, py, photoW, photoH, 22); ctx.stroke();
 
-  ctx.fillStyle = PURPLE; ctx.font = "600 52px 'Fraunces'";
-  ctx.fillText(producto.nombre, 540, py+photoH+68);
-  ctx.fillStyle = '#6E6459'; ctx.font = "26px 'Work Sans'";
-  ctx.fillText(producto.composicion || '', 540, py+photoH+108);
+  let y = py + photoH + 56;
+  ctx.fillStyle = PURPLE; ctx.font = "600 46px 'Fraunces'";
+  ctx.fillText(producto.nombre, 540, y);
+  y += 38;
+  ctx.fillStyle = '#6E6459'; ctx.font = "24px 'Work Sans'";
+  ctx.fillText(producto.composicion || '', 540, y);
+  y += 34;
 
-  let y = py+photoH+150;
+  if(textoAdicional){
+    ctx.fillStyle = '#EFE0A8';
+    const tw = ctx.measureText(textoAdicional).width;
+    ctx.font = "italic 700 26px 'Work Sans'";
+    const bw = Math.min(980, ctx.measureText(textoAdicional).width + 60);
+    dibujarRectRedondeado(ctx, (1080-bw)/2, y, bw, 46, 23); ctx.fill();
+    ctx.fillStyle = PURPLE;
+    ctx.fillText(textoAdicional, 540, y+31);
+    y += 66;
+  } else {
+    y += 16;
+  }
+
   variantes.forEach(v => {
     ctx.fillStyle = '#FFFFFF';
     dibujarRectRedondeado(ctx, 70, y, 940, 72, 12); ctx.fill();
-    ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.font = "30px 'Work Sans'";
+    ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.font = "28px 'Work Sans'";
     ctx.fillText(v.desc, 100, y+46);
-    ctx.fillStyle = PURPLE; ctx.textAlign = 'right'; ctx.font = "700 34px 'IBM Plex Mono'";
+    ctx.fillStyle = PURPLE; ctx.textAlign = 'right'; ctx.font = "700 32px 'IBM Plex Mono'";
     ctx.fillText('$ ' + v.precio, 980, y+46);
     ctx.textAlign = 'center';
-    y += 88;
+    y += 84;
   });
 
   ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 3; ctx.setLineDash([14,10]);
@@ -1784,7 +1801,7 @@ function dibujarFlyerWhatsApp(producto, variantes, img){
   return canvas;
 }
 
-function dibujarFlyerIG(producto, img){
+function dibujarFlyerIG(producto, img, textoAdicional){
   const canvas = document.createElement('canvas');
   canvas.width = 1080; canvas.height = 1920;
   const ctx = canvas.getContext('2d');
@@ -1806,26 +1823,35 @@ function dibujarFlyerIG(producto, img){
   ctx.fillStyle = PURPLE_DARK; ctx.font = "700 34px 'Work Sans'";
   ctx.fillText('NUEVO INGRESO', 540, 307);
 
-  const photoW=820, photoH=900, px=(1080-photoW)/2, py=390;
+  const photoW=820, photoH=880, px=(1080-photoW)/2, py=390;
   ctx.fillStyle = CREAM;
   dibujarRectRedondeado(ctx, px-14, py-14, photoW+28, photoH+28, 36); ctx.fill();
   dibujarFotoCover(ctx, img, px, py, photoW, photoH);
 
-  ctx.fillStyle = GOLD; ctx.font = "600 68px 'Fraunces'";
-  ctx.fillText(producto.nombre, 540, py+photoH+108);
-  ctx.fillStyle = CREAM; ctx.font = "32px 'Work Sans'";
-  ctx.fillText(producto.composicion || '', 540, py+photoH+160);
+  let y = py + photoH + 96;
+  ctx.fillStyle = GOLD; ctx.font = "600 64px 'Fraunces'";
+  ctx.fillText(producto.nombre, 540, y);
+  y += 50;
+  ctx.fillStyle = CREAM; ctx.font = "30px 'Work Sans'";
+  ctx.fillText(producto.composicion || '', 540, y);
+  y += 40;
+
+  if(textoAdicional){
+    ctx.fillStyle = GOLD; ctx.font = "italic 700 34px 'Work Sans'";
+    ctx.fillText(textoAdicional, 540, y);
+    y += 48;
+  }
 
   ctx.strokeStyle = GOLD_DARK; ctx.lineWidth = 4; ctx.setLineDash([16,12]);
-  ctx.beginPath(); ctx.moveTo(90, py+photoH+206); ctx.lineTo(990, py+photoH+206); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(90, y+16); ctx.lineTo(990, y+16); ctx.stroke();
   ctx.setLineDash([]);
+  y += 76;
 
   const beneficios = [
     ['CUOTAS SIN INTERÉS', 'Consultá medios de pago'],
     ['ENVÍOS A TODO EL PAÍS', 'Retiro en local o transporte'],
     ['DESCUENTOS POR MAYOR', 'Escribinos y te asesoramos'],
   ];
-  let y = py+photoH+266;
   beneficios.forEach(([tit, sub]) => {
     ctx.font = "700 36px 'Work Sans'";
     const tw = ctx.measureText(tit).width;
@@ -1847,6 +1873,7 @@ function dibujarFlyerIG(producto, img){
 function abrirNuevoIngreso(){
   mostrarPaso('step-nuevo-ingreso');
   document.getElementById('ni-skus').value = '';
+  document.getElementById('ni-texto').value = '';
   document.getElementById('ni-resultado').innerHTML = '';
   document.getElementById('ni-error').style.display = 'none';
 }
