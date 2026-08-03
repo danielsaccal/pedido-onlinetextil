@@ -324,7 +324,7 @@ header.top .admin-link:hover{opacity:0.85;}
       <h2>Nuevo ingreso — generar flyers</h2>
       <p class="note" style="margin-bottom:14px;">Escriba el/los SKU que ingresaron (separados por coma si son variantes del mismo producto) y arma el flyer para WhatsApp y la story para Instagram.</p>
       <div class="field"><label>SKU(s)</label><input type="text" id="ni-skus" placeholder="Ej: TOA171B, TOA171C"></div>
-      <div class="field"><label>Palabras clave para el generador (opcional)</label><input type="text" id="ni-keywords" placeholder="Ej: suave, calidez, hogar"></div>
+      <div class="field"><label>Palabras clave extra (opcional)</label><input type="text" id="ni-keywords" placeholder="Ej: hogar, regalo — el generador usa sobre todo la composición del producto"></div>
       <div class="field">
         <label>Texto adicional (opcional)</label>
         <div style="display:flex;gap:8px;">
@@ -1982,32 +1982,52 @@ function dibujarFlyerIG(producto, img, textoAdicional, variantesColor){
 function generarTextoConIA(){
   const skusTexto = document.getElementById('ni-skus').value.trim();
   const keywordsTexto = document.getElementById('ni-keywords').value.trim();
-  const primerSku = skusTexto.split(',')[0]?.trim();
-  const match = primerSku ? buscarProductoPorSku(primerSku) : null;
+  const skus = skusTexto.split(',').map(s => s.trim()).filter(Boolean);
+  const matches = skus.map(sku => buscarProductoPorSku(sku)).filter(Boolean);
+  const match = matches[0];
   const nombreProd = match ? match.producto.nombre : 'este producto';
-  const keywords = keywordsTexto ? keywordsTexto.split(',').map(k => k.trim()).filter(Boolean) : ['calidad', 'confort'];
+  const composicion = match ? (match.producto.composicion || '') : '';
+  const keywords = keywordsTexto ? keywordsTexto.split(',').map(k => k.trim()).filter(Boolean) : [];
 
-  const pick = () => keywords[Math.floor(Math.random()*keywords.length)];
+  // sacar datos tecnicos reales: de la composicion y de las descripciones de cada variante (medidas)
+  let fragmentos = composicion.split(/—|\//).map(f => f.trim()).filter(f => f && f !== '—');
+  const medidas = matches.map(m => m.variante.desc).filter(Boolean);
+  if(fragmentos.length === 0 && medidas.length === 0){
+    fragmentos = ['calidad OnLineTextil'];
+  }
+  const datos = [...fragmentos, ...medidas];
+  const pickDato = () => datos[Math.floor(Math.random()*datos.length)];
+  const pickKw = () => keywords.length ? keywords[Math.floor(Math.random()*keywords.length)] : null;
+
   const plantillas = [
-    () => `¡Nuevo! ${nombreProd} — pura ${pick()}`,
-    () => `${cap(pick())} en cada detalle`,
-    () => `Renová tu hogar con ${pick()}`,
-    () => `${nombreProd}: calidad y ${pick()}`,
-    () => `Edición especial — ${pick()}`,
-    () => `Vas a sentir la diferencia: ${pick()}`,
+    () => `${nombreProd}: ${pickDato()}`,
+    () => `Descubrí ${nombreProd} — ${pickDato()}`,
+    () => `Nuevo ingreso en ${pickDato()}`,
+    () => `${cap(pickDato())}, calidad OnLineTextil`,
   ];
+  if(keywords.length){
+    plantillas.push(() => `${pickDato()} — pura ${pickKw()}`);
+    plantillas.push(() => `${cap(pickKw())} con ${pickDato()}`);
+  }
   function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
 
   const usadas = new Set();
   const opciones = [];
-  while(opciones.length < 4 && usadas.size < plantillas.length){
+  let intentos = 0;
+  while(opciones.length < 4 && intentos < 20){
+    intentos++;
     const idx = Math.floor(Math.random()*plantillas.length);
-    if(usadas.has(idx)) continue;
-    usadas.add(idx);
-    opciones.push(plantillas[idx]());
+    const texto = plantillas[idx]();
+    if(usadas.has(texto)) continue;
+    usadas.add(texto);
+    opciones.push(texto);
   }
 
   const cont = document.getElementById('ni-opciones-texto');
+  if(opciones.length === 0){
+    cont.innerHTML = '<p class="note">Escribí primero el SKU para poder generar frases con sus datos reales.</p>';
+    return;
+  }
   cont.innerHTML = opciones.map(op => `
     <button type="button" class="btn-mini" style="display:block;width:100%;text-align:left;margin-bottom:6px;" onclick="document.getElementById('ni-texto').value = this.textContent; document.getElementById('ni-opciones-texto').innerHTML='';">${op}</button>
   `).join('');
