@@ -1715,12 +1715,21 @@ async function generarFlyersNuevoIngreso(){
       previewImg.style.cssText = 'max-width:100%;border-radius:10px;border:1px solid var(--line);margin-bottom:8px;';
       const btn = document.createElement('button');
       btn.className = 'btn btn-gold';
-      btn.textContent = 'Descargar ' + (nombre.includes('story') ? 'story IG' : 'flyer WhatsApp');
-      btn.onclick = () => {
-        const a = document.createElement('a');
-        a.href = canvas.toDataURL('image/png');
-        a.download = nombre;
-        a.click();
+      btn.textContent = 'Compartir/Descargar ' + (nombre.includes('story') ? 'story IG' : 'flyer WhatsApp');
+      btn.onclick = async () => {
+        canvas.toBlob(async (blob) => {
+          const file = new File([blob], nombre, {type:'image/png'});
+          try{
+            if(navigator.canShare && navigator.canShare({files:[file]})){
+              await navigator.share({files:[file], title:'OnLineTextil'});
+              return;
+            }
+          } catch(e){ /* si cancela o falla, baja a descargar */ }
+          const a = document.createElement('a');
+          a.href = canvas.toDataURL('image/png');
+          a.download = nombre;
+          a.click();
+        }, 'image/png');
       };
     wrap.appendChild(previewImg);
     wrap.appendChild(document.createElement('br'));
