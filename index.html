@@ -326,6 +326,7 @@ header.top .admin-link:hover{opacity:0.85;}
       <div class="field"><label>SKU(s)</label><input type="text" id="ni-skus" placeholder="Ej: TOA171B, TOA171C"></div>
       <div class="field"><label>Texto adicional (opcional)</label><input type="text" id="ni-texto" placeholder="Ej: ¡Llegó lo nuevo! Stock limitado"></div>
       <div class="field"><label>Variantes de diseño/color (opcional)</label><input type="text" id="ni-variantes" placeholder="Ej: Disponible en Beige, Gris y Terracota"></div>
+      <div class="field"><label>Descuento % — solo flyer mayorista (opcional)</label><input type="number" id="ni-descuento" min="0" max="100" step="0.01" placeholder="Ej: 15"></div>
       <p class="error" id="ni-error" style="display:none;">No encontré ningún producto con esos SKU.</p>
       <div class="actions">
         <button class="btn btn-gold" onclick="generarFlyersNuevoIngreso()">Generar flyers</button>
@@ -1699,6 +1700,7 @@ async function generarFlyersNuevoIngreso(){
   const skusTexto = document.getElementById('ni-skus').value.trim();
   const textoAdicional = document.getElementById('ni-texto').value.trim();
   const variantesColor = document.getElementById('ni-variantes').value.trim();
+  const descuentoPct = Math.min(100, Math.max(0, parseFloat(document.getElementById('ni-descuento').value) || 0));
   document.getElementById('ni-error').style.display = 'none';
   if(!skusTexto) return;
 
@@ -1721,7 +1723,7 @@ async function generarFlyersNuevoIngreso(){
 
     await document.fonts.ready;
 
-    const c1 = dibujarFlyerWhatsApp(producto, variantesTexto, img, textoAdicional, variantesColor);
+    const c1 = dibujarFlyerWhatsApp(producto, variantesTexto, img, textoAdicional, variantesColor, descuentoPct);
     const c2 = dibujarFlyerIG(producto, img, textoAdicional, variantesColor);
 
     cont.innerHTML = '';
@@ -1762,7 +1764,7 @@ async function generarFlyersNuevoIngreso(){
   }
 }
 
-function dibujarFlyerWhatsApp(producto, variantes, img, textoAdicional, variantesColor){
+function dibujarFlyerWhatsApp(producto, variantes, img, textoAdicional, variantesColor, descuentoPct){
   const W = 1080, H = 1300;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
@@ -1784,7 +1786,14 @@ function dibujarFlyerWhatsApp(producto, variantes, img, textoAdicional, variante
   ctx.fillStyle = PURPLE; ctx.font = "700 26px 'Work Sans'";
   ctx.fillText('NUEVO INGRESO', 540, 209);
 
-  const photoW=580, photoH=400, px=(W-photoW)/2, py=248;
+  if(descuentoPct > 0){
+    ctx.fillStyle = '#A6432F';
+    dibujarRectRedondeado(ctx, 460, 236, 160, 44, 22); ctx.fill();
+    ctx.fillStyle = '#FFFFFF'; ctx.font = "700 24px 'Work Sans'";
+    ctx.fillText('-' + descuentoPct + '% OFF', 540, 265);
+  }
+
+  const photoW=580, photoH=400, px=(W-photoW)/2, py=descuentoPct > 0 ? 296 : 248;
   dibujarFotoCover(ctx, img, px, py, photoW, photoH);
   ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 2;
   dibujarRectRedondeado(ctx, px, py, photoW, photoH, 22); ctx.stroke();
@@ -1823,14 +1832,30 @@ function dibujarFlyerWhatsApp(producto, variantes, img, textoAdicional, variante
   }
 
   variantes.forEach(v => {
+    const precioNum = parsePrice(v.precio);
+    const tieneDescuento = descuentoPct > 0 && precioNum !== null;
+    const filaAlto = tieneDescuento ? 92 : 72;
     ctx.fillStyle = '#FFFFFF';
-    dibujarRectRedondeado(ctx, 70, y, 940, 72, 12); ctx.fill();
+    dibujarRectRedondeado(ctx, 70, y, 940, filaAlto, 12); ctx.fill();
     ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.font = "28px 'Work Sans'";
-    ctx.fillText(v.desc, 100, y+46);
-    ctx.fillStyle = PURPLE; ctx.textAlign = 'right'; ctx.font = "700 32px 'IBM Plex Mono'";
-    ctx.fillText('$ ' + v.precio, 980, y+46);
+    ctx.fillText(v.desc, 100, y + (tieneDescuento ? 52 : 46));
+
+    if(tieneDescuento){
+      const neto = precioNum * (1 - descuentoPct/100);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#A6A296'; ctx.font = "22px 'Work Sans'";
+      const original = '$ ' + v.precio;
+      const ow = ctx.measureText(original).width;
+      ctx.fillText(original, 980, y+30);
+      ctx.beginPath(); ctx.moveTo(980-ow, y+23); ctx.lineTo(980, y+23); ctx.strokeStyle = '#A6A296'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#A6432F'; ctx.font = "700 34px 'IBM Plex Mono'";
+      ctx.fillText(formatPrice(neto), 980, y+66);
+    } else {
+      ctx.fillStyle = PURPLE; ctx.textAlign = 'right'; ctx.font = "700 32px 'IBM Plex Mono'";
+      ctx.fillText('$ ' + v.precio, 980, y+46);
+    }
     ctx.textAlign = 'center';
-    y += 84;
+    y += filaAlto + 12;
   });
 
   y += 20;
@@ -1933,6 +1958,8 @@ function abrirNuevoIngreso(){
   mostrarPaso('step-nuevo-ingreso');
   document.getElementById('ni-skus').value = '';
   document.getElementById('ni-texto').value = '';
+  document.getElementById('ni-variantes').value = '';
+  document.getElementById('ni-descuento').value = '';
   document.getElementById('ni-resultado').innerHTML = '';
   document.getElementById('ni-error').style.display = 'none';
 }
