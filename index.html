@@ -325,6 +325,7 @@ header.top .admin-link:hover{opacity:0.85;}
       <p class="note" style="margin-bottom:14px;">Escriba el/los SKU que ingresaron (separados por coma si son variantes del mismo producto) y arma el flyer para WhatsApp y la story para Instagram.</p>
       <div class="field"><label>SKU(s)</label><input type="text" id="ni-skus" placeholder="Ej: TOA171B, TOA171C"></div>
       <div class="field"><label>Texto adicional (opcional)</label><input type="text" id="ni-texto" placeholder="Ej: ¡Llegó lo nuevo! Stock limitado"></div>
+      <div class="field"><label>Variantes de diseño/color (opcional)</label><input type="text" id="ni-variantes" placeholder="Ej: Disponible en Beige, Gris y Terracota"></div>
       <p class="error" id="ni-error" style="display:none;">No encontré ningún producto con esos SKU.</p>
       <div class="actions">
         <button class="btn btn-gold" onclick="generarFlyersNuevoIngreso()">Generar flyers</button>
@@ -1666,6 +1667,23 @@ function dibujarRectRedondeado(ctx, x, y, w, h, r){
   ctx.closePath();
 }
 
+function envolverTexto(ctx, texto, maxWidth){
+  const palabras = texto.split(' ');
+  const lineas = [];
+  let actual = '';
+  palabras.forEach(palabra => {
+    const prueba = actual ? actual + ' ' + palabra : palabra;
+    if(ctx.measureText(prueba).width > maxWidth && actual){
+      lineas.push(actual);
+      actual = palabra;
+    } else {
+      actual = prueba;
+    }
+  });
+  if(actual) lineas.push(actual);
+  return lineas;
+}
+
 function dibujarFotoCover(ctx, img, x, y, w, h){
   const ratio = Math.max(w / img.width, h / img.height);
   const nw = img.width * ratio, nh = img.height * ratio;
@@ -1680,6 +1698,7 @@ function dibujarFotoCover(ctx, img, x, y, w, h){
 async function generarFlyersNuevoIngreso(){
   const skusTexto = document.getElementById('ni-skus').value.trim();
   const textoAdicional = document.getElementById('ni-texto').value.trim();
+  const variantesColor = document.getElementById('ni-variantes').value.trim();
   document.getElementById('ni-error').style.display = 'none';
   if(!skusTexto) return;
 
@@ -1702,8 +1721,8 @@ async function generarFlyersNuevoIngreso(){
 
     await document.fonts.ready;
 
-    const c1 = dibujarFlyerWhatsApp(producto, variantesTexto, img, textoAdicional);
-    const c2 = dibujarFlyerIG(producto, img, textoAdicional);
+    const c1 = dibujarFlyerWhatsApp(producto, variantesTexto, img, textoAdicional, variantesColor);
+    const c2 = dibujarFlyerIG(producto, img, textoAdicional, variantesColor);
 
     cont.innerHTML = '';
     [{canvas:c1, nombre:'flyer_whatsapp_' + producto.nombre.replace(/\s+/g,'_') + '.png'},
@@ -1743,20 +1762,21 @@ async function generarFlyersNuevoIngreso(){
   }
 }
 
-function dibujarFlyerWhatsApp(producto, variantes, img, textoAdicional){
+function dibujarFlyerWhatsApp(producto, variantes, img, textoAdicional, variantesColor){
+  const W = 1080, H = 1300;
   const canvas = document.createElement('canvas');
-  canvas.width = 1080; canvas.height = 1080;
+  canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
   const PURPLE = '#3D2B4E', GOLD = '#F5D470', CREAM = '#F5F3EF', INK = '#2A2320';
 
-  ctx.fillStyle = CREAM; ctx.fillRect(0,0,1080,1080);
-  ctx.fillStyle = PURPLE; ctx.fillRect(0,0,1080,150);
+  ctx.fillStyle = CREAM; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = PURPLE; ctx.fillRect(0,0,W,150);
   ctx.fillStyle = CREAM; ctx.textAlign = 'center';
   ctx.font = "600 54px 'Fraunces'";
   ctx.fillText('OnLineTextil', 540, 92);
 
   ctx.strokeStyle = GOLD; ctx.lineWidth = 8; ctx.setLineDash([22,14]);
-  ctx.beginPath(); ctx.moveTo(0,150); ctx.lineTo(1080,150); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,150); ctx.lineTo(W,150); ctx.stroke();
   ctx.setLineDash([]);
 
   ctx.fillStyle = GOLD;
@@ -1764,7 +1784,7 @@ function dibujarFlyerWhatsApp(producto, variantes, img, textoAdicional){
   ctx.fillStyle = PURPLE; ctx.font = "700 26px 'Work Sans'";
   ctx.fillText('NUEVO INGRESO', 540, 209);
 
-  const photoW=580, photoH=400, px=(1080-photoW)/2, py=248;
+  const photoW=580, photoH=400, px=(W-photoW)/2, py=248;
   dibujarFotoCover(ctx, img, px, py, photoW, photoH);
   ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 2;
   dibujarRectRedondeado(ctx, px, py, photoW, photoH, 22); ctx.stroke();
@@ -1778,16 +1798,28 @@ function dibujarFlyerWhatsApp(producto, variantes, img, textoAdicional){
   y += 34;
 
   if(textoAdicional){
-    ctx.fillStyle = '#EFE0A8';
-    const tw = ctx.measureText(textoAdicional).width;
     ctx.font = "italic 700 26px 'Work Sans'";
     const bw = Math.min(980, ctx.measureText(textoAdicional).width + 60);
-    dibujarRectRedondeado(ctx, (1080-bw)/2, y, bw, 46, 23); ctx.fill();
+    ctx.fillStyle = '#EFE0A8';
+    dibujarRectRedondeado(ctx, (W-bw)/2, y, bw, 46, 23); ctx.fill();
     ctx.fillStyle = PURPLE;
     ctx.fillText(textoAdicional, 540, y+31);
     y += 66;
   } else {
     y += 16;
+  }
+
+  if(variantesColor){
+    ctx.font = "26px 'Work Sans'";
+    const lineas = envolverTexto(ctx, variantesColor, 880);
+    const boxH = 30 + lineas.length*36;
+    ctx.strokeStyle = PURPLE; ctx.lineWidth = 2; ctx.fillStyle = '#FFFFFF';
+    dibujarRectRedondeado(ctx, 90, y, 900, boxH, 14); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = PURPLE;
+    lineas.forEach((linea, i) => {
+      ctx.fillText(linea, 540, y + 32 + i*36);
+    });
+    y += boxH + 26;
   }
 
   variantes.forEach(v => {
@@ -1801,13 +1833,22 @@ function dibujarFlyerWhatsApp(producto, variantes, img, textoAdicional){
     y += 84;
   });
 
+  y += 20;
   ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 3; ctx.setLineDash([14,10]);
-  ctx.beginPath(); ctx.moveTo(0,1024); ctx.lineTo(1080,1024); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
   ctx.setLineDash([]);
   ctx.fillStyle = '#6E6459'; ctx.font = "22px 'Work Sans'";
-  ctx.fillText('onlinetextil.com.ar · Venta mayorista', 540, 1052);
+  ctx.fillText('onlinetextil.com.ar · Venta mayorista', 540, y+28);
 
-  return canvas;
+  return canvas.height > y+50 ? recortarCanvas(canvas, y+50) : canvas;
+}
+
+function recortarCanvas(canvas, alturaFinal){
+  const recortado = document.createElement('canvas');
+  recortado.width = canvas.width;
+  recortado.height = alturaFinal;
+  recortado.getContext('2d').drawImage(canvas, 0, 0);
+  return recortado;
 }
 
 function dibujarFlyerIG(producto, img, textoAdicional){
@@ -1830,12 +1871,12 @@ function dibujarFlyerIG(producto, img, textoAdicional){
   ctx.fillStyle = PURPLE_DARK; ctx.font = "700 34px 'Work Sans'";
   ctx.fillText('NUEVO INGRESO', 540, 307);
 
-  const photoW=820, photoH=880, px=(1080-photoW)/2, py=390;
+  const photoW=820, photoH=820, px=(1080-photoW)/2, py=390;
   ctx.fillStyle = CREAM;
   dibujarRectRedondeado(ctx, px-14, py-14, photoW+28, photoH+28, 36); ctx.fill();
   dibujarFotoCover(ctx, img, px, py, photoW, photoH);
 
-  let y = py + photoH + 96;
+  let y = py + photoH + 90;
   ctx.fillStyle = GOLD; ctx.font = "600 64px 'Fraunces'";
   ctx.fillText(producto.nombre, 540, y);
   y += 50;
@@ -1849,10 +1890,21 @@ function dibujarFlyerIG(producto, img, textoAdicional){
     y += 48;
   }
 
+  if(variantesColor){
+    ctx.font = "28px 'Work Sans'";
+    const lineas = envolverTexto(ctx, variantesColor, 860);
+    ctx.fillStyle = CREAM;
+    lineas.forEach(linea => {
+      ctx.fillText(linea, 540, y);
+      y += 36;
+    });
+    y += 10;
+  }
+
   ctx.strokeStyle = GOLD_DARK; ctx.lineWidth = 4; ctx.setLineDash([16,12]);
   ctx.beginPath(); ctx.moveTo(90, y+16); ctx.lineTo(990, y+16); ctx.stroke();
   ctx.setLineDash([]);
-  y += 76;
+  y += 70;
 
   const beneficios = [
     ['CUOTAS SIN INTERÉS', 'Consultá medios de pago'],
@@ -1860,19 +1912,19 @@ function dibujarFlyerIG(producto, img, textoAdicional){
     ['DESCUENTOS POR MAYOR', 'Escribinos y te asesoramos'],
   ];
   beneficios.forEach(([tit, sub]) => {
-    ctx.font = "700 36px 'Work Sans'";
+    ctx.font = "700 34px 'Work Sans'";
     const tw = ctx.measureText(tit).width;
     ctx.fillStyle = GOLD;
-    ctx.beginPath(); ctx.arc(540 - tw/2 - 26, y-10, 7, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(540 - tw/2 - 24, y-10, 6, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = CREAM;
     ctx.fillText(tit, 540, y);
-    ctx.font = "26px 'Work Sans'"; ctx.fillStyle = '#D2C8D7';
-    ctx.fillText(sub, 540, y+42);
-    y += 105;
+    ctx.font = "24px 'Work Sans'"; ctx.fillStyle = '#D2C8D7';
+    ctx.fillText(sub, 540, y+38);
+    y += 92;
   });
 
   ctx.fillStyle = GOLD; ctx.font = "700 30px 'Work Sans'";
-  ctx.fillText('onlinetextil.com.ar', 540, 1850);
+  ctx.fillText('onlinetextil.com.ar', 540, Math.max(y+40, 1800));
 
   return canvas;
 }
