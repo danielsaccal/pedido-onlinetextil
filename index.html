@@ -1833,7 +1833,8 @@ async function generarFlyersNuevoIngreso(){
 
       const blobVideo = await generarVideoKenBurns(producto, img, textoAdicional, paletaKey);
       const urlVideo = URL.createObjectURL(blobVideo);
-      const nombreVideo = 'video_' + producto.nombre.replace(/\s+/g,'_') + '.webm';
+      const extVideo = blobVideo.type.includes('mp4') ? 'mp4' : 'webm';
+      const nombreVideo = 'video_' + producto.nombre.replace(/\s+/g,'_') + '.' + extVideo;
 
       videoWrap.innerHTML = '';
       const videoEl = document.createElement('video');
@@ -1843,7 +1844,7 @@ async function generarFlyersNuevoIngreso(){
       btnVideo.className = 'btn btn-gold';
       btnVideo.textContent = 'Compartir/Descargar video';
       btnVideo.onclick = async () => {
-        const file = new File([blobVideo], nombreVideo, {type:'video/webm'});
+        const file = new File([blobVideo], nombreVideo, {type: blobVideo.type});
         try{
           if(navigator.canShare && navigator.canShare({files:[file]})){
             await navigator.share({files:[file], title:'OnLineTextil'});
@@ -1855,7 +1856,9 @@ async function generarFlyersNuevoIngreso(){
       };
       const notaVideo = document.createElement('p');
       notaVideo.className = 'note';
-      notaVideo.textContent = 'Formato .webm — si Instagram no lo acepta directo, ábralo y grábelo de nuevo desde la app de Reels, o use un conversor a .mp4.';
+      notaVideo.textContent = extVideo === 'mp4'
+        ? 'Formato .mp4 — Instagram lo acepta directo.'
+        : 'Su navegador generó el video en .webm — si Instagram no lo acepta directo, ábralo y grábelo de nuevo desde la app de Reels, o use un conversor a .mp4.';
       videoWrap.appendChild(videoEl);
       videoWrap.appendChild(document.createElement('br'));
       videoWrap.appendChild(btnVideo);
@@ -2145,8 +2148,14 @@ async function generarVideoKenBurns(producto, img, textoAdicional, paletaKey){
   const ctx = canvas.getContext('2d');
 
   const stream = canvas.captureStream(30);
-  let mimeType = 'video/webm;codecs=vp9';
-  if(!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
+  const candidatos = [
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+  ];
+  let mimeType = candidatos.find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
   const recorder = new MediaRecorder(stream, {mimeType});
   const chunks = [];
   recorder.ondataavailable = e => { if(e.data.size > 0) chunks.push(e.data); };
@@ -2170,7 +2179,7 @@ async function generarVideoKenBurns(producto, img, textoAdicional, paletaKey){
   });
   recorder.stop();
   await terminado;
-  return new Blob(chunks, {type:'video/webm'});
+  return new Blob(chunks, {type: mimeType.split(';')[0]});
 }
 
 function generarTextoConIA(){
