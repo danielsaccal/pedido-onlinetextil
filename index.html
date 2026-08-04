@@ -2030,6 +2030,10 @@ function dibujarPiezaMinimalista(producto, img, formato, paletaKey){
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
 
+  const topSafe    = esPost ? 90 : (esReel ? 130 : 250);
+  const bottomSafe = esPost ? 90 : (esReel ? 380 : 250);
+  const sideSafe   = esReel ? 130 : 40;
+
   // foto a pantalla completa (cover), dominando el diseño
   const ratio = Math.max(W / img.width, H / img.height);
   const nw = img.width * ratio, nh = img.height * ratio;
@@ -2040,8 +2044,8 @@ function dibujarPiezaMinimalista(producto, img, formato, paletaKey){
   ctx.strokeStyle = P.bg; ctx.lineWidth = marco;
   ctx.strokeRect(marco/2, marco/2, W-marco, H-marco);
 
-  // isotipo chico en la esquina (circulo con "OT")
-  const cx = W - 90, cy = 90, r = 46;
+  // isotipo chico, corrido del lado izquierdo arriba para no chocar con los botones de Reels (derecha)
+  const cx = esReel ? 90 : W - 90, cy = Math.max(90, topSafe*0.55), r = 46;
   ctx.fillStyle = P.bg;
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
   ctx.fillStyle = P.accent; ctx.textAlign = 'center';
@@ -2056,8 +2060,8 @@ function dibujarPiezaMinimalista(producto, img, formato, paletaKey){
     ctx.beginPath(); ctx.moveTo(px-16, py-26); ctx.lineTo(px-16, py+26); ctx.lineTo(px+26, py); ctx.closePath(); ctx.fill();
   }
 
-  // franja inferior degradada con el nombre del producto
-  const gradH = 260;
+  // franja inferior degradada con el nombre del producto, siempre arriba del margen seguro
+  const gradH = bottomSafe + 90;
   const grad = ctx.createLinearGradient(0, H-gradH, 0, H);
   grad.addColorStop(0, 'rgba(0,0,0,0)');
   grad.addColorStop(1, 'rgba(0,0,0,0.72)');
@@ -2066,8 +2070,9 @@ function dibujarPiezaMinimalista(producto, img, formato, paletaKey){
 
   ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'center';
   ctx.font = "600 52px 'Fraunces'";
-  const lineasNombre = envolverTexto(ctx, producto.nombre, 880);
-  let y = H - 70 - (lineasNombre.length-1)*54;
+  const lineasNombre = envolverTexto(ctx, producto.nombre, 880 - sideSafe*2);
+  const yBase = H - bottomSafe - 30;
+  let y = yBase - (lineasNombre.length-1)*54;
   lineasNombre.forEach(linea => { ctx.fillText(linea, 540, y); y += 54; });
 
   ctx.fillStyle = P.accent;
@@ -2085,22 +2090,28 @@ function dibujarFlyerRedes(producto, img, textoAdicional, variantesColor, format
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
 
+  // zonas seguras de Instagram 2026: Reels tiene mucho mas margen abajo (botones/caption)
+  // que Stories, y menos arriba; Post (grilla 4:5) necesita margen top/bottom parejo
+  const topSafe    = esPost ? 90  : (esReel ? 130 : 250);
+  const bottomSafe = esPost ? 90  : (esReel ? 380 : 250);
+  const sideSafe   = esReel ? 130 : 60; // Reels: columna de botones (me gusta/comentar/compartir) a la derecha
+
   ctx.fillStyle = P.bg; ctx.fillRect(0,0,W,H);
   ctx.fillStyle = P.texto; ctx.textAlign = 'center';
-  ctx.font = `600 ${esPost ? 50 : 62}px 'Fraunces'`;
-  ctx.fillText('OnLineTextil', 540, esPost ? 100 : 140);
+  ctx.font = `600 ${esPost ? 46 : 58}px 'Fraunces'`;
+  ctx.fillText('OnLineTextil', 540, topSafe + 40);
 
   ctx.strokeStyle = P.accent; ctx.lineWidth = 6; ctx.setLineDash([20,14]);
-  ctx.beginPath(); ctx.moveTo(90, esPost ? 160 : 220); ctx.lineTo(990, esPost ? 160 : 220); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(90, topSafe + 100); ctx.lineTo(990, topSafe + 100); ctx.stroke();
   ctx.setLineDash([]);
 
   ctx.fillStyle = P.badgeBg;
-  const badgeY = esPost ? 196 : 264;
+  const badgeY = topSafe + 130;
   dibujarRectRedondeado(ctx, 330, badgeY, 420, 62, 31); ctx.fill();
   ctx.fillStyle = P.badgeText; ctx.font = "700 32px 'Work Sans'";
   ctx.fillText(esReel ? 'NUEVO EN REEL' : 'NUEVO INGRESO', 540, badgeY+40);
 
-  const photoW = esPost ? 700 : 780;
+  const photoW = (esPost ? 700 : 780) - (esReel ? sideSafe : 0);
   const photoH = esPost ? 560 : 720;
   const px = (W-photoW)/2, py = badgeY + 78;
   ctx.fillStyle = P.tarjeta;
@@ -2116,19 +2127,19 @@ function dibujarFlyerRedes(producto, img, textoAdicional, variantesColor, format
   }
 
   let y = py + photoH + (esPost ? 60 : 90);
-  ctx.fillStyle = P.titulo; ctx.font = `600 ${esPost ? 48 : 64}px 'Fraunces'`;
-  const lineasNombre = envolverTexto(ctx, producto.nombre, 940);
-  lineasNombre.forEach(linea => { ctx.fillText(linea, 540, y); y += esPost ? 52 : 66; });
+  ctx.fillStyle = P.titulo; ctx.font = `600 ${esPost ? 48 : 60}px 'Fraunces'`;
+  const lineasNombre = envolverTexto(ctx, producto.nombre, 940 - sideSafe*2);
+  lineasNombre.forEach(linea => { ctx.fillText(linea, 540, y); y += esPost ? 52 : 64; });
   y -= 16;
-  ctx.fillStyle = P.texto; ctx.font = `${esPost ? 26 : 30}px 'Work Sans'`;
-  const lineasComp = envolverTexto(ctx, producto.composicion || '', 940);
-  lineasComp.forEach(linea => { ctx.fillText(linea, 540, y); y += esPost ? 32 : 36; });
+  ctx.fillStyle = P.texto; ctx.font = `${esPost ? 26 : 28}px 'Work Sans'`;
+  const lineasComp = envolverTexto(ctx, producto.composicion || '', 940 - sideSafe*2);
+  lineasComp.forEach(linea => { ctx.fillText(linea, 540, y); y += esPost ? 32 : 34; });
   y += 4;
 
   if(textoAdicional){
-    ctx.fillStyle = P.accent; ctx.font = `italic 700 ${esPost ? 28 : 34}px 'Work Sans'`;
-    const lineasTxt = envolverTexto(ctx, textoAdicional, 900);
-    lineasTxt.forEach(linea => { ctx.fillText(linea, 540, y); y += esPost ? 36 : 44; });
+    ctx.fillStyle = P.accent; ctx.font = `italic 700 ${esPost ? 28 : 32}px 'Work Sans'`;
+    const lineasTxt = envolverTexto(ctx, textoAdicional, 900 - sideSafe*2);
+    lineasTxt.forEach(linea => { ctx.fillText(linea, 540, y); y += esPost ? 36 : 42; });
     y += 4;
   }
 
@@ -2145,26 +2156,29 @@ function dibujarFlyerRedes(producto, img, textoAdicional, variantesColor, format
   ctx.setLineDash([]);
   y += esPost ? 56 : 70;
 
+  const limiteInferior = H - bottomSafe;
   const beneficios = [
     ['💳 CUOTAS SIN INTERÉS', 'Preguntanos por los medios de pago'],
     ['🚚 ENVÍOS A TODO EL PAÍS', 'Te lo mandamos donde estés'],
     ['🏷️ DESCUENTOS POR MAYOR', 'Escribinos y te tiramos precio'],
   ];
-  const listaBeneficios = esPost ? [beneficios[0], beneficios[1]] : beneficios;
+  const pasoBeneficio = esPost ? 68 : 78;
+  const cantMax = Math.max(0, Math.floor((limiteInferior - 40 - y) / pasoBeneficio));
+  const listaBeneficios = beneficios.slice(0, Math.min(beneficios.length, esPost ? 2 : cantMax));
   listaBeneficios.forEach(([tit, sub]) => {
-    ctx.font = `700 ${esPost ? 28 : 34}px 'Work Sans'`;
+    ctx.font = `700 ${esPost ? 28 : 32}px 'Work Sans'`;
     const tw = ctx.measureText(tit).width;
     ctx.fillStyle = P.accent;
     ctx.beginPath(); ctx.arc(540 - tw/2 - 22, y-9, 6, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = P.texto;
     ctx.fillText(tit, 540, y);
-    ctx.font = `${esPost ? 20 : 24}px 'Work Sans'`; ctx.fillStyle = P.textoSub;
-    ctx.fillText(sub, 540, y + (esPost ? 32 : 38));
-    y += esPost ? 68 : 82;
+    ctx.font = `${esPost ? 20 : 22}px 'Work Sans'`; ctx.fillStyle = P.textoSub;
+    ctx.fillText(sub, 540, y + (esPost ? 32 : 36));
+    y += pasoBeneficio;
   });
 
-  ctx.fillStyle = P.accent; ctx.font = "700 30px 'Work Sans'";
-  ctx.fillText('onlinetextil.com.ar', 540, Math.min(Math.max(y+40, esPost ? H-70 : 1800), H-30));
+  ctx.fillStyle = P.accent; ctx.font = "700 28px 'Work Sans'";
+  ctx.fillText('onlinetextil.com.ar', 540, Math.min(y+36, limiteInferior - 10));
 
   return canvas;
 }
