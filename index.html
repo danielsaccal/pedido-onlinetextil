@@ -358,6 +358,9 @@ header.top .admin-link:hover{opacity:0.85;}
           <option value="crema">Crema suave</option>
         </select>
       </div>
+      <div class="field">
+        <label><input type="checkbox" id="ni-video"> 🎬 Generar también un video simple (zoom suave, ~5 seg, sin IA)</label>
+      </div>
       <p class="error" id="ni-error" style="display:none;">No encontré ningún producto con esos SKU.</p>
       <div class="actions">
         <button class="btn btn-gold" onclick="generarFlyersNuevoIngreso()">Generar flyers</button>
@@ -1821,6 +1824,43 @@ async function generarFlyersNuevoIngreso(){
     wrap.appendChild(btn);
     cont.appendChild(wrap);
   });
+
+    if(document.getElementById('ni-video').checked){
+      const videoWrap = document.createElement('div');
+      videoWrap.style.cssText = 'margin-bottom:16px;text-align:center;';
+      videoWrap.innerHTML = '<p class="note">Generando video (unos segundos)...</p>';
+      cont.appendChild(videoWrap);
+
+      const blobVideo = await generarVideoKenBurns(producto, img, textoAdicional, paletaKey);
+      const urlVideo = URL.createObjectURL(blobVideo);
+      const nombreVideo = 'video_' + producto.nombre.replace(/\s+/g,'_') + '.webm';
+
+      videoWrap.innerHTML = '';
+      const videoEl = document.createElement('video');
+      videoEl.src = urlVideo; videoEl.controls = true; videoEl.loop = true;
+      videoEl.style.cssText = 'max-width:100%;border-radius:10px;border:1px solid var(--line);margin-bottom:8px;';
+      const btnVideo = document.createElement('button');
+      btnVideo.className = 'btn btn-gold';
+      btnVideo.textContent = 'Compartir/Descargar video';
+      btnVideo.onclick = async () => {
+        const file = new File([blobVideo], nombreVideo, {type:'video/webm'});
+        try{
+          if(navigator.canShare && navigator.canShare({files:[file]})){
+            await navigator.share({files:[file], title:'OnLineTextil'});
+            return;
+          }
+        } catch(e){ /* sigue al fallback */ }
+        const a = document.createElement('a');
+        a.href = urlVideo; a.download = nombreVideo; a.click();
+      };
+      const notaVideo = document.createElement('p');
+      notaVideo.className = 'note';
+      notaVideo.textContent = 'Formato .webm — si Instagram no lo acepta directo, ábralo y grábelo de nuevo desde la app de Reels, o use un conversor a .mp4.';
+      videoWrap.appendChild(videoEl);
+      videoWrap.appendChild(document.createElement('br'));
+      videoWrap.appendChild(btnVideo);
+      videoWrap.appendChild(notaVideo);
+    }
   } catch(e){
     cont.innerHTML = '';
     alert('No se pudo generar el flyer: ' + e.message);
@@ -2024,6 +2064,115 @@ function dibujarFlyerRedes(producto, img, textoAdicional, variantesColor, format
   return canvas;
 }
 
+// ---------- video simple (sin IA, animacion tipo Ken Burns) ----------
+function facilInOut(t){ return t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2; }
+
+function dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progreso){
+  const P = PALETAS[paletaKey] || PALETAS.violeta;
+  const W = 1080, H = 1920;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = P.bg; ctx.fillRect(0,0,W,H);
+  ctx.textAlign = 'center';
+
+  ctx.fillStyle = P.texto; ctx.font = "600 62px 'Fraunces'";
+  ctx.globalAlpha = Math.min(1, progreso*4);
+  ctx.fillText('OnLineTextil', 540, 140);
+  ctx.globalAlpha = 1;
+
+  ctx.strokeStyle = P.accent; ctx.lineWidth = 6; ctx.setLineDash([20,14]);
+  ctx.beginPath(); ctx.moveTo(90,220); ctx.lineTo(990,220); ctx.stroke();
+  ctx.setLineDash([]);
+
+  const badgeAlpha = Math.max(0, Math.min(1, (progreso-0.05)*6));
+  ctx.globalAlpha = badgeAlpha;
+  ctx.fillStyle = P.badgeBg;
+  dibujarRectRedondeado(ctx, 330, 264, 420, 66, 33); ctx.fill();
+  ctx.fillStyle = P.badgeText; ctx.font = "700 34px 'Work Sans'";
+  ctx.fillText('NUEVO INGRESO', 540, 307);
+  ctx.globalAlpha = 1;
+
+  // foto con zoom suave (efecto Ken Burns)
+  const photoW=780, photoH=900, px=(W-photoW)/2, py=390;
+  ctx.fillStyle = P.tarjeta;
+  dibujarRectRedondeado(ctx, px-14, py-14, photoW+28, photoH+28, 36); ctx.fill();
+  ctx.save();
+  dibujarRectRedondeado(ctx, px, py, photoW, photoH, 22);
+  ctx.clip();
+  const zoom = 1 + 0.12*facilInOut(progreso);
+  const ratio = Math.max(photoW/img.width, photoH/img.height) * zoom;
+  const nw = img.width*ratio, nh = img.height*ratio;
+  ctx.drawImage(img, px+(photoW-nw)/2, py+(photoH-nh)/2, nw, nh);
+  ctx.restore();
+
+  let y = py + photoH + 90;
+  const nombreAlpha = Math.max(0, Math.min(1, (progreso-0.25)*4));
+  const nombreY = y + (1-nombreAlpha)*20;
+  ctx.globalAlpha = nombreAlpha;
+  ctx.fillStyle = P.titulo; ctx.font = "600 64px 'Fraunces'";
+  const lineasNombre = envolverTexto(ctx, producto.nombre, 940);
+  let yy = nombreY;
+  lineasNombre.forEach(linea => { ctx.fillText(linea, 540, yy); yy += 66; });
+  ctx.globalAlpha = 1;
+  y = yy - 16;
+
+  const compAlpha = Math.max(0, Math.min(1, (progreso-0.4)*4));
+  ctx.globalAlpha = compAlpha;
+  ctx.fillStyle = P.texto; ctx.font = "30px 'Work Sans'";
+  const lineasComp = envolverTexto(ctx, producto.composicion || '', 940);
+  lineasComp.forEach(linea => { ctx.fillText(linea, 540, y); y += 36; });
+  ctx.globalAlpha = 1;
+  y += 10;
+
+  if(textoAdicional){
+    const txtAlpha = Math.max(0, Math.min(1, (progreso-0.55)*4));
+    ctx.globalAlpha = txtAlpha;
+    ctx.fillStyle = P.accent; ctx.font = "italic 700 34px 'Work Sans'";
+    const lineasTxt = envolverTexto(ctx, textoAdicional, 900);
+    lineasTxt.forEach(linea => { ctx.fillText(linea, 540, y); y += 44; });
+    ctx.globalAlpha = 1;
+  }
+
+  const footAlpha = Math.max(0, Math.min(1, (progreso-0.75)*4));
+  ctx.globalAlpha = footAlpha;
+  ctx.fillStyle = P.accent; ctx.font = "700 30px 'Work Sans'";
+  ctx.fillText('onlinetextil.com.ar', 540, 1850);
+  ctx.globalAlpha = 1;
+}
+
+async function generarVideoKenBurns(producto, img, textoAdicional, paletaKey){
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080; canvas.height = 1920;
+  const ctx = canvas.getContext('2d');
+
+  const stream = canvas.captureStream(30);
+  let mimeType = 'video/webm;codecs=vp9';
+  if(!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
+  const recorder = new MediaRecorder(stream, {mimeType});
+  const chunks = [];
+  recorder.ondataavailable = e => { if(e.data.size > 0) chunks.push(e.data); };
+  const terminado = new Promise(resolve => recorder.onstop = resolve);
+  recorder.start();
+
+  const duracionMs = 5000;
+  const inicio = performance.now();
+  await new Promise(resolveAnim => {
+    function frame(t){
+      const elapsed = t - inicio;
+      const progreso = Math.min(1, elapsed / duracionMs);
+      dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progreso);
+      if(elapsed < duracionMs){
+        requestAnimationFrame(frame);
+      } else {
+        resolveAnim();
+      }
+    }
+    requestAnimationFrame(frame);
+  });
+  recorder.stop();
+  await terminado;
+  return new Blob(chunks, {type:'video/webm'});
+}
+
 function generarTextoConIA(){
   const skusTexto = document.getElementById('ni-skus').value.trim();
   const keywordsTexto = document.getElementById('ni-keywords').value.trim();
@@ -2104,6 +2253,7 @@ function abrirNuevoIngreso(){
   document.getElementById('ni-fmt-post').checked = false;
   document.getElementById('ni-fmt-reel').checked = false;
   document.getElementById('ni-paleta').value = 'violeta';
+  document.getElementById('ni-video').checked = false;
   document.getElementById('ni-opciones-texto').innerHTML = '';
   document.getElementById('ni-resultado').innerHTML = '';
   document.getElementById('ni-error').style.display = 'none';
