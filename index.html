@@ -2069,9 +2069,9 @@ function dibujarFlyerRedes(producto, img, textoAdicional, variantesColor, format
   y += esPost ? 56 : 70;
 
   const beneficios = [
-    ['CUOTAS SIN INTERÉS', 'Consultá medios de pago'],
-    ['ENVÍOS A TODO EL PAÍS', 'Retiro en persona, transporte de cargas o correo'],
-    ['DESCUENTOS POR MAYOR', 'Escribinos y te asesoramos'],
+    ['💳 CUOTAS SIN INTERÉS', 'Preguntanos por los medios de pago'],
+    ['🚚 ENVÍOS A TODO EL PAÍS', 'Te lo mandamos donde estés'],
+    ['🏷️ DESCUENTOS POR MAYOR', 'Escribinos y te tiramos precio'],
   ];
   const listaBeneficios = esPost ? [beneficios[0], beneficios[1]] : beneficios;
   listaBeneficios.forEach(([tit, sub]) => {
@@ -2215,14 +2215,17 @@ function generarCopyPosteo(producto, matches){
   const medidas = matches.map(m => m.variante.desc).filter(Boolean);
 
   let lineas = [];
-  lineas.push(producto.nombre.toUpperCase());
+  lineas.push('✨ ' + producto.nombre.toUpperCase() + ' ya está disponible ✨');
   lineas.push('');
-  if(materiales.length) lineas.push('Composición: ' + materiales.join(' / '));
-  if(gramaje) lineas.push('Gramaje: ' + gramaje);
-  if(medidas.length) lineas.push('Medidas disponibles: ' + medidas.join(', '));
+  if(materiales.length) lineas.push('🧵 Composición: ' + materiales.join(' / '));
+  if(gramaje) lineas.push('⚖️ Gramaje: ' + gramaje);
+  if(medidas.length) lineas.push('📏 Medidas disponibles: ' + medidas.join(', '));
   lineas.push('');
-  lineas.push('Consultá por WhatsApp.');
-  lineas.push('Envíos a todo el país — retiro en persona, transporte de cargas o correo.');
+  lineas.push('💳 Cuotas sin interés');
+  lineas.push('🚚 Envíos a todo el país (retiro en persona, transporte de cargas o correo)');
+  lineas.push('🏷️ Descuentos por compra mayorista');
+  lineas.push('');
+  lineas.push('📲 ¡Escribinos por WhatsApp y te contamos todo!');
   lineas.push('');
 
   const catActual = CATALOGO.find(c => c.productos.includes(producto));
