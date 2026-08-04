@@ -1821,22 +1821,37 @@ async function generarFlyersNuevoIngreso(){
   cont.innerHTML = '<p class="note">Generando...</p>';
 
   try{
-    const { ci, pi, producto } = matches[0];
-    const imgSrc = imagenEfectiva(ci, pi, producto);
-    const img = await cargarImagenParaCanvas(imgSrc);
-    const variantesTexto = matches.map(m => ({desc: m.variante.desc, precio: m.variante.precio}));
+    // agrupar los SKU por producto real (puede haber varios productos distintos)
+    const gruposMap = {};
+    matches.forEach(m => {
+      const key = m.ci + '-' + m.pi;
+      if(!gruposMap[key]) gruposMap[key] = { ci: m.ci, pi: m.pi, producto: m.producto, variantes: [] };
+      gruposMap[key].variantes.push({ desc: m.variante.desc, precio: m.variante.precio });
+    });
+    const grupos = Object.values(gruposMap);
+
+    // cargar la foto de cada producto distinto
+    for(const g of grupos){
+      const imgSrc = imagenEfectiva(g.ci, g.pi, g.producto);
+      g.img = await cargarImagenParaCanvas(imgSrc);
+    }
 
     await document.fonts.ready;
 
+    const primerProducto = grupos[0].producto;
     const paletaKey = document.getElementById('ni-paleta').value;
     const estilo = document.querySelector('input[name="ni-estilo"]:checked').value;
-    const piezas = [{canvas: dibujarFlyerWhatsApp(producto, variantesTexto, img, textoAdicional, variantesColor, descuentoPct), nombre:'flyer_whatsapp_' + producto.nombre.replace(/\s+/g,'_') + '.png', etiqueta:'flyer WhatsApp'}];
+    const nombreArchivoBase = grupos.map(g => g.producto.nombre).join('_').replace(/\s+/g,'_').slice(0,60);
+    const piezas = [{canvas: dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoPct), nombre:'flyer_whatsapp_' + nombreArchivoBase + '.png', etiqueta:'flyer WhatsApp'}];
 
     const formatosElegidos = [];
     if(document.getElementById('ni-fmt-story').checked) formatosElegidos.push(['story','story IG']);
     if(document.getElementById('ni-fmt-post').checked) formatosElegidos.push(['post','posteo IG']);
     if(document.getElementById('ni-fmt-reel').checked) formatosElegidos.push(['reel','portada de Reel']);
 
+    // las piezas de redes siguen siendo de un producto por vez (usan el primero de la lista)
+    const producto = primerProducto;
+    const img = grupos[0].img;
     formatosElegidos.forEach(([formato, etiqueta]) => {
       if(estilo === 'minimal'){
         Object.keys(PALETAS).forEach(pk => {
@@ -1895,7 +1910,7 @@ async function generarFlyersNuevoIngreso(){
   });
 
     if(document.getElementById('ni-fmt-post').checked || document.getElementById('ni-fmt-reel').checked){
-      const copyTexto = generarCopyPosteo(producto, matches);
+      const copyTexto = generarCopyPosteo(producto, grupos[0].variantes.map(v => ({variante: v})));
       const copyWrap = document.createElement('div');
       copyWrap.style.cssText = 'margin-bottom:16px;grid-column:1/-1;';
       const copyLabel = document.createElement('p');
@@ -1966,12 +1981,13 @@ async function generarFlyersNuevoIngreso(){
   }
 }
 
-function dibujarFlyerWhatsApp(producto, variantes, img, textoAdicional, variantesColor, descuentoPct){
-  const W = 1080, H = 1300;
+function dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoPct){
+  const W = 1080, H = 1900;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
   const PURPLE = '#3D2B4E', GOLD = '#F5D470', CREAM = '#F5F3EF', INK = '#2A2320';
+  const multi = grupos.length > 1;
 
   ctx.fillStyle = CREAM; ctx.fillRect(0,0,W,H);
   ctx.fillStyle = PURPLE; ctx.fillRect(0,0,W,150);
@@ -1986,22 +2002,28 @@ function dibujarFlyerWhatsApp(producto, variantes, img, textoAdicional, variante
   ctx.fillStyle = GOLD;
   dibujarRectRedondeado(ctx, 380, 176, 320, 52, 26); ctx.fill();
   ctx.fillStyle = PURPLE; ctx.font = "700 26px 'Work Sans'";
-  ctx.fillText('NUEVO INGRESO', 540, 209);
+  ctx.fillText(multi ? 'NUEVOS INGRESOS' : 'NUEVO INGRESO', 540, 209);
 
-  const photoW=580, photoH=400, px=(W-photoW)/2, py=248;
-  dibujarFotoContain(ctx, img, px, py, photoW, photoH, "#FFFFFF");
-  ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 2;
-  dibujarRectRedondeado(ctx, px, py, photoW, photoH, 22); ctx.stroke();
+  let y = 248;
 
-  let y = py + photoH + 56;
-  ctx.fillStyle = PURPLE; ctx.font = "600 46px 'Fraunces'";
-  const lineasNombre = envolverTexto(ctx, producto.nombre, 940);
-  lineasNombre.forEach(linea => { ctx.fillText(linea, 540, y); y += 50; });
-  y -= 12;
-  ctx.fillStyle = '#6E6459'; ctx.font = "24px 'Work Sans'";
-  const lineasComp = envolverTexto(ctx, producto.composicion || '', 940);
-  lineasComp.forEach(linea => { ctx.fillText(linea, 540, y); y += 30; });
-  y += 4;
+  if(!multi){
+    // un solo producto: foto grande centrada, como antes
+    const { producto, img, variantes } = grupos[0];
+    const photoW=580, photoH=400, px=(W-photoW)/2, py=y;
+    dibujarFotoContain(ctx, img, px, py, photoW, photoH, "#FFFFFF");
+    ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 2;
+    dibujarRectRedondeado(ctx, px, py, photoW, photoH, 22); ctx.stroke();
+
+    y = py + photoH + 56;
+    ctx.fillStyle = PURPLE; ctx.font = "600 46px 'Fraunces'";
+    const lineasNombre = envolverTexto(ctx, producto.nombre, 940);
+    lineasNombre.forEach(linea => { ctx.fillText(linea, 540, y); y += 50; });
+    y -= 12;
+    ctx.fillStyle = '#6E6459'; ctx.font = "24px 'Work Sans'";
+    const lineasComp = envolverTexto(ctx, producto.composicion || '', 940);
+    lineasComp.forEach(linea => { ctx.fillText(linea, 540, y); y += 30; });
+    y += 4;
+  }
 
   if(textoAdicional){
     ctx.font = "italic 700 26px 'Work Sans'";
@@ -2031,19 +2053,50 @@ function dibujarFlyerWhatsApp(producto, variantes, img, textoAdicional, variante
     y += boxH + 26;
   }
 
-  variantes.forEach(v => {
+  function dibujarFilaPrecio(v){
     const precioNum = parsePrice(v.precio);
     const tieneDescuento = descuentoPct > 0 && precioNum !== null;
     const precioMostrado = tieneDescuento ? formatPrice(precioNum * (1 - descuentoPct/100)) : ('$ ' + v.precio);
     ctx.fillStyle = '#FFFFFF';
-    dibujarRectRedondeado(ctx, 70, y, 940, 72, 12); ctx.fill();
+    dibujarRectRedondeado(ctx, multi ? 246 : 70, y, multi ? 764 : 940, 72, 12); ctx.fill();
     ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.font = "28px 'Work Sans'";
-    ctx.fillText(v.desc, 100, y+46);
+    ctx.fillText(v.desc, multi ? 276 : 100, y+46);
     ctx.fillStyle = PURPLE; ctx.textAlign = 'right'; ctx.font = "700 32px 'IBM Plex Mono'";
-    ctx.fillText(precioMostrado, 980, y+46);
+    ctx.fillText(precioMostrado, multi ? 980 : 980, y+46);
     ctx.textAlign = 'center';
     y += 84;
-  });
+  }
+
+  if(multi){
+    grupos.forEach((g, idx) => {
+      const photoS = 180;
+      const px = 70, py = y;
+      dibujarFotoContain(ctx, g.img, px, py, photoS, photoS, "#FFFFFF");
+      ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 2;
+      dibujarRectRedondeado(ctx, px, py, photoS, photoS, 16); ctx.stroke();
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = PURPLE; ctx.font = "600 34px 'Fraunces'";
+      const lineasNombre = envolverTexto(ctx, g.producto.nombre, 660);
+      let yTxt = py + 44;
+      lineasNombre.slice(0,2).forEach(linea => { ctx.fillText(linea, px+photoS+30, yTxt); yTxt += 38; });
+      ctx.fillStyle = '#6E6459'; ctx.font = "22px 'Work Sans'";
+      const lineasComp = envolverTexto(ctx, g.producto.composicion || '', 660);
+      lineasComp.slice(0,2).forEach(linea => { ctx.fillText(linea, px+photoS+30, yTxt); yTxt += 26; });
+      ctx.textAlign = 'center';
+
+      y += photoS + 20;
+      g.variantes.forEach(v => dibujarFilaPrecio(v));
+      if(idx < grupos.length-1){
+        ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 2; ctx.setLineDash([10,8]);
+        ctx.beginPath(); ctx.moveTo(70,y+10); ctx.lineTo(1010,y+10); ctx.stroke();
+        ctx.setLineDash([]);
+        y += 34;
+      }
+    });
+  } else {
+    grupos[0].variantes.forEach(v => dibujarFilaPrecio(v));
+  }
 
   y += 20;
   ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 3; ctx.setLineDash([14,10]);
