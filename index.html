@@ -415,6 +415,11 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
           <label class="ni-chip"><input type="checkbox" id="ni-fmt-post"><span>Posteo</span></label>
           <label class="ni-chip"><input type="checkbox" id="ni-fmt-reel"><span>Reel</span></label>
         </div>
+        <div class="ni-chips" style="margin-top:8px;">
+          <label class="ni-chip"><input type="radio" name="ni-diseno" value="editorial" checked><span>Editorial (foto grande)</span></label>
+          <label class="ni-chip"><input type="radio" name="ni-diseno" value="tarjeta"><span>Tarjeta con marco</span></label>
+          <label class="ni-chip"><input type="radio" name="ni-diseno" value="texto"><span>Solo texto</span></label>
+        </div>
         <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video"><span>🎬 Video simple (zoom, ~5 seg)</span></label>
       </div>
 
@@ -1910,10 +1915,15 @@ async function generarFlyersNuevoIngreso(){
     // las piezas de redes siguen siendo de un producto por vez (usan el primero de la lista)
     const producto = primerProducto;
     const img = grupos[0].img;
+    const diseno = document.querySelector('input[name="ni-diseno"]:checked').value;
     formatosElegidos.forEach(([formato, etiqueta]) => {
+      let canvasPieza;
+      if(diseno === 'tarjeta') canvasPieza = dibujarPiezaTarjeta(producto, img, formato);
+      else if(diseno === 'texto') canvasPieza = dibujarPiezaTexto(producto, textoAdicional, formato);
+      else canvasPieza = dibujarPiezaEditorial(producto, img, formato);
       piezas.push({
-        canvas: dibujarPiezaMinimalista(producto, img, formato),
-        nombre: formato + '_' + producto.nombre.replace(/\s+/g,'_') + '.png',
+        canvas: canvasPieza,
+        nombre: formato + '_' + diseno + '_' + producto.nombre.replace(/\s+/g,'_') + '.png',
         etiqueta: etiqueta
       });
     });
@@ -2170,7 +2180,7 @@ const PALETAS = {
   crema:   {bg:'#F5F3EF', badgeBg:'#3D2B4E', badgeText:'#F5D470', accent:'#3D2B4E', accentDark:'#2A1D36', titulo:'#3D2B4E', texto:'#3D2B4E', textoSub:'#6E6459', tarjeta:'#FFFFFF'},
 };
 
-function dibujarPiezaMinimalista(producto, img, formato){
+function dibujarPiezaEditorial(producto, img, formato){
   const P = PALETAS.violeta;
   const esPost = formato === 'post';
   const esReel = formato === 'reel';
@@ -2222,6 +2232,107 @@ function dibujarPiezaMinimalista(producto, img, formato){
   const lineasNombre = envolverTexto(ctx, producto.nombre, 880 - sideSafe*2);
   let y = H - barraH + 90;
   lineasNombre.forEach(linea => { ctx.fillText(linea, 540, y); y += 54; });
+
+  return canvas;
+}
+
+function dibujarPiezaTarjeta(producto, img, formato){
+  const P = PALETAS.violeta;
+  const esPost = formato === 'post';
+  const esReel = formato === 'reel';
+  const W = 1080, H = esPost ? 1350 : 1920;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  const topSafe    = esPost ? 90 : (esReel ? 130 : 250);
+  const bottomSafe = esPost ? 90 : (esReel ? 380 : 250);
+  const sideSafe   = esReel ? 130 : 60;
+
+  ctx.fillStyle = P.tarjeta; ctx.fillRect(0,0,W,H);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = P.bg; ctx.font = "600 34px 'Fraunces'";
+  ctx.fillText('OnLineTextil', W/2, topSafe*0.55);
+
+  // tarjeta centrada con marco y sombra, tipo cuadro colgado
+  const cardW = W - sideSafe*2 - 40;
+  const cardTop = topSafe*0.55 + 40;
+  const cardBottom = H - bottomSafe - 20;
+  const cardH = cardBottom - cardTop;
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.18)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 14;
+  ctx.fillStyle = '#FFFFFF';
+  dibujarRectRedondeado(ctx, (W-cardW)/2, cardTop, cardW, cardH, 10);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle = P.bg; ctx.lineWidth = 2;
+  dibujarRectRedondeado(ctx, (W-cardW)/2, cardTop, cardW, cardH, 10); ctx.stroke();
+
+  const pad = 34;
+  const photoW = cardW - pad*2;
+  const photoH = cardH - pad*2 - 90;
+  const px = (W-photoW)/2, py = cardTop + pad;
+  dibujarFotoContain(ctx, img, px, py, photoW, photoH, '#FFFFFF');
+
+  ctx.fillStyle = P.bg; ctx.font = "600 40px 'Fraunces'";
+  const lineasNombre = envolverTexto(ctx, producto.nombre, photoW - 20);
+  let y = py + photoH + 46;
+  lineasNombre.slice(0,2).forEach(linea => { ctx.fillText(linea, W/2, y); y += 42; });
+
+  if(esReel){
+    const pcx = px+photoW/2, pcy = py+photoH/2;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath(); ctx.arc(pcx, pcy, 56, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath(); ctx.moveTo(pcx-14, pcy-24); ctx.lineTo(pcx-14, pcy+24); ctx.lineTo(pcx+24, pcy); ctx.closePath(); ctx.fill();
+  }
+
+  return canvas;
+}
+
+function dibujarPiezaTexto(producto, textoAdicional, formato){
+  const P = PALETAS.violeta;
+  const esPost = formato === 'post';
+  const esReel = formato === 'reel';
+  const W = 1080, H = esPost ? 1350 : 1920;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  const topSafe    = esPost ? 90 : (esReel ? 130 : 250);
+  const bottomSafe = esPost ? 90 : (esReel ? 380 : 250);
+  const sideSafe   = esReel ? 130 : 70;
+  const centroY = topSafe + (H - topSafe - bottomSafe)/2;
+
+  ctx.fillStyle = P.bg; ctx.fillRect(0,0,W,H);
+  ctx.textAlign = 'center';
+
+  ctx.fillStyle = P.accent; ctx.font = "700 26px 'Work Sans'";
+  ctx.fillText('NUEVO INGRESO', W/2, centroY - 130);
+
+  ctx.strokeStyle = P.accent; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(W/2-60, centroY-95); ctx.lineTo(W/2+60, centroY-95); ctx.stroke();
+
+  ctx.fillStyle = '#FFFFFF'; ctx.font = "600 74px 'Fraunces'";
+  const lineasNombre = envolverTexto(ctx, producto.nombre, W - sideSafe*2);
+  let y = centroY - ((lineasNombre.length-1)*80)/2;
+  lineasNombre.forEach(linea => { ctx.fillText(linea, W/2, y); y += 80; });
+
+  y += 30;
+  ctx.fillStyle = 'rgba(245,243,239,0.85)'; ctx.font = "32px 'Work Sans'";
+  const lineasComp = envolverTexto(ctx, producto.composicion || '', W - sideSafe*2);
+  lineasComp.forEach(linea => { ctx.fillText(linea, W/2, y); y += 42; });
+
+  if(textoAdicional){
+    y += 20;
+    ctx.fillStyle = P.accent; ctx.font = "italic 700 30px 'Work Sans'";
+    const lineasTxt = envolverTexto(ctx, textoAdicional, W - sideSafe*2);
+    lineasTxt.forEach(linea => { ctx.fillText(linea, W/2, y); y += 40; });
+  }
+
+  ctx.fillStyle = 'rgba(245,243,239,0.7)'; ctx.font = "700 26px 'Work Sans'";
+  ctx.fillText('onlinetextil.com.ar', W/2, H - bottomSafe - 20);
 
   return canvas;
 }
