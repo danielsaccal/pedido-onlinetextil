@@ -59,11 +59,24 @@ header.top::after{
 }
 header.top h1{color:var(--cream);font-size:1.7rem;margin:0 0 4px;font-weight:600;}
 header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-transform:uppercase;}
-header.top .admin-link{
-  margin-top:10px;font-size:0.7rem;opacity:0.55;text-transform:none;letter-spacing:normal;
-  cursor:pointer;text-decoration:underline;
+.menu-herramientas{position:relative;display:inline-block;margin-top:12px;}
+.menu-toggle{
+  background:rgba(245,243,239,0.12);border:1px solid rgba(245,243,239,0.35);color:var(--cream);
+  font-size:0.72rem;padding:6px 14px;border-radius:20px;cursor:pointer;font-family:'Work Sans';
 }
-header.top .admin-link:hover{opacity:0.85;}
+.menu-toggle:hover{background:rgba(245,243,239,0.22);}
+.menu-dropdown{
+  display:none;position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);
+  background:var(--white);border:1px solid var(--line);border-radius:10px;
+  box-shadow:0 8px 20px rgba(0,0,0,0.18);min-width:230px;z-index:30;overflow:hidden;
+}
+.menu-dropdown.open{display:block;}
+.menu-dropdown span{
+  display:block;padding:11px 16px;font-size:0.82rem;color:var(--ink);cursor:pointer;
+  border-bottom:1px solid var(--line);text-align:left;
+}
+.menu-dropdown span:last-child{border-bottom:none;}
+.menu-dropdown span:hover{background:var(--cream);color:var(--purple);}
 
 .hist-search{margin-bottom:14px;}
 .hist-search input{width:100%;padding:11px 14px;border-radius:8px;border:1px solid var(--line);font-family:'Work Sans';font-size:0.95rem;background:var(--white);}
@@ -326,13 +339,18 @@ header.top .admin-link:hover{opacity:0.85;}
 <header class="top">
   <h1>OnLineTextil</h1>
   <p>Pedido mayorista · onlinetextil.com.ar</p>
-  <p class="admin-link" onclick="abrirHistorial()">Historial de pedidos</p>
-  <p class="admin-link" onclick="abrirClientes()">Clientes</p>
-  <p class="admin-link" onclick="abrirCompartirRubro()">Compartir catálogo por rubro</p>
-  <p class="admin-link" onclick="abrirNuevoIngreso()">Nuevo ingreso (flyers)</p>
-  <p class="admin-link" onclick="abrirActualizarFoto()">Actualizar foto de producto</p>
-  <p class="admin-link" onclick="abrirGrilla()">Vista previa de grilla IG</p>
-  <p class="admin-link" onclick="abrirRompecabezas()">Rompecabezas para grilla</p>
+  <div class="menu-herramientas">
+    <button class="menu-toggle" onclick="toggleMenuHerramientas()">⚙ Herramientas ▾</button>
+    <div class="menu-dropdown" id="menu-dropdown">
+      <span onclick="abrirHistorial()">Historial de pedidos</span>
+      <span onclick="abrirClientes()">Clientes</span>
+      <span onclick="abrirCompartirRubro()">Compartir catálogo por rubro</span>
+      <span onclick="abrirNuevoIngreso()">Nuevo ingreso (flyers)</span>
+      <span onclick="abrirActualizarFoto()">Actualizar foto de producto</span>
+      <span onclick="abrirGrilla()">Vista previa de grilla IG</span>
+      <span onclick="abrirRompecabezas()">Rompecabezas para grilla</span>
+    </div>
+  </div>
 </header>
 
 <div class="app">
@@ -675,6 +693,21 @@ async function guardarClienteEnBaseDeDatos(orden){
 }
 </script>
 <script>
+// ---------- menu de herramientas ----------
+function toggleMenuHerramientas(){
+  document.getElementById('menu-dropdown').classList.toggle('open');
+}
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('menu-dropdown');
+  const toggle = document.querySelector('.menu-toggle');
+  if(menu && menu.classList.contains('open') && !menu.contains(e.target) && e.target !== toggle){
+    menu.classList.remove('open');
+  }
+});
+document.querySelectorAll('.menu-dropdown span').forEach(item => {
+  item.addEventListener('click', () => document.getElementById('menu-dropdown').classList.remove('open'));
+});
+
 // ---------- estado ----------
 const cart = {}; // key: rowId -> {sku, desc, nombreProducto, precio, cantidad, imagen}
 let fotosOverride = {}; // key: "ci-pi" -> foto reemplazada en base64 (se carga antes de renderizar el catalogo)
