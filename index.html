@@ -1932,9 +1932,9 @@ async function generarFlyersNuevoIngreso(){
     const diseno = document.querySelector('input[name="ni-diseno"]:checked').value;
     formatosElegidos.forEach(([formato, etiqueta]) => {
       let canvasPieza;
-      if(diseno === 'tarjeta') canvasPieza = dibujarPiezaTarjeta(producto, img, formato);
+      if(diseno === 'tarjeta') canvasPieza = dibujarPiezaTarjeta(producto, img, formato, textoAdicional);
       else if(diseno === 'texto') canvasPieza = dibujarPiezaTexto(producto, textoAdicional, formato);
-      else canvasPieza = dibujarPiezaEditorial(producto, img, formato);
+      else canvasPieza = dibujarPiezaEditorial(producto, img, formato, textoAdicional);
       piezas.push({
         canvas: canvasPieza,
         nombre: formato + '_' + diseno + '_' + producto.nombre.replace(/\s+/g,'_') + '.png',
@@ -2194,7 +2194,7 @@ const PALETAS = {
   crema:   {bg:'#F5F3EF', badgeBg:'#3D2B4E', badgeText:'#F5D470', accent:'#3D2B4E', accentDark:'#2A1D36', titulo:'#3D2B4E', texto:'#3D2B4E', textoSub:'#6E6459', tarjeta:'#FFFFFF'},
 };
 
-function dibujarPiezaEditorial(producto, img, formato){
+function dibujarPiezaEditorial(producto, img, formato, textoAdicional){
   const P = PALETAS.violeta;
   const esPost = formato === 'post';
   const esReel = formato === 'reel';
@@ -2233,8 +2233,12 @@ function dibujarPiezaEditorial(producto, img, formato){
     ctx.beginPath(); ctx.moveTo(px-16, py-26); ctx.lineTo(px-16, py+26); ctx.lineTo(px+26, py); ctx.closePath(); ctx.fill();
   }
 
-  // barra inferior solida con el nombre del producto, siempre arriba del margen seguro
-  const barraH = bottomSafe + 130;
+  // barra inferior solida con el nombre del producto (y el texto adicional, si hay), siempre arriba del margen seguro
+  ctx.font = "600 50px 'Fraunces'";
+  const lineasNombre = envolverTexto(ctx, producto.nombre, 880 - sideSafe*2);
+  ctx.font = "italic 600 30px 'Work Sans'";
+  const lineasTxt = textoAdicional ? envolverTexto(ctx, textoAdicional, 880 - sideSafe*2) : [];
+  const barraH = bottomSafe + 100 + lineasNombre.length*54 + (lineasTxt.length ? lineasTxt.length*38 + 20 : 0);
   ctx.fillStyle = P.bg;
   ctx.fillRect(0, H-barraH, W, barraH);
 
@@ -2243,14 +2247,20 @@ function dibujarPiezaEditorial(producto, img, formato){
 
   ctx.fillStyle = P.accent; ctx.textAlign = 'center';
   ctx.font = "600 50px 'Fraunces'";
-  const lineasNombre = envolverTexto(ctx, producto.nombre, 880 - sideSafe*2);
   let y = H - barraH + 90;
   lineasNombre.forEach(linea => { ctx.fillText(linea, 540, y); y += 54; });
+
+  if(lineasTxt.length){
+    y += 12;
+    ctx.font = "italic 600 30px 'Work Sans'";
+    ctx.fillStyle = '#FFFFFF';
+    lineasTxt.forEach(linea => { ctx.fillText(linea, 540, y); y += 38; });
+  }
 
   return canvas;
 }
 
-function dibujarPiezaTarjeta(producto, img, formato){
+function dibujarPiezaTarjeta(producto, img, formato, textoAdicional){
   const P = PALETAS.violeta;
   const esPost = formato === 'post';
   const esReel = formato === 'reel';
@@ -2284,8 +2294,9 @@ function dibujarPiezaTarjeta(producto, img, formato){
   dibujarRectRedondeado(ctx, (W-cardW)/2, cardTop, cardW, cardH, 10); ctx.stroke();
 
   const pad = 34;
+  const espacioTexto = textoAdicional ? 140 : 90;
   const photoW = cardW - pad*2;
-  const photoH = cardH - pad*2 - 90;
+  const photoH = cardH - pad*2 - espacioTexto;
   const px = (W-photoW)/2, py = cardTop + pad;
   dibujarFotoContain(ctx, img, px, py, photoW, photoH, '#FFFFFF');
 
@@ -2293,6 +2304,13 @@ function dibujarPiezaTarjeta(producto, img, formato){
   const lineasNombre = envolverTexto(ctx, producto.nombre, photoW - 20);
   let y = py + photoH + 46;
   lineasNombre.slice(0,2).forEach(linea => { ctx.fillText(linea, W/2, y); y += 42; });
+
+  if(textoAdicional){
+    ctx.fillStyle = P.bg; ctx.font = "italic 600 26px 'Work Sans'";
+    const lineasTxt = envolverTexto(ctx, textoAdicional, photoW - 20);
+    y += 6;
+    lineasTxt.slice(0,2).forEach(linea => { ctx.fillText(linea, W/2, y); y += 32; });
+  }
 
   if(esReel){
     const pcx = px+photoW/2, pcy = py+photoH/2;
@@ -2322,30 +2340,30 @@ function dibujarPiezaTexto(producto, textoAdicional, formato){
   ctx.fillStyle = P.bg; ctx.fillRect(0,0,W,H);
   ctx.textAlign = 'center';
 
-  ctx.fillStyle = P.accent; ctx.font = "700 26px 'Work Sans'";
-  ctx.fillText('NUEVO INGRESO', W/2, centroY - 130);
+  ctx.fillStyle = P.accent; ctx.font = "700 30px 'Work Sans'";
+  ctx.fillText('NUEVO INGRESO', W/2, centroY - 150);
 
   ctx.strokeStyle = P.accent; ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(W/2-60, centroY-95); ctx.lineTo(W/2+60, centroY-95); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W/2-60, centroY-110); ctx.lineTo(W/2+60, centroY-110); ctx.stroke();
 
-  ctx.fillStyle = '#FFFFFF'; ctx.font = "600 74px 'Fraunces'";
+  ctx.fillStyle = '#FFFFFF'; ctx.font = "600 92px 'Fraunces'";
   const lineasNombre = envolverTexto(ctx, producto.nombre, W - sideSafe*2);
-  let y = centroY - ((lineasNombre.length-1)*80)/2;
-  lineasNombre.forEach(linea => { ctx.fillText(linea, W/2, y); y += 80; });
+  let y = centroY - ((lineasNombre.length-1)*98)/2;
+  lineasNombre.forEach(linea => { ctx.fillText(linea, W/2, y); y += 98; });
 
-  y += 30;
-  ctx.fillStyle = 'rgba(245,243,239,0.85)'; ctx.font = "32px 'Work Sans'";
+  y += 34;
+  ctx.fillStyle = 'rgba(245,243,239,0.85)'; ctx.font = "40px 'Work Sans'";
   const lineasComp = envolverTexto(ctx, producto.composicion || '', W - sideSafe*2);
-  lineasComp.forEach(linea => { ctx.fillText(linea, W/2, y); y += 42; });
+  lineasComp.forEach(linea => { ctx.fillText(linea, W/2, y); y += 50; });
 
   if(textoAdicional){
-    y += 20;
-    ctx.fillStyle = P.accent; ctx.font = "italic 700 30px 'Work Sans'";
+    y += 24;
+    ctx.fillStyle = P.accent; ctx.font = "italic 700 38px 'Work Sans'";
     const lineasTxt = envolverTexto(ctx, textoAdicional, W - sideSafe*2);
-    lineasTxt.forEach(linea => { ctx.fillText(linea, W/2, y); y += 40; });
+    lineasTxt.forEach(linea => { ctx.fillText(linea, W/2, y); y += 48; });
   }
 
-  ctx.fillStyle = 'rgba(245,243,239,0.7)'; ctx.font = "700 26px 'Work Sans'";
+  ctx.fillStyle = 'rgba(245,243,239,0.7)'; ctx.font = "700 28px 'Work Sans'";
   ctx.fillText('onlinetextil.com.ar', W/2, H - bottomSafe - 20);
 
   return canvas;
