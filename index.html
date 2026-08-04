@@ -98,6 +98,14 @@ header.top .admin-link:hover{opacity:0.85;}
 }
 .filtro-banner a{color:var(--purple-dark);text-decoration:underline;cursor:pointer;font-weight:600;}
 .ni-checks{display:flex;flex-wrap:wrap;gap:14px;padding:10px 12px;background:var(--cream);border-radius:8px;}
+.grilla-ig{display:grid;grid-template-columns:repeat(3, 1fr);gap:3px;background:var(--line);}
+.grilla-celda{position:relative;aspect-ratio:1/1;overflow:hidden;background:var(--cream);}
+.grilla-celda img{width:100%;height:100%;object-fit:cover;display:block;}
+.grilla-celda .quitar{
+  position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;
+  border:none;border-radius:50%;width:24px;height:24px;font-size:0.8rem;cursor:pointer;line-height:1;
+}
+.grilla-vacia{grid-column:1/4;text-align:center;padding:30px;color:#8A8072;font-size:0.85rem;}
 .ni-checks label{display:flex;align-items:center;gap:6px;font-size:0.85rem;cursor:pointer;}
 .rubro-item{
   display:flex;justify-content:space-between;align-items:center;
@@ -301,6 +309,7 @@ header.top .admin-link:hover{opacity:0.85;}
   <p class="admin-link" onclick="abrirCompartirRubro()">Compartir catálogo por rubro</p>
   <p class="admin-link" onclick="abrirNuevoIngreso()">Nuevo ingreso (flyers)</p>
   <p class="admin-link" onclick="abrirActualizarFoto()">Actualizar foto de producto</p>
+  <p class="admin-link" onclick="abrirGrilla()">Vista previa de grilla IG</p>
 </header>
 
 <div class="app">
@@ -386,6 +395,19 @@ header.top .admin-link:hover{opacity:0.85;}
       <div class="actions"><button class="btn btn-gold" onclick="buscarProductoParaFoto()">Buscar</button></div>
       <div id="fs-resultado" style="margin-top:16px;"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <!-- STEP: VISTA PREVIA DE GRILLA IG -->
+  <div class="step" id="step-grilla">
+    <div class="form-card">
+      <h2>Vista previa de grilla IG</h2>
+      <p class="note" style="margin-bottom:14px;">Cada vez que genera un posteo o pieza minimalista, puede sumarla acá con "+ Agregar a grilla" para ver cómo va quedando el perfil.</p>
+      <div id="grilla-cont" class="grilla-ig"></div>
+      <div class="actions" style="margin-top:14px;">
+        <button class="btn btn-ghost" onclick="vaciarGrilla()">Vaciar grilla</button>
+        <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      </div>
     </div>
   </div>
 
@@ -1843,6 +1865,14 @@ async function generarFlyersNuevoIngreso(){
     wrap.appendChild(previewImg);
     wrap.appendChild(document.createElement('br'));
     wrap.appendChild(btn);
+    if(!nombre.startsWith('flyer_whatsapp')){
+      const btnGrilla = document.createElement('button');
+      btnGrilla.className = 'btn-mini';
+      btnGrilla.style.cssText = 'margin-left:8px;';
+      btnGrilla.textContent = '+ Agregar a grilla';
+      btnGrilla.onclick = () => agregarAGrilla(canvas.toDataURL('image/png'), nombre);
+      wrap.appendChild(btnGrilla);
+    }
     cont.appendChild(wrap);
   });
 
@@ -2043,6 +2073,20 @@ function dibujarPiezaMinimalista(producto, img, formato, paletaKey){
   const marco = 22;
   ctx.strokeStyle = P.bg; ctx.lineWidth = marco;
   ctx.strokeRect(marco/2, marco/2, W-marco, H-marco);
+
+  // cintita chica con la categoria, del lado opuesto al isotipo — un poco mas de presencia sin recargar
+  const catActualMin = CATALOGO.find(c => c.productos.includes(producto));
+  if(catActualMin){
+    ctx.font = "700 24px 'Work Sans'";
+    const textoCategoria = catActualMin.categoria.split('/')[0].trim();
+    const anchoCinta = ctx.measureText(textoCategoria).width + 44;
+    const cintaX = esReel ? W - anchoCinta - 40 : 40;
+    const cintaY = Math.max(50, topSafe*0.4);
+    ctx.fillStyle = P.bg;
+    dibujarRectRedondeado(ctx, cintaX, cintaY, anchoCinta, 46, 23); ctx.fill();
+    ctx.fillStyle = P.accent; ctx.textAlign = 'center';
+    ctx.fillText(textoCategoria, cintaX + anchoCinta/2, cintaY + 31);
+  }
 
   // isotipo chico, corrido del lado izquierdo arriba para no chocar con los botones de Reels (derecha)
   const cx = esReel ? 90 : W - 90, cy = Math.max(90, topSafe*0.55), r = 46;
@@ -2382,6 +2426,48 @@ function generarTextoConIA(){
 function irAFlyerConSku(sku){
   abrirNuevoIngreso();
   document.getElementById('ni-skus').value = sku;
+}
+
+// ---------- grilla IG (vista previa) ----------
+function leerGrilla(){
+  try{ return JSON.parse(localStorage.getItem('ot_grilla') || '[]'); }
+  catch(e){ return []; }
+}
+function guardarGrilla(items){
+  localStorage.setItem('ot_grilla', JSON.stringify(items));
+}
+function agregarAGrilla(dataUrl, nombre){
+  const items = leerGrilla();
+  items.unshift({dataUrl, nombre, id: Date.now() + '-' + Math.random().toString(36).slice(2)});
+  guardarGrilla(items);
+  alert('Agregada a la grilla. Podés verla en "Vista previa de grilla IG".');
+}
+function quitarDeGrilla(id){
+  guardarGrilla(leerGrilla().filter(it => it.id !== id));
+  renderGrilla();
+}
+function vaciarGrilla(){
+  if(!confirm('¿Vaciar toda la grilla?')) return;
+  guardarGrilla([]);
+  renderGrilla();
+}
+function renderGrilla(){
+  const cont = document.getElementById('grilla-cont');
+  const items = leerGrilla();
+  if(items.length === 0){
+    cont.innerHTML = '<p class="grilla-vacia">Todavía no agregó ninguna pieza. Genere un posteo o pieza minimalista y toque "+ Agregar a grilla".</p>';
+    return;
+  }
+  cont.innerHTML = items.map(it => `
+    <div class="grilla-celda">
+      <img src="${it.dataUrl}" alt="${escapeAttr(it.nombre)}">
+      <button class="quitar" onclick="quitarDeGrilla('${it.id}')">✕</button>
+    </div>
+  `).join('');
+}
+function abrirGrilla(){
+  mostrarPaso('step-grilla');
+  renderGrilla();
 }
 
 function abrirNuevoIngreso(){
