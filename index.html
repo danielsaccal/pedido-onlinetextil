@@ -108,8 +108,16 @@ header.top .admin-link:hover{opacity:0.85;}
   font-size:0.82rem;color:var(--ink);background:var(--white);transition:all .15s ease;
 }
 .ni-chip input:checked + span{background:var(--purple);border-color:var(--purple);color:var(--cream);}
-.ni-resultado-grilla{margin-top:20px;display:grid;grid-template-columns:1fr;gap:16px;}
-@media (min-width:640px){.ni-resultado-grilla{grid-template-columns:1fr 1fr;}}
+.ni-resultado-grilla{
+  margin-top:20px;display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;
+  padding-bottom:10px;-webkit-overflow-scrolling:touch;
+}
+.ni-resultado-grilla::-webkit-scrollbar{height:6px;}
+.ni-resultado-grilla::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
+.ni-resultado-grilla .ni-pieza, .ni-resultado-grilla .ni-copy-wrap, .ni-resultado-grilla .ni-video-wrap{
+  scroll-snap-align:start;flex:0 0 82%;max-width:340px;
+}
+@media (min-width:640px){.ni-resultado-grilla .ni-pieza, .ni-resultado-grilla .ni-copy-wrap, .ni-resultado-grilla .ni-video-wrap{flex:0 0 300px;}}
 .ni-pieza{background:var(--cream);border-radius:10px;padding:12px;text-align:center;}
 .ni-pieza img, .ni-pieza video{max-width:100%;border-radius:8px;border:1px solid var(--line);margin-bottom:8px;}
 .ni-pieza .ni-pieza-acciones{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;}
@@ -1912,7 +1920,7 @@ async function generarFlyersNuevoIngreso(){
     if(document.getElementById('ni-fmt-post').checked || document.getElementById('ni-fmt-reel').checked){
       const copyTexto = generarCopyPosteo(producto, grupos[0].variantes.map(v => ({variante: v})));
       const copyWrap = document.createElement('div');
-      copyWrap.style.cssText = 'margin-bottom:16px;grid-column:1/-1;';
+      copyWrap.className = 'ni-copy-wrap'; copyWrap.style.cssText = 'background:var(--cream);border-radius:10px;padding:12px;';
       const copyLabel = document.createElement('p');
       copyLabel.innerHTML = '<b>Copy para pegar en la descripción del posteo/reel:</b>';
       copyLabel.style.cssText = 'font-size:0.85rem;margin-bottom:6px;';
@@ -1937,7 +1945,7 @@ async function generarFlyersNuevoIngreso(){
 
     if(document.getElementById('ni-video').checked){
       const videoWrap = document.createElement('div');
-      videoWrap.style.cssText = 'margin-bottom:16px;text-align:center;grid-column:1/-1;';
+      videoWrap.className = 'ni-video-wrap'; videoWrap.style.cssText = 'text-align:center;background:var(--cream);border-radius:10px;padding:12px;';
       videoWrap.innerHTML = '<p class="note">Generando video (unos segundos)...</p>';
       cont.appendChild(videoWrap);
 
