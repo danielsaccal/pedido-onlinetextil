@@ -427,8 +427,20 @@ header.top .admin-link:hover{opacity:0.85;}
   <div class="step" id="step-grilla">
     <div class="form-card">
       <h2>Vista previa de grilla IG</h2>
-      <p class="note" style="margin-bottom:10px;">Cada vez que genera un posteo o pieza minimalista, puede sumarla acá con "+ Agregar a grilla" para ver cómo va quedando el perfil.</p>
-      <p class="note" style="margin-bottom:14px;">💡 Para que se vea más prolija: mantenga la <b>misma paleta</b> en todo, o alterne <b>2 paletas cada 3 fotos</b> (efecto ajedrezado/filas) en vez de mezclarlas al azar.</p>
+      <p class="note" style="margin-bottom:14px;">Cada vez que genera un posteo o pieza minimalista, puede sumarla acá con "+ Agregar a grilla".</p>
+
+      <p class="ni-seccion-tit">¿Qué técnica quiere usar?</p>
+      <div class="ni-chips" id="tecnica-chips" style="margin-bottom:12px;">
+        <label class="ni-chip"><input type="radio" name="tecnica-grilla" value="unica" checked><span>Paleta única</span></label>
+        <label class="ni-chip"><input type="radio" name="tecnica-grilla" value="ajedrez"><span>Ajedrezado</span></label>
+        <label class="ni-chip"><input type="radio" name="tecnica-grilla" value="filas"><span>Filas (cada 3)</span></label>
+        <label class="ni-chip"><input type="radio" name="tecnica-grilla" value="bordes"><span>Solo bordes iguales</span></label>
+      </div>
+      <p class="note" style="margin-bottom:6px;">Así quedaría (ejemplo con colores, no son fotos reales):</p>
+      <div id="tecnica-ejemplo" class="grilla-ig" style="margin-bottom:8px;"></div>
+      <p class="note" id="tecnica-explicacion" style="margin-bottom:18px;"></p>
+
+      <p class="ni-seccion-tit">Su grilla</p>
       <div id="grilla-cont" class="grilla-ig"></div>
       <div class="actions" style="margin-top:14px;">
         <button class="btn btn-ghost" onclick="vaciarGrilla()">Vaciar grilla</button>
@@ -2508,6 +2520,43 @@ function irAFlyerConSku(sku){
 }
 
 // ---------- grilla IG (vista previa) ----------
+const TECNICAS_INFO = {
+  unica: 'Usa siempre la misma paleta en todo — es la opción más segura y prolija.',
+  ajedrez: 'Alterna 2 paletas, una foto sí y una no — efecto tablero de ajedrez.',
+  filas: 'Cada fila completa (3 fotos) usa una paleta, y cambia en la fila siguiente.',
+  bordes: 'Cambie de paleta libremente — lo único que mantiene todo unido es el marco de color, que ya está en cada pieza minimalista.',
+};
+function leerTecnicaGrilla(){
+  return localStorage.getItem('ot_tecnica_grilla') || 'unica';
+}
+function guardarTecnicaGrilla(t){
+  localStorage.setItem('ot_tecnica_grilla', t);
+}
+function paletaSugerida(tecnica, posicion){
+  const paletas = ['violeta','dorado','crema'];
+  if(tecnica === 'ajedrez') return posicion % 2 === 0 ? 'violeta' : 'dorado';
+  if(tecnica === 'filas') return paletas[Math.floor(posicion/3) % paletas.length];
+  return null; // unica / bordes: sin sugerencia fija
+}
+function renderEjemploTecnica(){
+  const tecnica = document.querySelector('input[name="tecnica-grilla"]:checked').value;
+  const colores = {violeta:'#3D2B4E', dorado:'#F5D470', crema:'#F5F3EF'};
+  const cont = document.getElementById('tecnica-ejemplo');
+  let celdas = [];
+  for(let i=0;i<6;i++){
+    let paleta;
+    if(tecnica === 'unica') paleta = 'violeta';
+    else if(tecnica === 'ajedrez') paleta = i % 2 === 0 ? 'violeta' : 'dorado';
+    else if(tecnica === 'filas') paleta = ['violeta','dorado','crema'][Math.floor(i/3) % 3];
+    else paleta = ['violeta','dorado','crema'][i % 3]; // bordes: libre, se muestra variado
+    celdas.push(paleta);
+  }
+  cont.innerHTML = celdas.map(p => `<div class="grilla-celda" style="background:${colores[p]};aspect-ratio:1/1;"></div>`).join('');
+  document.getElementById('tecnica-explicacion').textContent = TECNICAS_INFO[tecnica];
+  guardarTecnicaGrilla(tecnica);
+}
+document.querySelectorAll('input[name="tecnica-grilla"]').forEach(r => r.addEventListener('change', renderEjemploTecnica));
+
 function leerGrilla(){
   try{ return JSON.parse(localStorage.getItem('ot_grilla') || '[]'); }
   catch(e){ return []; }
@@ -2519,7 +2568,10 @@ function agregarAGrilla(dataUrl, nombre){
   const items = leerGrilla();
   items.unshift({dataUrl, nombre, id: Date.now() + '-' + Math.random().toString(36).slice(2)});
   guardarGrilla(items);
-  alert('Agregada a la grilla. Podés verla en "Vista previa de grilla IG".');
+  const tecnica = leerTecnicaGrilla();
+  const sugerida = paletaSugerida(tecnica, items.length); // proxima posicion
+  const msgSugerencia = sugerida ? `\n\nPara la próxima foto, usá la paleta: ${sugerida}.` : '';
+  alert('Agregada a la grilla. Podés verla en "Vista previa de grilla IG".' + msgSugerencia);
 }
 function quitarDeGrilla(id){
   guardarGrilla(leerGrilla().filter(it => it.id !== id));
@@ -2546,6 +2598,10 @@ function renderGrilla(){
 }
 function abrirGrilla(){
   mostrarPaso('step-grilla');
+  const tecnicaGuardada = leerTecnicaGrilla();
+  const radio = document.querySelector(`input[name="tecnica-grilla"][value="${tecnicaGuardada}"]`);
+  if(radio) radio.checked = true;
+  renderEjemploTecnica();
   renderGrilla();
 }
 
