@@ -2228,11 +2228,23 @@ function generarCopyPosteo(producto, matches){
   lineas.push('📲 ¡Escribinos por WhatsApp y te contamos todo!');
   lineas.push('');
 
+  const HASHTAGS_POR_RUBRO = {
+    'SABANAS': ['#sabanas', '#ropadecama', '#dormitorio'],
+    'CUBRECAMAS / EDREDONES / FRAZADAS': ['#cubrecamas', '#edredones', '#frazadas'],
+    'TOALLAS / TOALLONES / BATAS': ['#toallas', '#bano', '#toallones'],
+    'REPASADORES': ['#cocina', '#repasadores', '#hogar'],
+    'MANTELERIA': ['#manteleria', '#mesa', '#hogar'],
+    'CORTINAS DE AMBIENTE': ['#cortinas', '#decohogar', '#deco'],
+    'CORTINAS DE BANO / ACCESORIOS': ['#bano', '#accesoriosbano', '#decobano'],
+    'TELAS': ['#telas', '#tapiceria', '#costura'],
+    'ALMOHADAS': ['#almohadas', '#descanso', '#dormitorio'],
+  };
+  const HASHTAGS_GENERICOS = ['#hogar', '#decohogar', '#homedecor', '#bazar', '#hogarargentino', '#textiles'];
+
   const catActual = CATALOGO.find(c => c.productos.includes(producto));
-  const hashtagCategoria = catActual ? '#' + catActual.categoria.split(/\s|\//).filter(Boolean)[0].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'') : '';
-  const hashtagProducto = '#' + producto.nombre.replace(/\s+/g,'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  const hashtags = ['#onlinetextil', '#ventamayorista', '#textiles', hashtagCategoria, hashtagProducto].filter(Boolean);
-  lineas.push(hashtags.join(' '));
+  const hashtagsRubro = (catActual && HASHTAGS_POR_RUBRO[catActual.categoria]) || [];
+  const hashtags = ['#onlinetextil', ...hashtagsRubro, ...HASHTAGS_GENERICOS.slice(0, 4)];
+  lineas.push([...new Set(hashtags)].join(' '));
 
   return lineas.join('\n');
 }
