@@ -2668,14 +2668,47 @@ async function generarRompecabezas(){
     }
 
     cont.innerHTML = '';
+
+    const avisoOrden = document.createElement('p');
+    avisoOrden.className = 'note';
+    avisoOrden.style.cssText = 'grid-column:1/-1;flex:0 0 100%;background:var(--cream);padding:10px 12px;border-radius:8px;';
+    avisoOrden.innerHTML = '⚠️ Instagram muestra lo más nuevo primero, así que hay que subirlas <b>al revés</b> para que se lean bien de izquierda a derecha. Fíjese el número de paso en cada una.';
+    cont.appendChild(avisoOrden);
+
+    const copyTexto = generarCopyPosteo(match.producto, [{variante: match.variante}]);
+    const copyWrap = document.createElement('div');
+    copyWrap.className = 'ni-copy-wrap';
+    copyWrap.style.cssText = 'background:var(--cream);border-radius:10px;padding:12px;';
+    const copyLabel = document.createElement('p');
+    copyLabel.innerHTML = '<b>Copy (use el mismo texto en las ' + partes + ' partes):</b>';
+    copyLabel.style.cssText = 'font-size:0.85rem;margin-bottom:6px;';
+    const copyArea = document.createElement('textarea');
+    copyArea.value = copyTexto;
+    copyArea.readOnly = true;
+    copyArea.rows = 8;
+    copyArea.style.cssText = 'width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:\'Work Sans\';font-size:0.85rem;background:var(--white);margin-bottom:8px;';
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'btn-mini';
+    copyBtn.textContent = 'Copiar texto';
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(copyTexto);
+      copyBtn.textContent = '¡Copiado!';
+      setTimeout(() => copyBtn.textContent = 'Copiar texto', 1500);
+    };
+    copyWrap.appendChild(copyLabel);
+    copyWrap.appendChild(copyArea);
+    copyWrap.appendChild(copyBtn);
+    cont.appendChild(copyWrap);
+
     piezas.forEach((p, i) => {
+      const pasoSubida = partes - i; // se sube al reves: la parte de mas a la derecha va primero
       const wrap = document.createElement('div');
       wrap.className = 'ni-pieza';
       const previewImg = document.createElement('img');
       previewImg.src = p.canvas.toDataURL('image/png');
       const label = document.createElement('p');
       label.className = 'note';
-      label.textContent = `Parte ${i+1} de ${partes} — publicar en este orden`;
+      label.innerHTML = `Parte ${i+1} de ${partes} (posición en la grilla)<br><b>Subir en el paso ${pasoSubida} de ${partes}</b>${pasoSubida===1 ? ' — primera que sube' : (pasoSubida===partes ? ' — última que sube' : '')}`;
       const acciones = document.createElement('div');
       acciones.className = 'ni-pieza-acciones';
       const btn = document.createElement('button');
