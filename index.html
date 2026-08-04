@@ -149,6 +149,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
   width:28px;height:24px;font-size:0.75rem;cursor:pointer;
 }
 .grilla-vacia{grid-column:1/4;text-align:center;padding:30px;color:#8A8072;font-size:0.85rem;}
+.grilla-celda-vacia{background:repeating-linear-gradient(45deg, var(--cream), var(--cream) 10px, #EDE8DE 10px, #EDE8DE 20px);}
 .rubro-item{
   display:flex;justify-content:space-between;align-items:center;
   padding:12px 14px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;background:var(--cream);
@@ -2652,7 +2653,10 @@ function renderGrilla(){
     cont.innerHTML = '<p class="grilla-vacia">Todavía no agregó ninguna pieza. Genere un posteo o pieza minimalista y toque "+ Agregar a grilla".</p>';
     return;
   }
-  cont.innerHTML = items.map((it, idx) => `
+  const totalCasilleros = Math.max(9, Math.ceil(items.length/3)*3);
+  const vacios = totalCasilleros - items.length;
+
+  let html = items.map((it, idx) => `
     <div class="grilla-celda">
       <img src="${it.dataUrl}" alt="${escapeAttr(it.nombre)}">
       <button class="quitar" onclick="quitarDeGrilla('${it.id}')">✕</button>
@@ -2662,6 +2666,10 @@ function renderGrilla(){
       </div>
     </div>
   `).join('');
+  for(let i=0;i<vacios;i++){
+    html += `<div class="grilla-celda grilla-celda-vacia"></div>`;
+  }
+  cont.innerHTML = html;
 }
 function moverEnGrilla(idx, direccion){
   const items = leerGrilla();
