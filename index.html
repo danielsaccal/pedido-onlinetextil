@@ -141,6 +141,13 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
   position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;
   border:none;border-radius:50%;width:24px;height:24px;font-size:0.8rem;cursor:pointer;line-height:1;
 }
+.grilla-mover{
+  position:absolute;bottom:4px;left:4px;right:4px;display:flex;justify-content:space-between;
+}
+.grilla-mover button{
+  background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:5px;
+  width:28px;height:24px;font-size:0.75rem;cursor:pointer;
+}
 .grilla-vacia{grid-column:1/4;text-align:center;padding:30px;color:#8A8072;font-size:0.85rem;}
 .rubro-item{
   display:flex;justify-content:space-between;align-items:center;
@@ -2645,12 +2652,24 @@ function renderGrilla(){
     cont.innerHTML = '<p class="grilla-vacia">Todavía no agregó ninguna pieza. Genere un posteo o pieza minimalista y toque "+ Agregar a grilla".</p>';
     return;
   }
-  cont.innerHTML = items.map(it => `
+  cont.innerHTML = items.map((it, idx) => `
     <div class="grilla-celda">
       <img src="${it.dataUrl}" alt="${escapeAttr(it.nombre)}">
       <button class="quitar" onclick="quitarDeGrilla('${it.id}')">✕</button>
+      <div class="grilla-mover">
+        ${idx > 0 ? `<button onclick="moverEnGrilla(${idx}, -1)">◀</button>` : '<span></span>'}
+        ${idx < items.length-1 ? `<button onclick="moverEnGrilla(${idx}, 1)">▶</button>` : '<span></span>'}
+      </div>
     </div>
   `).join('');
+}
+function moverEnGrilla(idx, direccion){
+  const items = leerGrilla();
+  const nuevoIdx = idx + direccion;
+  if(nuevoIdx < 0 || nuevoIdx >= items.length) return;
+  [items[idx], items[nuevoIdx]] = [items[nuevoIdx], items[idx]];
+  guardarGrilla(items);
+  renderGrilla();
 }
 // ---------- rompecabezas / triptico ----------
 function abrirRompecabezas(){
