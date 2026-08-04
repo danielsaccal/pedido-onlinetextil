@@ -331,7 +331,6 @@ header.top .admin-link:hover{opacity:0.85;}
       <h2>Nuevo ingreso — generar flyers</h2>
       <p class="note" style="margin-bottom:14px;">Escriba el/los SKU que ingresaron (separados por coma si son variantes del mismo producto) y arma el flyer para WhatsApp y la story para Instagram.</p>
       <div class="field"><label>SKU(s)</label><input type="text" id="ni-skus" placeholder="Ej: TOA171B, TOA171C"></div>
-      <div class="field"><label>Palabras clave extra (opcional)</label><input type="text" id="ni-keywords" placeholder="Ej: hogar, regalo — el generador usa sobre todo la composición del producto"></div>
       <div class="field">
         <label>Texto adicional (opcional)</label>
         <div style="display:flex;gap:8px;">
@@ -2184,64 +2183,39 @@ async function generarVideoKenBurns(producto, img, textoAdicional, paletaKey){
 
 function generarTextoConIA(){
   const skusTexto = document.getElementById('ni-skus').value.trim();
-  const keywordsTexto = document.getElementById('ni-keywords').value.trim();
   const skus = skusTexto.split(',').map(s => s.trim()).filter(Boolean);
   const matches = skus.map(sku => buscarProductoPorSku(sku)).filter(Boolean);
   const match = matches[0];
-  const nombreProd = match ? match.producto.nombre : 'este producto';
+  const nombreProd = match ? match.producto.nombre : '';
   const composicion = match ? (match.producto.composicion || '') : '';
-  const keywords = keywordsTexto ? keywordsTexto.split(',').map(k => k.trim()).filter(Boolean) : [];
-  function cap(s){ return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
   // extraer datos tecnicos puntuales: % de material, gramaje, y medidas de las variantes
   const materiales = [...composicion.matchAll(/(\d+%\s*[A-Za-zÁÉÍÓÚáéíóúñÑ]+)/g)].map(m => m[1]);
   const gramajeMatch = composicion.match(/(\d+\s*gr(?:s|\/m2)?)/i);
-  const gramaje = gramajeMatch ? gramajeMatch[1].replace(/gr(?!s)/i,'gr') : null;
+  const gramaje = gramajeMatch ? gramajeMatch[1] : null;
   const medidas = matches.map(m => m.variante.desc).filter(Boolean);
   const materialPrincipal = materiales[0] || null;
 
-  const plantillas = [];
-  if(materialPrincipal){
-    plantillas.push(() => `${nombreProd} — ${materialPrincipal}, suavidad que se siente`);
-    plantillas.push(() => `Tejido en ${materialPrincipal.toLowerCase()}, pensado para durar`);
-    plantillas.push(() => `${materialPrincipal} de calidad, directo para tu hogar`);
-  }
-  if(gramaje){
-    plantillas.push(() => `${nombreProd}: ${gramaje} de puro confort`);
-    plantillas.push(() => `Calidez asegurada — ${gramaje} en cada ${nombreProd.toLowerCase()}`);
-  }
-  if(materialPrincipal && gramaje){
-    plantillas.push(() => `${materialPrincipal}, ${gramaje} — calidad que se nota`);
-  }
-  if(medidas.length){
-    plantillas.push(() => `${nombreProd} en ${medidas[Math.floor(Math.random()*medidas.length)]}`);
-  }
-  if(keywords.length){
-    const pickKw = () => keywords[Math.floor(Math.random()*keywords.length)];
-    plantillas.push(() => `${materialPrincipal || nombreProd} — pura ${pickKw()}`);
-  }
-  if(plantillas.length === 0){
-    plantillas.push(() => `¡Nuevo ingreso! ${nombreProd}`);
-  }
-
-  const usadas = new Set();
+  // combinar solo datos tecnicos reales, sin adjetivos ni frases de marketing
+  const datosBase = [materialPrincipal, gramaje].filter(Boolean);
   const opciones = [];
-  let intentos = 0;
-  while(opciones.length < 4 && intentos < 30 && usadas.size < plantillas.length){
-    intentos++;
-    const idx = Math.floor(Math.random()*plantillas.length);
-    const texto = plantillas[idx]();
-    if(usadas.has(texto)) continue;
-    usadas.add(texto);
-    opciones.push(texto);
-  }
+  if(datosBase.length) opciones.push(datosBase.join(' — '));
+  if(nombreProd && datosBase.length) opciones.push(nombreProd + ': ' + datosBase.join(', '));
+  if(medidas.length) opciones.push(medidas.join(' / '));
+  if(materialPrincipal && medidas.length) opciones.push(materialPrincipal + ' — ' + medidas[0]);
+  if(gramaje && medidas.length) opciones.push(gramaje + ' — ' + medidas[0]);
+  if(materiales.length > 1) opciones.push(materiales.join(' / '));
 
   const cont = document.getElementById('ni-opciones-texto');
   if(!match){
     cont.innerHTML = '<p class="note">Escribí primero el SKU para poder generar frases con sus datos reales.</p>';
     return;
   }
-  cont.innerHTML = opciones.map(op => `
+  if(opciones.length === 0){
+    cont.innerHTML = '<p class="note">Este producto no tiene datos técnicos suficientes (% material, gramaje o medidas) para generar texto.</p>';
+    return;
+  }
+  cont.innerHTML = [...new Set(opciones)].slice(0,5).map(op => `
     <button type="button" class="btn-mini" style="display:block;width:100%;text-align:left;margin-bottom:6px;" onclick="document.getElementById('ni-texto').value = this.textContent; document.getElementById('ni-opciones-texto').innerHTML='';">${op}</button>
   `).join('');
 }
@@ -2254,7 +2228,6 @@ function irAFlyerConSku(sku){
 function abrirNuevoIngreso(){
   mostrarPaso('step-nuevo-ingreso');
   document.getElementById('ni-skus').value = '';
-  document.getElementById('ni-keywords').value = '';
   document.getElementById('ni-texto').value = '';
   document.getElementById('ni-variantes').value = '';
   document.getElementById('ni-descuento').value = '';
