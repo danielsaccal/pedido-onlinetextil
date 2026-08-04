@@ -350,12 +350,20 @@ header.top .admin-link:hover{opacity:0.85;}
         </div>
       </div>
       <div class="field">
+        <label>Estilo de las piezas para redes</label>
+        <div class="ni-checks">
+          <label><input type="radio" name="ni-estilo" value="minimal" checked> Minimalista (foto grande, para grilla)</label>
+          <label><input type="radio" name="ni-estilo" value="completo"> Completo (con cuotas/envíos/descuentos)</label>
+        </div>
+      </div>
+      <div class="field">
         <label>Paleta de colores</label>
         <select id="ni-paleta">
           <option value="violeta">Violeta (clásica)</option>
           <option value="dorado">Dorada</option>
           <option value="crema">Crema suave</option>
         </select>
+        <p class="note" style="margin-top:4px;">En estilo minimalista se generan las 3 paletas juntas para elegir.</p>
       </div>
       <div class="field">
         <label><input type="checkbox" id="ni-video"> 🎬 Generar también un video simple (zoom suave, ~5 seg, sin IA)</label>
@@ -1781,17 +1789,31 @@ async function generarFlyersNuevoIngreso(){
     await document.fonts.ready;
 
     const paletaKey = document.getElementById('ni-paleta').value;
+    const estilo = document.querySelector('input[name="ni-estilo"]:checked').value;
     const piezas = [{canvas: dibujarFlyerWhatsApp(producto, variantesTexto, img, textoAdicional, variantesColor, descuentoPct), nombre:'flyer_whatsapp_' + producto.nombre.replace(/\s+/g,'_') + '.png', etiqueta:'flyer WhatsApp'}];
 
-    if(document.getElementById('ni-fmt-story').checked){
-      piezas.push({canvas: dibujarFlyerRedes(producto, img, textoAdicional, variantesColor, 'story', paletaKey), nombre:'story_ig_' + producto.nombre.replace(/\s+/g,'_') + '.png', etiqueta:'story IG'});
-    }
-    if(document.getElementById('ni-fmt-post').checked){
-      piezas.push({canvas: dibujarFlyerRedes(producto, img, textoAdicional, variantesColor, 'post', paletaKey), nombre:'post_ig_' + producto.nombre.replace(/\s+/g,'_') + '.png', etiqueta:'posteo IG'});
-    }
-    if(document.getElementById('ni-fmt-reel').checked){
-      piezas.push({canvas: dibujarFlyerRedes(producto, img, textoAdicional, variantesColor, 'reel', paletaKey), nombre:'portada_reel_' + producto.nombre.replace(/\s+/g,'_') + '.png', etiqueta:'portada de Reel'});
-    }
+    const formatosElegidos = [];
+    if(document.getElementById('ni-fmt-story').checked) formatosElegidos.push(['story','story IG']);
+    if(document.getElementById('ni-fmt-post').checked) formatosElegidos.push(['post','posteo IG']);
+    if(document.getElementById('ni-fmt-reel').checked) formatosElegidos.push(['reel','portada de Reel']);
+
+    formatosElegidos.forEach(([formato, etiqueta]) => {
+      if(estilo === 'minimal'){
+        Object.keys(PALETAS).forEach(pk => {
+          piezas.push({
+            canvas: dibujarPiezaMinimalista(producto, img, formato, pk),
+            nombre: formato + '_' + pk + '_' + producto.nombre.replace(/\s+/g,'_') + '.png',
+            etiqueta: etiqueta + ' — ' + pk
+          });
+        });
+      } else {
+        piezas.push({
+          canvas: dibujarFlyerRedes(producto, img, textoAdicional, variantesColor, formato, paletaKey),
+          nombre: formato + '_' + producto.nombre.replace(/\s+/g,'_') + '.png',
+          etiqueta: etiqueta
+        });
+      }
+    });
 
     cont.innerHTML = '';
     piezas.forEach(({canvas, nombre, etiqueta}) => {
@@ -1998,6 +2020,61 @@ const PALETAS = {
   dorado:  {bg:'#F5D470', badgeBg:'#3D2B4E', badgeText:'#F5F3EF', accent:'#3D2B4E', accentDark:'#2A1D36', titulo:'#3D2B4E', texto:'#3D2B4E', textoSub:'#5B4A6E', tarjeta:'#FFFFFF'},
   crema:   {bg:'#F5F3EF', badgeBg:'#3D2B4E', badgeText:'#F5D470', accent:'#3D2B4E', accentDark:'#2A1D36', titulo:'#3D2B4E', texto:'#3D2B4E', textoSub:'#6E6459', tarjeta:'#FFFFFF'},
 };
+
+function dibujarPiezaMinimalista(producto, img, formato, paletaKey){
+  const P = PALETAS[paletaKey] || PALETAS.violeta;
+  const esPost = formato === 'post';
+  const esReel = formato === 'reel';
+  const W = 1080, H = esPost ? 1350 : 1920;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // foto a pantalla completa (cover), dominando el diseño
+  const ratio = Math.max(W / img.width, H / img.height);
+  const nw = img.width * ratio, nh = img.height * ratio;
+  ctx.drawImage(img, (W-nw)/2, (H-nh)/2, nw, nh);
+
+  // marco fino con el color de marca — la unica referencia de marca en el cuerpo
+  const marco = 22;
+  ctx.strokeStyle = P.bg; ctx.lineWidth = marco;
+  ctx.strokeRect(marco/2, marco/2, W-marco, H-marco);
+
+  // isotipo chico en la esquina (circulo con "OT")
+  const cx = W - 90, cy = 90, r = 46;
+  ctx.fillStyle = P.bg;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = P.accent; ctx.textAlign = 'center';
+  ctx.font = "700 34px 'Work Sans'";
+  ctx.fillText('OT', cx, cy+12);
+
+  if(esReel){
+    const px = W/2, py = H/2;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath(); ctx.arc(px, py, 60, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath(); ctx.moveTo(px-16, py-26); ctx.lineTo(px-16, py+26); ctx.lineTo(px+26, py); ctx.closePath(); ctx.fill();
+  }
+
+  // franja inferior degradada con el nombre del producto
+  const gradH = 260;
+  const grad = ctx.createLinearGradient(0, H-gradH, 0, H);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.72)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, H-gradH, W, gradH);
+
+  ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'center';
+  ctx.font = "600 52px 'Fraunces'";
+  const lineasNombre = envolverTexto(ctx, producto.nombre, 880);
+  let y = H - 70 - (lineasNombre.length-1)*54;
+  lineasNombre.forEach(linea => { ctx.fillText(linea, 540, y); y += 54; });
+
+  ctx.fillStyle = P.accent;
+  ctx.fillRect(W/2-40, H-gradH+28, 80, 5);
+
+  return canvas;
+}
 
 function dibujarFlyerRedes(producto, img, textoAdicional, variantesColor, formato, paletaKey){
   const P = PALETAS[paletaKey] || PALETAS.violeta;
