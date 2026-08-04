@@ -415,17 +415,6 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
           <label class="ni-chip"><input type="checkbox" id="ni-fmt-post"><span>Posteo</span></label>
           <label class="ni-chip"><input type="checkbox" id="ni-fmt-reel"><span>Reel</span></label>
         </div>
-        <div class="ni-chips" style="margin-top:8px;">
-          <label class="ni-chip"><input type="radio" name="ni-estilo" value="minimal" checked><span>Minimalista</span></label>
-          <label class="ni-chip"><input type="radio" name="ni-estilo" value="completo"><span>Completo</span></label>
-        </div>
-        <div class="field" style="margin-top:10px;">
-          <select id="ni-paleta">
-            <option value="violeta">Paleta violeta (clásica)</option>
-            <option value="dorado">Paleta dorada</option>
-            <option value="crema">Paleta crema suave</option>
-          </select>
-        </div>
         <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video"><span>🎬 Video simple (zoom, ~5 seg)</span></label>
       </div>
 
@@ -454,20 +443,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
   <div class="step" id="step-grilla">
     <div class="form-card">
       <h2>Vista previa de grilla IG</h2>
-      <p class="note" style="margin-bottom:14px;">Cada vez que genera un posteo o pieza minimalista, puede sumarla acá con "+ Agregar a grilla".</p>
-
-      <p class="ni-seccion-tit">¿Qué técnica quiere usar?</p>
-      <div class="ni-chips" id="tecnica-chips" style="margin-bottom:12px;">
-        <label class="ni-chip"><input type="radio" name="tecnica-grilla" value="unica" checked><span>Paleta única</span></label>
-        <label class="ni-chip"><input type="radio" name="tecnica-grilla" value="ajedrez"><span>Ajedrezado</span></label>
-        <label class="ni-chip"><input type="radio" name="tecnica-grilla" value="filas"><span>Filas (cada 3)</span></label>
-        <label class="ni-chip"><input type="radio" name="tecnica-grilla" value="bordes"><span>Solo bordes iguales</span></label>
-      </div>
-      <p class="note" style="margin-bottom:6px;">Así quedaría (ejemplo con colores, no son fotos reales):</p>
-      <div id="tecnica-ejemplo" class="grilla-ig" style="margin-bottom:8px;"></div>
-      <p class="note" id="tecnica-explicacion" style="margin-bottom:18px;"></p>
-
-      <p class="ni-seccion-tit">Su grilla</p>
+      <p class="note" style="margin-bottom:14px;">Cada vez que genera una pieza para redes, puede sumarla acá con "+ Agregar a grilla". Use las flechas ◀▶ de cada foto para reordenarlas.</p>
       <div id="grilla-cont" class="grilla-ig"></div>
       <div class="actions" style="margin-top:14px;">
         <button class="btn btn-ghost" onclick="vaciarGrilla()">Vaciar grilla</button>
@@ -1923,35 +1899,23 @@ async function generarFlyersNuevoIngreso(){
     await document.fonts.ready;
 
     const primerProducto = grupos[0].producto;
-    const paletaKey = document.getElementById('ni-paleta').value;
-    const estilo = document.querySelector('input[name="ni-estilo"]:checked').value;
     const nombreArchivoBase = grupos.map(g => g.producto.nombre).join('_').replace(/\s+/g,'_').slice(0,60);
     const piezas = [{canvas: dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoPct), nombre:'flyer_whatsapp_' + nombreArchivoBase + '.png', etiqueta:'flyer WhatsApp'}];
 
     const formatosElegidos = [];
-    if(document.getElementById('ni-fmt-story').checked) formatosElegidos.push(['story','story IG']);
-    if(document.getElementById('ni-fmt-post').checked) formatosElegidos.push(['post','posteo IG']);
-    if(document.getElementById('ni-fmt-reel').checked) formatosElegidos.push(['reel','portada de Reel']);
+    if(document.getElementById('ni-fmt-story').checked) formatosElegidos.push(['story','Story']);
+    if(document.getElementById('ni-fmt-post').checked) formatosElegidos.push(['post','Posteo']);
+    if(document.getElementById('ni-fmt-reel').checked) formatosElegidos.push(['reel','Reel']);
 
     // las piezas de redes siguen siendo de un producto por vez (usan el primero de la lista)
     const producto = primerProducto;
     const img = grupos[0].img;
     formatosElegidos.forEach(([formato, etiqueta]) => {
-      if(estilo === 'minimal'){
-        Object.keys(PALETAS).forEach(pk => {
-          piezas.push({
-            canvas: dibujarPiezaMinimalista(producto, img, formato, pk),
-            nombre: formato + '_' + pk + '_' + producto.nombre.replace(/\s+/g,'_') + '.png',
-            etiqueta: etiqueta + ' — ' + pk
-          });
-        });
-      } else {
-        piezas.push({
-          canvas: dibujarFlyerRedes(producto, img, textoAdicional, variantesColor, formato, paletaKey),
-          nombre: formato + '_' + producto.nombre.replace(/\s+/g,'_') + '.png',
-          etiqueta: etiqueta
-        });
-      }
+      piezas.push({
+        canvas: dibujarPiezaMinimalista(producto, img, formato),
+        nombre: formato + '_' + producto.nombre.replace(/\s+/g,'_') + '.png',
+        etiqueta: etiqueta
+      });
     });
 
     cont.innerHTML = '';
@@ -2025,7 +1989,7 @@ async function generarFlyersNuevoIngreso(){
       videoWrap.innerHTML = '<p class="note">Generando video (unos segundos)...</p>';
       cont.appendChild(videoWrap);
 
-      const blobVideo = await generarVideoKenBurns(producto, img, textoAdicional, paletaKey);
+      const blobVideo = await generarVideoKenBurns(producto, img, textoAdicional, 'violeta');
       const urlVideo = URL.createObjectURL(blobVideo);
       const extVideo = blobVideo.type.includes('mp4') ? 'mp4' : 'webm';
       const nombreVideo = 'video_' + producto.nombre.replace(/\s+/g,'_') + '.' + extVideo;
@@ -2206,8 +2170,8 @@ const PALETAS = {
   crema:   {bg:'#F5F3EF', badgeBg:'#3D2B4E', badgeText:'#F5D470', accent:'#3D2B4E', accentDark:'#2A1D36', titulo:'#3D2B4E', texto:'#3D2B4E', textoSub:'#6E6459', tarjeta:'#FFFFFF'},
 };
 
-function dibujarPiezaMinimalista(producto, img, formato, paletaKey){
-  const P = PALETAS[paletaKey] || PALETAS.violeta;
+function dibujarPiezaMinimalista(producto, img, formato){
+  const P = PALETAS.violeta;
   const esPost = formato === 'post';
   const esReel = formato === 'reel';
   const W = 1080, H = esPost ? 1350 : 1920;
@@ -2224,32 +2188,18 @@ function dibujarPiezaMinimalista(producto, img, formato, paletaKey){
   const nw = img.width * ratio, nh = img.height * ratio;
   ctx.drawImage(img, (W-nw)/2, (H-nh)/2, nw, nh);
 
-  // marco fino con el color de marca — la unica referencia de marca en el cuerpo
-  const marco = 22;
+  // marco fino con el color de marca — unico detalle de marca sobre la foto
+  const marco = 16;
   ctx.strokeStyle = P.bg; ctx.lineWidth = marco;
   ctx.strokeRect(marco/2, marco/2, W-marco, H-marco);
 
-  // cintita chica con la categoria, del lado opuesto al isotipo — un poco mas de presencia sin recargar
-  const catActualMin = CATALOGO.find(c => c.productos.includes(producto));
-  if(catActualMin){
-    ctx.font = "700 24px 'Work Sans'";
-    const textoCategoria = catActualMin.categoria.split('/')[0].trim();
-    const anchoCinta = ctx.measureText(textoCategoria).width + 44;
-    const cintaX = esReel ? W - anchoCinta - 40 : 40;
-    const cintaY = Math.max(50, topSafe*0.4);
-    ctx.fillStyle = P.bg;
-    dibujarRectRedondeado(ctx, cintaX, cintaY, anchoCinta, 46, 23); ctx.fill();
-    ctx.fillStyle = P.accent; ctx.textAlign = 'center';
-    ctx.fillText(textoCategoria, cintaX + anchoCinta/2, cintaY + 31);
-  }
-
-  // isotipo chico, corrido del lado izquierdo arriba para no chocar con los botones de Reels (derecha)
-  const cx = esReel ? 90 : W - 90, cy = Math.max(90, topSafe*0.55), r = 46;
-  ctx.fillStyle = P.bg;
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = P.accent; ctx.textAlign = 'center';
-  ctx.font = "700 34px 'Work Sans'";
-  ctx.fillText('OT', cx, cy+12);
+  // wordmark chico y centrado arriba, dentro de la zona segura
+  ctx.textAlign = 'center';
+  ctx.font = "600 30px 'Fraunces'";
+  ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 10;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText('OnLineTextil', W/2, Math.max(56, topSafe*0.4));
+  ctx.shadowBlur = 0;
 
   if(esReel){
     const px = W/2, py = H/2;
@@ -2259,125 +2209,19 @@ function dibujarPiezaMinimalista(producto, img, formato, paletaKey){
     ctx.beginPath(); ctx.moveTo(px-16, py-26); ctx.lineTo(px-16, py+26); ctx.lineTo(px+26, py); ctx.closePath(); ctx.fill();
   }
 
-  // franja inferior degradada con el nombre del producto, siempre arriba del margen seguro
-  const gradH = bottomSafe + 90;
-  const grad = ctx.createLinearGradient(0, H-gradH, 0, H);
-  grad.addColorStop(0, 'rgba(0,0,0,0)');
-  grad.addColorStop(1, 'rgba(0,0,0,0.72)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, H-gradH, W, gradH);
+  // barra inferior solida con el nombre del producto, siempre arriba del margen seguro
+  const barraH = bottomSafe + 130;
+  ctx.fillStyle = P.bg;
+  ctx.fillRect(0, H-barraH, W, barraH);
 
-  ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'center';
-  ctx.font = "600 52px 'Fraunces'";
+  ctx.strokeStyle = P.accent; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(W/2-36, H-barraH+34); ctx.lineTo(W/2+36, H-barraH+34); ctx.stroke();
+
+  ctx.fillStyle = P.accent; ctx.textAlign = 'center';
+  ctx.font = "600 50px 'Fraunces'";
   const lineasNombre = envolverTexto(ctx, producto.nombre, 880 - sideSafe*2);
-  const yBase = H - bottomSafe - 30;
-  let y = yBase - (lineasNombre.length-1)*54;
+  let y = H - barraH + 90;
   lineasNombre.forEach(linea => { ctx.fillText(linea, 540, y); y += 54; });
-
-  ctx.fillStyle = P.accent;
-  ctx.fillRect(W/2-40, H-gradH+28, 80, 5);
-
-  return canvas;
-}
-
-function dibujarFlyerRedes(producto, img, textoAdicional, variantesColor, formato, paletaKey){
-  const P = PALETAS[paletaKey] || PALETAS.violeta;
-  const esPost = formato === 'post';
-  const esReel = formato === 'reel';
-  const W = 1080, H = esPost ? 1350 : 1920;
-  const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
-
-  // zonas seguras de Instagram 2026: Reels tiene mucho mas margen abajo (botones/caption)
-  // que Stories, y menos arriba; Post (grilla 4:5) necesita margen top/bottom parejo
-  const topSafe    = esPost ? 90  : (esReel ? 130 : 250);
-  const bottomSafe = esPost ? 90  : (esReel ? 380 : 250);
-  const sideSafe   = esReel ? 130 : 60; // Reels: columna de botones (me gusta/comentar/compartir) a la derecha
-
-  ctx.fillStyle = P.bg; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle = P.texto; ctx.textAlign = 'center';
-  ctx.font = `600 ${esPost ? 46 : 58}px 'Fraunces'`;
-  ctx.fillText('OnLineTextil', 540, topSafe + 40);
-
-  ctx.strokeStyle = P.accent; ctx.lineWidth = 6; ctx.setLineDash([20,14]);
-  ctx.beginPath(); ctx.moveTo(90, topSafe + 100); ctx.lineTo(990, topSafe + 100); ctx.stroke();
-  ctx.setLineDash([]);
-
-  ctx.fillStyle = P.badgeBg;
-  const badgeY = topSafe + 130;
-  dibujarRectRedondeado(ctx, 330, badgeY, 420, 62, 31); ctx.fill();
-  ctx.fillStyle = P.badgeText; ctx.font = "700 32px 'Work Sans'";
-  ctx.fillText(esReel ? 'NUEVO EN REEL' : 'NUEVO INGRESO', 540, badgeY+40);
-
-  const photoW = (esPost ? 700 : 780) - (esReel ? sideSafe : 0);
-  const photoH = esPost ? 560 : 720;
-  const px = (W-photoW)/2, py = badgeY + 78;
-  ctx.fillStyle = P.tarjeta;
-  dibujarRectRedondeado(ctx, px-14, py-14, photoW+28, photoH+28, 36); ctx.fill();
-  dibujarFotoContain(ctx, img, px, py, photoW, photoH, "#FFFFFF");
-
-  if(esReel){
-    const cx = px+photoW-70, cy = py+70;
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.beginPath(); ctx.arc(cx, cy, 42, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath(); ctx.moveTo(cx-12, cy-18); ctx.lineTo(cx-12, cy+18); ctx.lineTo(cx+18, cy); ctx.closePath(); ctx.fill();
-  }
-
-  let y = py + photoH + (esPost ? 60 : 90);
-  ctx.fillStyle = P.titulo; ctx.font = `600 ${esPost ? 48 : 60}px 'Fraunces'`;
-  const lineasNombre = envolverTexto(ctx, producto.nombre, 940 - sideSafe*2);
-  lineasNombre.forEach(linea => { ctx.fillText(linea, 540, y); y += esPost ? 52 : 64; });
-  y -= 16;
-  ctx.fillStyle = P.texto; ctx.font = `${esPost ? 26 : 28}px 'Work Sans'`;
-  const lineasComp = envolverTexto(ctx, producto.composicion || '', 940 - sideSafe*2);
-  lineasComp.forEach(linea => { ctx.fillText(linea, 540, y); y += esPost ? 32 : 34; });
-  y += 4;
-
-  if(textoAdicional){
-    ctx.fillStyle = P.accent; ctx.font = `italic 700 ${esPost ? 28 : 32}px 'Work Sans'`;
-    const lineasTxt = envolverTexto(ctx, textoAdicional, 900 - sideSafe*2);
-    lineasTxt.forEach(linea => { ctx.fillText(linea, 540, y); y += esPost ? 36 : 42; });
-    y += 4;
-  }
-
-  if(variantesColor){
-    ctx.font = `${esPost ? 24 : 28}px 'Work Sans'`;
-    const lineas = envolverTexto(ctx, variantesColor, 860);
-    ctx.fillStyle = P.texto;
-    lineas.forEach(linea => { ctx.fillText(linea, 540, y); y += esPost ? 30 : 36; });
-    y += 10;
-  }
-
-  ctx.strokeStyle = P.accentDark; ctx.lineWidth = 4; ctx.setLineDash([16,12]);
-  ctx.beginPath(); ctx.moveTo(90, y+16); ctx.lineTo(990, y+16); ctx.stroke();
-  ctx.setLineDash([]);
-  y += esPost ? 56 : 70;
-
-  const limiteInferior = H - bottomSafe;
-  const beneficios = [
-    ['💳 CUOTAS SIN INTERÉS', 'Preguntanos por los medios de pago'],
-    ['🚚 ENVÍOS A TODO EL PAÍS', 'Te lo mandamos donde estés'],
-    ['🏷️ DESCUENTOS POR MAYOR', 'Escribinos y te tiramos precio'],
-  ];
-  const pasoBeneficio = esPost ? 68 : 78;
-  const cantMax = Math.max(0, Math.floor((limiteInferior - 40 - y) / pasoBeneficio));
-  const listaBeneficios = beneficios.slice(0, Math.min(beneficios.length, esPost ? 2 : cantMax));
-  listaBeneficios.forEach(([tit, sub]) => {
-    ctx.font = `700 ${esPost ? 28 : 32}px 'Work Sans'`;
-    const tw = ctx.measureText(tit).width;
-    ctx.fillStyle = P.accent;
-    ctx.beginPath(); ctx.arc(540 - tw/2 - 22, y-9, 6, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = P.texto;
-    ctx.fillText(tit, 540, y);
-    ctx.font = `${esPost ? 20 : 22}px 'Work Sans'`; ctx.fillStyle = P.textoSub;
-    ctx.fillText(sub, 540, y + (esPost ? 32 : 36));
-    y += pasoBeneficio;
-  });
-
-  ctx.fillStyle = P.accent; ctx.font = "700 28px 'Work Sans'";
-  ctx.fillText('onlinetextil.com.ar', 540, Math.min(y+36, limiteInferior - 10));
 
   return canvas;
 }
@@ -2584,43 +2428,6 @@ function irAFlyerConSku(sku){
 }
 
 // ---------- grilla IG (vista previa) ----------
-const TECNICAS_INFO = {
-  unica: 'Usa siempre la misma paleta en todo — es la opción más segura y prolija.',
-  ajedrez: 'Alterna 2 paletas, una foto sí y una no — efecto tablero de ajedrez.',
-  filas: 'Cada fila completa (3 fotos) usa una paleta, y cambia en la fila siguiente.',
-  bordes: 'Cambie de paleta libremente — lo único que mantiene todo unido es el marco de color, que ya está en cada pieza minimalista.',
-};
-function leerTecnicaGrilla(){
-  return localStorage.getItem('ot_tecnica_grilla') || 'unica';
-}
-function guardarTecnicaGrilla(t){
-  localStorage.setItem('ot_tecnica_grilla', t);
-}
-function paletaSugerida(tecnica, posicion){
-  const paletas = ['violeta','dorado','crema'];
-  if(tecnica === 'ajedrez') return posicion % 2 === 0 ? 'violeta' : 'dorado';
-  if(tecnica === 'filas') return paletas[Math.floor(posicion/3) % paletas.length];
-  return null; // unica / bordes: sin sugerencia fija
-}
-function renderEjemploTecnica(){
-  const tecnica = document.querySelector('input[name="tecnica-grilla"]:checked').value;
-  const colores = {violeta:'#3D2B4E', dorado:'#F5D470', crema:'#F5F3EF'};
-  const cont = document.getElementById('tecnica-ejemplo');
-  let celdas = [];
-  for(let i=0;i<6;i++){
-    let paleta;
-    if(tecnica === 'unica') paleta = 'violeta';
-    else if(tecnica === 'ajedrez') paleta = i % 2 === 0 ? 'violeta' : 'dorado';
-    else if(tecnica === 'filas') paleta = ['violeta','dorado','crema'][Math.floor(i/3) % 3];
-    else paleta = ['violeta','dorado','crema'][i % 3]; // bordes: libre, se muestra variado
-    celdas.push(paleta);
-  }
-  cont.innerHTML = celdas.map(p => `<div class="grilla-celda" style="background:${colores[p]};aspect-ratio:1/1;"></div>`).join('');
-  document.getElementById('tecnica-explicacion').textContent = TECNICAS_INFO[tecnica];
-  guardarTecnicaGrilla(tecnica);
-}
-document.querySelectorAll('input[name="tecnica-grilla"]').forEach(r => r.addEventListener('change', renderEjemploTecnica));
-
 function leerGrilla(){
   try{ return JSON.parse(localStorage.getItem('ot_grilla') || '[]'); }
   catch(e){ return []; }
@@ -2632,10 +2439,7 @@ function agregarAGrilla(dataUrl, nombre){
   const items = leerGrilla();
   items.unshift({dataUrl, nombre, id: Date.now() + '-' + Math.random().toString(36).slice(2)});
   guardarGrilla(items);
-  const tecnica = leerTecnicaGrilla();
-  const sugerida = paletaSugerida(tecnica, items.length); // proxima posicion
-  const msgSugerencia = sugerida ? `\n\nPara la próxima foto, usá la paleta: ${sugerida}.` : '';
-  alert('Agregada a la grilla. Podés verla en "Vista previa de grilla IG".' + msgSugerencia);
+  alert('Agregada a la grilla. Podés verla en "Vista previa de grilla IG".');
 }
 function quitarDeGrilla(id){
   guardarGrilla(leerGrilla().filter(it => it.id !== id));
@@ -2807,10 +2611,6 @@ async function generarRompecabezas(){
 
 function abrirGrilla(){
   mostrarPaso('step-grilla');
-  const tecnicaGuardada = leerTecnicaGrilla();
-  const radio = document.querySelector(`input[name="tecnica-grilla"][value="${tecnicaGuardada}"]`);
-  if(radio) radio.checked = true;
-  renderEjemploTecnica();
   renderGrilla();
 }
 
@@ -2823,7 +2623,6 @@ function abrirNuevoIngreso(){
   document.getElementById('ni-fmt-story').checked = true;
   document.getElementById('ni-fmt-post').checked = false;
   document.getElementById('ni-fmt-reel').checked = false;
-  document.getElementById('ni-paleta').value = 'violeta';
   document.getElementById('ni-video').checked = false;
   document.getElementById('ni-opciones-texto').innerHTML = '';
   document.getElementById('ni-resultado').innerHTML = '';
