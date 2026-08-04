@@ -1824,6 +1824,32 @@ async function generarFlyersNuevoIngreso(){
     cont.appendChild(wrap);
   });
 
+    if(document.getElementById('ni-fmt-post').checked || document.getElementById('ni-fmt-reel').checked){
+      const copyTexto = generarCopyPosteo(producto, matches);
+      const copyWrap = document.createElement('div');
+      copyWrap.style.cssText = 'margin-bottom:16px;';
+      const copyLabel = document.createElement('p');
+      copyLabel.innerHTML = '<b>Copy para pegar en la descripción del posteo/reel:</b>';
+      copyLabel.style.cssText = 'font-size:0.85rem;margin-bottom:6px;';
+      const copyArea = document.createElement('textarea');
+      copyArea.value = copyTexto;
+      copyArea.readOnly = true;
+      copyArea.rows = 8;
+      copyArea.style.cssText = 'width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:\'Work Sans\';font-size:0.85rem;background:var(--cream);margin-bottom:8px;';
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'btn-mini';
+      copyBtn.textContent = 'Copiar texto';
+      copyBtn.onclick = () => {
+        navigator.clipboard.writeText(copyTexto);
+        copyBtn.textContent = '¡Copiado!';
+        setTimeout(() => copyBtn.textContent = 'Copiar texto', 1500);
+      };
+      copyWrap.appendChild(copyLabel);
+      copyWrap.appendChild(copyArea);
+      copyWrap.appendChild(copyBtn);
+      cont.appendChild(copyWrap);
+    }
+
     if(document.getElementById('ni-video').checked){
       const videoWrap = document.createElement('div');
       videoWrap.style.cssText = 'margin-bottom:16px;text-align:center;';
@@ -2179,6 +2205,33 @@ async function generarVideoKenBurns(producto, img, textoAdicional, paletaKey){
   recorder.stop();
   await terminado;
   return new Blob(chunks, {type: mimeType.split(';')[0]});
+}
+
+function generarCopyPosteo(producto, matches){
+  const composicion = producto.composicion || '';
+  const materiales = [...composicion.matchAll(/(\d+%\s*[A-Za-zÁÉÍÓÚáéíóúñÑ]+)/g)].map(m => m[1]);
+  const gramajeMatch = composicion.match(/(\d+\s*gr(?:s|\/m2)?)/i);
+  const gramaje = gramajeMatch ? gramajeMatch[1] : null;
+  const medidas = matches.map(m => m.variante.desc).filter(Boolean);
+
+  let lineas = [];
+  lineas.push(producto.nombre.toUpperCase());
+  lineas.push('');
+  if(materiales.length) lineas.push('Composición: ' + materiales.join(' / '));
+  if(gramaje) lineas.push('Gramaje: ' + gramaje);
+  if(medidas.length) lineas.push('Medidas disponibles: ' + medidas.join(', '));
+  lineas.push('');
+  lineas.push('Consultá por WhatsApp.');
+  lineas.push('Envíos a todo el país — retiro en persona, transporte de cargas o correo.');
+  lineas.push('');
+
+  const catActual = CATALOGO.find(c => c.productos.includes(producto));
+  const hashtagCategoria = catActual ? '#' + catActual.categoria.split(/\s|\//).filter(Boolean)[0].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'') : '';
+  const hashtagProducto = '#' + producto.nombre.replace(/\s+/g,'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const hashtags = ['#onlinetextil', '#ventamayorista', '#textiles', hashtagCategoria, hashtagProducto].filter(Boolean);
+  lineas.push(hashtags.join(' '));
+
+  return lineas.join('\n');
 }
 
 function generarTextoConIA(){
