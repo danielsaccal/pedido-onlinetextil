@@ -332,6 +332,7 @@ header.top .admin-link:hover{opacity:0.85;}
   <p class="admin-link" onclick="abrirNuevoIngreso()">Nuevo ingreso (flyers)</p>
   <p class="admin-link" onclick="abrirActualizarFoto()">Actualizar foto de producto</p>
   <p class="admin-link" onclick="abrirGrilla()">Vista previa de grilla IG</p>
+  <p class="admin-link" onclick="abrirRompecabezas()">Rompecabezas para grilla</p>
 </header>
 
 <div class="app">
@@ -444,6 +445,28 @@ header.top .admin-link:hover{opacity:0.85;}
       <div id="grilla-cont" class="grilla-ig"></div>
       <div class="actions" style="margin-top:14px;">
         <button class="btn btn-ghost" onclick="vaciarGrilla()">Vaciar grilla</button>
+        <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP: ROMPECABEZAS PARA GRILLA -->
+  <div class="step" id="step-rompecabezas">
+    <div class="form-card">
+      <h2>Rompecabezas para grilla</h2>
+      <p class="note" style="margin-bottom:14px;">Corta la foto de un producto en 2 o 3 partes. Publicadas una al lado de la otra, en ese orden, forman una sola imagen continua en la grilla.</p>
+      <div class="field"><label>SKU</label><input type="text" id="rp-sku" placeholder="Ej: TOA171B"></div>
+      <div class="field">
+        <label>Partes</label>
+        <div class="ni-chips">
+          <label class="ni-chip"><input type="radio" name="rp-partes" value="3" checked><span>3 (tríptico)</span></label>
+          <label class="ni-chip"><input type="radio" name="rp-partes" value="2"><span>2</span></label>
+        </div>
+      </div>
+      <div class="actions"><button class="btn btn-gold" onclick="generarRompecabezas()">Generar</button></div>
+      <p class="error" id="rp-error" style="display:none;">No encontré ningún producto con ese SKU.</p>
+      <div id="rp-resultado" class="ni-resultado-grilla"></div>
+      <div class="actions" style="margin-top:14px;">
         <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
       </div>
     </div>
@@ -2596,6 +2619,99 @@ function renderGrilla(){
     </div>
   `).join('');
 }
+// ---------- rompecabezas / triptico ----------
+function abrirRompecabezas(){
+  mostrarPaso('step-rompecabezas');
+  document.getElementById('rp-sku').value = '';
+  document.getElementById('rp-resultado').innerHTML = '';
+  document.getElementById('rp-error').style.display = 'none';
+}
+
+async function generarRompecabezas(){
+  const sku = document.getElementById('rp-sku').value.trim();
+  const partes = parseInt(document.querySelector('input[name="rp-partes"]:checked').value, 10);
+  const errorEl = document.getElementById('rp-error');
+  const cont = document.getElementById('rp-resultado');
+  errorEl.style.display = 'none';
+  if(!sku) return;
+
+  const match = buscarProductoPorSku(sku);
+  if(!match){
+    errorEl.style.display = 'block';
+    cont.innerHTML = '';
+    return;
+  }
+
+  cont.innerHTML = '<p class="note">Generando...</p>';
+  try{
+    const imgSrc = imagenEfectiva(match.ci, match.pi, match.producto);
+    const img = await cargarImagenParaCanvas(imgSrc);
+
+    // armar una tira ancha con la foto (cover) del tamaño de "partes" cuadrados juntos
+    const lado = 1080;
+    const tiraW = lado * partes;
+    const tira = document.createElement('canvas');
+    tira.width = tiraW; tira.height = lado;
+    const ctxTira = tira.getContext('2d');
+    ctxTira.fillStyle = '#FFFFFF'; ctxTira.fillRect(0,0,tiraW,lado);
+    const ratio = Math.max(tiraW / img.width, lado / img.height);
+    const nw = img.width * ratio, nh = img.height * ratio;
+    ctxTira.drawImage(img, (tiraW-nw)/2, (lado-nh)/2, nw, nh);
+
+    // cortar en partes cuadradas, en orden de izquierda a derecha
+    const piezas = [];
+    for(let i=0;i<partes;i++){
+      const recorte = document.createElement('canvas');
+      recorte.width = lado; recorte.height = lado;
+      recorte.getContext('2d').drawImage(tira, i*lado, 0, lado, lado, 0, 0, lado, lado);
+      piezas.push({canvas: recorte, nombre: 'rompecabezas_' + (i+1) + 'de' + partes + '_' + match.producto.nombre.replace(/\s+/g,'_') + '.png'});
+    }
+
+    cont.innerHTML = '';
+    piezas.forEach((p, i) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'ni-pieza';
+      const previewImg = document.createElement('img');
+      previewImg.src = p.canvas.toDataURL('image/png');
+      const label = document.createElement('p');
+      label.className = 'note';
+      label.textContent = `Parte ${i+1} de ${partes} — publicar en este orden`;
+      const acciones = document.createElement('div');
+      acciones.className = 'ni-pieza-acciones';
+      const btn = document.createElement('button');
+      btn.className = 'btn-mini';
+      btn.textContent = 'Descargar';
+      btn.onclick = () => {
+        const a = document.createElement('a');
+        a.href = p.canvas.toDataURL('image/png');
+        a.download = p.nombre;
+        a.click();
+      };
+      acciones.appendChild(btn);
+      wrap.appendChild(previewImg);
+      wrap.appendChild(label);
+      wrap.appendChild(acciones);
+      cont.appendChild(wrap);
+    });
+
+    const btnTodos = document.createElement('button');
+    btnTodos.className = 'btn btn-gold';
+    btnTodos.style.cssText = 'margin-top:14px;';
+    btnTodos.textContent = 'Agregar las ' + partes + ' partes a la grilla, en orden';
+    btnTodos.onclick = () => {
+      const items = leerGrilla();
+      const nuevos = piezas.map(p => ({dataUrl: p.canvas.toDataURL('image/png'), nombre: p.nombre, id: Date.now() + '-' + Math.random().toString(36).slice(2)}));
+      items.unshift(...nuevos);
+      guardarGrilla(items);
+      alert('Se agregaron las ' + partes + ' partes, en orden, al principio de la grilla.');
+    };
+    cont.appendChild(btnTodos);
+  } catch(e){
+    cont.innerHTML = '';
+    alert('No se pudo generar el rompecabezas: ' + e.message);
+  }
+}
+
 function abrirGrilla(){
   mostrarPaso('step-grilla');
   const tecnicaGuardada = leerTecnicaGrilla();
