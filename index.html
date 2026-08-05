@@ -548,6 +548,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
           <div class="field"><label>Provincia</label><input type="text" id="f-provincia" placeholder="Ej: Corrientes"></div>
         </div>
         <div id="autocomplete-lista" class="autocomplete-lista" style="display:none;"></div>
+        <p id="autocomplete-debug" style="font-size:0.68rem;color:#A8A092;margin:4px 0 0;"></p>
       </div>
       <div class="field">
         <label>Transporte</label>
@@ -1525,14 +1526,20 @@ document.getElementById('hist-buscador').addEventListener('input', e => renderHi
 let clientesAutocomplete = null;
 
 function precargarClientesParaAutocompletar(){
-  if(clientesAutocomplete !== null) return; // ya cargados en esta sesion
+  const debugEl = document.getElementById('autocomplete-debug');
+  if(debugEl) debugEl.textContent = 'Cargando clientes...';
+  if(clientesAutocomplete !== null){
+    if(debugEl) debugEl.textContent = 'Clientes ya cargados: ' + clientesAutocomplete.length;
+    return;
+  }
   db.collection('clientes').get().then(snap => {
     clientesAutocomplete = snap.docs.map(d => d.data());
-    console.log('Clientes cargados para autocompletar:', clientesAutocomplete.length);
+    if(debugEl) debugEl.textContent = 'Clientes cargados: ' + clientesAutocomplete.length;
     buscarClienteAutocompletar(); // por si ya habia texto escrito antes de que cargue
   }).catch(e => {
     console.error('Error precargando clientes para autocompletar:', e);
     clientesAutocomplete = [];
+    if(debugEl) debugEl.textContent = 'Error al cargar clientes: ' + e.message;
     const cont = document.getElementById('autocomplete-lista');
     cont.innerHTML = '<div class="autocomplete-item" style="color:#A6432F;">No se pudo cargar la lista de clientes: ' + e.message + '</div>';
     cont.style.display = 'block';
@@ -1542,6 +1549,7 @@ function precargarClientesParaAutocompletar(){
 
 function buscarClienteAutocompletar(){
   const cont = document.getElementById('autocomplete-lista');
+  const debugEl = document.getElementById('autocomplete-debug');
   const valores = {
     nombre: document.getElementById('f-nombre').value.trim().toLowerCase(),
     apellido: document.getElementById('f-apellido').value.trim().toLowerCase(),
@@ -1552,8 +1560,14 @@ function buscarClienteAutocompletar(){
   };
   const hayAlgo = Object.values(valores).some(v => v.length >= 2);
 
-  if(!hayAlgo || !clientesAutocomplete || clientesAutocomplete.length === 0){
+  if(!hayAlgo){
     cont.style.display = 'none';
+    if(debugEl) debugEl.textContent = 'Escriba al menos 2 letras para buscar.';
+    return;
+  }
+  if(!clientesAutocomplete || clientesAutocomplete.length === 0){
+    cont.style.display = 'none';
+    if(debugEl) debugEl.textContent = 'Todavía no hay clientes cargados en memoria (clientesAutocomplete: ' + (clientesAutocomplete ? '0' : 'null') + ').';
     return;
   }
 
@@ -1567,9 +1581,11 @@ function buscarClienteAutocompletar(){
 
   if(coincidencias.length === 0){
     cont.style.display = 'none';
+    if(debugEl) debugEl.textContent = 'Buscando entre ' + clientesAutocomplete.length + ' clientes — 0 coincidencias.';
     return;
   }
 
+  if(debugEl) debugEl.textContent = coincidencias.length + ' coincidencia(s) encontrada(s).';
   cont.innerHTML = coincidencias.map((c, idx) => `
     <div class="autocomplete-item" onclick="elegirClienteAutocompletado(${idx})">
       <b>${c.nombre||''} ${c.apellido||''}</b>
