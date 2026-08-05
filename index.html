@@ -1945,6 +1945,14 @@ function extraerDatosTecnicos(composicion){
   const gramajeMatch = (composicion||'').match(/(\d+\s*gr(?:s|\/m2)?)/i);
   return { materiales, gramaje: gramajeMatch ? gramajeMatch[1] : null };
 }
+function obtenerCategoriaAmigable(producto){
+  const cat = CATALOGO.find(c => c.productos.includes(producto));
+  if(!cat) return '';
+  const nat = NOMBRES_NATURALES_CATEGORIA[cat.categoria];
+  if(nat) return nat[1].charAt(0).toUpperCase() + nat[1].slice(1);
+  return cat.categoria.charAt(0) + cat.categoria.slice(1).toLowerCase();
+}
+
 function fichaTecnica(producto, variantesDelGrupo){
   const { materiales, gramaje } = extraerDatosTecnicos(producto.composicion);
   const partes = [];
@@ -2138,14 +2146,14 @@ async function generarFlyersNuevoIngreso(){
         const g = grupos[(i - slideIdx) % grupos.length]; // rota entre TODOS los productos cargados
         const estiloSlide = estilosCarrusel[i % estilosCarrusel.length];
         const paletaSlide = paletasCarrusel[i % paletasCarrusel.length];
-        const ficha = fichaTecnica(g.producto, g.variantes);
+        const medidas = g.variantes.map(v => v.desc).filter(Boolean).join(', ');
         let canvasSlide;
         if(estiloSlide === 'tarjeta'){
           // con foto: solo el nombre, sin repetir la ficha (la foto ya habla por si sola)
           canvasSlide = dibujarPiezaTarjeta(g.producto, g.img, 'post', textoAdicionalOriginal || null, paletaSlide);
         } else if(estiloSlide === 'texto'){
-          // sin foto: aca si va la ficha tecnica completa
-          const txtSlide = [textoAdicionalOriginal, ficha].filter(Boolean).join(' · ');
+          // la composicion (material/gramaje) ya la muestra sola esta pieza: acá solo sumamos medidas, sin repetir
+          const txtSlide = [textoAdicionalOriginal, medidas].filter(Boolean).join(' · ');
           canvasSlide = dibujarPiezaTexto(g.producto, txtSlide, 'post', paletaSlide);
         } else {
           canvasSlide = dibujarPiezaEditorial(g.producto, g.img, 'post', textoAdicionalOriginal || null, paletaSlide);
@@ -2481,21 +2489,26 @@ function dibujarPiezaEditorial(producto, img, formato, textoAdicional, paletaKey
     ctx.beginPath(); ctx.moveTo(px-16, py-26); ctx.lineTo(px-16, py+26); ctx.lineTo(px+26, py); ctx.closePath(); ctx.fill();
   }
 
-  // barra inferior solida con el nombre del producto (y el texto adicional, si hay), siempre arriba del margen seguro
+  // barra inferior solida con el rubro, el nombre del producto (y el texto adicional, si hay), siempre arriba del margen seguro
+  const categoriaLabel = obtenerCategoriaAmigable(producto).toUpperCase();
   ctx.font = "600 50px 'Fraunces'";
   const lineasNombre = envolverTexto(ctx, producto.nombre, 880 - sideSafe*2);
   ctx.font = "italic 600 30px 'Work Sans'";
   const lineasTxt = textoAdicional ? envolverTexto(ctx, textoAdicional, 880 - sideSafe*2) : [];
-  const barraH = bottomSafe + 100 + lineasNombre.length*54 + (lineasTxt.length ? lineasTxt.length*38 + 20 : 0);
+  const barraH = bottomSafe + 148 + lineasNombre.length*54 + (lineasTxt.length ? lineasTxt.length*38 + 20 : 0);
   ctx.fillStyle = P.bg;
   ctx.fillRect(0, H-barraH, W, barraH);
 
+  ctx.fillStyle = P.accent; ctx.textAlign = 'center';
+  ctx.font = "700 32px 'Work Sans'";
+  if(categoriaLabel) ctx.fillText(categoriaLabel, 540, H-barraH+50);
+
   ctx.strokeStyle = P.accent; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.moveTo(W/2-36, H-barraH+34); ctx.lineTo(W/2+36, H-barraH+34); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W/2-36, H-barraH+78); ctx.lineTo(W/2+36, H-barraH+78); ctx.stroke();
 
   ctx.fillStyle = P.accent; ctx.textAlign = 'center';
   ctx.font = "600 50px 'Fraunces'";
-  let y = H - barraH + 90;
+  let y = H - barraH + 134;
   lineasNombre.forEach(linea => { ctx.fillText(linea, 540, y); y += 54; });
 
   if(lineasTxt.length){
@@ -2542,15 +2555,22 @@ function dibujarPiezaTarjeta(producto, img, formato, textoAdicional, paletaKey){
   dibujarRectRedondeado(ctx, (W-cardW)/2, cardTop, cardW, cardH, 10); ctx.stroke();
 
   const pad = 34;
-  const espacioTexto = textoAdicional ? 140 : 90;
+  const espacioTexto = (textoAdicional ? 140 : 90) + 34;
   const photoW = cardW - pad*2;
   const photoH = cardH - pad*2 - espacioTexto;
   const px = (W-photoW)/2, py = cardTop + pad;
   dibujarFotoContain(ctx, img, px, py, photoW, photoH, '#FFFFFF');
 
+  const categoriaLabel = obtenerCategoriaAmigable(producto).toUpperCase();
+  let y = py + photoH + 40;
+  if(categoriaLabel){
+    ctx.fillStyle = '#8A7BA0'; ctx.font = "700 24px 'Work Sans'";
+    ctx.fillText(categoriaLabel, W/2, y);
+    y += 36;
+  }
+
   ctx.fillStyle = P.bg; ctx.font = "600 40px 'Fraunces'";
   const lineasNombre = envolverTexto(ctx, producto.nombre, photoW - 20);
-  let y = py + photoH + 46;
   lineasNombre.slice(0,2).forEach(linea => { ctx.fillText(linea, W/2, y); y += 42; });
 
   if(textoAdicional){
@@ -2588,8 +2608,9 @@ function dibujarPiezaTexto(producto, textoAdicional, formato, paletaKey){
   ctx.fillStyle = P.bg; ctx.fillRect(0,0,W,H);
   ctx.textAlign = 'center';
 
-  ctx.fillStyle = P.accent; ctx.font = "700 30px 'Work Sans'";
-  ctx.fillText('NUEVO INGRESO', W/2, centroY - 150);
+  const categoriaLabel = obtenerCategoriaAmigable(producto).toUpperCase();
+  ctx.fillStyle = P.accent; ctx.font = "700 38px 'Work Sans'";
+  if(categoriaLabel) ctx.fillText(categoriaLabel, W/2, centroY - 150);
 
   ctx.strokeStyle = P.accent; ctx.lineWidth = 4;
   ctx.beginPath(); ctx.moveTo(W/2-60, centroY-110); ctx.lineTo(W/2+60, centroY-110); ctx.stroke();
