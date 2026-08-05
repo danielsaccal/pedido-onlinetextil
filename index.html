@@ -398,7 +398,20 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 
       <div class="ni-seccion">
         <p class="ni-seccion-tit">Producto</p>
-        <div class="field"><label>SKU(s)</label><input type="text" id="ni-skus" placeholder="Ej: TOA171B, TOA171C"></div>
+        <div class="ni-chips" style="margin-bottom:10px;">
+          <label class="ni-chip"><input type="radio" name="ni-modo" value="sku" checked onchange="toggleModoNI()"><span>Por SKU</span></label>
+          <label class="ni-chip"><input type="radio" name="ni-modo" value="categoria" onchange="toggleModoNI()"><span>Por categoría</span></label>
+        </div>
+        <div id="ni-modo-sku">
+          <div class="field"><label>SKU(s)</label><input type="text" id="ni-skus" placeholder="Ej: TOA171B, TOA171C"></div>
+        </div>
+        <div id="ni-modo-categoria" style="display:none;">
+          <div class="field">
+            <label>Categoría(s) — elija una o combine varias</label>
+            <div class="ni-chips" id="ni-categorias-chips"></div>
+          </div>
+          <div class="field"><label>Cantidad de productos a usar</label><input type="number" id="ni-cat-cantidad" min="2" max="8" value="4"></div>
+        </div>
       </div>
 
       <div class="ni-seccion">
@@ -1993,17 +2006,50 @@ function dibujarFotoContain(ctx, img, x, y, w, h, fondo){
 }
 
 async function generarFlyersNuevoIngreso(){
-  const skusTexto = document.getElementById('ni-skus').value.trim();
-  const textoAdicional = document.getElementById('ni-texto').value.trim();
+  const modo = document.querySelector('input[name="ni-modo"]:checked').value;
+  let textoAdicional = document.getElementById('ni-texto').value.trim();
   const variantesColor = document.getElementById('ni-variantes').value.trim();
   const descuentoPct = Math.min(100, Math.max(0, parseFloat(document.getElementById('ni-descuento').value) || 0));
   document.getElementById('ni-error').style.display = 'none';
-  if(!skusTexto) return;
 
-  const skus = skusTexto.split(',').map(s => s.trim()).filter(Boolean);
-  const matches = skus.map(sku => buscarProductoPorSku(sku)).filter(Boolean);
+  let matches = [];
+  let temaCategoriaTexto = null;
+
+  if(modo === 'categoria'){
+    const catIndices = [...document.querySelectorAll('.ni-cat-check:checked')].map(el => parseInt(el.value, 10));
+    if(catIndices.length === 0) return;
+    const cantidad = Math.min(8, Math.max(2, parseInt(document.getElementById('ni-cat-cantidad').value, 10) || 4));
+
+    const porCategoria = {};
+    catIndices.forEach(ci => {
+      porCategoria[ci] = CATALOGO[ci].productos.map((p, pi) => ({ci, pi, producto: p}));
+    });
+    const elegidos = [];
+    let idx = 0;
+    while(elegidos.length < cantidad && catIndices.some(ci => porCategoria[ci].length > 0)){
+      const ci = catIndices[idx % catIndices.length];
+      if(porCategoria[ci].length > 0) elegidos.push(porCategoria[ci].shift());
+      idx++;
+    }
+    matches = elegidos
+      .filter(e => e.producto.variantes && e.producto.variantes.length)
+      .map(e => ({ ci: e.ci, pi: e.pi, producto: e.producto, variante: e.producto.variantes[0] }));
+
+    const temasUnicos = [...new Set(catIndices.map(ci => TEMAS_CATEGORIA[CATALOGO[ci].categoria]).filter(Boolean))];
+    temaCategoriaTexto = temasUnicos.join(' · ');
+  } else {
+    const skusTexto = document.getElementById('ni-skus').value.trim();
+    if(!skusTexto) return;
+    const skus = skusTexto.split(',').map(s => s.trim()).filter(Boolean);
+    matches = skus.map(sku => buscarProductoPorSku(sku)).filter(Boolean);
+  }
+
+  if(temaCategoriaTexto){
+    textoAdicional = [textoAdicional, temaCategoriaTexto].filter(Boolean).join(' — ');
+  }
 
   if(matches.length === 0){
+    document.getElementById('ni-error').textContent = modo === 'categoria' ? 'No encontré productos en esas categorías.' : 'No encontré ningún producto con esos SKU.';
     document.getElementById('ni-error').style.display = 'block';
     return;
   }
@@ -2991,6 +3037,32 @@ function abrirGrilla(){
   renderGrilla();
 }
 
+const TEMAS_CATEGORIA = {
+  'SABANAS': 'Ideales para hotelería, sanatorios y uso diario en el hogar',
+  'CUBRECAMAS / EDREDONES / FRAZADAS': 'Para prepararte para el frío',
+  'TOALLAS / TOALLONES / BATAS': 'Confort para el día a día, en casa o en hotelería',
+  'REPASADORES': 'Infaltables en la cocina de todos los días',
+  'MANTELERIA': 'Para vestir la mesa en cualquier ocasión',
+  'CORTINAS DE AMBIENTE': 'El detalle que termina de vestir un ambiente',
+  'CORTINAS DE BANO / ACCESORIOS': 'El toque final para el baño',
+  'TELAS': 'Materia prima para tapicería, costura y proyectos propios',
+  'ALMOHADAS': 'Para un descanso de verdad',
+};
+
+function toggleModoNI(){
+  const modo = document.querySelector('input[name="ni-modo"]:checked').value;
+  document.getElementById('ni-modo-sku').style.display = modo === 'sku' ? 'block' : 'none';
+  document.getElementById('ni-modo-categoria').style.display = modo === 'categoria' ? 'block' : 'none';
+}
+
+function poblarCategoriasNI(){
+  const cont = document.getElementById('ni-categorias-chips');
+  if(cont.children.length > 0) return; // ya cargadas
+  cont.innerHTML = CATALOGO.map((cat, i) => `
+    <label class="ni-chip"><input type="checkbox" class="ni-cat-check" value="${i}"><span>${cat.categoria.toLowerCase()}</span></label>
+  `).join('');
+}
+
 function abrirNuevoIngreso(){
   mostrarPaso('step-nuevo-ingreso');
   document.getElementById('ni-skus').value = '';
@@ -3004,6 +3076,11 @@ function abrirNuevoIngreso(){
   document.getElementById('ni-video-ml').checked = false;
   document.getElementById('ni-fmt-carrusel').checked = false;
   document.getElementById('ni-carrusel-cant').value = '5';
+  document.getElementById('ni-cat-cantidad').value = '4';
+  document.querySelector('input[name="ni-modo"][value="sku"]').checked = true;
+  poblarCategoriasNI();
+  document.querySelectorAll('.ni-cat-check').forEach(c => c.checked = false);
+  toggleModoNI();
   document.getElementById('ni-opciones-texto').innerHTML = '';
   document.getElementById('ni-resultado').innerHTML = '';
   document.getElementById('ni-error-contenido').style.display = 'none';
@@ -3011,11 +3088,22 @@ function abrirNuevoIngreso(){
 }
 
 function irAFormatoGrafico(){
-  const skusTexto = document.getElementById('ni-skus').value.trim();
+  const modo = document.querySelector('input[name="ni-modo"]:checked').value;
   const errorEl = document.getElementById('ni-error-contenido');
-  if(!skusTexto){
-    errorEl.style.display = 'block';
-    return;
+  if(modo === 'sku'){
+    const skusTexto = document.getElementById('ni-skus').value.trim();
+    if(!skusTexto){
+      errorEl.textContent = 'Escriba al menos un SKU.';
+      errorEl.style.display = 'block';
+      return;
+    }
+  } else {
+    const hayCategoria = document.querySelectorAll('.ni-cat-check:checked').length > 0;
+    if(!hayCategoria){
+      errorEl.textContent = 'Elija al menos una categoría.';
+      errorEl.style.display = 'block';
+      return;
+    }
   }
   errorEl.style.display = 'none';
   mostrarPaso('step-ni-formato');
