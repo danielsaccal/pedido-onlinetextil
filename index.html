@@ -1528,10 +1528,15 @@ function precargarClientesParaAutocompletar(){
   if(clientesAutocomplete !== null) return; // ya cargados en esta sesion
   db.collection('clientes').get().then(snap => {
     clientesAutocomplete = snap.docs.map(d => d.data());
+    console.log('Clientes cargados para autocompletar:', clientesAutocomplete.length);
     buscarClienteAutocompletar(); // por si ya habia texto escrito antes de que cargue
   }).catch(e => {
     console.error('Error precargando clientes para autocompletar:', e);
     clientesAutocomplete = [];
+    const cont = document.getElementById('autocomplete-lista');
+    cont.innerHTML = '<div class="autocomplete-item" style="color:#A6432F;">No se pudo cargar la lista de clientes: ' + e.message + '</div>';
+    cont.style.display = 'block';
+    setTimeout(() => { cont.style.display = 'none'; cont.innerHTML=''; }, 6000);
   });
 }
 
@@ -2145,7 +2150,7 @@ async function generarFlyersNuevoIngreso(){
       for(let i=slideIdx; i<cantCarrusel; i++){
         const g = grupos[(i - slideIdx) % grupos.length]; // rota entre TODOS los productos cargados
         const estiloSlide = estilosCarrusel[i % estilosCarrusel.length];
-        const paletaSlide = paletasCarrusel[i % paletasCarrusel.length];
+        const paletaSlide = paletasCarrusel[(i + Math.floor(i/3)) % paletasCarrusel.length];
         const medidas = g.variantes.map(v => v.desc).filter(Boolean).join(', ');
         let canvasSlide;
         if(estiloSlide === 'tarjeta'){
