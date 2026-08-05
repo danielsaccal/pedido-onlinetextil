@@ -1588,7 +1588,7 @@ function abrirClientes(){
 function cargarClientes(){
   document.getElementById('cli-lista').innerHTML = '<p class="empty-msg">Cargando clientes...</p>';
   db.collection('clientes').orderBy('ultimaFecha', 'desc').get().then(snap => {
-    listaClientes = snap.docs.map(d => d.data());
+    listaClientes = snap.docs.map(d => ({...d.data(), id: d.id}));
     renderClientes('');
   }).catch(err => {
     document.getElementById('cli-lista').innerHTML = '<p class="empty-msg">No se pudo cargar la lista: ' + err.message + '</p>';
@@ -1624,8 +1624,13 @@ function renderClientes(filtro){
           </div>
         </div>
         <div class="hist-body" style="display:block;border-top:1px dashed var(--line);">
+          <b>Localidad:</b> ${c.localidad||''} ${c.provincia?'('+c.provincia+')':''}<br>
           <b>Transporte habitual:</b> ${c.transporte||''}<br>
           <b>Último pedido:</b> ${c.ultimoPedido||''} — ${ultimaFecha}
+          <div class="hist-acciones">
+            <button class="btn-mini" onclick="mostrarEdicionCliente('${c.id}')">✏️ Editar</button>
+          </div>
+          <div id="edit-cliente-${c.id}" style="display:none;"></div>
         </div>
       </div>
     `;
@@ -1633,6 +1638,74 @@ function renderClientes(filtro){
 }
 
 document.getElementById('cli-buscador').addEventListener('input', e => renderClientes(e.target.value));
+
+function mostrarEdicionCliente(id){
+  const c = (listaClientes || []).find(x => x.id === id);
+  if(!c) return;
+  const cont = document.getElementById('edit-cliente-' + id);
+  if(cont.style.display === 'block'){
+    cont.style.display = 'none';
+    return;
+  }
+  cont.innerHTML = `
+    <div class="edit-form">
+      <div class="field-row">
+        <div><label>Nombre</label><input type="text" id="ec-nombre-${id}" value="${escapeAttr(c.nombre||'')}"></div>
+        <div><label>Apellido</label><input type="text" id="ec-apellido-${id}" value="${escapeAttr(c.apellido||'')}"></div>
+      </div>
+      <div class="field-row">
+        <div><label>CUIT</label><input type="text" id="ec-cuit-${id}" value="${escapeAttr(c.cuit||'')}"></div>
+        <div><label>Teléfono</label><input type="text" id="ec-telefono-${id}" value="${escapeAttr(c.telefono||'')}"></div>
+      </div>
+      <div class="field-row">
+        <div><label>Email</label><input type="text" id="ec-email-${id}" value="${escapeAttr(c.email||'')}"></div>
+        <div><label>Transporte</label><input type="text" id="ec-transporte-${id}" value="${escapeAttr(c.transporte||'')}"></div>
+      </div>
+      <div class="field-row">
+        <div><label>Localidad</label><input type="text" id="ec-localidad-${id}" value="${escapeAttr(c.localidad||'')}"></div>
+        <div><label>Provincia</label><input type="text" id="ec-provincia-${id}" value="${escapeAttr(c.provincia||'')}"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn-mini" style="background:var(--gold);border-color:var(--gold-dark);" onclick="guardarEdicionCliente('${id}')">Guardar cambios</button>
+        <button class="btn-mini" onclick="document.getElementById('edit-cliente-${id}').style.display='none';">Cancelar</button>
+      </div>
+    </div>
+  `;
+  cont.style.display = 'block';
+}
+
+async function guardarEdicionCliente(idViejo){
+  const c = (listaClientes || []).find(x => x.id === idViejo);
+  if(!c) return;
+
+  const nombre = document.getElementById(`ec-nombre-${idViejo}`).value.trim();
+  const apellido = document.getElementById(`ec-apellido-${idViejo}`).value.trim();
+  const cuit = document.getElementById(`ec-cuit-${idViejo}`).value.trim();
+  const telefono = document.getElementById(`ec-telefono-${idViejo}`).value.trim();
+  const email = document.getElementById(`ec-email-${idViejo}`).value.trim();
+  const transporte = document.getElementById(`ec-transporte-${idViejo}`).value.trim();
+  const localidad = document.getElementById(`ec-localidad-${idViejo}`).value.trim();
+  const provincia = document.getElementById(`ec-provincia-${idViejo}`).value.trim();
+
+  const nuevoId = (cuit || 'sin-cuit').trim().replace(/[\\/\s]/g, '') || 'sin-cuit';
+  const datos = {
+    nombre, apellido, cuit, telefono, email, transporte, localidad, provincia,
+    ultimoPedido: c.ultimoPedido || '',
+    ultimaFecha: c.ultimaFecha || new Date().toISOString(),
+    cantidadPedidos: c.cantidadPedidos || 1
+  };
+
+  try{
+    await db.collection('clientes').doc(nuevoId).set(datos, { merge: true });
+    if(nuevoId !== idViejo){
+      await db.collection('clientes').doc(idViejo).delete();
+    }
+    alert('Cliente actualizado.');
+    cargarClientes();
+  } catch(e){
+    alert('No se pudo guardar: ' + e.message);
+  }
+}
 
 // ---------- carga manual de pedido ----------
 async function guardarPedidoManual(){
