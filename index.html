@@ -1927,6 +1927,30 @@ function dibujarRectRedondeado(ctx, x, y, w, h, r){
   ctx.closePath();
 }
 
+function extraerDatosTecnicos(composicion){
+  const materiales = [...(composicion||'').matchAll(/(\d+%\s*[A-Za-zÁÉÍÓÚáéíóúñÑ]+)/g)].map(m => m[1]);
+  const gramajeMatch = (composicion||'').match(/(\d+\s*gr(?:s|\/m2)?)/i);
+  return { materiales, gramaje: gramajeMatch ? gramajeMatch[1] : null };
+}
+function fichaTecnica(producto, variantesDelGrupo){
+  const { materiales, gramaje } = extraerDatosTecnicos(producto.composicion);
+  const partes = [];
+  if(materiales.length) partes.push(materiales.join(' / '));
+  if(gramaje) partes.push(gramaje);
+  if(variantesDelGrupo && variantesDelGrupo.length){
+    partes.push(variantesDelGrupo.map(v => v.desc).join(', '));
+  }
+  return partes.join(' · ');
+}
+function denominadorComun(grupos){
+  // busca un material % que se repita en TODOS los productos, y si comparten categoria
+  const listasMateriales = grupos.map(g => extraerDatosTecnicos(g.producto.composicion).materiales.map(m => m.toLowerCase()));
+  const comunMaterial = listasMateriales.length
+    ? listasMateriales[0].find(m => listasMateriales.every(lista => lista.includes(m)))
+    : null;
+  return comunMaterial || null;
+}
+
 function envolverTexto(ctx, texto, maxWidth){
   const palabras = texto.split(' ');
   const lineas = [];
@@ -2033,16 +2057,36 @@ async function generarFlyersNuevoIngreso(){
     if(document.getElementById('ni-fmt-carrusel').checked){
       const cantCarrusel = Math.min(8, Math.max(3, parseInt(document.getElementById('ni-carrusel-cant').value, 10) || 5));
       const estilosCarrusel = ['editorial', 'texto', 'tarjeta'];
-      for(let i=0; i<cantCarrusel; i++){
+      const multiProducto = grupos.length > 1;
+      let slideIdx = 0;
+
+      // portada, solo si hay mas de un producto: usa lo que tienen en comun
+      if(multiProducto){
+        const comun = denominadorComun(grupos);
+        const nombresTexto = grupos.map(g => g.producto.nombre).join(' · ');
+        const productoPortada = { nombre: nombresTexto, composicion: comun ? comun.charAt(0).toUpperCase()+comun.slice(1) : '' };
+        const txtPortada = [textoAdicional, comun ? `Todos en ${comun}` : null].filter(Boolean).join(' — ');
+        piezas.push({
+          canvas: dibujarPiezaTexto(productoPortada, txtPortada, 'post'),
+          nombre: 'carrusel_1de' + cantCarrusel + '_portada.png',
+          etiqueta: 'Carrusel 1/' + cantCarrusel + ' (portada)'
+        });
+        slideIdx = 1;
+      }
+
+      for(let i=slideIdx; i<cantCarrusel; i++){
+        const g = grupos[(i - slideIdx) % grupos.length]; // rota entre TODOS los productos cargados
         const estiloSlide = estilosCarrusel[i % estilosCarrusel.length];
+        const ficha = fichaTecnica(g.producto, g.variantes);
+        const txtSlide = [textoAdicional, ficha].filter(Boolean).join(' · ');
         let canvasSlide;
-        if(estiloSlide === 'tarjeta') canvasSlide = dibujarPiezaTarjeta(producto, img, 'post', textoAdicional);
-        else if(estiloSlide === 'texto') canvasSlide = dibujarPiezaTexto(producto, textoAdicional, 'post');
-        else canvasSlide = dibujarPiezaEditorial(producto, img, 'post', textoAdicional);
+        if(estiloSlide === 'tarjeta') canvasSlide = dibujarPiezaTarjeta(g.producto, g.img, 'post', txtSlide);
+        else if(estiloSlide === 'texto') canvasSlide = dibujarPiezaTexto(g.producto, txtSlide, 'post');
+        else canvasSlide = dibujarPiezaEditorial(g.producto, g.img, 'post', txtSlide);
         piezas.push({
           canvas: canvasSlide,
-          nombre: 'carrusel_' + (i+1) + 'de' + cantCarrusel + '_' + producto.nombre.replace(/\s+/g,'_') + '.png',
-          etiqueta: 'Carrusel ' + (i+1) + '/' + cantCarrusel
+          nombre: 'carrusel_' + (i+1) + 'de' + cantCarrusel + '_' + g.producto.nombre.replace(/\s+/g,'_') + '.png',
+          etiqueta: 'Carrusel ' + (i+1) + '/' + cantCarrusel + ' — ' + g.producto.nombre
         });
       }
     }
