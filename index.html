@@ -1550,6 +1550,12 @@ function precargarClientesParaAutocompletar(){
 function buscarClienteAutocompletar(){
   const cont = document.getElementById('autocomplete-lista');
   const debugEl = document.getElementById('autocomplete-debug');
+
+  const campoActivo = document.activeElement;
+  if(campoActivo && campoActivo.tagName === 'INPUT' && cont.offsetParent){
+    cont.style.top = (campoActivo.offsetTop + campoActivo.offsetHeight + 4) + 'px';
+  }
+
   const valores = {
     nombre: document.getElementById('f-nombre').value.trim().toLowerCase(),
     apellido: document.getElementById('f-apellido').value.trim().toLowerCase(),
