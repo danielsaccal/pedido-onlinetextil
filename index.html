@@ -1558,9 +1558,10 @@ function buscarClienteAutocompletar(){
     email: document.getElementById('f-email').value.trim().toLowerCase(),
     localidad: document.getElementById('f-localidad').value.trim().toLowerCase(),
   };
-  const hayAlgo = Object.values(valores).some(v => v.length >= 2);
+  // lo que se haya escrito en CUALQUIER campo, sin importar cual, se busca contra TODOS los datos del cliente
+  const terminos = Object.values(valores).filter(v => v.length >= 2);
 
-  if(!hayAlgo){
+  if(terminos.length === 0){
     cont.style.display = 'none';
     if(debugEl) debugEl.textContent = 'Escriba al menos 2 letras para buscar.';
     return;
@@ -1572,11 +1573,9 @@ function buscarClienteAutocompletar(){
   }
 
   const coincidencias = clientesAutocomplete.filter(c => {
-    return Object.keys(valores).some(campo => {
-      const val = valores[campo];
-      if(val.length < 2) return false;
-      return (c[campo] || '').toLowerCase().includes(val);
-    });
+    const textoCliente = [c.nombre, c.apellido, c.cuit, c.telefono, c.email, c.localidad, c.provincia]
+      .filter(Boolean).join(' ').toLowerCase();
+    return terminos.some(term => textoCliente.includes(term));
   }).slice(0, 6);
 
   if(coincidencias.length === 0){
