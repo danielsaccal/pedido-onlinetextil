@@ -364,6 +364,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <span onclick="abrirClientes()">Clientes</span>
       <span onclick="abrirCompartirRubro()">Compartir catálogo por rubro</span>
       <span onclick="abrirActualizarFoto()">Actualizar foto de producto</span>
+      <span onclick="abrirNuevoProducto()">Agregar producto nuevo</span>
     </div>
   </div>
 </header>
@@ -486,6 +487,50 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
     </div>
   </div>
 
+  <!-- STEP: AGREGAR PRODUCTO NUEVO -->
+  <div class="step" id="step-nuevo-producto">
+    <div class="form-card">
+      <h2>Agregar producto nuevo</h2>
+
+      <div class="ni-seccion">
+        <p class="ni-seccion-tit">Categoría</p>
+        <div class="field">
+          <select id="np-categoria" onchange="toggleCategoriaTelasNP()">
+            <option value="">Elegir categoría...</option>
+          </select>
+        </div>
+        <div class="field" id="np-metros-wrap" style="display:none;">
+          <label>Metros por rollo/pieza</label>
+          <input type="number" id="np-metros" min="1" placeholder="Ej: 30">
+          <p class="note" style="margin-top:4px;">Es tela: el precio de cada variante se carga por metro, y esto calcula el precio del rollo completo.</p>
+        </div>
+      </div>
+
+      <div class="ni-seccion">
+        <p class="ni-seccion-tit">Datos del producto</p>
+        <div class="field"><label>Título</label><input type="text" id="np-titulo" placeholder="Ej: Fantasia"></div>
+        <div class="field"><label>Subtítulo (calidad, composición, hilos, etc.)</label><input type="text" id="np-subtitulo" placeholder="Ej: 100% Algodón — 360 gr"></div>
+      </div>
+
+      <div class="ni-seccion">
+        <p class="ni-seccion-tit">Variantes</p>
+        <div id="np-variantes-cont"></div>
+        <button type="button" class="btn-mini" onclick="agregarVarianteNP()">+ Agregar variante</button>
+      </div>
+
+      <div class="ni-seccion">
+        <p class="ni-seccion-tit">Foto</p>
+        <div class="field"><input type="file" accept="image/*" id="np-foto"></div>
+      </div>
+
+      <p class="error" id="np-error" style="display:none;"></p>
+      <div class="actions">
+        <button class="btn btn-gold" onclick="guardarProductoNuevo()">Guardar producto</button>
+        <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      </div>
+    </div>
+  </div>
+
   <!-- STEP: VISTA PREVIA DE GRILLA IG -->
   <div class="step" id="step-grilla">
     <div class="form-card">
@@ -550,6 +595,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
         <div id="autocomplete-lista" class="autocomplete-lista" style="display:none;"></div>
         <p id="autocomplete-debug" style="font-size:0.68rem;color:#A8A092;margin:4px 0 0;"></p>
       </div>
+      <button type="button" class="btn-mini" onclick="borrarDatosCliente()">🗑️ Borrar datos del cliente</button>
       <div class="field">
         <label>Transporte</label>
         <input type="text" id="f-transporte" placeholder="Ej: retiro en local, transporte tal, envío a domicilio...">
@@ -910,6 +956,14 @@ function mostrarPaso(id){
   document.getElementById(id).classList.add('active');
   document.getElementById('cartbar').style.display = (id === 'step-catalogo') ? 'flex' : 'none';
   window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function borrarDatosCliente(){
+  ['f-nombre','f-apellido','f-cuit','f-telefono','f-email','f-localidad','f-provincia','f-transporte'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('autocomplete-lista').style.display = 'none';
+  document.getElementById('autocomplete-debug').textContent = '';
 }
 
 function irADatos(){
@@ -1876,6 +1930,143 @@ function buscarProductoPorSku(sku){
     }
   }
   return null;
+}
+
+// ---------- agregar producto nuevo ----------
+let contadorVarianteNP = 0;
+
+function abrirNuevoProducto(){
+  mostrarPaso('step-nuevo-producto');
+  const sel = document.getElementById('np-categoria');
+  if(sel.options.length <= 1){
+    CATALOGO.forEach((cat, i) => {
+      const opt = document.createElement('option');
+      opt.value = cat.categoria;
+      opt.textContent = cat.categoria.toLowerCase();
+      sel.appendChild(opt);
+    });
+  }
+  sel.value = '';
+  document.getElementById('np-metros-wrap').style.display = 'none';
+  document.getElementById('np-metros').value = '';
+  document.getElementById('np-titulo').value = '';
+  document.getElementById('np-subtitulo').value = '';
+  document.getElementById('np-foto').value = '';
+  document.getElementById('np-error').style.display = 'none';
+  document.getElementById('np-variantes-cont').innerHTML = '';
+  agregarVarianteNP();
+  agregarVarianteNP();
+}
+
+function toggleCategoriaTelasNP(){
+  const esTelas = document.getElementById('np-categoria').value === 'TELAS';
+  document.getElementById('np-metros-wrap').style.display = esTelas ? 'block' : 'none';
+}
+
+function agregarVarianteNP(){
+  const cont = document.getElementById('np-variantes-cont');
+  const id = 'npv-' + (contadorVarianteNP++);
+  const row = document.createElement('div');
+  row.className = 'edit-item-row-nuevo';
+  row.id = id;
+  row.style.cssText = 'display:grid;grid-template-columns:100px 1fr 110px 32px;gap:6px;align-items:center;margin-bottom:6px;';
+  row.innerHTML = `
+    <input type="text" placeholder="SKU" class="npv-sku">
+    <input type="text" placeholder="Descripción (ej: 1 Plaza)" class="npv-desc">
+    <input type="text" placeholder="Precio" class="npv-precio">
+    <button type="button" class="btn-mini" onclick="document.getElementById('${id}').remove();">✕</button>
+  `;
+  cont.appendChild(row);
+}
+
+async function guardarProductoNuevo(){
+  const errorEl = document.getElementById('np-error');
+  errorEl.style.display = 'none';
+
+  const categoria = document.getElementById('np-categoria').value;
+  const titulo = document.getElementById('np-titulo').value.trim();
+  const subtitulo = document.getElementById('np-subtitulo').value.trim();
+  const esTelas = categoria === 'TELAS';
+  const metros = esTelas ? (parseInt(document.getElementById('np-metros').value, 10) || null) : null;
+  const archivoFoto = document.getElementById('np-foto').files[0];
+
+  const variantes = [];
+  document.querySelectorAll('#np-variantes-cont .edit-item-row-nuevo').forEach(row => {
+    const sku = row.querySelector('.npv-sku').value.trim();
+    const desc = row.querySelector('.npv-desc').value.trim();
+    const precio = row.querySelector('.npv-precio').value.trim();
+    if(sku && desc && precio) variantes.push({sku, desc, precio});
+  });
+
+  if(!categoria){ errorEl.textContent = 'Elija una categoría.'; errorEl.style.display = 'block'; return; }
+  if(!titulo){ errorEl.textContent = 'Falta el título del producto.'; errorEl.style.display = 'block'; return; }
+  if(variantes.length === 0){ errorEl.textContent = 'Cargue al menos una variante con SKU, descripción y precio.'; errorEl.style.display = 'block'; return; }
+  if(esTelas && !metros){ errorEl.textContent = 'Es una tela: indique los metros por rollo/pieza.'; errorEl.style.display = 'block'; return; }
+
+  let imagenBase64 = null;
+  if(archivoFoto){
+    imagenBase64 = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 480;
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.75));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(archivoFoto);
+    });
+  }
+
+  const nuevoProducto = {
+    nombre: titulo,
+    composicion: subtitulo,
+    variantes,
+    imagen: imagenBase64,
+    metros: metros || undefined,
+  };
+
+  try{
+    const ref = await db.collection('productos_nuevos').add({
+      categoria, nombre: titulo, composicion: subtitulo, variantes,
+      imagenBase64, metros: metros || null,
+      creado: new Date().toISOString()
+    });
+
+    const cat = CATALOGO.find(c => c.categoria === categoria);
+    if(cat) cat.productos.push(nuevoProducto);
+
+    alert('Producto agregado al catálogo.');
+    renderCatalogo(document.getElementById('buscador').value);
+    abrirNuevoProducto();
+  } catch(e){
+    errorEl.textContent = 'No se pudo guardar: ' + e.message;
+    errorEl.style.display = 'block';
+  }
+}
+
+function cargarProductosNuevos(){
+  return db.collection('productos_nuevos').get().then(snap => {
+    snap.docs.forEach(d => {
+      const p = d.data();
+      const cat = CATALOGO.find(c => c.categoria === p.categoria);
+      if(cat){
+        cat.productos.push({
+          nombre: p.nombre,
+          composicion: p.composicion,
+          variantes: p.variantes,
+          imagen: p.imagenBase64,
+          metros: p.metros || undefined,
+        });
+      }
+    });
+  }).catch(e => console.error('Error cargando productos nuevos:', e));
 }
 
 function abrirActualizarFoto(){
@@ -3190,7 +3381,7 @@ function irAFormatoGrafico(){
 
 </script>
 <script>
-cargarFotosOverride().then(() => {
+Promise.all([cargarFotosOverride(), cargarProductosNuevos()]).then(() => {
   renderCatalogo(document.getElementById('buscador').value);
 });
 </script>
