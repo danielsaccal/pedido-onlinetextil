@@ -424,7 +424,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
           <div class="field"><label>Cantidad de productos a usar</label><input type="number" id="ni-cat-cantidad" min="2" max="8" value="4"></div>
         </div>
         <div id="ni-modo-foto" style="display:none;">
-          <p class="note" style="margin-bottom:10px;">Para un producto que todavía no está en el catálogo — solo genera el flyer, no lo guarda en el catálogo.</p>
+          <p class="note" style="margin-bottom:10px;">Para un producto que todavía no está en el catálogo. Genera el flyer igual, y si además quiere que quede guardado, use el botón de abajo.</p>
           <div class="field"><label>Foto</label><input type="file" accept="image/*" id="ni-foto-suelta"></div>
           <div class="field"><label>Título</label><input type="text" id="ni-foto-titulo" placeholder="Ej: Fantasia"></div>
           <div class="field"><label>Subtítulo (composición, calidad, hilos, etc.)</label><input type="text" id="ni-foto-subtitulo" placeholder="Ej: 100% Algodón — 360 gr"></div>
@@ -433,6 +433,24 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
             <div id="ni-foto-variantes-cont"></div>
             <button type="button" class="btn-mini" onclick="agregarVarianteNIFoto()">+ Agregar variante</button>
           </div>
+
+          <div id="ni-foto-cat-wrap" style="display:none;margin-top:10px;">
+            <div class="field">
+              <label>Categoría del catálogo</label>
+              <select id="ni-foto-categoria">
+                <option value="">Elegir categoría...</option>
+              </select>
+            </div>
+            <div class="field" id="ni-foto-metros-wrap" style="display:none;">
+              <label>Metros por rollo/pieza</label>
+              <input type="number" id="ni-foto-metros" min="1">
+            </div>
+            <div class="actions">
+              <button type="button" class="btn-mini" style="background:var(--gold);border-color:var(--gold-dark);" onclick="confirmarAgregarFotoSueltaAlCatalogo()">Confirmar y guardar en el catálogo</button>
+              <button type="button" class="btn-mini" onclick="document.getElementById('ni-foto-cat-wrap').style.display='none';">Cancelar</button>
+            </div>
+          </div>
+          <button type="button" class="btn-mini" id="ni-foto-btn-catalogo" style="margin-top:10px;" onclick="mostrarSelectorCategoriaFotoSuelta()">+ Agregar al catálogo</button>
         </div>
       </div>
 
@@ -3768,6 +3786,106 @@ function agregarVarianteNIFoto(){
   cont.appendChild(row);
 }
 
+function mostrarSelectorCategoriaFotoSuelta(){
+  const foto = document.getElementById('ni-foto-suelta').files[0];
+  const titulo = document.getElementById('ni-foto-titulo').value.trim();
+  const hayVariante = [...document.querySelectorAll('#ni-foto-variantes-cont .edit-item-row-nuevo')].some(row =>
+    row.querySelector('.nifv-sku').value.trim() && row.querySelector('.nifv-desc').value.trim() && row.querySelector('.nifv-precio').value.trim()
+  );
+  if(!foto){ alert('Suba una foto primero.'); return; }
+  if(!titulo){ alert('Falta el título.'); return; }
+  if(!hayVariante){ alert('Cargue al menos una variante con SKU, descripción y precio.'); return; }
+
+  const sel = document.getElementById('ni-foto-categoria');
+  if(sel.options.length <= 1){
+    CATALOGO.forEach(cat => {
+      const opt = document.createElement('option');
+      opt.value = cat.categoria;
+      opt.textContent = cat.categoria.toLowerCase();
+      sel.appendChild(opt);
+    });
+    sel.onchange = () => {
+      document.getElementById('ni-foto-metros-wrap').style.display = sel.value === 'TELAS' ? 'block' : 'none';
+    };
+  }
+  document.getElementById('ni-foto-cat-wrap').style.display = 'block';
+}
+
+let guardandoFotoSueltaCatalogo = false;
+async function confirmarAgregarFotoSueltaAlCatalogo(){
+  if(guardandoFotoSueltaCatalogo) return;
+  const categoria = document.getElementById('ni-foto-categoria').value;
+  if(!categoria){ alert('Elija una categoría.'); return; }
+  const esTelas = categoria === 'TELAS';
+  const metros = esTelas ? (parseInt(document.getElementById('ni-foto-metros').value, 10) || null) : null;
+  if(esTelas && !metros){ alert('Es una tela: indique los metros por rollo/pieza.'); return; }
+
+  const titulo = document.getElementById('ni-foto-titulo').value.trim();
+  const subtitulo = document.getElementById('ni-foto-subtitulo').value.trim();
+  const archivoFoto = document.getElementById('ni-foto-suelta').files[0];
+  const variantes = [];
+  document.querySelectorAll('#ni-foto-variantes-cont .edit-item-row-nuevo').forEach(row => {
+    const sku = row.querySelector('.nifv-sku').value.trim();
+    const desc = row.querySelector('.nifv-desc').value.trim();
+    const precio = row.querySelector('.nifv-precio').value.trim();
+    if(sku && desc && precio) variantes.push({sku, desc, precio});
+  });
+
+  const skusVistos = new Set();
+  for(const v of variantes){
+    const skuNorm = v.sku.trim().toUpperCase();
+    if(skusVistos.has(skuNorm)){ alert('El SKU "' + v.sku + '" está repetido entre las variantes.'); return; }
+    skusVistos.add(skuNorm);
+    const existente = buscarProductoPorSku(v.sku);
+    if(existente){ alert('El SKU "' + v.sku + '" ya existe (producto: ' + existente.producto.nombre + '). Use otro SKU.'); return; }
+  }
+
+  guardandoFotoSueltaCatalogo = true;
+  const btn = document.querySelector('#ni-foto-cat-wrap .btn-mini');
+  if(btn){ btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+  try{
+    const imagenBase64 = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 480;
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.75));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(archivoFoto);
+    });
+
+    const nuevoProducto = { nombre: titulo, composicion: subtitulo, variantes, imagen: imagenBase64, metros: metros || undefined };
+    const ref = await db.collection('productos_nuevos').add({
+      categoria, nombre: titulo, composicion: subtitulo, variantes,
+      imagenBase64, metros: metros || null,
+      creado: new Date().toISOString()
+    });
+    nuevoProducto._editKey = 'nuevo-' + ref.id;
+    nuevoProducto._docId = ref.id;
+
+    const cat = CATALOGO.find(c => c.categoria === categoria);
+    if(cat) cat.productos.push(nuevoProducto);
+
+    alert('Producto agregado al catálogo.');
+    document.getElementById('ni-foto-cat-wrap').style.display = 'none';
+    renderCatalogo(document.getElementById('buscador').value);
+  } catch(e){
+    alert('No se pudo guardar: ' + e.message);
+  } finally {
+    guardandoFotoSueltaCatalogo = false;
+    if(btn){ btn.disabled = false; btn.textContent = 'Confirmar y guardar en el catálogo'; }
+  }
+}
+
 function poblarCategoriasNI(){
   const cont = document.getElementById('ni-categorias-chips');
   if(cont.children.length > 0) return; // ya cargadas
@@ -3794,6 +3912,9 @@ function abrirNuevoIngreso(){
   document.getElementById('ni-foto-titulo').value = '';
   document.getElementById('ni-foto-subtitulo').value = '';
   document.getElementById('ni-foto-variantes-cont').innerHTML = '';
+  document.getElementById('ni-foto-cat-wrap').style.display = 'none';
+  document.getElementById('ni-foto-categoria').value = '';
+  document.getElementById('ni-foto-metros').value = '';
   agregarVarianteNIFoto();
   agregarVarianteNIFoto();
   document.querySelector('input[name="ni-modo"][value="sku"]').checked = true;
