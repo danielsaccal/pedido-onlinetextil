@@ -351,6 +351,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <header class="top">
@@ -373,6 +374,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <span class="menu-item-sub" onclick="abrirNuevoProducto()">Agregar producto nuevo</span>
       <span class="menu-item-sub" onclick="abrirEditarProducto()">Editar producto</span>
       <span class="menu-item-sub" onclick="abrirEliminarProducto()">Eliminar producto</span>
+      <span class="menu-item-sub" onclick="abrirImportarExcel()">Importar precios (Excel)</span>
       <span class="menu-item-sub" onclick="abrirActualizarFoto()">Actualizar foto de producto</span>
     </div>
   </div>
@@ -627,6 +629,19 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <div class="actions"><button class="btn btn-gold" onclick="buscarProductoParaEliminar()">Buscar</button></div>
       <p class="error" id="dp-error-busqueda" style="display:none;">No encontré ningún producto con ese SKU.</p>
       <div id="dp-resultado" style="margin-top:16px;"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <!-- STEP: IMPORTAR PRECIOS DESDE EXCEL -->
+  <div class="step" id="step-importar-excel">
+    <div class="form-card">
+      <h2>Importar precios desde Excel</h2>
+      <p class="note" style="margin-bottom:14px;">El archivo debe tener columnas de SKU, descripción y precio (en cualquier orden, con esos nombres en la primera fila). Solo actualiza productos que ya existen — no crea productos nuevos.</p>
+      <div class="field"><input type="file" accept=".xlsx,.xls,.csv" id="ie-archivo"></div>
+      <div class="actions"><button class="btn btn-gold" onclick="procesarExcelImportado()">Procesar archivo</button></div>
+      <p class="error" id="ie-error" style="display:none;"></p>
+      <div id="ie-preview" style="margin-top:16px;"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
@@ -2040,6 +2055,133 @@ let productoEnEdicion = null;
 let contadorVarianteEP = 0;
 
 // ---------- eliminar producto / variante ----------
+// ---------- importar precios desde Excel ----------
+let cambiosImportacionExcel = [];
+
+function abrirImportarExcel(){
+  mostrarPaso('step-importar-excel');
+  document.getElementById('ie-archivo').value = '';
+  document.getElementById('ie-error').style.display = 'none';
+  document.getElementById('ie-preview').innerHTML = '';
+  cambiosImportacionExcel = [];
+}
+
+function procesarExcelImportado(){
+  const errorEl = document.getElementById('ie-error');
+  const previewEl = document.getElementById('ie-preview');
+  errorEl.style.display = 'none';
+  previewEl.innerHTML = '';
+  const archivo = document.getElementById('ie-archivo').files[0];
+  if(!archivo){ errorEl.textContent = 'Elija un archivo primero.'; errorEl.style.display = 'block'; return; }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try{
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const hoja = wb.Sheets[wb.SheetNames[0]];
+      const filas = XLSX.utils.sheet_to_json(hoja, {defval:''});
+      if(filas.length === 0){ errorEl.textContent = 'El archivo está vacío.'; errorEl.style.display = 'block'; return; }
+
+      // detectar las columnas de sku / descripcion / precio sin importar el nombre exacto ni mayusculas
+      const columnas = Object.keys(filas[0]);
+      const colSku = columnas.find(c => /sku/i.test(c));
+      const colDesc = columnas.find(c => /desc/i.test(c));
+      const colPrecio = columnas.find(c => /precio/i.test(c));
+      if(!colSku || !colPrecio){
+        errorEl.textContent = 'No encontré las columnas de SKU y precio. Revise que la primera fila tenga esos títulos.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      const encontrados = [];
+      const noEncontrados = [];
+      filas.forEach(fila => {
+        const sku = String(fila[colSku] || '').trim();
+        if(!sku) return;
+        const nuevoDesc = colDesc ? String(fila[colDesc] || '').trim() : '';
+        const nuevoPrecio = String(fila[colPrecio] || '').trim();
+        const match = buscarProductoPorSku(sku);
+        if(match){
+          encontrados.push({ sku, nuevoDesc, nuevoPrecio, match });
+        } else {
+          noEncontrados.push(sku);
+        }
+      });
+
+      cambiosImportacionExcel = encontrados;
+
+      let html = `<p style="font-size:0.85rem;margin-bottom:10px;"><b>${encontrados.length}</b> SKU encontrados y listos para actualizar` +
+        (noEncontrados.length ? `, <b>${noEncontrados.length}</b> no encontrados` : '') + `.</p>`;
+
+      if(encontrados.length){
+        html += '<div style="max-height:320px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;">';
+        html += encontrados.map(c => {
+          const vActual = c.match.variante;
+          return `<div style="padding:8px 12px;border-bottom:1px solid var(--line);font-size:0.82rem;">
+            <b>${c.sku}</b> — ${c.match.producto.nombre}<br>
+            <span style="color:#8A8072;">${vActual.desc}${c.nuevoDesc && c.nuevoDesc !== vActual.desc ? ' → ' + c.nuevoDesc : ''}</span><br>
+            $ ${vActual.precio} → <b style="color:${c.nuevoPrecio !== vActual.precio ? '#A6432F' : 'inherit'};">$ ${c.nuevoPrecio}</b>
+          </div>`;
+        }).join('');
+        html += '</div>';
+      }
+      if(noEncontrados.length){
+        html += `<p class="note" style="margin-top:10px;">No encontrados: ${noEncontrados.join(', ')}</p>`;
+      }
+      if(encontrados.length){
+        html += `<div class="actions" style="margin-top:14px;">
+          <button class="btn btn-gold" id="ie-btn-aplicar" onclick="aplicarCambiosImportados()">Aplicar ${encontrados.length} cambios</button>
+        </div>`;
+      }
+      previewEl.innerHTML = html;
+    } catch(err){
+      errorEl.textContent = 'No se pudo leer el archivo: ' + err.message;
+      errorEl.style.display = 'block';
+    }
+  };
+  reader.readAsArrayBuffer(archivo);
+}
+
+async function aplicarCambiosImportados(){
+  const btn = document.getElementById('ie-btn-aplicar');
+  if(btn){ btn.disabled = true; btn.textContent = 'Aplicando...'; }
+
+  // agrupar los cambios por producto, para actualizar cada producto una sola vez con todas sus variantes al dia
+  const porProducto = new Map();
+  cambiosImportacionExcel.forEach(c => {
+    if(!porProducto.has(c.match.producto)) porProducto.set(c.match.producto, []);
+    porProducto.get(c.match.producto).push(c);
+  });
+
+  let actualizados = 0;
+  for(const [producto, cambios] of porProducto){
+    cambios.forEach(c => {
+      const v = producto.variantes.find(v => v.sku.toUpperCase() === c.sku.toUpperCase());
+      if(v){
+        v.precio = c.nuevoPrecio;
+        if(c.nuevoDesc) v.desc = c.nuevoDesc;
+      }
+    });
+    try{
+      if(producto._editKey && producto._editKey.startsWith('nuevo-')){
+        await db.collection('productos_nuevos').doc(producto._docId).update({ variantes: producto.variantes });
+      } else {
+        await db.collection('productos_editados').doc(producto._editKey).set({
+          nombre: producto.nombre, composicion: producto.composicion,
+          variantes: producto.variantes, metros: producto.metros || null
+        }, { merge: true });
+      }
+      actualizados++;
+    } catch(e){
+      console.error('Error actualizando producto', producto.nombre, e);
+    }
+  }
+
+  alert('Se actualizaron ' + actualizados + ' de ' + porProducto.size + ' productos.');
+  renderCatalogo(document.getElementById('buscador').value);
+  abrirImportarExcel();
+}
+
 function abrirEliminarProducto(){
   mostrarPaso('step-eliminar-producto');
   document.getElementById('dp-sku').value = '';
