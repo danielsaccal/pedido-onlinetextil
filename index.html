@@ -366,6 +366,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <span onclick="abrirActualizarFoto()">Actualizar foto de producto</span>
       <span onclick="abrirNuevoProducto()">Agregar producto nuevo</span>
       <span onclick="abrirEditarProducto()">Editar producto</span>
+      <span onclick="abrirEliminarProducto()">Eliminar producto</span>
     </div>
   </div>
 </header>
@@ -569,6 +570,19 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
         </div>
       </div>
 
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <!-- STEP: ELIMINAR PRODUCTO -->
+  <div class="step" id="step-eliminar-producto">
+    <div class="form-card">
+      <h2>Eliminar producto</h2>
+      <p class="note" style="margin-bottom:14px;">Busque por SKU. Si el producto tiene varias variantes, se elimina solo esa variante; si es la única, se elimina el producto entero.</p>
+      <div class="field"><label>SKU</label><input type="text" id="dp-sku" placeholder="Ej: TOA171B"></div>
+      <div class="actions"><button class="btn btn-gold" onclick="buscarProductoParaEliminar()">Buscar</button></div>
+      <p class="error" id="dp-error-busqueda" style="display:none;">No encontré ningún producto con ese SKU.</p>
+      <div id="dp-resultado" style="margin-top:16px;"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
@@ -1981,6 +1995,103 @@ let contadorVarianteNP = 0;
 let productoEnEdicion = null;
 let contadorVarianteEP = 0;
 
+// ---------- eliminar producto / variante ----------
+function abrirEliminarProducto(){
+  mostrarPaso('step-eliminar-producto');
+  document.getElementById('dp-sku').value = '';
+  document.getElementById('dp-error-busqueda').style.display = 'none';
+  document.getElementById('dp-resultado').innerHTML = '';
+}
+
+function buscarProductoParaEliminar(){
+  const sku = document.getElementById('dp-sku').value.trim();
+  const errorEl = document.getElementById('dp-error-busqueda');
+  const cont = document.getElementById('dp-resultado');
+  if(!sku) return;
+
+  const match = buscarProductoPorSku(sku);
+  if(!match){
+    errorEl.style.display = 'block';
+    cont.innerHTML = '';
+    return;
+  }
+  errorEl.style.display = 'none';
+
+  const p = match.producto;
+  const esUnica = p.variantes.length === 1;
+  const skuBuscado = sku.trim().toUpperCase();
+
+  cont.innerHTML = `
+    <div class="hist-pedido">
+      <div class="hist-head" style="cursor:default;">
+        <div>
+          <div class="num">${p.nombre}</div>
+          <div class="meta">${p.composicion || ''}</div>
+        </div>
+      </div>
+      <div class="hist-body" style="display:block;border-top:1px dashed var(--line);">
+        <p style="margin:0 0 10px;font-size:0.85rem;">Variantes de este producto:</p>
+        ${p.variantes.map(v => `
+          <p style="margin:2px 0;font-size:0.85rem;${v.sku.toUpperCase()===skuBuscado ? 'font-weight:700;color:#A6432F;' : ''}">
+            ${v.sku.toUpperCase()===skuBuscado ? '→ ' : ''}${v.sku} — ${v.desc} — $ ${v.precio}
+          </p>
+        `).join('')}
+        <p class="note" style="margin-top:12px;">
+          ${esUnica
+            ? '⚠️ Es la única variante — al eliminarla se borra todo el producto.'
+            : '⚠️ Se va a eliminar solo esta variante; el resto del producto queda intacto.'}
+        </p>
+        <div class="actions" style="margin-top:10px;">
+          <button class="btn-mini" style="background:#A6432F;color:#fff;border-color:#A6432F;" onclick="confirmarEliminarVariante('${escapeAttr(sku)}')">
+            ${esUnica ? 'Eliminar producto entero' : 'Eliminar esta variante'}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function confirmarEliminarVariante(sku){
+  const match = buscarProductoPorSku(sku);
+  if(!match) return;
+  const p = match.producto;
+  const esUnica = p.variantes.length === 1;
+
+  if(!confirm(esUnica ? '¿Eliminar todo el producto "' + p.nombre + '"? No se puede deshacer.' : '¿Eliminar la variante ' + sku + ' de "' + p.nombre + '"?')){
+    return;
+  }
+
+  try{
+    if(esUnica){
+      // eliminar el producto entero
+      if(p._editKey.startsWith('nuevo-')){
+        await db.collection('productos_nuevos').doc(p._docId).delete();
+      } else {
+        await db.collection('productos_eliminados').doc(p._editKey).set({ eliminado: true, fecha: new Date().toISOString() });
+      }
+      const cat = CATALOGO.find(c => c.productos.includes(p));
+      if(cat) cat.productos = cat.productos.filter(prod => prod !== p);
+    } else {
+      // eliminar solo esa variante
+      const nuevasVariantes = p.variantes.filter(v => v.sku.toUpperCase() !== sku.trim().toUpperCase());
+      if(p._editKey.startsWith('nuevo-')){
+        await db.collection('productos_nuevos').doc(p._docId).update({ variantes: nuevasVariantes });
+      } else {
+        await db.collection('productos_editados').doc(p._editKey).set({
+          nombre: p.nombre, composicion: p.composicion, variantes: nuevasVariantes, metros: p.metros || null
+        }, { merge: true });
+      }
+      p.variantes = nuevasVariantes;
+    }
+
+    alert('Listo.');
+    renderCatalogo(document.getElementById('buscador').value);
+    abrirEliminarProducto();
+  } catch(e){
+    alert('No se pudo eliminar: ' + e.message);
+  }
+}
+
 function abrirEditarProducto(){
   mostrarPaso('step-editar-producto');
   document.getElementById('ep-sku').value = '';
@@ -2170,7 +2281,21 @@ function agregarVarianteNP(){
   cont.appendChild(row);
 }
 
+let guardandoProductoNuevo = false;
 async function guardarProductoNuevo(){
+  if(guardandoProductoNuevo) return;
+  guardandoProductoNuevo = true;
+  const btnGuardar = document.querySelector('#step-nuevo-producto button.btn-gold');
+  if(btnGuardar){ btnGuardar.disabled = true; btnGuardar.textContent = 'Guardando...'; }
+  try{
+    await guardarProductoNuevoInterno();
+  } finally {
+    guardandoProductoNuevo = false;
+    if(btnGuardar){ btnGuardar.disabled = false; btnGuardar.textContent = 'Guardar producto'; }
+  }
+}
+
+async function guardarProductoNuevoInterno(){
   const errorEl = document.getElementById('np-error');
   errorEl.style.display = 'none';
 
@@ -2286,6 +2411,16 @@ function etiquetarProductosEstaticos(){
       if(!p._editKey) p._editKey = 'static-' + ci + '-' + pi;
     });
   });
+}
+
+function cargarProductosEliminados(){
+  return db.collection('productos_eliminados').get().then(snap => {
+    const keysEliminadas = new Set(snap.docs.map(d => d.id));
+    if(keysEliminadas.size === 0) return;
+    CATALOGO.forEach(cat => {
+      cat.productos = cat.productos.filter(p => !keysEliminadas.has(p._editKey));
+    });
+  }).catch(e => console.error('Error cargando productos eliminados:', e));
 }
 
 function cargarProductosEditados(){
@@ -3621,6 +3756,8 @@ function irAFormatoGrafico(){
 <script>
 etiquetarProductosEstaticos();
 Promise.all([cargarFotosOverride(), cargarProductosNuevos()]).then(() => {
+  return cargarProductosEliminados();
+}).then(() => {
   return cargarProductosEditados();
 }).then(() => {
   renderCatalogo(document.getElementById('buscador').value);
