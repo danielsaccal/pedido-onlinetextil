@@ -123,7 +123,6 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 .ni-seccion:first-of-type{border-top:none;padding-top:0;}
 .ni-seccion-tit{font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:#A8A092;margin:0 0 10px;font-weight:600;}
 .ni-chips{display:flex;flex-wrap:wrap;gap:8px;}
-.foto-check-blanquear{display:flex;align-items:center;gap:6px;font-size:0.78rem;color:#6E6459;margin-top:6px;cursor:pointer;}
 .ni-chip{position:relative;cursor:pointer;}
 .ni-chip input{position:absolute;opacity:0;width:0;height:0;}
 .ni-chip span{
@@ -429,7 +428,6 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
           <div class="field">
             <label>Foto</label>
             <input type="file" accept="image/*" capture="environment" id="ni-foto-suelta">
-            <label class="foto-check-blanquear"><input type="checkbox" id="ni-foto-suelta-blanquear" checked> Blanquear fondo claro automáticamente</label>
           </div>
           <div class="field"><label>Título</label><input type="text" id="ni-foto-titulo" placeholder="Ej: Fantasia"></div>
           <div class="field"><label>Subtítulo (composición, calidad, hilos, etc.)</label><input type="text" id="ni-foto-subtitulo" placeholder="Ej: 100% Algodón — 360 gr"></div>
@@ -566,7 +564,6 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
         <p class="ni-seccion-tit">Foto</p>
         <div class="field">
           <input type="file" accept="image/*" capture="environment" id="np-foto">
-          <label class="foto-check-blanquear"><input type="checkbox" id="np-foto-blanquear" checked> Blanquear fondo claro automáticamente</label>
         </div>
       </div>
 
@@ -608,7 +605,6 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
           <p class="ni-seccion-tit">Foto (opcional, solo si quiere reemplazarla)</p>
           <div class="field">
             <input type="file" accept="image/*" capture="environment" id="ep-foto">
-            <label class="foto-check-blanquear"><input type="checkbox" id="ep-foto-blanquear" checked> Blanquear fondo claro automáticamente</label>
           </div>
         </div>
 
@@ -2247,9 +2243,7 @@ async function guardarProductoEditado(){
           const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
           const canvas = document.createElement('canvas');
           canvas.width = w; canvas.height = h;
-          const ctxTmp2250 = canvas.getContext('2d');
-          ctxTmp2250.drawImage(img, 0, 0, w, h);
-          if(document.getElementById('ep-foto-blanquear').checked) blanquearFondoClaro(ctxTmp2250, w, h);
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
           resolve(canvas.toDataURL('image/jpeg', 0.75));
         };
         img.src = e.target.result;
@@ -2399,9 +2393,7 @@ async function guardarProductoNuevoInterno(){
           const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
           const canvas = document.createElement('canvas');
           canvas.width = w; canvas.height = h;
-          const ctxTmp2400 = canvas.getContext('2d');
-          ctxTmp2400.drawImage(img, 0, 0, w, h);
-          if(document.getElementById('np-foto-blanquear').checked) blanquearFondoClaro(ctxTmp2400, w, h);
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
           resolve(canvas.toDataURL('image/jpeg', 0.75));
         };
         img.src = e.target.result;
@@ -2523,7 +2515,6 @@ function buscarProductoParaFoto(){
     <div class="field">
       <label>Nueva foto</label>
       <input type="file" accept="image/*" capture="environment" id="fs-archivo">
-      <label class="foto-check-blanquear"><input type="checkbox" id="fs-archivo-blanquear" checked> Blanquear fondo claro automáticamente</label>
     </div>
     <button class="btn btn-gold" onclick="guardarFotoProducto(${ci}, ${pi})">Guardar foto nueva</button>
   `;
@@ -2543,9 +2534,7 @@ function guardarFotoProducto(ci, pi){
       const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
-      const ctxTmp2542 = canvas.getContext('2d');
-      ctxTmp2542.drawImage(img, 0, 0, w, h);
-      if(document.getElementById('fs-archivo-blanquear').checked) blanquearFondoClaro(ctxTmp2542, w, h);
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
 
       try{
@@ -2618,23 +2607,6 @@ function denominadorComun(grupos){
     ? listasMateriales[0].find(m => listasMateriales.every(lista => lista.includes(m)))
     : null;
   return comunMaterial || null;
-}
-
-function blanquearFondoClaro(ctx, w, h){
-  const imgData = ctx.getImageData(0, 0, w, h);
-  const d = imgData.data;
-  for(let i=0; i<d.length; i+=4){
-    const r=d[i], g=d[i+1], b=d[i+2];
-    const min = Math.min(r,g,b), max = Math.max(r,g,b);
-    const dispersion = max - min; // que tan gris/neutro es el pixel (bajo = neutro)
-    if(min > 195 && dispersion < 35){
-      const factor = Math.max(0.55, Math.min(1, (min - 195) / 40));
-      d[i]   = r + (255-r)*factor;
-      d[i+1] = g + (255-g)*factor;
-      d[i+2] = b + (255-b)*factor;
-    }
-  }
-  ctx.putImageData(imgData, 0, 0);
 }
 
 function envolverTexto(ctx, texto, maxWidth){
@@ -2735,9 +2707,7 @@ async function generarFlyersNuevoIngreso(){
           const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
           const canvas = document.createElement('canvas');
           canvas.width = w; canvas.height = h;
-          const ctxTmp2732 = canvas.getContext('2d');
-          ctxTmp2732.drawImage(img, 0, 0, w, h);
-          if(document.getElementById('ni-foto-suelta-blanquear').checked) blanquearFondoClaro(ctxTmp2732, w, h);
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
           resolve(canvas.toDataURL('image/jpeg', 0.85));
         };
         img.src = e.target.result;
@@ -3895,9 +3865,7 @@ async function confirmarAgregarFotoSueltaAlCatalogo(){
           const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
           const canvas = document.createElement('canvas');
           canvas.width = w; canvas.height = h;
-          const ctxTmp3890 = canvas.getContext('2d');
-          ctxTmp3890.drawImage(img, 0, 0, w, h);
-          if(document.getElementById('ni-foto-suelta-blanquear').checked) blanquearFondoClaro(ctxTmp3890, w, h);
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
           resolve(canvas.toDataURL('image/jpeg', 0.75));
         };
         img.src = e.target.result;
