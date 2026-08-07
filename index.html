@@ -411,6 +411,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
         <div class="ni-chips" style="margin-bottom:10px;">
           <label class="ni-chip"><input type="radio" name="ni-modo" value="sku" checked onchange="toggleModoNI()"><span>Por SKU</span></label>
           <label class="ni-chip"><input type="radio" name="ni-modo" value="categoria" onchange="toggleModoNI()"><span>Por categoría</span></label>
+          <label class="ni-chip"><input type="radio" name="ni-modo" value="foto" onchange="toggleModoNI()"><span>Foto suelta (sin catálogo)</span></label>
         </div>
         <div id="ni-modo-sku">
           <div class="field"><label>SKU(s)</label><input type="text" id="ni-skus" placeholder="Ej: TOA171B, TOA171C"></div>
@@ -421,6 +422,17 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
             <div class="ni-chips" id="ni-categorias-chips"></div>
           </div>
           <div class="field"><label>Cantidad de productos a usar</label><input type="number" id="ni-cat-cantidad" min="2" max="8" value="4"></div>
+        </div>
+        <div id="ni-modo-foto" style="display:none;">
+          <p class="note" style="margin-bottom:10px;">Para un producto que todavía no está en el catálogo — solo genera el flyer, no lo guarda en el catálogo.</p>
+          <div class="field"><label>Foto</label><input type="file" accept="image/*" id="ni-foto-suelta"></div>
+          <div class="field"><label>Título</label><input type="text" id="ni-foto-titulo" placeholder="Ej: Fantasia"></div>
+          <div class="field"><label>Subtítulo (composición, calidad, hilos, etc.)</label><input type="text" id="ni-foto-subtitulo" placeholder="Ej: 100% Algodón — 360 gr"></div>
+          <div class="field">
+            <label>Variantes</label>
+            <div id="ni-foto-variantes-cont"></div>
+            <button type="button" class="btn-mini" onclick="agregarVarianteNIFoto()">+ Agregar variante</button>
+          </div>
         </div>
       </div>
 
@@ -2644,6 +2656,39 @@ async function generarFlyersNuevoIngreso(){
 
     const temasUnicos = [...new Set(catIndices.map(ci => TEMAS_CATEGORIA[CATALOGO[ci].categoria]).filter(Boolean))];
     temaCategoriaTexto = temasUnicos.join(' · ');
+  } else if(modo === 'foto'){
+    const archivoFoto = document.getElementById('ni-foto-suelta').files[0];
+    const titulo = document.getElementById('ni-foto-titulo').value.trim();
+    const subtitulo = document.getElementById('ni-foto-subtitulo').value.trim();
+    const variantesFoto = [];
+    document.querySelectorAll('#ni-foto-variantes-cont .edit-item-row-nuevo').forEach(row => {
+      const sku = row.querySelector('.nifv-sku').value.trim();
+      const desc = row.querySelector('.nifv-desc').value.trim();
+      const precio = row.querySelector('.nifv-precio').value.trim();
+      if(sku && desc && precio) variantesFoto.push({sku, desc, precio});
+    });
+    if(!archivoFoto || !titulo || variantesFoto.length === 0) return;
+
+    const imagenBase64 = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 480;
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(archivoFoto);
+    });
+
+    const productoSuelto = { nombre: titulo, composicion: subtitulo, variantes: variantesFoto, imagen: imagenBase64 };
+    matches = variantesFoto.map(v => ({ ci: -1, pi: -1, producto: productoSuelto, variante: v }));
   } else {
     const skusTexto = document.getElementById('ni-skus').value.trim();
     if(!skusTexto) return;
@@ -3703,6 +3748,24 @@ function toggleModoNI(){
   const modo = document.querySelector('input[name="ni-modo"]:checked').value;
   document.getElementById('ni-modo-sku').style.display = modo === 'sku' ? 'block' : 'none';
   document.getElementById('ni-modo-categoria').style.display = modo === 'categoria' ? 'block' : 'none';
+  document.getElementById('ni-modo-foto').style.display = modo === 'foto' ? 'block' : 'none';
+}
+
+let contadorVarianteNIFoto = 0;
+function agregarVarianteNIFoto(){
+  const cont = document.getElementById('ni-foto-variantes-cont');
+  const id = 'nifv-' + (contadorVarianteNIFoto++);
+  const row = document.createElement('div');
+  row.className = 'edit-item-row-nuevo';
+  row.id = id;
+  row.style.cssText = 'display:grid;grid-template-columns:100px 1fr 110px 32px;gap:6px;align-items:center;margin-bottom:6px;';
+  row.innerHTML = `
+    <input type="text" placeholder="SKU" class="nifv-sku">
+    <input type="text" placeholder="Descripción (ej: 1 Plaza)" class="nifv-desc">
+    <input type="text" placeholder="Precio" class="nifv-precio">
+    <button type="button" class="btn-mini" onclick="document.getElementById('${id}').remove();">✕</button>
+  `;
+  cont.appendChild(row);
 }
 
 function poblarCategoriasNI(){
@@ -3727,6 +3790,12 @@ function abrirNuevoIngreso(){
   document.getElementById('ni-fmt-carrusel').checked = false;
   document.getElementById('ni-carrusel-cant').value = '5';
   document.getElementById('ni-cat-cantidad').value = '4';
+  document.getElementById('ni-foto-suelta').value = '';
+  document.getElementById('ni-foto-titulo').value = '';
+  document.getElementById('ni-foto-subtitulo').value = '';
+  document.getElementById('ni-foto-variantes-cont').innerHTML = '';
+  agregarVarianteNIFoto();
+  agregarVarianteNIFoto();
   document.querySelector('input[name="ni-modo"][value="sku"]').checked = true;
   poblarCategoriasNI();
   document.querySelectorAll('.ni-cat-check').forEach(c => c.checked = false);
@@ -3747,13 +3816,22 @@ function irAFormatoGrafico(){
       errorEl.style.display = 'block';
       return;
     }
-  } else {
+  } else if(modo === 'categoria'){
     const hayCategoria = document.querySelectorAll('.ni-cat-check:checked').length > 0;
     if(!hayCategoria){
       errorEl.textContent = 'Elija al menos una categoría.';
       errorEl.style.display = 'block';
       return;
     }
+  } else if(modo === 'foto'){
+    const foto = document.getElementById('ni-foto-suelta').files[0];
+    const titulo = document.getElementById('ni-foto-titulo').value.trim();
+    const hayVariante = [...document.querySelectorAll('#ni-foto-variantes-cont .edit-item-row-nuevo')].some(row =>
+      row.querySelector('.nifv-sku').value.trim() && row.querySelector('.nifv-desc').value.trim() && row.querySelector('.nifv-precio').value.trim()
+    );
+    if(!foto){ errorEl.textContent = 'Suba una foto.'; errorEl.style.display = 'block'; return; }
+    if(!titulo){ errorEl.textContent = 'Falta el título.'; errorEl.style.display = 'block'; return; }
+    if(!hayVariante){ errorEl.textContent = 'Cargue al menos una variante con SKU, descripción y precio.'; errorEl.style.display = 'block'; return; }
   }
   errorEl.style.display = 'none';
   mostrarPaso('step-ni-formato');
