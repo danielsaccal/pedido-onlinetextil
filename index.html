@@ -365,6 +365,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <span onclick="abrirCompartirRubro()">Compartir catálogo por rubro</span>
       <span onclick="abrirActualizarFoto()">Actualizar foto de producto</span>
       <span onclick="abrirNuevoProducto()">Agregar producto nuevo</span>
+      <span onclick="abrirEditarProducto()">Editar producto</span>
     </div>
   </div>
 </header>
@@ -528,6 +529,47 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
         <button class="btn btn-gold" onclick="guardarProductoNuevo()">Guardar producto</button>
         <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
       </div>
+    </div>
+  </div>
+
+  <!-- STEP: EDITAR PRODUCTO -->
+  <div class="step" id="step-editar-producto">
+    <div class="form-card">
+      <h2>Editar producto</h2>
+      <p class="note" style="margin-bottom:14px;">Busque cualquier producto por uno de sus SKU para editar título, subtítulo, variantes o foto.</p>
+      <div class="field"><label>SKU</label><input type="text" id="ep-sku" placeholder="Ej: TOA171B"></div>
+      <div class="actions"><button class="btn btn-gold" onclick="buscarProductoParaEditar()">Buscar</button></div>
+      <p class="error" id="ep-error-busqueda" style="display:none;">No encontré ningún producto con ese SKU.</p>
+
+      <div id="ep-form-cont" style="display:none;margin-top:18px;">
+        <div class="ni-seccion">
+          <p class="ni-seccion-tit">Datos del producto</p>
+          <div class="field"><label>Título</label><input type="text" id="ep-titulo"></div>
+          <div class="field"><label>Subtítulo (calidad, composición, hilos, etc.)</label><input type="text" id="ep-subtitulo"></div>
+          <div class="field" id="ep-metros-wrap" style="display:none;">
+            <label>Metros por rollo/pieza</label>
+            <input type="number" id="ep-metros" min="1">
+          </div>
+        </div>
+
+        <div class="ni-seccion">
+          <p class="ni-seccion-tit">Variantes</p>
+          <div id="ep-variantes-cont"></div>
+          <button type="button" class="btn-mini" onclick="agregarVarianteEP()">+ Agregar variante</button>
+        </div>
+
+        <div class="ni-seccion">
+          <p class="ni-seccion-tit">Foto (opcional, solo si quiere reemplazarla)</p>
+          <div class="field"><input type="file" accept="image/*" id="ep-foto"></div>
+        </div>
+
+        <p class="error" id="ep-error" style="display:none;"></p>
+        <div class="actions">
+          <button class="btn btn-gold" onclick="guardarProductoEditado()">Guardar cambios</button>
+        </div>
+      </div>
+
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
 
@@ -1935,6 +1977,155 @@ function buscarProductoPorSku(sku){
 // ---------- agregar producto nuevo ----------
 let contadorVarianteNP = 0;
 
+// ---------- editar producto existente ----------
+let productoEnEdicion = null;
+let contadorVarianteEP = 0;
+
+function abrirEditarProducto(){
+  mostrarPaso('step-editar-producto');
+  document.getElementById('ep-sku').value = '';
+  document.getElementById('ep-form-cont').style.display = 'none';
+  document.getElementById('ep-error-busqueda').style.display = 'none';
+  document.getElementById('ep-error').style.display = 'none';
+  productoEnEdicion = null;
+}
+
+function buscarProductoParaEditar(){
+  const sku = document.getElementById('ep-sku').value.trim();
+  const errorEl = document.getElementById('ep-error-busqueda');
+  if(!sku) return;
+
+  const match = buscarProductoPorSku(sku);
+  if(!match){
+    errorEl.style.display = 'block';
+    document.getElementById('ep-form-cont').style.display = 'none';
+    return;
+  }
+  errorEl.style.display = 'none';
+  productoEnEdicion = match; // {ci, pi, producto, categoria, variante}
+
+  const p = match.producto;
+  document.getElementById('ep-titulo').value = p.nombre || '';
+  document.getElementById('ep-subtitulo').value = p.composicion || '';
+  const esTelas = match.categoria === 'TELAS';
+  document.getElementById('ep-metros-wrap').style.display = esTelas ? 'block' : 'none';
+  document.getElementById('ep-metros').value = p.metros || '';
+
+  const cont = document.getElementById('ep-variantes-cont');
+  cont.innerHTML = '';
+  p.variantes.forEach(v => agregarVarianteEP(v));
+
+  document.getElementById('ep-foto').value = '';
+  document.getElementById('ep-form-cont').style.display = 'block';
+}
+
+function agregarVarianteEP(datos){
+  const cont = document.getElementById('ep-variantes-cont');
+  const id = 'epv-' + (contadorVarianteEP++);
+  const row = document.createElement('div');
+  row.className = 'edit-item-row-nuevo';
+  row.id = id;
+  row.style.cssText = 'display:grid;grid-template-columns:100px 1fr 110px 32px;gap:6px;align-items:center;margin-bottom:6px;';
+  row.innerHTML = `
+    <input type="text" placeholder="SKU" class="epv-sku" value="${datos ? escapeAttr(datos.sku) : ''}">
+    <input type="text" placeholder="Descripción" class="epv-desc" value="${datos ? escapeAttr(datos.desc) : ''}">
+    <input type="text" placeholder="Precio" class="epv-precio" value="${datos ? escapeAttr(datos.precio) : ''}">
+    <button type="button" class="btn-mini" onclick="document.getElementById('${id}').remove();">✕</button>
+  `;
+  cont.appendChild(row);
+}
+
+async function guardarProductoEditado(){
+  const errorEl = document.getElementById('ep-error');
+  errorEl.style.display = 'none';
+  if(!productoEnEdicion) return;
+
+  const titulo = document.getElementById('ep-titulo').value.trim();
+  const subtitulo = document.getElementById('ep-subtitulo').value.trim();
+  const esTelas = productoEnEdicion.categoria === 'TELAS';
+  const metros = esTelas ? (parseInt(document.getElementById('ep-metros').value, 10) || null) : null;
+  const archivoFoto = document.getElementById('ep-foto').files[0];
+
+  const variantes = [];
+  document.querySelectorAll('#ep-variantes-cont .edit-item-row-nuevo').forEach(row => {
+    const sku = row.querySelector('.epv-sku').value.trim();
+    const desc = row.querySelector('.epv-desc').value.trim();
+    const precio = row.querySelector('.epv-precio').value.trim();
+    if(sku && desc && precio) variantes.push({sku, desc, precio});
+  });
+
+  if(!titulo){ errorEl.textContent = 'Falta el título del producto.'; errorEl.style.display = 'block'; return; }
+  if(variantes.length === 0){ errorEl.textContent = 'Debe quedar al menos una variante.'; errorEl.style.display = 'block'; return; }
+  if(esTelas && !metros){ errorEl.textContent = 'Es una tela: indique los metros por rollo/pieza.'; errorEl.style.display = 'block'; return; }
+
+  // los SKU de este mismo producto pueden repetirse consigo mismo (no cambiaron); solo bloquear si chocan con OTRO producto
+  const skusVistos = new Set();
+  for(const v of variantes){
+    const skuNorm = v.sku.trim().toUpperCase();
+    if(skusVistos.has(skuNorm)){
+      errorEl.textContent = 'El SKU "' + v.sku + '" está repetido entre las variantes.';
+      errorEl.style.display = 'block';
+      return;
+    }
+    skusVistos.add(skuNorm);
+    const existente = buscarProductoPorSku(v.sku);
+    if(existente && existente.producto !== productoEnEdicion.producto){
+      errorEl.textContent = 'El SKU "' + v.sku + '" ya pertenece a otro producto (' + existente.producto.nombre + ').';
+      errorEl.style.display = 'block';
+      return;
+    }
+  }
+
+  let imagenBase64 = null;
+  if(archivoFoto){
+    imagenBase64 = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 480;
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.75));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(archivoFoto);
+    });
+  }
+
+  const p = productoEnEdicion.producto;
+  try{
+    if(p._editKey && p._editKey.startsWith('nuevo-')){
+      // producto agregado con "Agregar producto nuevo": editar el mismo documento
+      const datosUpdate = { nombre: titulo, composicion: subtitulo, variantes, metros: metros || null };
+      if(imagenBase64) datosUpdate.imagenBase64 = imagenBase64;
+      await db.collection('productos_nuevos').doc(p._docId).update(datosUpdate);
+    } else {
+      // producto original del catalogo: guardar la edicion como override
+      const datosUpdate = { nombre: titulo, composicion: subtitulo, variantes, metros: metros || null };
+      if(imagenBase64) datosUpdate.imagenBase64 = imagenBase64;
+      await db.collection('productos_editados').doc(p._editKey).set(datosUpdate, { merge: true });
+    }
+
+    p.nombre = titulo;
+    p.composicion = subtitulo;
+    p.variantes = variantes;
+    p.metros = metros || undefined;
+    if(imagenBase64) p.imagen = imagenBase64;
+
+    alert('Producto actualizado.');
+    renderCatalogo(document.getElementById('buscador').value);
+    abrirEditarProducto();
+  } catch(e){
+    errorEl.textContent = 'No se pudo guardar: ' + e.message;
+    errorEl.style.display = 'block';
+  }
+}
+
 function abrirNuevoProducto(){
   mostrarPaso('step-nuevo-producto');
   const sel = document.getElementById('np-categoria');
@@ -2081,10 +2272,39 @@ function cargarProductosNuevos(){
           variantes: p.variantes,
           imagen: p.imagenBase64,
           metros: p.metros || undefined,
+          _editKey: 'nuevo-' + d.id,
+          _docId: d.id,
         });
       }
     });
   }).catch(e => console.error('Error cargando productos nuevos:', e));
+}
+
+function etiquetarProductosEstaticos(){
+  CATALOGO.forEach((cat, ci) => {
+    cat.productos.forEach((p, pi) => {
+      if(!p._editKey) p._editKey = 'static-' + ci + '-' + pi;
+    });
+  });
+}
+
+function cargarProductosEditados(){
+  return db.collection('productos_editados').get().then(snap => {
+    snap.docs.forEach(d => {
+      const datos = d.data();
+      for(const cat of CATALOGO){
+        const prod = cat.productos.find(p => p._editKey === d.id);
+        if(prod){
+          prod.nombre = datos.nombre;
+          prod.composicion = datos.composicion;
+          prod.variantes = datos.variantes;
+          prod.metros = datos.metros || undefined;
+          if(datos.imagenBase64) prod.imagen = datos.imagenBase64;
+          break;
+        }
+      }
+    });
+  }).catch(e => console.error('Error cargando productos editados:', e));
 }
 
 function abrirActualizarFoto(){
@@ -3399,7 +3619,10 @@ function irAFormatoGrafico(){
 
 </script>
 <script>
+etiquetarProductosEstaticos();
 Promise.all([cargarFotosOverride(), cargarProductosNuevos()]).then(() => {
+  return cargarProductosEditados();
+}).then(() => {
   renderCatalogo(document.getElementById('buscador').value);
 });
 </script>
