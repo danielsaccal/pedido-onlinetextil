@@ -2003,6 +2003,24 @@ async function guardarProductoNuevo(){
   if(variantes.length === 0){ errorEl.textContent = 'Cargue al menos una variante con SKU, descripción y precio.'; errorEl.style.display = 'block'; return; }
   if(esTelas && !metros){ errorEl.textContent = 'Es una tela: indique los metros por rollo/pieza.'; errorEl.style.display = 'block'; return; }
 
+  // chequear que ningun SKU nuevo repita uno que ya existe en el catalogo (ni entre si)
+  const skusVistos = new Set();
+  for(const v of variantes){
+    const skuNorm = v.sku.trim().toUpperCase();
+    if(skusVistos.has(skuNorm)){
+      errorEl.textContent = 'El SKU "' + v.sku + '" está repetido entre las variantes que está cargando.';
+      errorEl.style.display = 'block';
+      return;
+    }
+    skusVistos.add(skuNorm);
+    const existente = buscarProductoPorSku(v.sku);
+    if(existente){
+      errorEl.textContent = 'El SKU "' + v.sku + '" ya existe (producto: ' + existente.producto.nombre + '). Use otro SKU.';
+      errorEl.style.display = 'block';
+      return;
+    }
+  }
+
   let imagenBase64 = null;
   if(archivoFoto){
     imagenBase64 = await new Promise((resolve) => {
