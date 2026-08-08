@@ -367,7 +367,6 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 
       <p class="menu-grupo-tit">Mayorista</p>
       <span onclick="abrirHistorial()">Historial de pedidos</span>
-      <span onclick="abrirPedidoTexto()">Pedido rápido con texto</span>
       <span onclick="abrirClientes()">Clientes</span>
 
       <p class="menu-subgrupo-tit">Catálogo</p>
@@ -647,18 +646,6 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
     </div>
   </div>
 
-  <!-- STEP: PEDIDO RAPIDO CON TEXTO -->
-  <div class="step" id="step-pedido-texto">
-    <div class="form-card">
-      <h2>Pedido rápido con texto</h2>
-      <p class="note" style="margin-bottom:14px;">Escriba algo como "pedido para Tarsia de 5 BAR900". Reconoce por patrones (no es una IA de lenguaje libre) — siempre le muestra la previsualización antes de crear nada.</p>
-      <div class="field"><textarea id="pt-texto" rows="3" placeholder="Ej: pedido para Tarsia de 5 BAR900" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:'Work Sans';"></textarea></div>
-      <div class="actions"><button class="btn btn-gold" onclick="analizarPedidoTexto()">Analizar</button></div>
-      <p class="error" id="pt-error" style="display:none;"></p>
-      <div id="pt-preview" style="margin-top:16px;"></div>
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
-    </div>
-  </div>
 
   <!-- STEP: VISTA PREVIA DE GRILLA IG -->
   <div class="step" id="step-grilla">
@@ -1456,126 +1443,6 @@ function enviarAOnLineTextil(){
 
 // ---------- historial de pedidos ----------
 let historialPedidos = null;
-
-// ---------- pedido rapido con texto (reconocimiento por patrones) ----------
-let pedidoTextoAnalisis = null;
-
-function abrirPedidoTexto(){
-  mostrarPaso('step-pedido-texto');
-  document.getElementById('pt-texto').value = '';
-  document.getElementById('pt-error').style.display = 'none';
-  document.getElementById('pt-preview').innerHTML = '';
-  pedidoTextoAnalisis = null;
-  if(clientesAutocomplete === null) precargarClientesParaAutocompletar();
-}
-
-function buscarSkuEnTexto(texto){
-  const textoUpper = texto.toUpperCase();
-  let mejor = null;
-  CATALOGO.forEach((cat, ci) => {
-    cat.productos.forEach((prod, pi) => {
-      prod.variantes.forEach(v => {
-        const skuUpper = v.sku.toUpperCase();
-        const escapado = skuUpper.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp('(^|[^A-Z0-9])' + escapado + '($|[^A-Z0-9])');
-        if(regex.test(textoUpper)){
-          if(!mejor || skuUpper.length > mejor.sku.length){
-            mejor = { ci, pi, producto: prod, variante: v, sku: skuUpper };
-          }
-        }
-      });
-    });
-  });
-  return mejor;
-}
-
-function buscarCantidadEnTexto(texto, skuEncontrado){
-  const textoSinSku = skuEncontrado ? texto.replace(new RegExp(skuEncontrado.sku, 'ig'), ' ') : texto;
-  const nums = textoSinSku.match(/\b\d+([.,]\d+)?\b/g);
-  if(!nums || nums.length === 0) return 1;
-  return parseInt(nums[0], 10) || 1;
-}
-
-function buscarClienteEnTexto(texto){
-  if(!clientesAutocomplete || clientesAutocomplete.length === 0) return null;
-  const textoLower = texto.toLowerCase();
-  let mejor = null, mejorLen = 0;
-  clientesAutocomplete.forEach(c => {
-    [c.nombre, c.apellido].forEach(campo => {
-      if(!campo || campo.length < 3) return;
-      const campoLower = campo.toLowerCase();
-      if(textoLower.includes(campoLower) && campoLower.length > mejorLen){
-        mejor = c; mejorLen = campoLower.length;
-      }
-    });
-  });
-  return mejor;
-}
-
-function analizarPedidoTexto(){
-  const texto = document.getElementById('pt-texto').value.trim();
-  const errorEl = document.getElementById('pt-error');
-  const previewEl = document.getElementById('pt-preview');
-  errorEl.style.display = 'none';
-  previewEl.innerHTML = '';
-
-  if(!texto){ errorEl.textContent = 'Escriba algo primero.'; errorEl.style.display = 'block'; return; }
-
-  const skuMatch = buscarSkuEnTexto(texto);
-  if(!skuMatch){
-    errorEl.textContent = 'No encontré ningún SKU conocido en ese texto. Revise que el SKU esté escrito tal cual está en el catálogo.';
-    errorEl.style.display = 'block';
-    return;
-  }
-  const cantidad = buscarCantidadEnTexto(texto, skuMatch);
-  const cliente = buscarClienteEnTexto(texto);
-
-  pedidoTextoAnalisis = { skuMatch, cantidad, cliente };
-
-  const subtotal = (parseFloat(skuMatch.variante.precio.replace(/\./g,'').replace(',','.')) || 0) * cantidad;
-
-  previewEl.innerHTML = `
-    <div class="hist-pedido">
-      <div class="hist-body" style="display:block;">
-        <p style="margin:0 0 8px;"><b>Cliente:</b> ${cliente ? (cliente.nombre + ' ' + (cliente.apellido||'')) : '⚠️ No reconocido — lo completa a mano en el paso siguiente'}</p>
-        <p style="margin:0 0 8px;"><b>Producto:</b> ${skuMatch.producto.nombre} — ${skuMatch.variante.desc}</p>
-        <p style="margin:0 0 8px;"><b>SKU:</b> ${skuMatch.variante.sku} &nbsp; <b>Cantidad:</b> ${cantidad} &nbsp; <b>Precio unit.:</b> $ ${skuMatch.variante.precio}</p>
-        <p style="margin:0;"><b>Subtotal:</b> ${formatPrice(subtotal)}</p>
-      </div>
-      <div class="actions" style="margin-top:12px;">
-        <button class="btn btn-gold" onclick="confirmarPedidoTexto()">Confirmar y continuar el pedido</button>
-      </div>
-    </div>
-  `;
-}
-
-function confirmarPedidoTexto(){
-  if(!pedidoTextoAnalisis) return;
-  const { skuMatch, cantidad, cliente } = pedidoTextoAnalisis;
-  const id = skuMatch.ci + '-' + skuMatch.pi;
-  const imagen = imagenEfectiva(skuMatch.ci, skuMatch.pi, skuMatch.producto);
-  cart[id] = {
-    sku: skuMatch.variante.sku,
-    desc: skuMatch.variante.desc,
-    nombreProducto: skuMatch.producto.nombre,
-    precio: skuMatch.variante.precio,
-    cantidad,
-    imagen
-  };
-
-  irADatos();
-
-  if(cliente){
-    document.getElementById('f-nombre').value = cliente.nombre || '';
-    document.getElementById('f-apellido').value = cliente.apellido || '';
-    document.getElementById('f-cuit').value = cliente.cuit || '';
-    document.getElementById('f-telefono').value = cliente.telefono || '';
-    document.getElementById('f-email').value = cliente.email || '';
-    document.getElementById('f-localidad').value = cliente.localidad || '';
-    document.getElementById('f-provincia').value = cliente.provincia || '';
-    document.getElementById('f-transporte').value = cliente.transporte || '';
-  }
-}
 
 function abrirHistorial(){
   mostrarPaso('step-historial');
