@@ -367,6 +367,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 
       <p class="menu-grupo-tit">Mayorista</p>
       <span onclick="abrirHistorial()">Historial de pedidos</span>
+      <span onclick="abrirPedidoIA()">Pedido con IA (texto libre)</span>
       <span onclick="abrirClientes()">Clientes</span>
 
       <p class="menu-subgrupo-tit">Catálogo</p>
@@ -642,6 +643,19 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <div class="actions"><button class="btn btn-gold" onclick="procesarExcelImportado()">Procesar archivo</button></div>
       <p class="error" id="ie-error" style="display:none;"></p>
       <div id="ie-preview" style="margin-top:16px;"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <!-- STEP: PEDIDO CON IA (TEXTO LIBRE) -->
+  <div class="step" id="step-pedido-ia">
+    <div class="form-card">
+      <h2>Pedido con IA (texto libre)</h2>
+      <p class="note" style="margin-bottom:14px;">Escriba el pedido como si se lo dijera a alguien. Ej: "pedido para Tarsia de 5 docenas de los repasadores más económicos". Siempre le muestra la previsualización antes de crear nada.</p>
+      <div class="field"><textarea id="pia-texto" rows="3" placeholder="Ej: pedido para Tarsia de 5 BAR900" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:'Work Sans';"></textarea></div>
+      <div class="actions"><button class="btn btn-gold" id="pia-btn-analizar" onclick="analizarPedidoIA()">Analizar con IA</button></div>
+      <p class="error" id="pia-error" style="display:none;"></p>
+      <div id="pia-preview" style="margin-top:16px;"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
@@ -1443,6 +1457,148 @@ function enviarAOnLineTextil(){
 
 // ---------- historial de pedidos ----------
 let historialPedidos = null;
+
+// ---------- pedido con IA real (Cloudflare Worker + Claude) ----------
+const URL_WORKER_IA = 'https://lucky-shape-ec64.danielsaccal.workers.dev';
+let pedidoIAPropuesta = null;
+
+function abrirPedidoIA(){
+  mostrarPaso('step-pedido-ia');
+  document.getElementById('pia-texto').value = '';
+  document.getElementById('pia-error').style.display = 'none';
+  document.getElementById('pia-preview').innerHTML = '';
+  pedidoIAPropuesta = null;
+  if(clientesAutocomplete === null) precargarClientesParaAutocompletar();
+}
+
+function armarCatalogoResumido(){
+  const lineas = [];
+  CATALOGO.forEach(cat => {
+    cat.productos.forEach(prod => {
+      prod.variantes.forEach(v => {
+        lineas.push(`${v.sku} | ${prod.nombre} | ${v.desc} | $${v.precio}`);
+      });
+    });
+  });
+  return lineas.join('\n');
+}
+
+function buscarClientePorNombreIA(nombre){
+  if(!nombre || !clientesAutocomplete) return null;
+  const nombreLower = nombre.toLowerCase();
+  return clientesAutocomplete.find(c =>
+    (c.nombre && nombreLower.includes(c.nombre.toLowerCase())) ||
+    (c.apellido && nombreLower.includes(c.apellido.toLowerCase()))
+  ) || null;
+}
+
+async function analizarPedidoIA(){
+  const texto = document.getElementById('pia-texto').value.trim();
+  const errorEl = document.getElementById('pia-error');
+  const previewEl = document.getElementById('pia-preview');
+  const btn = document.getElementById('pia-btn-analizar');
+  errorEl.style.display = 'none';
+  previewEl.innerHTML = '';
+  if(!texto){ errorEl.textContent = 'Escriba el pedido primero.'; errorEl.style.display = 'block'; return; }
+
+  btn.disabled = true; btn.textContent = 'Pensando...';
+  try{
+    const resp = await fetch(URL_WORKER_IA, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ texto, catalogoResumido: armarCatalogoResumido() })
+    });
+    const datos = await resp.json();
+    if(!resp.ok || datos.error){
+      errorEl.textContent = 'Error: ' + (datos.error || 'no se pudo interpretar el pedido');
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    // cruzar cada sku propuesto contra el catalogo real, para mostrar datos reales (no lo que "dijo" la IA)
+    const itemsResueltos = (datos.items || []).map(it => {
+      const match = buscarProductoPorSku(it.sku);
+      return { ...it, match };
+    });
+
+    const clienteMatch = buscarClientePorNombreIA(datos.cliente);
+    pedidoIAPropuesta = { itemsResueltos, cliente: datos.cliente, clienteMatch };
+
+    let html = `<p style="margin:0 0 8px;"><b>Cliente:</b> ${clienteMatch ? (clienteMatch.nombre + ' ' + (clienteMatch.apellido||'')) : (datos.cliente ? datos.cliente + ' ⚠️ (no coincide con ninguno guardado, complételo a mano)' : '⚠️ No mencionado')}</p>`;
+
+    html += '<div style="border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:10px;">';
+    let subtotalTotal = 0;
+    itemsResueltos.forEach(it => {
+      if(it.match){
+        const precioNum = parseFloat(it.match.variante.precio.replace(/\./g,'').replace(',','.')) || 0;
+        const subtotal = precioNum * it.cantidad;
+        subtotalTotal += subtotal;
+        html += `<div style="padding:10px 12px;border-bottom:1px solid var(--line);font-size:0.85rem;">
+          <b>${it.match.producto.nombre}</b> — ${it.match.variante.desc} (SKU ${it.match.variante.sku})<br>
+          ${it.cantidad} x $ ${it.match.variante.precio} = ${formatPrice(subtotal)}<br>
+          <span style="color:#8A8072;font-size:0.78rem;">${it.motivo || ''}</span>
+        </div>`;
+      } else {
+        html += `<div style="padding:10px 12px;border-bottom:1px solid var(--line);font-size:0.85rem;color:#A6432F;">
+          ⚠️ SKU "${it.sku}" no encontrado en el catálogo — no se va a agregar.<br>
+          <span style="font-size:0.78rem;">${it.motivo || ''}</span>
+        </div>`;
+      }
+    });
+    html += `<div style="padding:10px 12px;font-weight:700;">Total: ${formatPrice(subtotalTotal)}</div>`;
+    html += '</div>';
+
+    if(datos.advertencias && datos.advertencias.length){
+      html += '<p class="note" style="margin-bottom:10px;">' + datos.advertencias.map(a => '⚠️ ' + a).join('<br>') + '</p>';
+    }
+
+    const hayValidos = itemsResueltos.some(it => it.match);
+    if(hayValidos){
+      html += `<div class="actions"><button class="btn btn-gold" onclick="confirmarPedidoIA()">Confirmar y continuar el pedido</button></div>`;
+    } else {
+      html += '<p class="error" style="display:block;">Ningún ítem se pudo relacionar con el catálogo. Pruebe reformular el pedido.</p>';
+    }
+
+    previewEl.innerHTML = html;
+  } catch(err){
+    errorEl.textContent = 'No se pudo conectar con la IA: ' + err.message;
+    errorEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Analizar con IA';
+  }
+}
+
+function confirmarPedidoIA(){
+  if(!pedidoIAPropuesta) return;
+  const { itemsResueltos, clienteMatch } = pedidoIAPropuesta;
+
+  itemsResueltos.forEach(it => {
+    if(!it.match) return;
+    const id = it.match.ci + '-' + it.match.pi;
+    const imagen = imagenEfectiva(it.match.ci, it.match.pi, it.match.producto);
+    cart[id] = {
+      sku: it.match.variante.sku,
+      desc: it.match.variante.desc,
+      nombreProducto: it.match.producto.nombre,
+      precio: it.match.variante.precio,
+      cantidad: it.cantidad,
+      imagen
+    };
+  });
+
+  irADatos();
+
+  if(clienteMatch){
+    document.getElementById('f-nombre').value = clienteMatch.nombre || '';
+    document.getElementById('f-apellido').value = clienteMatch.apellido || '';
+    document.getElementById('f-cuit').value = clienteMatch.cuit || '';
+    document.getElementById('f-telefono').value = clienteMatch.telefono || '';
+    document.getElementById('f-email').value = clienteMatch.email || '';
+    document.getElementById('f-localidad').value = clienteMatch.localidad || '';
+    document.getElementById('f-provincia').value = clienteMatch.provincia || '';
+    document.getElementById('f-transporte').value = clienteMatch.transporte || '';
+  }
+}
 
 function abrirHistorial(){
   mostrarPaso('step-historial');
