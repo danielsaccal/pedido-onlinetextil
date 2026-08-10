@@ -518,7 +518,6 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
         <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video"><span>🎬 Video simple (zoom, ~5 seg)</span></label>
         <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video-ml"><span>🛒 Video para Mercado Libre (10 seg, sin marca)</span></label>
         <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video-ia-reel"><span>🤖 Video con IA real para Reel</span></label>
-        <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video-ia-ml"><span>🤖 Video con IA real para Mercado Libre</span></label>
         <p class="note" style="margin-top:4px;">Los de IA real tardan 1-2 minutos y tienen costo por uso (Google) — a diferencia de los de zoom, que son gratis e instantáneos.</p>
       </div>
 
@@ -3404,7 +3403,7 @@ async function generarFlyersNuevoIngreso(){
       videoMLWrap.appendChild(notaVideoML);
     }
 
-    if(document.getElementById('ni-video-ia-reel').checked || document.getElementById('ni-video-ia-ml').checked){
+    if(document.getElementById('ni-video-ia-reel').checked){
       const descripcionProducto = `${producto.nombre}, ${producto.composicion || ''}`.trim();
 
       // convertir la foto ya cargada (img) a base64 para pasarla como referencia
@@ -3414,12 +3413,7 @@ async function generarFlyersNuevoIngreso(){
       canvasRef.getContext('2d').drawImage(img, 0, 0);
       const imagenRefBase64 = canvasRef.toDataURL('image/jpeg', 0.85).split(',')[1];
 
-      if(document.getElementById('ni-video-ia-reel').checked){
-        await generarYMostrarVideoIA(cont, 'reel', descripcionProducto, imagenRefBase64, producto.nombre);
-      }
-      if(document.getElementById('ni-video-ia-ml').checked){
-        await generarYMostrarVideoIA(cont, 'mercadolibre', descripcionProducto, imagenRefBase64, producto.nombre);
-      }
+      await generarYMostrarVideoIA(cont, 'reel', descripcionProducto, imagenRefBase64, producto.nombre);
     }
   } catch(e){
     cont.innerHTML = '';
@@ -4365,7 +4359,6 @@ function abrirNuevoIngreso(){
   document.getElementById('ni-video').checked = false;
   document.getElementById('ni-video-ml').checked = false;
   document.getElementById('ni-video-ia-reel').checked = false;
-  document.getElementById('ni-video-ia-ml').checked = false;
   document.getElementById('ni-fmt-carrusel').checked = false;
   document.getElementById('ni-carrusel-cant').value = '5';
   document.getElementById('ni-cat-cantidad').value = '4';
