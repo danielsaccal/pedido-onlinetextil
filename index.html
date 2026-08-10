@@ -517,6 +517,9 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
         <p class="note" style="margin-top:4px;">El diseño elegido arriba aplica a Story/Posteo/Reel. El carrusel siempre varía entre los 3 estilos, para que no se vea repetitivo.</p>
         <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video"><span>🎬 Video simple (zoom, ~5 seg)</span></label>
         <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video-ml"><span>🛒 Video para Mercado Libre (10 seg, sin marca)</span></label>
+        <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video-ia-reel"><span>🤖 Video con IA real para Reel</span></label>
+        <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video-ia-ml"><span>🤖 Video con IA real para Mercado Libre</span></label>
+        <p class="note" style="margin-top:4px;">Los de IA real tardan 1-2 minutos y tienen costo por uso (Google) — a diferencia de los de zoom, que son gratis e instantáneos.</p>
       </div>
 
       <p class="error" id="ni-error" style="display:none;">No encontré ningún producto con esos SKU.</p>
@@ -1476,6 +1479,86 @@ let historialPedidos = null;
 // ---------- pedido con IA real (Cloudflare Worker + Claude) ----------
 const URL_WORKER_IA = 'https://lucky-shape-ec64.danielsaccal.workers.dev';
 let pedidoIAPropuesta = null;
+
+async function generarYMostrarVideoIA(cont, formato, descripcionProducto, imagenRefBase64, nombreProducto){
+  const wrap = document.createElement('div');
+  wrap.className = 'ni-video-wrap';
+  wrap.style.cssText = 'text-align:center;background:var(--cream);border-radius:10px;padding:12px;';
+  const etiquetaFormato = formato === 'mercadolibre' ? 'Mercado Libre' : 'Reel';
+  wrap.innerHTML = `<p class="note">🤖 Generando video con IA real para ${etiquetaFormato}... puede tardar 1 a 2 minutos, no cierre esta pantalla.</p>`;
+  cont.appendChild(wrap);
+
+  try{
+    const respInicio = await fetch(URL_WORKER_IA, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ accion: 'generarVideo', descripcionProducto, formato, imagenBase64: imagenRefBase64 })
+    });
+    const datosInicio = await respInicio.json();
+    if(!respInicio.ok || datosInicio.error){
+      wrap.innerHTML = `<p class="error" style="display:block;">Error al iniciar el video (${etiquetaFormato}): ${datosInicio.error || 'desconocido'}</p>`;
+      return;
+    }
+
+    const operationName = datosInicio.operationName;
+    let listo = false, intentos = 0;
+    let videoBase64 = null;
+    while(!listo && intentos < 24){ // hasta ~4 minutos (24 x 10 seg)
+      await new Promise(r => setTimeout(r, 10000));
+      intentos++;
+      const respEstado = await fetch(URL_WORKER_IA, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ accion: 'estadoVideo', operationName })
+      });
+      const datosEstado = await respEstado.json();
+      if(datosEstado.error && !datosEstado.listo){
+        wrap.innerHTML = `<p class="error" style="display:block;">Error consultando el video (${etiquetaFormato}): ${datosEstado.error}</p>`;
+        return;
+      }
+      if(datosEstado.listo){
+        listo = true;
+        if(datosEstado.error){
+          wrap.innerHTML = `<p class="error" style="display:block;">${etiquetaFormato}: ${datosEstado.error}</p>`;
+          return;
+        }
+        videoBase64 = datosEstado.videoBase64;
+      } else {
+        wrap.innerHTML = `<p class="note">🤖 Generando video con IA real para ${etiquetaFormato}... (${intentos*10} seg)</p>`;
+      }
+    }
+
+    if(!videoBase64){
+      wrap.innerHTML = `<p class="error" style="display:block;">El video de ${etiquetaFormato} tardó demasiado, intente de nuevo.</p>`;
+      return;
+    }
+
+    const byteChars = atob(videoBase64);
+    const byteNums = new Array(byteChars.length);
+    for(let i=0;i<byteChars.length;i++) byteNums[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([new Uint8Array(byteNums)], {type:'video/mp4'});
+    const url = URL.createObjectURL(blob);
+    const nombreArchivo = 'ia_' + formato + '_' + nombreProducto.replace(/\s+/g,'_') + '.mp4';
+
+    wrap.innerHTML = '';
+    const videoEl = document.createElement('video');
+    videoEl.src = url; videoEl.controls = true; videoEl.loop = true;
+    videoEl.style.cssText = 'max-width:100%;border-radius:10px;border:1px solid var(--line);margin-bottom:8px;';
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-gold';
+    btn.textContent = 'Descargar video (' + etiquetaFormato + ')';
+    btn.onclick = () => { const a = document.createElement('a'); a.href = url; a.download = nombreArchivo; a.click(); };
+    const nota = document.createElement('p');
+    nota.className = 'note';
+    nota.textContent = 'Generado con IA real (Google Veo), sin marca de agua visible, respetando el formato de ' + etiquetaFormato + '.';
+    wrap.appendChild(videoEl);
+    wrap.appendChild(document.createElement('br'));
+    wrap.appendChild(btn);
+    wrap.appendChild(nota);
+  } catch(err){
+    wrap.innerHTML = `<p class="error" style="display:block;">No se pudo conectar con la IA (${etiquetaFormato}): ${err.message}</p>`;
+  }
+}
 
 function abrirPedidoIA(){
   mostrarPaso('step-pedido-ia');
@@ -3320,6 +3403,24 @@ async function generarFlyersNuevoIngreso(){
       videoMLWrap.appendChild(btnVideoML);
       videoMLWrap.appendChild(notaVideoML);
     }
+
+    if(document.getElementById('ni-video-ia-reel').checked || document.getElementById('ni-video-ia-ml').checked){
+      const descripcionProducto = `${producto.nombre}, ${producto.composicion || ''}`.trim();
+
+      // convertir la foto ya cargada (img) a base64 para pasarla como referencia
+      const canvasRef = document.createElement('canvas');
+      canvasRef.width = img.naturalWidth || img.width;
+      canvasRef.height = img.naturalHeight || img.height;
+      canvasRef.getContext('2d').drawImage(img, 0, 0);
+      const imagenRefBase64 = canvasRef.toDataURL('image/jpeg', 0.85).split(',')[1];
+
+      if(document.getElementById('ni-video-ia-reel').checked){
+        await generarYMostrarVideoIA(cont, 'reel', descripcionProducto, imagenRefBase64, producto.nombre);
+      }
+      if(document.getElementById('ni-video-ia-ml').checked){
+        await generarYMostrarVideoIA(cont, 'mercadolibre', descripcionProducto, imagenRefBase64, producto.nombre);
+      }
+    }
   } catch(e){
     cont.innerHTML = '';
     alert('No se pudo generar el flyer: ' + e.message);
@@ -4263,6 +4364,8 @@ function abrirNuevoIngreso(){
   document.getElementById('ni-fmt-reel').checked = false;
   document.getElementById('ni-video').checked = false;
   document.getElementById('ni-video-ml').checked = false;
+  document.getElementById('ni-video-ia-reel').checked = false;
+  document.getElementById('ni-video-ia-ml').checked = false;
   document.getElementById('ni-fmt-carrusel').checked = false;
   document.getElementById('ni-carrusel-cant').value = '5';
   document.getElementById('ni-cat-cantidad').value = '4';
