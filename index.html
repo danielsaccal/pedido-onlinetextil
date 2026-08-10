@@ -101,6 +101,13 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 .hist-body td.n{text-align:right;font-family:'IBM Plex Mono';white-space:nowrap;}
 .hist-chev{transition:transform .2s;color:var(--purple);}
 .hist-pedido.open .hist-chev{transform:rotate(180deg);}
+.estado-pedido{
+  font-size:0.72rem;font-weight:700;padding:5px 10px;border-radius:14px;border:none;
+  cursor:pointer;font-family:'Work Sans';-webkit-appearance:none;appearance:none;
+}
+.estado-pedido.estado-pendiente{background:#EFE0A8;color:#7A6420;}
+.estado-pedido.estado-parcial{background:#F3C9A0;color:#8A4A12;}
+.estado-pedido.estado-completo{background:#C9DDB8;color:#3D6122;}
 .hist-acciones{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);}
 .btn-mini{
   background:var(--cream);border:1px solid var(--line);border-radius:7px;
@@ -769,6 +776,12 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
   <div class="step" id="step-historial">
     <div class="hist-search">
       <input type="text" id="hist-buscador" placeholder="Buscar por N° de pedido, nombre o SKU...">
+    </div>
+    <div class="ni-chips" style="margin-bottom:14px;">
+      <label class="ni-chip"><input type="radio" name="hist-filtro-estado" value="todos" checked onchange="renderHistorial(document.getElementById('hist-buscador').value)"><span>Todos</span></label>
+      <label class="ni-chip"><input type="radio" name="hist-filtro-estado" value="pendiente" onchange="renderHistorial(document.getElementById('hist-buscador').value)"><span>Pendientes</span></label>
+      <label class="ni-chip"><input type="radio" name="hist-filtro-estado" value="parcial" onchange="renderHistorial(document.getElementById('hist-buscador').value)"><span>Parciales</span></label>
+      <label class="ni-chip"><input type="radio" name="hist-filtro-estado" value="completo" onchange="renderHistorial(document.getElementById('hist-buscador').value)"><span>Completos</span></label>
     </div>
     <div id="hist-lista"><p class="empty-msg">Cargando pedidos...</p></div>
     <div style="display:flex;gap:10px;margin-top:10px;">
@@ -1795,7 +1808,10 @@ function renderHistorial(filtro){
   filtro = (filtro||'').trim().toLowerCase();
   const cont = document.getElementById('hist-lista');
   const pedidos = historialPedidos || [];
+  const filtroEstadoEl = document.querySelector('input[name="hist-filtro-estado"]:checked');
+  const filtroEstado = filtroEstadoEl ? filtroEstadoEl.value : 'todos';
   const filtrados = pedidos.filter(p => {
+    if(filtroEstado !== 'todos' && (p.estado || 'pendiente') !== filtroEstado) return false;
     if(!filtro) return true;
     const haystack = [p.numero, p.cliente?.nombre, p.cliente?.apellido, ...(p.items||[]).map(i => i.sku + ' ' + i.nombreProducto)].join(' ').toLowerCase();
     return haystack.includes(filtro);
@@ -1808,6 +1824,7 @@ function renderHistorial(filtro){
 
   cont.innerHTML = filtrados.map(p => {
     const fecha = p.fecha ? new Date(p.fecha).toLocaleString('es-AR') : '';
+    const estado = p.estado || 'pendiente';
     const itemsRows = (p.items||[]).map(i => `
       <tr>
         <td>${i.cantidad} × ${i.sku}<br><span style="color:#8A8072;font-size:0.78rem;">${i.nombreProducto||''} — ${i.desc||''}</span>${i.descuentoItemPct > 0 ? `<br><span style="color:var(--sage);font-size:0.75rem;">Desc. ítem: ${i.descuentoItemPct}%</span>` : ''}${i.nota ? `<br><span style="color:var(--sage);font-size:0.75rem;">Nota: ${i.nota}</span>` : ''}</td>
@@ -1821,6 +1838,11 @@ function renderHistorial(filtro){
             <div class="meta">${p.cliente?.nombre||''} ${p.cliente?.apellido||''} · ${fecha}</div>
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
+            <select class="estado-pedido estado-${estado}" onclick="event.stopPropagation()" onchange="event.stopPropagation(); cambiarEstadoPedido('${p.numero}', this.value, this)">
+              <option value="pendiente" ${estado==='pendiente'?'selected':''}>Pendiente</option>
+              <option value="parcial" ${estado==='parcial'?'selected':''}>Parcial</option>
+              <option value="completo" ${estado==='completo'?'selected':''}>Completo</option>
+            </select>
             <div class="tot">${formatPrice(p.total)}</div>
             <span class="hist-chev">▾</span>
           </div>
@@ -1847,6 +1869,17 @@ function renderHistorial(filtro){
 }
 
 document.getElementById('hist-buscador').addEventListener('input', e => renderHistorial(e.target.value));
+
+async function cambiarEstadoPedido(numero, nuevoEstado, selectEl){
+  selectEl.className = 'estado-pedido estado-' + nuevoEstado;
+  try{
+    await db.collection('pedidos').doc(numero).update({ estado: nuevoEstado });
+    const p = (historialPedidos || []).find(x => x.numero === numero);
+    if(p) p.estado = nuevoEstado;
+  } catch(e){
+    alert('No se pudo guardar el estado: ' + e.message);
+  }
+}
 
 // ---------- autocompletar cliente en el formulario de pedido ----------
 let clientesAutocomplete = null;
