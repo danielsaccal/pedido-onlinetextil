@@ -108,6 +108,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 .estado-pedido.estado-pendiente{background:#EFE0A8;color:#7A6420;}
 .estado-pedido.estado-parcial{background:#F3C9A0;color:#8A4A12;}
 .estado-pedido.estado-completo{background:#C9DDB8;color:#3D6122;}
+.estado-pedido.estado-cancelado{background:#E0B8B0;color:#7A2E1E;}
 .hist-acciones{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);}
 .btn-mini{
   background:var(--cream);border:1px solid var(--line);border-radius:7px;
@@ -782,6 +783,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <label class="ni-chip"><input type="radio" name="hist-filtro-estado" value="pendiente" onchange="renderHistorial(document.getElementById('hist-buscador').value)"><span>Pendientes</span></label>
       <label class="ni-chip"><input type="radio" name="hist-filtro-estado" value="parcial" onchange="renderHistorial(document.getElementById('hist-buscador').value)"><span>Parciales</span></label>
       <label class="ni-chip"><input type="radio" name="hist-filtro-estado" value="completo" onchange="renderHistorial(document.getElementById('hist-buscador').value)"><span>Completos</span></label>
+      <label class="ni-chip"><input type="radio" name="hist-filtro-estado" value="cancelado" onchange="renderHistorial(document.getElementById('hist-buscador').value)"><span>Cancelados</span></label>
     </div>
     <div id="hist-lista"><p class="empty-msg">Cargando pedidos...</p></div>
     <div style="display:flex;gap:10px;margin-top:10px;">
@@ -1842,6 +1844,7 @@ function renderHistorial(filtro){
               <option value="pendiente" ${estado==='pendiente'?'selected':''}>Pendiente</option>
               <option value="parcial" ${estado==='parcial'?'selected':''}>Parcial</option>
               <option value="completo" ${estado==='completo'?'selected':''}>Completo</option>
+              <option value="cancelado" ${estado==='cancelado'?'selected':''}>Cancelado</option>
             </select>
             <div class="tot">${formatPrice(p.total)}</div>
             <span class="hist-chev">▾</span>
@@ -1860,6 +1863,7 @@ function renderHistorial(filtro){
             <button class="btn-mini" onclick="event.stopPropagation(); compartirHistorial('${p.numero}')">📤 Compartir</button>
             <button class="btn-mini" onclick="event.stopPropagation(); imprimirHistorial('${p.numero}')">🖨️ Imprimir</button>
             <button class="btn-mini" onclick="event.stopPropagation(); mostrarEdicionHistorial('${p.numero}')">✏️ Modificar</button>
+            <button class="btn-mini" style="background:#A6432F;color:#fff;border-color:#A6432F;" onclick="event.stopPropagation(); cancelarPedidoHistorial('${p.numero}')">❌ Cancelar pedido</button>
           </div>
           <div id="edit-${p.numero}" style="display:none;"></div>
         </div>
@@ -1878,6 +1882,18 @@ async function cambiarEstadoPedido(numero, nuevoEstado, selectEl){
     if(p) p.estado = nuevoEstado;
   } catch(e){
     alert('No se pudo guardar el estado: ' + e.message);
+  }
+}
+
+async function cancelarPedidoHistorial(numero){
+  if(!confirm('¿Cancelar el pedido ' + numero + '? Queda marcado como cancelado, no se borra del historial.')) return;
+  try{
+    await db.collection('pedidos').doc(numero).update({ estado: 'cancelado' });
+    const p = (historialPedidos || []).find(x => x.numero === numero);
+    if(p) p.estado = 'cancelado';
+    renderHistorial(document.getElementById('hist-buscador').value);
+  } catch(e){
+    alert('No se pudo cancelar: ' + e.message);
   }
 }
 
