@@ -661,6 +661,18 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       </div>
 
       <div class="ni-seccion">
+        <p class="ni-seccion-tit">✨ Generar con IA (opcional)</p>
+        <div class="field">
+          <label>Describa qué quiere anunciar</label>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="an-ia-desc" placeholder="Ej: día del niño con descuento" style="flex:1;">
+            <button type="button" class="btn-mini" id="an-ia-btn" onclick="generarContenidoConIA()" style="white-space:nowrap;">🤖 Generar</button>
+          </div>
+          <p class="error" id="an-ia-error" style="display:none;"></p>
+        </div>
+      </div>
+
+      <div class="ni-seccion">
         <p class="ni-seccion-tit">Mensaje</p>
         <div class="field"><label>Título (el mensaje principal)</label><input type="text" id="an-titulo" placeholder="Ej: ¡Feliz Día del Niño!"></div>
         <div class="field"><label>Subtítulo (opcional)</label><input type="text" id="an-subtitulo" placeholder="Ej: 6 cuotas sin interés en toda la tienda"></div>
@@ -4176,8 +4188,43 @@ function moverEnGrilla(idx, direccion){
 }
 // ---------- rompecabezas / triptico ----------
 // ---------- anuncios y promociones (sin producto puntual) ----------
+async function generarContenidoConIA(){
+  const descripcion = document.getElementById('an-ia-desc').value.trim();
+  const errorEl = document.getElementById('an-ia-error');
+  const btn = document.getElementById('an-ia-btn');
+  errorEl.style.display = 'none';
+  if(!descripcion){ errorEl.textContent = 'Escriba primero qué quiere anunciar.'; errorEl.style.display = 'block'; return; }
+
+  btn.disabled = true; btn.textContent = 'Pensando...';
+  try{
+    const resp = await fetch(URL_WORKER_IA, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ accion: 'generarContenidoAnuncio', descripcion })
+    });
+    const datos = await resp.json();
+    if(!resp.ok || datos.error){
+      errorEl.textContent = 'Error: ' + (datos.error || 'no se pudo generar el contenido');
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    if(datos.titulo) document.getElementById('an-titulo').value = datos.titulo;
+    document.getElementById('an-subtitulo').value = datos.subtitulo || '';
+    if(datos.paleta && ['violeta','dorado','crema'].includes(datos.paleta)) document.getElementById('an-paleta').value = datos.paleta;
+    if(datos.tipografia && ['serif','sans'].includes(datos.tipografia)) document.getElementById('an-tipografia').value = datos.tipografia;
+  } catch(err){
+    errorEl.textContent = 'No se pudo conectar con la IA: ' + err.message;
+    errorEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = '🤖 Generar';
+  }
+}
+
 function abrirAnuncio(){
   mostrarPaso('step-anuncio');
+  document.getElementById('an-ia-desc').value = '';
+  document.getElementById('an-ia-error').style.display = 'none';
   document.getElementById('an-titulo').value = '';
   document.getElementById('an-subtitulo').value = '';
   document.getElementById('an-fmt-story').checked = true;
