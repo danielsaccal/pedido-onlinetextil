@@ -666,6 +666,34 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
         <div class="field"><label>Subtítulo (opcional)</label><input type="text" id="an-subtitulo" placeholder="Ej: 6 cuotas sin interés en toda la tienda"></div>
       </div>
 
+      <div class="ni-seccion">
+        <p class="ni-seccion-tit">Estilo visual</p>
+        <div class="field">
+          <label>Paleta de color</label>
+          <select id="an-paleta">
+            <option value="violeta">Violeta (fondo violeta, letra dorada)</option>
+            <option value="dorado">Dorada (fondo dorado, letra violeta)</option>
+            <option value="crema">Crema (fondo claro, letra violeta)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Tipografía del título</label>
+          <select id="an-tipografia">
+            <option value="serif">Elegante (serif)</option>
+            <option value="sans">Moderna (sans)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Tamaño del título</label>
+          <select id="an-tamano">
+            <option value="88">Normal</option>
+            <option value="110" selected>Grande</option>
+            <option value="135">Muy grande</option>
+          </select>
+        </div>
+        <label class="ni-chip" style="display:inline-flex;"><input type="checkbox" id="an-sombra" checked><span>Sombra detrás del texto</span></label>
+      </div>
+
       <p class="error" id="an-error" style="display:none;">Escriba al menos el título.</p>
       <div class="actions"><button class="btn btn-gold" onclick="generarAnuncio()">Generar</button></div>
       <div id="an-resultado" class="ni-resultado-grilla"></div>
@@ -3780,8 +3808,12 @@ function dibujarPiezaTexto(producto, textoAdicional, formato, paletaKey){
   return canvas;
 }
 
-function dibujarPiezaAnuncio(titulo, subtitulo, formato){
-  const P = PALETAS.violeta;
+function dibujarPiezaAnuncio(titulo, subtitulo, formato, paletaKey, tipografia, tamanoTitulo, conSombra){
+  const P = PALETAS[paletaKey] || PALETAS.violeta;
+  const fuenteTitulo = tipografia === 'sans' ? "'Work Sans'" : "'Fraunces'";
+  const pesoTitulo = tipografia === 'sans' ? '800' : '600';
+  const tamano = tamanoTitulo || 88;
+  const interlineado = Math.round(tamano * 1.07);
   const esPost = formato === 'post';
   const esReel = formato === 'reel';
   const W = 1080, H = esPost ? 1350 : 1920;
@@ -3805,10 +3837,17 @@ function dibujarPiezaAnuncio(titulo, subtitulo, formato){
   ctx.fillStyle = P.texto; ctx.font = "600 34px 'Fraunces'";
   ctx.fillText('OnLineTextil', W/2, topSafe*0.5);
 
-  ctx.fillStyle = P.texto; ctx.font = "600 88px 'Fraunces'";
+  if(conSombra){
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 6;
+  }
+  ctx.fillStyle = P.texto; ctx.font = `${pesoTitulo} ${tamano}px ${fuenteTitulo}`;
   const lineasTitulo = envolverTexto(ctx, titulo, W - sideSafe*2);
-  let y = centroY - ((lineasTitulo.length-1)*94)/2;
-  lineasTitulo.forEach(linea => { ctx.fillText(linea, W/2, y); y += 94; });
+  let y = centroY - ((lineasTitulo.length-1)*interlineado)/2;
+  lineasTitulo.forEach(linea => { ctx.fillText(linea, W/2, y); y += interlineado; });
+  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
 
   if(subtitulo){
     y += 30;
@@ -4144,6 +4183,10 @@ function abrirAnuncio(){
   document.getElementById('an-fmt-story').checked = true;
   document.getElementById('an-fmt-post').checked = false;
   document.getElementById('an-fmt-reel').checked = false;
+  document.getElementById('an-paleta').value = 'violeta';
+  document.getElementById('an-tipografia').value = 'serif';
+  document.getElementById('an-tamano').value = '110';
+  document.getElementById('an-sombra').checked = true;
   document.getElementById('an-error').style.display = 'none';
   document.getElementById('an-resultado').innerHTML = '';
 }
@@ -4162,9 +4205,14 @@ function generarAnuncio(){
   if(document.getElementById('an-fmt-reel').checked) formatos.push(['reel','Reel']);
   if(formatos.length === 0){ errorEl.textContent = 'Elija al menos un formato.'; errorEl.style.display = 'block'; return; }
 
+  const paletaKey = document.getElementById('an-paleta').value;
+  const tipografia = document.getElementById('an-tipografia').value;
+  const tamanoTitulo = parseInt(document.getElementById('an-tamano').value, 10);
+  const conSombra = document.getElementById('an-sombra').checked;
+
   cont.innerHTML = '';
   formatos.forEach(([formato, etiqueta]) => {
-    const canvas = dibujarPiezaAnuncio(titulo, subtitulo, formato);
+    const canvas = dibujarPiezaAnuncio(titulo, subtitulo, formato, paletaKey, tipografia, tamanoTitulo, conSombra);
     const nombre = 'anuncio_' + formato + '_' + titulo.replace(/\s+/g,'_').slice(0,30) + '.png';
 
     const wrap = document.createElement('div');
