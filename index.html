@@ -666,6 +666,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
           <label>Describa qué quiere anunciar</label>
           <div style="display:flex;gap:8px;">
             <input type="text" id="an-ia-desc" placeholder="Ej: día del niño con descuento" style="flex:1;">
+            <button type="button" class="btn-mini" id="an-ia-mic" onclick="dictarEnCampo('an-ia-desc','an-ia-mic', false)" style="white-space:nowrap;">🎙️</button>
             <button type="button" class="btn-mini" id="an-ia-btn" onclick="generarContenidoConIA()" style="white-space:nowrap;">🤖 Generar</button>
           </div>
           <p class="error" id="an-ia-error" style="display:none;"></p>
@@ -731,7 +732,10 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
     <div class="form-card">
       <h2>Pedido con IA (texto libre)</h2>
       <p class="note" style="margin-bottom:14px;">Escriba el pedido como si se lo dijera a alguien. Ej: "pedido para Tarsia de 5 docenas de los repasadores más económicos". Siempre le muestra la previsualización antes de crear nada.</p>
-      <div class="field"><textarea id="pia-texto" rows="3" placeholder="Ej: pedido para Tarsia de 5 BAR900" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:'Work Sans';"></textarea></div>
+      <div class="field">
+        <textarea id="pia-texto" rows="3" placeholder="Ej: pedido para Tarsia de 5 BAR900" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:'Work Sans';"></textarea>
+        <button type="button" class="btn-mini" id="pia-mic" style="margin-top:6px;" onclick="dictarEnCampo('pia-texto','pia-mic', true)">🎙️ Dictar por voz</button>
+      </div>
       <div class="actions"><button class="btn btn-gold" id="pia-btn-analizar" onclick="analizarPedidoIA()">Analizar con IA</button></div>
       <p class="error" id="pia-error" style="display:none;"></p>
       <div id="pia-preview" style="margin-top:16px;"></div>
@@ -1134,6 +1138,46 @@ function renderCatalogo(filtro){
 }
 
 function escapeAttr(s){ return String(s).replace(/'/g, "\\'"); }
+
+// ---------- dictado por voz (gratis, del navegador) ----------
+const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+function dictarEnCampo(idCampo, idBoton, agregar){
+  const btn = document.getElementById(idBoton);
+  const campo = document.getElementById(idCampo);
+  if(!SpeechRecognitionAPI){
+    alert('Su navegador no permite dictado por voz acá. Pruebe desde Safari directo (no desde el ícono de la app agregada a la pantalla de inicio).');
+    return;
+  }
+  const reconocimiento = new SpeechRecognitionAPI();
+  reconocimiento.lang = 'es-AR';
+  reconocimiento.interimResults = false;
+  reconocimiento.continuous = false;
+
+  btn.disabled = true;
+  const textoOriginal = btn.textContent;
+  btn.textContent = '🎙️ Escuchando...';
+
+  reconocimiento.onresult = (e) => {
+    const texto = e.results[0][0].transcript;
+    if(agregar && campo.value.trim()){
+      campo.value = campo.value.trim() + ' ' + texto;
+    } else {
+      campo.value = texto;
+    }
+    campo.dispatchEvent(new Event('input'));
+  };
+  reconocimiento.onerror = (e) => {
+    if(e.error !== 'aborted' && e.error !== 'no-speech'){
+      alert('No se pudo escuchar: ' + e.error);
+    }
+  };
+  reconocimiento.onend = () => {
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+  };
+  reconocimiento.start();
+}
 
 function cambiarCantidad(id, delta, sku, desc, nombreProducto, precio){
   const input = document.getElementById('qty-'+id);
