@@ -372,6 +372,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <span onclick="abrirNuevoIngreso()">Nuevo ingreso (flyers, video)</span>
       <span onclick="abrirGrilla()">Vista previa de grilla IG</span>
       <span onclick="abrirRompecabezas()">Rompecabezas para grilla</span>
+      <span onclick="abrirAnuncio()">Anuncios y promociones</span>
 
       <p class="menu-grupo-tit">Mayorista</p>
       <span onclick="abrirHistorial()">Historial de pedidos</span>
@@ -640,6 +641,34 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <div class="actions"><button class="btn btn-gold" onclick="buscarProductoParaEliminar()">Buscar</button></div>
       <p class="error" id="dp-error-busqueda" style="display:none;">No encontré ningún producto con ese SKU.</p>
       <div id="dp-resultado" style="margin-top:16px;"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <!-- STEP: ANUNCIOS Y PROMOCIONES -->
+  <div class="step" id="step-anuncio">
+    <div class="form-card">
+      <h2>Anuncios y promociones</h2>
+      <p class="note" style="margin-bottom:14px;">Para mensajes generales que no son de un producto puntual: fechas especiales, cuotas, promos. Mantiene siempre los colores y el logo de la marca.</p>
+
+      <div class="ni-seccion">
+        <p class="ni-seccion-tit">Formato</p>
+        <div class="ni-chips">
+          <label class="ni-chip"><input type="checkbox" id="an-fmt-story" checked><span>Story</span></label>
+          <label class="ni-chip"><input type="checkbox" id="an-fmt-post"><span>Posteo</span></label>
+          <label class="ni-chip"><input type="checkbox" id="an-fmt-reel"><span>Reel</span></label>
+        </div>
+      </div>
+
+      <div class="ni-seccion">
+        <p class="ni-seccion-tit">Mensaje</p>
+        <div class="field"><label>Título (el mensaje principal)</label><input type="text" id="an-titulo" placeholder="Ej: ¡Feliz Día del Niño!"></div>
+        <div class="field"><label>Subtítulo (opcional)</label><input type="text" id="an-subtitulo" placeholder="Ej: 6 cuotas sin interés en toda la tienda"></div>
+      </div>
+
+      <p class="error" id="an-error" style="display:none;">Escriba al menos el título.</p>
+      <div class="actions"><button class="btn btn-gold" onclick="generarAnuncio()">Generar</button></div>
+      <div id="an-resultado" class="ni-resultado-grilla"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
@@ -3751,6 +3780,51 @@ function dibujarPiezaTexto(producto, textoAdicional, formato, paletaKey){
   return canvas;
 }
 
+function dibujarPiezaAnuncio(titulo, subtitulo, formato){
+  const P = PALETAS.violeta;
+  const esPost = formato === 'post';
+  const esReel = formato === 'reel';
+  const W = 1080, H = esPost ? 1350 : 1920;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  const topSafe    = esPost ? 90 : (esReel ? 130 : 250);
+  const bottomSafe = esPost ? 90 : (esReel ? 380 : 250);
+  const sideSafe   = esReel ? 130 : 70;
+  const centroY = topSafe + (H - topSafe - bottomSafe)/2;
+
+  ctx.fillStyle = P.bg; ctx.fillRect(0,0,W,H);
+  ctx.textAlign = 'center';
+
+  // marco fino con el color de marca, mismo detalle que las piezas de producto
+  const marco = 16;
+  ctx.strokeStyle = P.accent; ctx.lineWidth = marco;
+  ctx.strokeRect(marco/2, marco/2, W-marco, H-marco);
+
+  ctx.fillStyle = P.texto; ctx.font = "600 34px 'Fraunces'";
+  ctx.fillText('OnLineTextil', W/2, topSafe*0.5);
+
+  ctx.fillStyle = P.texto; ctx.font = "600 88px 'Fraunces'";
+  const lineasTitulo = envolverTexto(ctx, titulo, W - sideSafe*2);
+  let y = centroY - ((lineasTitulo.length-1)*94)/2;
+  lineasTitulo.forEach(linea => { ctx.fillText(linea, W/2, y); y += 94; });
+
+  if(subtitulo){
+    y += 30;
+    ctx.strokeStyle = P.accent; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(W/2-50, y-30); ctx.lineTo(W/2+50, y-30); ctx.stroke();
+    ctx.fillStyle = P.accent; ctx.font = "700 40px 'Work Sans'";
+    const lineasSub = envolverTexto(ctx, subtitulo, W - sideSafe*2);
+    lineasSub.forEach(linea => { ctx.fillText(linea, W/2, y); y += 50; });
+  }
+
+  ctx.fillStyle = P.textoSub; ctx.font = "700 28px 'Work Sans'";
+  ctx.fillText('onlinetextil.com.ar', W/2, H - bottomSafe - 20);
+
+  return canvas;
+}
+
 // ---------- video simple (sin IA, animacion tipo Ken Burns) ----------
 function facilInOut(t){ return t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2; }
 
@@ -4062,6 +4136,74 @@ function moverEnGrilla(idx, direccion){
   renderGrilla();
 }
 // ---------- rompecabezas / triptico ----------
+// ---------- anuncios y promociones (sin producto puntual) ----------
+function abrirAnuncio(){
+  mostrarPaso('step-anuncio');
+  document.getElementById('an-titulo').value = '';
+  document.getElementById('an-subtitulo').value = '';
+  document.getElementById('an-fmt-story').checked = true;
+  document.getElementById('an-fmt-post').checked = false;
+  document.getElementById('an-fmt-reel').checked = false;
+  document.getElementById('an-error').style.display = 'none';
+  document.getElementById('an-resultado').innerHTML = '';
+}
+
+function generarAnuncio(){
+  const titulo = document.getElementById('an-titulo').value.trim();
+  const subtitulo = document.getElementById('an-subtitulo').value.trim();
+  const errorEl = document.getElementById('an-error');
+  const cont = document.getElementById('an-resultado');
+  if(!titulo){ errorEl.style.display = 'block'; return; }
+  errorEl.style.display = 'none';
+
+  const formatos = [];
+  if(document.getElementById('an-fmt-story').checked) formatos.push(['story','Story']);
+  if(document.getElementById('an-fmt-post').checked) formatos.push(['post','Posteo']);
+  if(document.getElementById('an-fmt-reel').checked) formatos.push(['reel','Reel']);
+  if(formatos.length === 0){ errorEl.textContent = 'Elija al menos un formato.'; errorEl.style.display = 'block'; return; }
+
+  cont.innerHTML = '';
+  formatos.forEach(([formato, etiqueta]) => {
+    const canvas = dibujarPiezaAnuncio(titulo, subtitulo, formato);
+    const nombre = 'anuncio_' + formato + '_' + titulo.replace(/\s+/g,'_').slice(0,30) + '.png';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'ni-pieza';
+    const previewImg = document.createElement('img');
+    previewImg.src = canvas.toDataURL('image/png');
+    const acciones = document.createElement('div');
+    acciones.className = 'ni-pieza-acciones';
+    const btn = document.createElement('button');
+    btn.className = 'btn-mini';
+    btn.textContent = etiqueta;
+    btn.onclick = async () => {
+      canvas.toBlob(async (blob) => {
+        const file = new File([blob], nombre, {type:'image/png'});
+        try{
+          if(navigator.canShare && navigator.canShare({files:[file]})){
+            await navigator.share({files:[file], title:'OnLineTextil'});
+            return;
+          }
+        } catch(e){ /* si cancela o falla, baja a descargar */ }
+        const a = document.createElement('a');
+        a.href = canvas.toDataURL('image/png');
+        a.download = nombre;
+        a.click();
+      }, 'image/png');
+    };
+    const btnGrilla = document.createElement('button');
+    btnGrilla.className = 'btn-mini';
+    btnGrilla.textContent = '+ Grilla';
+    btnGrilla.onclick = () => agregarAGrilla(canvas.toDataURL('image/png'), nombre);
+
+    wrap.appendChild(previewImg);
+    acciones.appendChild(btn);
+    acciones.appendChild(btnGrilla);
+    wrap.appendChild(acciones);
+    cont.appendChild(wrap);
+  });
+}
+
 function abrirRompecabezas(){
   mostrarPaso('step-rompecabezas');
   document.getElementById('rp-sku').value = '';
