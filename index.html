@@ -381,6 +381,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 
       <p class="menu-subgrupo-tit">Catálogo</p>
       <span class="menu-item-sub" onclick="abrirCompartirRubro()">Compartir catálogo por rubro</span>
+      <span class="menu-item-sub" onclick="abrirEnviarCatalogo()">Enviar catálogo a clientes</span>
       <span class="menu-item-sub" onclick="abrirNuevoProducto()">Agregar producto nuevo</span>
       <span class="menu-item-sub" onclick="abrirEditarProducto()">Editar producto</span>
       <span class="menu-item-sub" onclick="abrirEliminarProducto()">Eliminar producto</span>
@@ -409,6 +410,23 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <p class="note" style="margin-bottom:14px;">Genera un link que abre el catálogo mostrando solo ese rubro, listo para mandar por WhatsApp o email.</p>
       <div id="rubros-lista"></div>
       <button class="btn btn-ghost" style="margin-top:12px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <!-- STEP: ENVIAR CATALOGO A CLIENTES -->
+  <div class="step" id="step-enviar-catalogo">
+    <div class="form-card">
+      <h2>Enviar catálogo a clientes</h2>
+      <p class="note" style="margin-bottom:14px;">Este es el link para clientes: solo catálogo y pedidos, sin ninguna de las herramientas de administración.</p>
+      <div class="field">
+        <input type="text" id="ec-link" value="https://danielsaccal.github.io/pedido-onlinetextil/cliente/" readonly style="background:var(--cream);">
+      </div>
+      <div class="actions">
+        <button class="btn btn-gold" onclick="compartirCatalogoClientes()">Compartir por WhatsApp</button>
+        <button class="btn btn-ghost" onclick="copiarLinkCatalogoClientes()">Copiar link</button>
+      </div>
+      <p class="note" id="ec-copiado" style="display:none;margin-top:8px;">¡Copiado!</p>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
 
@@ -2405,6 +2423,26 @@ function quitarFiltroRubro(){
   document.getElementById('filtro-banner').style.display = 'none';
   renderCatalogo('');
   history.replaceState(null, '', location.pathname);
+}
+
+function abrirEnviarCatalogo(){
+  mostrarPaso('step-enviar-catalogo');
+  document.getElementById('ec-copiado').style.display = 'none';
+}
+
+function compartirCatalogoClientes(){
+  const link = document.getElementById('ec-link').value;
+  const texto = encodeURIComponent('Hola! Te paso nuestro catálogo de OnLineTextil para hacer tu pedido: ' + link);
+  window.open('https://wa.me/?text=' + texto, '_blank');
+}
+
+function copiarLinkCatalogoClientes(){
+  const link = document.getElementById('ec-link').value;
+  navigator.clipboard.writeText(link).then(() => {
+    const nota = document.getElementById('ec-copiado');
+    nota.style.display = 'block';
+    setTimeout(() => nota.style.display = 'none', 2000);
+  });
 }
 
 function abrirCompartirRubro(){
