@@ -131,6 +131,16 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 .ni-seccion:first-of-type{border-top:none;padding-top:0;}
 .ni-seccion-tit{font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:#A8A092;margin:0 0 10px;font-weight:600;}
 .ni-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.cc-tabla{border-collapse:collapse;font-size:0.8rem;min-width:900px;}
+.cc-tabla th{
+  text-align:left;padding:8px 6px;background:var(--cream);color:#6E6459;
+  font-size:0.68rem;text-transform:uppercase;letter-spacing:0.03em;white-space:nowrap;
+  border-bottom:1px solid var(--line);
+}
+.cc-tabla td{padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:middle;}
+.cc-tabla input{width:90px;padding:6px 7px;border:1px solid var(--line);border-radius:6px;font-size:0.8rem;font-family:'Work Sans';}
+.cc-tabla input.cc-articulo{width:130px;}
+.cc-tabla .cc-calculado{font-weight:700;color:var(--purple);white-space:nowrap;}
 .ni-chip{position:relative;cursor:pointer;}
 .ni-chip input{position:absolute;opacity:0;width:0;height:0;}
 .ni-chip span{
@@ -386,6 +396,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <span class="menu-item-sub" onclick="abrirEditarProducto()">Editar producto</span>
       <span class="menu-item-sub" onclick="abrirEliminarProducto()">Eliminar producto</span>
       <span class="menu-item-sub" onclick="abrirImportarExcel()">Importar precios (Excel)</span>
+      <span class="menu-item-sub" onclick="abrirCalculadoraCostos()">Calculadora de costos</span>
       <span class="menu-item-sub" onclick="abrirActualizarFoto()">Actualizar foto de producto</span>
     </div>
   </div>
@@ -741,6 +752,30 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <div class="actions"><button class="btn btn-gold" onclick="procesarExcelImportado()">Procesar archivo</button></div>
       <p class="error" id="ie-error" style="display:none;"></p>
       <div id="ie-preview" style="margin-top:16px;"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <!-- STEP: CALCULADORA DE COSTOS -->
+  <div class="step" id="step-calculadora-costos">
+    <div class="form-card" style="max-width:100%;overflow-x:auto;">
+      <h2>Calculadora de costos</h2>
+      <p class="note" style="margin-bottom:14px;">Cada fila se calcula sola. Un mismo artículo puede tener varias filas si usa telas de distinto ancho.</p>
+      <div style="overflow-x:auto;">
+        <table class="cc-tabla" id="cc-tabla">
+          <thead>
+            <tr>
+              <th>Código</th><th>Ancho tela</th><th>Artículo</th><th>Tela</th>
+              <th>Consumo</th><th>Costo tela</th><th>Total tela</th>
+              <th>Costo confección</th><th>Costo insumos</th><th>Costo artículo</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="cc-filas"></tbody>
+        </table>
+      </div>
+      <div class="actions" style="margin-top:14px;">
+        <button class="btn-mini" onclick="agregarFilaCostos()">+ Agregar fila</button>
+      </div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
@@ -2496,6 +2531,114 @@ let contadorVarianteEP = 0;
 // ---------- eliminar producto / variante ----------
 // ---------- importar precios desde Excel ----------
 let cambiosImportacionExcel = [];
+
+// ---------- calculadora de costos ----------
+let filasCostosCargadas = false;
+
+function abrirCalculadoraCostos(){
+  mostrarPaso('step-calculadora-costos');
+  if(!filasCostosCargadas){
+    cargarFilasCostos();
+  }
+}
+
+function cargarFilasCostos(){
+  const tbody = document.getElementById('cc-filas');
+  tbody.innerHTML = '<tr><td colspan="11" class="note" style="padding:12px;">Cargando...</td></tr>';
+  db.collection('calculadora_costos').orderBy('creado', 'asc').get().then(snap => {
+    filasCostosCargadas = true;
+    tbody.innerHTML = '';
+    if(snap.empty){
+      agregarFilaCostos();
+      return;
+    }
+    snap.docs.forEach(d => agregarFilaCostos(d.id, d.data()));
+  }).catch(e => {
+    tbody.innerHTML = '<tr><td colspan="11" class="note" style="padding:12px;color:#A6432F;">No se pudo cargar: ' + e.message + '</td></tr>';
+  });
+}
+
+function agregarFilaCostos(idExistente, datos){
+  const tbody = document.getElementById('cc-filas');
+  if(tbody.querySelector('.note')) tbody.innerHTML = ''; // sacar el "cargando"
+
+  const id = idExistente || ('local-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+  const d = datos || {};
+  const tr = document.createElement('tr');
+  tr.id = 'cc-fila-' + id;
+  tr.innerHTML = `
+    <td><input type="text" class="cc-codigo" value="${d.codigo ? escapeAttr(d.codigo) : ''}" oninput="guardarFilaCostosDebounce('${id}')"></td>
+    <td><input type="text" class="cc-ancho" value="${d.ancho ? escapeAttr(d.ancho) : ''}" placeholder="cm" oninput="guardarFilaCostosDebounce('${id}')"></td>
+    <td><input type="text" class="cc-articulo" value="${d.articulo ? escapeAttr(d.articulo) : ''}" oninput="guardarFilaCostosDebounce('${id}')"></td>
+    <td><input type="text" class="cc-tela" value="${d.tela ? escapeAttr(d.tela) : ''}" oninput="guardarFilaCostosDebounce('${id}')"></td>
+    <td><input type="number" class="cc-consumo" step="0.01" value="${d.consumo ?? ''}" oninput="recalcularFilaCostos('${id}')"></td>
+    <td><input type="number" class="cc-costotela" step="0.01" value="${d.costoTela ?? ''}" oninput="recalcularFilaCostos('${id}')"></td>
+    <td class="cc-calculado cc-totaltela">$ 0,00</td>
+    <td><input type="number" class="cc-confeccion" step="0.01" value="${d.costoConfeccion ?? ''}" oninput="recalcularFilaCostos('${id}')"></td>
+    <td><input type="number" class="cc-insumos" step="0.01" value="${d.costoInsumos ?? ''}" oninput="recalcularFilaCostos('${id}')"></td>
+    <td class="cc-calculado cc-costoarticulo">$ 0,00</td>
+    <td><button type="button" class="btn-mini" onclick="eliminarFilaCostos('${id}')">✕</button></td>
+  `;
+  tbody.appendChild(tr);
+  recalcularFilaCostos(id, true);
+}
+
+function recalcularFilaCostos(id, sinGuardar){
+  const tr = document.getElementById('cc-fila-' + id);
+  if(!tr) return;
+  const consumo = parseFloat(tr.querySelector('.cc-consumo').value) || 0;
+  const costoTela = parseFloat(tr.querySelector('.cc-costotela').value) || 0;
+  const confeccion = parseFloat(tr.querySelector('.cc-confeccion').value) || 0;
+  const insumos = parseFloat(tr.querySelector('.cc-insumos').value) || 0;
+
+  const totalTela = consumo * costoTela;
+  const costoArticulo = totalTela + confeccion + insumos;
+
+  tr.querySelector('.cc-totaltela').textContent = formatPrice(totalTela);
+  tr.querySelector('.cc-costoarticulo').textContent = formatPrice(costoArticulo);
+
+  if(!sinGuardar) guardarFilaCostosDebounce(id);
+}
+
+let timersGuardadoCostos = {};
+function guardarFilaCostosDebounce(id){
+  recalcularFilaCostos(id, true);
+  clearTimeout(timersGuardadoCostos[id]);
+  timersGuardadoCostos[id] = setTimeout(() => guardarFilaCostos(id), 800);
+}
+
+async function guardarFilaCostos(id){
+  const tr = document.getElementById('cc-fila-' + id);
+  if(!tr) return;
+  const datos = {
+    codigo: tr.querySelector('.cc-codigo').value.trim(),
+    ancho: tr.querySelector('.cc-ancho').value.trim(),
+    articulo: tr.querySelector('.cc-articulo').value.trim(),
+    tela: tr.querySelector('.cc-tela').value.trim(),
+    consumo: parseFloat(tr.querySelector('.cc-consumo').value) || 0,
+    costoTela: parseFloat(tr.querySelector('.cc-costotela').value) || 0,
+    costoConfeccion: parseFloat(tr.querySelector('.cc-confeccion').value) || 0,
+    costoInsumos: parseFloat(tr.querySelector('.cc-insumos').value) || 0,
+    creado: new Date().toISOString(),
+  };
+  try{
+    await db.collection('calculadora_costos').doc(id).set(datos, { merge: true });
+  } catch(e){
+    console.error('Error guardando fila de costos:', e);
+  }
+}
+
+async function eliminarFilaCostos(id){
+  if(!confirm('¿Eliminar esta fila?')) return;
+  try{
+    await db.collection('calculadora_costos').doc(id).delete();
+  } catch(e){ /* si era una fila local sin guardar todavia, no hay drama */ }
+  const tr = document.getElementById('cc-fila-' + id);
+  if(tr) tr.remove();
+  if(document.getElementById('cc-filas').children.length === 0){
+    agregarFilaCostos();
+  }
+}
 
 function abrirImportarExcel(){
   mostrarPaso('step-importar-excel');
