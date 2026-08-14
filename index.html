@@ -437,6 +437,16 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
         <button class="btn btn-ghost" onclick="copiarLinkCatalogoClientes()">Copiar link</button>
       </div>
       <p class="note" id="ec-copiado" style="display:none;margin-top:8px;">¡Copiado!</p>
+
+      <p class="ni-seccion-tit" style="margin-top:20px;">O como archivo Excel</p>
+      <p class="note" style="margin-bottom:10px;">Baja el catálogo completo (o solo un rubro) en un archivo .xlsx, para mandar directo por WhatsApp o email a quien no quiera entrar al link.</p>
+      <div class="field">
+        <select id="ec-excel-rubro">
+          <option value="todos">Todo el catálogo</option>
+        </select>
+      </div>
+      <div class="actions"><button class="btn btn-gold" onclick="descargarCatalogoExcel()">Descargar Excel</button></div>
+
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
@@ -2473,6 +2483,48 @@ function quitarFiltroRubro(){
 function abrirEnviarCatalogo(){
   mostrarPaso('step-enviar-catalogo');
   document.getElementById('ec-copiado').style.display = 'none';
+  const sel = document.getElementById('ec-excel-rubro');
+  if(sel.options.length <= 1){
+    CATALOGO.forEach((cat, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = cat.categoria.toLowerCase();
+      sel.appendChild(opt);
+    });
+  }
+}
+
+function descargarCatalogoExcel(){
+  const seleccion = document.getElementById('ec-excel-rubro').value;
+  const categorias = seleccion === 'todos' ? CATALOGO : [CATALOGO[parseInt(seleccion, 10)]];
+
+  const filas = [];
+  categorias.forEach(cat => {
+    cat.productos.forEach(prod => {
+      prod.variantes.forEach(v => {
+        filas.push({
+          'Categoría': cat.categoria,
+          'Producto': prod.nombre,
+          'Composición': prod.composicion || '',
+          'SKU': v.sku,
+          'Variante': v.desc,
+          'Precio': v.precio,
+        });
+      });
+    });
+  });
+
+  if(filas.length === 0){ alert('No hay productos para exportar.'); return; }
+
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  hoja['!cols'] = [{wch:22},{wch:26},{wch:26},{wch:12},{wch:24},{wch:14}];
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, 'Catálogo');
+
+  const nombreArchivo = seleccion === 'todos'
+    ? 'catalogo_onlinetextil.xlsx'
+    : 'catalogo_' + CATALOGO[parseInt(seleccion, 10)].categoria.toLowerCase().replace(/\s+/g,'_') + '.xlsx';
+  XLSX.writeFile(libro, nombreArchivo);
 }
 
 function compartirCatalogoClientes(){
