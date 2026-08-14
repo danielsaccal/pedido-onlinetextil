@@ -375,6 +375,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
     <div class="search-wrap">
       <input type="text" id="buscador" placeholder="Buscar producto o SKU...">
     </div>
+    <button type="button" class="btn-mini" style="margin-bottom:14px;" onclick="descargarCatalogoExcelCliente()">📥 Descargar catálogo en Excel</button>
     <div id="categorias"></div>
     <p class="empty-msg" id="sin-resultados" style="display:none;">No se encontraron productos.</p>
   </div>
@@ -674,6 +675,31 @@ function renderCatalogo(filtro){
 }
 
 function escapeAttr(s){ return String(s).replace(/'/g, "\\'"); }
+
+function descargarCatalogoExcelCliente(){
+  const filas = [];
+  CATALOGO.forEach(cat => {
+    cat.productos.forEach(prod => {
+      prod.variantes.forEach(v => {
+        filas.push({
+          'Categoría': cat.categoria,
+          'Producto': prod.nombre,
+          'Composición': prod.composicion || '',
+          'SKU': v.sku,
+          'Variante': v.desc,
+          'Precio': v.precio,
+        });
+      });
+    });
+  });
+  if(filas.length === 0){ alert('No hay productos para exportar.'); return; }
+
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  hoja['!cols'] = [{wch:22},{wch:26},{wch:26},{wch:12},{wch:24},{wch:14}];
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, 'Catálogo');
+  XLSX.writeFile(libro, 'catalogo_onlinetextil.xlsx');
+}
 
 // ---------- dictado por voz (gratis, del navegador) ----------
 const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
