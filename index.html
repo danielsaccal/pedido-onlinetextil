@@ -386,6 +386,10 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 
       <p class="menu-grupo-tit">Mayorista</p>
       <span onclick="abrirHistorial()">Historial de pedidos</span>
+      <span onclick="abrirClientesInactivos()">Clientes inactivos</span>
+      <span onclick="abrirPendientesEntrega()">Pendientes de entrega</span>
+      <span onclick="abrirHistorialPrecios()">Historial de precios</span>
+      <span onclick="abrirConfigPush()">Avisos push</span>
       <span onclick="abrirPedidoIA()">Pedido con IA (texto libre)</span>
       <span onclick="abrirClientes()">Clientes</span>
 
@@ -927,6 +931,64 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
     <div style="display:flex;gap:10px;margin-top:10px;">
       <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
       <button class="btn btn-ghost" onclick="mostrarPaso('step-manual')">+ Cargar pedido manual</button>
+    </div>
+  </div>
+
+  <!-- STEP: CLIENTES INACTIVOS -->
+  <div class="step" id="step-clientes-inactivos">
+    <div class="form-card">
+      <h2>Clientes inactivos</h2>
+      <p class="note" style="margin-bottom:14px;">Clientes que no hicieron ningún pedido en los últimos días que indique.</p>
+      <div class="field" style="max-width:200px;">
+        <label>Días sin comprar</label>
+        <input type="number" id="ci-dias" min="1" value="60" onchange="renderClientesInactivos()">
+      </div>
+      <div id="ci-lista" style="margin-top:14px;"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <!-- STEP: PENDIENTES DE ENTREGA -->
+  <div class="step" id="step-pendientes-entrega">
+    <div class="form-card">
+      <h2>Pendientes de entrega</h2>
+      <p class="note" style="margin-bottom:14px;">Pedidos marcados como Pendiente o Parcial, ordenados del más viejo al más nuevo.</p>
+      <div id="pe-lista"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <!-- STEP: HISTORIAL DE PRECIOS -->
+  <div class="step" id="step-historial-precios">
+    <div class="form-card">
+      <h2>Historial de precios</h2>
+      <p class="note" style="margin-bottom:14px;">Busque un SKU para ver cómo cambió su precio en el tiempo.</p>
+      <div class="field"><label>SKU</label><input type="text" id="hp-sku" placeholder="Ej: TOA171B"></div>
+      <div class="actions"><button class="btn btn-gold" onclick="buscarHistorialPrecios()">Buscar</button></div>
+      <div id="hp-resultado" style="margin-top:16px;"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <!-- STEP: CONFIGURAR AVISOS PUSH -->
+  <div class="step" id="step-config-push">
+    <div class="form-card">
+      <h2>Avisos push</h2>
+      <p class="note" style="margin-bottom:14px;">Recibe una notificación en este celular cuando haya clientes inactivos. Tiene que usar el ícono que agregó a la pantalla de inicio (no Safari suelto) para que funcione.</p>
+      <div class="field" style="max-width:220px;">
+        <label>Avisarme cada (días)</label>
+        <input type="number" id="cp-frecuencia" min="1" value="7">
+      </div>
+      <div class="field" style="max-width:220px;">
+        <label>Umbral de inactividad (días)</label>
+        <input type="number" id="cp-umbral" min="1" value="60">
+      </div>
+      <p id="cp-estado" class="note" style="margin:10px 0;">Estado: revisando...</p>
+      <div class="actions">
+        <button class="btn btn-gold" onclick="activarPush()">Activar notificaciones</button>
+        <button class="btn btn-ghost" onclick="guardarConfigPush()">Guardar configuración</button>
+      </div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
 
@@ -1873,6 +1935,70 @@ function confirmarPedidoIA(){
   }
 }
 
+// ---------- clientes inactivos ----------
+function abrirClientesInactivos(){
+  mostrarPaso('step-clientes-inactivos');
+  document.getElementById('ci-lista').innerHTML = '<p class="empty-msg">Cargando...</p>';
+  db.collection('clientes').get().then(snap => {
+    listaClientes = snap.docs.map(d => ({...d.data(), id: d.id}));
+    renderClientesInactivos();
+  }).catch(e => {
+    document.getElementById('ci-lista').innerHTML = '<p class="empty-msg">No se pudo cargar: ' + e.message + '</p>';
+  });
+}
+
+function renderClientesInactivos(){
+  const cont = document.getElementById('ci-lista');
+  const dias = parseInt(document.getElementById('ci-dias').value, 10) || 60;
+  if(!listaClientes){ return; }
+  const ahora = Date.now();
+  const inactivos = listaClientes.filter(c => {
+    if(!c.ultimaFecha) return true;
+    const diasPasados = (ahora - new Date(c.ultimaFecha).getTime()) / (1000*60*60*24);
+    return diasPasados >= dias;
+  }).sort((a,b) => new Date(a.ultimaFecha||0) - new Date(b.ultimaFecha||0));
+
+  if(inactivos.length === 0){
+    cont.innerHTML = '<p class="empty-msg">No hay clientes inactivos con ese umbral.</p>';
+    return;
+  }
+  cont.innerHTML = `<p class="note" style="margin-bottom:10px;">${inactivos.length} cliente(s) sin comprar hace ${dias}+ días:</p>` +
+    inactivos.map(c => {
+      const fecha = c.ultimaFecha ? new Date(c.ultimaFecha).toLocaleDateString('es-AR') : 'sin pedidos registrados';
+      return `<div class="hist-pedido"><div class="hist-head" style="cursor:default;">
+        <div><div class="num">${c.nombre||''} ${c.apellido||''}</div><div class="meta">${c.telefono||''} · ${c.email||''} · Último pedido: ${fecha}</div></div>
+      </div></div>`;
+    }).join('');
+}
+
+// ---------- pendientes de entrega ----------
+function abrirPendientesEntrega(){
+  mostrarPaso('step-pendientes-entrega');
+  const cont = document.getElementById('pe-lista');
+  cont.innerHTML = '<p class="empty-msg">Cargando...</p>';
+  db.collection('pedidos').get().then(snap => {
+    const pedidos = snap.docs.map(d => d.data())
+      .filter(p => (p.estado || 'pendiente') === 'pendiente' || p.estado === 'parcial')
+      .sort((a,b) => new Date(a.fecha||0) - new Date(b.fecha||0));
+
+    if(pedidos.length === 0){
+      cont.innerHTML = '<p class="empty-msg">No hay pedidos pendientes ni parciales. 🎉</p>';
+      return;
+    }
+    const ahora = Date.now();
+    cont.innerHTML = pedidos.map(p => {
+      const dias = p.fecha ? Math.floor((ahora - new Date(p.fecha).getTime())/(1000*60*60*24)) : null;
+      const estado = p.estado || 'pendiente';
+      return `<div class="hist-pedido"><div class="hist-head" style="cursor:default;">
+        <div><div class="num">${p.numero}</div><div class="meta">${p.cliente?.nombre||''} ${p.cliente?.apellido||''} · ${p.fecha ? new Date(p.fecha).toLocaleDateString('es-AR') : ''}${dias!==null ? ' · hace ' + dias + ' día'+(dias===1?'':'s') : ''}</div></div>
+        <span class="estado-pedido estado-${estado}" style="pointer-events:none;">${estado==='pendiente'?'Pendiente':'Parcial'}</span>
+      </div></div>`;
+    }).join('');
+  }).catch(e => {
+    cont.innerHTML = '<p class="empty-msg">No se pudo cargar: ' + e.message + '</p>';
+  });
+}
+
 function abrirHistorial(){
   mostrarPaso('step-historial');
   cargarHistorial();
@@ -2802,6 +2928,7 @@ async function aplicarCambiosImportados(){
     cambios.forEach(c => {
       const v = producto.variantes.find(v => v.sku.toUpperCase() === c.sku.toUpperCase());
       if(v){
+        if(v.precio !== c.nuevoPrecio) registrarCambioPrecio(v.sku, v.precio, c.nuevoPrecio);
         v.precio = c.nuevoPrecio;
         if(c.nuevoDesc) v.desc = c.nuevoDesc;
       }
@@ -2922,6 +3049,124 @@ async function confirmarEliminarVariante(sku){
   }
 }
 
+// ---------- historial de precios ----------
+function registrarCambioPrecio(sku, precioAnterior, precioNuevo){
+  db.collection('historial_precios').add({
+    sku, precioAnterior, precioNuevo, fecha: new Date().toISOString()
+  }).catch(e => console.error('Error registrando historial de precio:', e));
+}
+
+// ---------- avisos push ----------
+const VAPID_PUBLIC_KEY = 'BOTyuLihKW1fm4qzr0xOHz5ubDYRFlKLzWU3iCpDgTHmlKcFAXYMMNkE4sk_Bu5Y5K4XTprluAiiLKHrqFK76n0';
+
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for(let i=0; i<rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+function abrirConfigPush(){
+  mostrarPaso('step-config-push');
+  cargarConfigPush();
+}
+
+async function cargarConfigPush(){
+  const estadoEl = document.getElementById('cp-estado');
+  try{
+    const doc = await db.collection('config').doc('push').get();
+    if(doc.exists){
+      const d = doc.data();
+      if(d.frecuenciaDias) document.getElementById('cp-frecuencia').value = d.frecuenciaDias;
+      if(d.umbralDias) document.getElementById('cp-umbral').value = d.umbralDias;
+    }
+  } catch(e){ /* sin config previa, no hay drama */ }
+
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    estadoEl.textContent = 'Estado: este navegador no admite notificaciones push.';
+    return;
+  }
+  const esStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  try{
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = reg ? await reg.pushManager.getSubscription() : null;
+    if(sub){
+      estadoEl.textContent = 'Estado: notificaciones activadas en este dispositivo.';
+    } else if(esStandalone){
+      estadoEl.textContent = 'Estado: todavía no activadas. Toque "Activar notificaciones".';
+    } else {
+      estadoEl.textContent = 'Estado: no activadas. En iPhone, abra la app desde el ícono de la pantalla de inicio (no desde Safari suelto) para poder activarlas.';
+    }
+  } catch(e){
+    estadoEl.textContent = 'Estado: ' + e.message;
+  }
+}
+
+async function activarPush(){
+  const estadoEl = document.getElementById('cp-estado');
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    alert('Este navegador no admite notificaciones push.');
+    return;
+  }
+  try{
+    const reg = await navigator.serviceWorker.register('./sw.js');
+    const permiso = await Notification.requestPermission();
+    if(permiso !== 'granted'){
+      estadoEl.textContent = 'Estado: permiso denegado por el usuario.';
+      return;
+    }
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+    await db.collection('config').doc('push').set({ subscription: sub.toJSON() }, { merge: true });
+    await guardarConfigPush(true);
+    estadoEl.textContent = 'Estado: ¡notificaciones activadas!';
+  } catch(e){
+    estadoEl.textContent = 'Estado: no se pudo activar (' + e.message + ')';
+  }
+}
+
+async function guardarConfigPush(silencioso){
+  const frecuenciaDias = parseInt(document.getElementById('cp-frecuencia').value, 10) || 7;
+  const umbralDias = parseInt(document.getElementById('cp-umbral').value, 10) || 60;
+  try{
+    await db.collection('config').doc('push').set({ frecuenciaDias, umbralDias }, { merge: true });
+    if(!silencioso) alert('Configuración guardada.');
+  } catch(e){
+    alert('No se pudo guardar: ' + e.message);
+  }
+}
+
+function abrirHistorialPrecios(){
+  mostrarPaso('step-historial-precios');
+  document.getElementById('hp-sku').value = '';
+  document.getElementById('hp-resultado').innerHTML = '';
+}
+
+function buscarHistorialPrecios(){
+  const sku = document.getElementById('hp-sku').value.trim();
+  const cont = document.getElementById('hp-resultado');
+  if(!sku) return;
+  cont.innerHTML = '<p class="empty-msg">Buscando...</p>';
+  db.collection('historial_precios').where('sku', '==', sku).get().then(snap => {
+    if(snap.empty){
+      cont.innerHTML = '<p class="empty-msg">No hay cambios registrados para ese SKU (puede que nunca se haya modificado desde que existe este historial).</p>';
+      return;
+    }
+    const cambios = snap.docs.map(d => d.data()).sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
+    cont.innerHTML = cambios.map(c => `
+      <div class="hist-pedido"><div class="hist-head" style="cursor:default;">
+        <div><div class="num">$ ${c.precioAnterior} → $ ${c.precioNuevo}</div><div class="meta">${new Date(c.fecha).toLocaleString('es-AR')}</div></div>
+      </div></div>
+    `).join('');
+  }).catch(e => {
+    cont.innerHTML = '<p class="empty-msg">No se pudo buscar: ' + e.message + '</p>';
+  });
+}
+
 function abrirEditarProducto(){
   mostrarPaso('step-editar-producto');
   document.getElementById('ep-sku').value = '';
@@ -3039,6 +3284,10 @@ async function guardarProductoEditado(){
   }
 
   const p = productoEnEdicion.producto;
+  variantes.forEach(vNueva => {
+    const vVieja = p.variantes.find(v => v.sku.toUpperCase() === vNueva.sku.toUpperCase());
+    if(vVieja && vVieja.precio !== vNueva.precio) registrarCambioPrecio(vNueva.sku, vVieja.precio, vNueva.precio);
+  });
   try{
     if(p._editKey && p._editKey.startsWith('nuevo-')){
       // producto agregado con "Agregar producto nuevo": editar el mismo documento
