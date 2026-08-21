@@ -2726,17 +2726,67 @@ function listaTodosLosSku(){
   return skus;
 }
 
+// ---------- detectar color dominante (aproximado, mejor con telas lisas) ----------
+const COLORES_NOMBRADOS = [
+  ['Blanco', [255,255,255]], ['Negro', [15,15,15]], ['Gris', [128,128,128]], ['Gris claro', [200,200,200]],
+  ['Beige', [222,196,160]], ['Crudo', [235,222,195]], ['Marrón', [101,67,33]], ['Terracota', [190,95,65]],
+  ['Rojo', [190,35,35]], ['Bordó', [100,20,30]], ['Rosa', [225,150,175]], ['Naranja', [220,120,40]],
+  ['Amarillo', [225,205,60]], ['Verde', [60,140,80]], ['Verde oliva', [110,120,60]], ['Celeste', [130,190,225]],
+  ['Azul', [40,80,160]], ['Azul marino', [20,30,80]], ['Violeta', [120,80,160]], ['Turquesa', [40,175,175]],
+];
+
+function nombreColorMasCercano(r,g,b){
+  let mejor = null, mejorDist = Infinity;
+  COLORES_NOMBRADOS.forEach(([nombre, [cr,cg,cb]]) => {
+    const dist = (r-cr)**2 + (g-cg)**2 + (b-cb)**2;
+    if(dist < mejorDist){ mejorDist = dist; mejor = nombre; }
+  });
+  return mejor;
+}
+
+function detectarColorDominante(archivo){
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const tam = 60;
+      const canvas = document.createElement('canvas');
+      canvas.width = tam; canvas.height = tam;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, tam, tam);
+      const datos = ctx.getImageData(0, 0, tam, tam).data;
+      let r=0, g=0, b=0, n=0;
+      for(let i=0; i<datos.length; i+=4){
+        r += datos[i]; g += datos[i+1]; b += datos[i+2]; n++;
+      }
+      r = Math.round(r/n); g = Math.round(g/n); b = Math.round(b/n);
+      resolve({ r, g, b, nombre: nombreColorMasCercano(r,g,b) });
+    };
+    img.onerror = () => resolve(null);
+    img.src = URL.createObjectURL(archivo);
+  });
+}
+
 async function procesarEscaneoEtiqueta(archivo){
   if(!archivo) return;
   const cont = document.getElementById('escaner-resultado');
   cont.innerHTML = '<p class="note">🔎 Leyendo la etiqueta... (puede tardar unos segundos la primera vez)</p>';
 
   try{
-    const { data: { text } } = await Tesseract.recognize(archivo, 'eng');
+    const [ocrResult, color] = await Promise.all([
+      Tesseract.recognize(archivo, 'eng'),
+      detectarColorDominante(archivo)
+    ]);
+    const text = ocrResult.data.text;
     const tokens = text.toUpperCase().match(/[A-Z0-9]{3,}/g) || [];
 
+    const colorHtml = color ? `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="display:inline-block;width:22px;height:22px;border-radius:5px;border:1px solid var(--line);background:rgb(${color.r},${color.g},${color.b});"></span>
+        <span class="note" style="margin:0;">Color aproximado detectado: <b>${color.nombre}</b> (más confiable si la tela es lisa)</span>
+      </div>` : '';
+
     if(tokens.length === 0){
-      cont.innerHTML = '<p class="error" style="display:block;">No pude leer ningún código en la foto. Pruebe con más luz y bien de cerca.</p>';
+      cont.innerHTML = colorHtml + '<p class="error" style="display:block;">No pude leer ningún código en la foto. Pruebe con más luz y bien de cerca.</p>';
       return;
     }
 
@@ -2760,19 +2810,22 @@ async function procesarEscaneoEtiqueta(archivo){
     }).slice(0, 4);
 
     if(mejores.length === 0){
-      cont.innerHTML = `<p class="error" style="display:block;">Leí "${tokens.join(', ')}" pero no encontré ningún SKU parecido en el catálogo.</p>`;
+      cont.innerHTML = colorHtml + `<p class="error" style="display:block;">Leí "${tokens.join(', ')}" pero no encontré ningún SKU parecido en el catálogo.</p>`;
       return;
     }
 
-    cont.innerHTML = '<p class="note" style="margin-bottom:8px;">Esto encontré parecido a lo leído en la etiqueta:</p>' +
-      mejores.map(c => `
+    cont.innerHTML = colorHtml + '<p class="note" style="margin-bottom:8px;">Esto encontré parecido a lo leído en la etiqueta:</p>' +
+      mejores.map(c => {
+        const coincideColor = color && (c.variante.desc + ' ' + (c.producto.composicion||'')).toLowerCase().includes(color.nombre.toLowerCase());
+        return `
         <div class="hist-pedido">
           <div class="hist-head" style="cursor:default;">
-            <div><div class="num">${c.sku}</div><div class="meta">${c.producto.nombre} — ${c.variante.desc} — $ ${c.variante.precio}</div></div>
+            <div><div class="num">${c.sku}${coincideColor ? ' 🎨' : ''}</div><div class="meta">${c.producto.nombre} — ${c.variante.desc} — $ ${c.variante.precio}</div></div>
             <button class="btn-mini" onclick="agregarProductoEscaneado('${escapeAttr(c.sku)}')">+ Agregar</button>
           </div>
         </div>
-      `).join('') +
+      `;
+      }).join('') +
       '<p class="note" style="margin-top:8px;">Si ninguno es el correcto, busque a mano en el buscador de arriba.</p>';
   } catch(err){
     cont.innerHTML = '<p class="error" style="display:block;">No se pudo leer la foto: ' + err.message + '</p>';
