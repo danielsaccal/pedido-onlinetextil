@@ -2716,6 +2716,31 @@ function distanciaLevenshtein(a, b){
   return d[m][n];
 }
 
+function buscarPorTextoLibre(texto){
+  const PALABRAS_IGNORAR = new Set(['de','la','el','los','las','en','con','para','y','del','un','una']);
+  const palabras = texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .match(/[a-z0-9]{3,}/g) || [];
+  const palabrasUtiles = palabras.filter(p => !PALABRAS_IGNORAR.has(p));
+  if(palabrasUtiles.length === 0) return [];
+
+  const resultados = [];
+  CATALOGO.forEach(cat => {
+    cat.productos.forEach(prod => {
+      const textoProducto = (prod.nombre + ' ' + (prod.composicion||'')).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      prod.variantes.forEach(v => {
+        const textoCompleto = (textoProducto + ' ' + v.desc).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        let coincidencias = 0;
+        palabrasUtiles.forEach(p => { if(textoCompleto.includes(p)) coincidencias++; });
+        if(coincidencias >= 2 || (coincidencias >= 1 && palabrasUtiles.length <= 2)){
+          resultados.push({ sku: v.sku, producto: prod, variante: v, categoria: cat.categoria, similitud: coincidencias / palabrasUtiles.length });
+        }
+      });
+    });
+  });
+  resultados.sort((a,b) => b.similitud - a.similitud);
+  return resultados;
+}
+
 function listaTodosLosSku(){
   const skus = [];
   CATALOGO.forEach(cat => {
@@ -2801,6 +2826,10 @@ async function procesarEscaneoEtiqueta(archivo){
         }
       });
     });
+    // ademas de buscar el codigo, buscar el texto completo contra nombre/composicion/medida (para encartes tipo "Sabana Danubio 400 hilos Queen")
+    const candidatosPorTexto = buscarPorTextoLibre(text);
+    candidatos.push(...candidatosPorTexto);
+
     candidatos.sort((a,b) => b.similitud - a.similitud);
     const vistos = new Set();
     const mejores = candidatos.filter(c => {
@@ -2810,7 +2839,7 @@ async function procesarEscaneoEtiqueta(archivo){
     }).slice(0, 4);
 
     if(mejores.length === 0){
-      cont.innerHTML = colorHtml + `<p class="error" style="display:block;">Leí "${tokens.join(', ')}" pero no encontré ningún SKU parecido en el catálogo.</p>`;
+      cont.innerHTML = colorHtml + `<p class="error" style="display:block;">Leí "${tokens.join(', ')}" pero no encontré ningún SKU ni nombre parecido en el catálogo.</p>`;
       return;
     }
 
