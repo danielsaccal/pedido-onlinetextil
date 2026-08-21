@@ -370,6 +370,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 <header class="top">
@@ -414,6 +415,9 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
     <div class="search-wrap">
       <input type="text" id="buscador" placeholder="Buscar producto o SKU...">
     </div>
+    <button type="button" class="btn-mini" style="margin-bottom:14px;" onclick="document.getElementById('escaner-foto').click()">📷 Escanear etiqueta (SKU)</button>
+    <input type="file" accept="image/*" capture="environment" id="escaner-foto" style="display:none;" onchange="procesarEscaneoEtiqueta(this.files[0])">
+    <div id="escaner-resultado"></div>
     <div id="categorias"></div>
     <p class="empty-msg" id="sin-resultados" style="display:none;">No se encontraron productos.</p>
   </div>
@@ -2697,6 +2701,98 @@ function cargarFotosOverride(){
 function imagenEfectiva(ci, pi, p){
   return fotosOverride[`${ci}-${pi}`] || p.imagen;
 }
+// ---------- escanear etiqueta (OCR + coincidencia de SKU) ----------
+function distanciaLevenshtein(a, b){
+  const m = a.length, n = b.length;
+  const d = Array.from({length: m+1}, () => new Array(n+1).fill(0));
+  for(let i=0;i<=m;i++) d[i][0] = i;
+  for(let j=0;j<=n;j++) d[0][j] = j;
+  for(let i=1;i<=m;i++){
+    for(let j=1;j<=n;j++){
+      const costo = a[i-1] === b[j-1] ? 0 : 1;
+      d[i][j] = Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+costo);
+    }
+  }
+  return d[m][n];
+}
+
+function listaTodosLosSku(){
+  const skus = [];
+  CATALOGO.forEach(cat => {
+    cat.productos.forEach(prod => {
+      prod.variantes.forEach(v => skus.push({sku: v.sku, producto: prod, variante: v, categoria: cat.categoria}));
+    });
+  });
+  return skus;
+}
+
+async function procesarEscaneoEtiqueta(archivo){
+  if(!archivo) return;
+  const cont = document.getElementById('escaner-resultado');
+  cont.innerHTML = '<p class="note">🔎 Leyendo la etiqueta... (puede tardar unos segundos la primera vez)</p>';
+
+  try{
+    const { data: { text } } = await Tesseract.recognize(archivo, 'eng');
+    const tokens = text.toUpperCase().match(/[A-Z0-9]{3,}/g) || [];
+
+    if(tokens.length === 0){
+      cont.innerHTML = '<p class="error" style="display:block;">No pude leer ningún código en la foto. Pruebe con más luz y bien de cerca.</p>';
+      return;
+    }
+
+    const todosSku = listaTodosLosSku();
+    const candidatos = [];
+    tokens.forEach(tok => {
+      todosSku.forEach(s => {
+        const dist = distanciaLevenshtein(tok, s.sku.toUpperCase());
+        const similitud = 1 - dist / Math.max(tok.length, s.sku.length);
+        if(similitud >= 0.6){
+          candidatos.push({ ...s, similitud, leido: tok });
+        }
+      });
+    });
+    candidatos.sort((a,b) => b.similitud - a.similitud);
+    const vistos = new Set();
+    const mejores = candidatos.filter(c => {
+      if(vistos.has(c.sku)) return false;
+      vistos.add(c.sku);
+      return true;
+    }).slice(0, 4);
+
+    if(mejores.length === 0){
+      cont.innerHTML = `<p class="error" style="display:block;">Leí "${tokens.join(', ')}" pero no encontré ningún SKU parecido en el catálogo.</p>`;
+      return;
+    }
+
+    cont.innerHTML = '<p class="note" style="margin-bottom:8px;">Esto encontré parecido a lo leído en la etiqueta:</p>' +
+      mejores.map(c => `
+        <div class="hist-pedido">
+          <div class="hist-head" style="cursor:default;">
+            <div><div class="num">${c.sku}</div><div class="meta">${c.producto.nombre} — ${c.variante.desc} — $ ${c.variante.precio}</div></div>
+            <button class="btn-mini" onclick="agregarProductoEscaneado('${escapeAttr(c.sku)}')">+ Agregar</button>
+          </div>
+        </div>
+      `).join('') +
+      '<p class="note" style="margin-top:8px;">Si ninguno es el correcto, busque a mano en el buscador de arriba.</p>';
+  } catch(err){
+    cont.innerHTML = '<p class="error" style="display:block;">No se pudo leer la foto: ' + err.message + '</p>';
+  } finally {
+    document.getElementById('escaner-foto').value = '';
+  }
+}
+
+function agregarProductoEscaneado(sku){
+  const match = buscarProductoPorSku(sku);
+  if(!match) return;
+  const id = match.ci + '-' + match.pi;
+  const enCarrito = cart[id] ? cart[id].cantidad : 0;
+  const imagen = imagenEfectiva(match.ci, match.pi, match.producto);
+  cart[id] = { sku: match.variante.sku, desc: match.variante.desc, nombreProducto: match.producto.nombre, precio: parsePrice(match.variante.precio), cantidad: enCarrito + 1, imagen };
+  actualizarCartbar();
+  document.getElementById('escaner-resultado').innerHTML = '<p class="note">✅ Se agregó "' + match.producto.nombre + ' — ' + match.variante.desc + '" al pedido.</p>';
+  renderCatalogo(document.getElementById('buscador').value);
+}
+
 function buscarProductoPorSku(sku){
   const skuUpper = sku.trim().toUpperCase();
   for(let ci=0; ci<CATALOGO.length; ci++){
