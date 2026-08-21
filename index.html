@@ -416,7 +416,9 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <input type="text" id="buscador" placeholder="Buscar producto o SKU...">
     </div>
     <button type="button" class="btn-mini" style="margin-bottom:14px;" onclick="document.getElementById('escaner-foto').click()">📷 Escanear etiqueta (SKU)</button>
+    <button type="button" class="btn-mini" style="margin-bottom:14px;" onclick="document.getElementById('escaner-foto-producto').click()">🤖 Buscar por foto del producto (IA)</button>
     <input type="file" accept="image/*" capture="environment" id="escaner-foto" style="display:none;" onchange="procesarEscaneoEtiqueta(this.files[0])">
+    <input type="file" accept="image/*" capture="environment" id="escaner-foto-producto" style="display:none;" onchange="procesarBusquedaVisualIA(this.files[0])">
     <div id="escaner-resultado"></div>
     <div id="categorias"></div>
     <p class="empty-msg" id="sin-resultados" style="display:none;">No se encontraron productos.</p>
@@ -2873,6 +2875,94 @@ function agregarProductoEscaneado(sku){
   actualizarCartbar();
   document.getElementById('escaner-resultado').innerHTML = '<p class="note">✅ Se agregó "' + match.producto.nombre + ' — ' + match.variante.desc + '" al pedido.</p>';
   renderCatalogo(document.getElementById('buscador').value);
+}
+
+// ---------- busqueda visual por foto del producto, con IA real (Claude vision) ----------
+function armarCatalogoResumidoPorProducto(){
+  const vistos = new Set();
+  const lineas = [];
+  CATALOGO.forEach(cat => {
+    cat.productos.forEach(prod => {
+      if(vistos.has(prod.nombre)) return;
+      vistos.add(prod.nombre);
+      lineas.push(`${prod.nombre} | ${cat.categoria} | ${prod.composicion || ''}`);
+    });
+  });
+  return lineas.join('\n');
+}
+
+function buscarProductoPorNombreExacto(nombre){
+  for(const cat of CATALOGO){
+    const prod = cat.productos.find(p => p.nombre.trim().toLowerCase() === nombre.trim().toLowerCase());
+    if(prod) return { producto: prod, categoria: cat.categoria };
+  }
+  return null;
+}
+
+async function procesarBusquedaVisualIA(archivo){
+  if(!archivo) return;
+  const cont = document.getElementById('escaner-resultado');
+  cont.innerHTML = '<p class="note">🤖 Analizando la foto con IA... puede tardar unos segundos.</p>';
+
+  try{
+    const imagenBase64 = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 700;
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(archivo);
+    });
+
+    const resp = await fetch(URL_WORKER_IA, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ accion: 'buscarProductoPorFoto', imagenBase64, catalogoResumido: armarCatalogoResumidoPorProducto() })
+    });
+    const datos = await resp.json();
+    if(!resp.ok || datos.error){
+      cont.innerHTML = '<p class="error" style="display:block;">Error: ' + (datos.error || 'no se pudo analizar la foto') + '</p>';
+      return;
+    }
+
+    const candidatos = (datos.candidatos || []).map(c => ({...c, match: buscarProductoPorNombreExacto(c.producto)})).filter(c => c.match);
+
+    if(candidatos.length === 0){
+      cont.innerHTML = '<p class="error" style="display:block;">La IA no encontró ningún producto parecido en el catálogo.</p>';
+      return;
+    }
+
+    cont.innerHTML = '<p class="note" style="margin-bottom:8px;">Esto le pareció más parecido a la IA:</p>' +
+      candidatos.map(c => {
+        const variantesHtml = c.match.producto.variantes.map(v => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+            <span style="font-size:0.8rem;">${v.desc} — $ ${v.precio}</span>
+            <button class="btn-mini" onclick="agregarProductoEscaneado('${escapeAttr(v.sku)}')">+ Agregar</button>
+          </div>
+        `).join('');
+        return `
+        <div class="hist-pedido">
+          <div class="hist-head" style="cursor:default;">
+            <div><div class="num">${c.match.producto.nombre} <span style="font-weight:400;font-size:0.75rem;color:#8A8072;">(confianza: ${c.confianza})</span></div><div class="meta">${c.motivo || ''}</div></div>
+          </div>
+          <div class="hist-body" style="display:block;border-top:1px dashed var(--line);">${variantesHtml}</div>
+        </div>
+      `;
+      }).join('');
+  } catch(err){
+    cont.innerHTML = '<p class="error" style="display:block;">No se pudo conectar con la IA: ' + err.message + '</p>';
+  } finally {
+    document.getElementById('escaner-foto-producto').value = '';
+  }
 }
 
 function buscarProductoPorSku(sku){
