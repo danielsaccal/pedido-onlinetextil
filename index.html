@@ -822,32 +822,20 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <p class="error" id="mli-error" style="display:none;"></p>
       <div id="mli-preview" style="margin-top:14px;"></div>
 
-      <p class="ni-seccion-tit" style="margin-top:24px;">O cargar una venta suelta a mano</p>
-      <p class="note" style="margin-bottom:14px;">Cargue cada venta con todos los gastos que tuvo (agregue o saque filas libremente) — la ganancia neta se calcula sola.</p>
-
+      <p class="ni-seccion-tit" style="margin-top:24px;">Gastos periódicos (ej: publicidad mensual)</p>
+      <p class="note" style="margin-bottom:10px;">Para gastos que no son de una venta puntual, como la publicidad que le cobran junto a fin de mes. Se resta del total del período, sin repartirlo entre ventas (repartirlo sería inventar un número).</p>
       <div class="field">
         <label>Cuenta</label>
-        <select id="ml-cuenta">
+        <select id="gp-cuenta">
           <option value="Alberto">Alberto</option>
           <option value="Rita">Rita</option>
         </select>
       </div>
-      <div class="field"><label>Producto</label><input type="text" id="ml-producto" placeholder="Ej: Juego de sábanas Queen"></div>
-      <div class="field"><label>Fecha</label><input type="date" id="ml-fecha"></div>
-      <div class="field"><label>Precio de venta (lo que pagó el cliente)</label><input type="number" step="0.01" id="ml-precio-venta" oninput="recalcularGananciaML()"></div>
-
-      <p class="ni-seccion-tit" style="margin-top:14px;">Egresos (todos los que correspondan)</p>
-      <div id="ml-egresos-cont"></div>
-      <button type="button" class="btn-mini" onclick="agregarEgresoML()">+ Agregar gasto</button>
-
-      <div style="margin-top:16px;padding:12px;background:var(--cream);border-radius:10px;">
-        <p style="margin:0;font-size:0.85rem;">Total egresos: <b id="ml-total-egresos">$ 0,00</b></p>
-        <p style="margin:6px 0 0;font-size:1.1rem;">Ganancia neta: <b id="ml-ganancia-neta" style="color:var(--purple);">$ 0,00</b></p>
-      </div>
-
-      <div class="actions" style="margin-top:16px;">
-        <button class="btn btn-gold" onclick="guardarVentaML()">Guardar venta</button>
-      </div>
+      <div class="field"><label>Mes</label><input type="month" id="gp-mes"></div>
+      <div class="field"><label>Concepto</label><input type="text" id="gp-concepto" value="Publicidad"></div>
+      <div class="field"><label>Monto</label><input type="number" step="0.01" id="gp-monto"></div>
+      <div class="actions"><button class="btn btn-gold" onclick="guardarGastoPeriodicoML()">Guardar gasto</button></div>
+      <div id="gp-lista" style="margin-top:10px;"></div>
 
       <p class="ni-seccion-tit" style="margin-top:24px;">Resumen</p>
       <div class="ni-chips" style="margin-bottom:10px;">
@@ -3176,77 +3164,67 @@ async function importarVentasML(){
 
 function abrirVentasML(){
   mostrarPaso('step-ventas-ml');
-  resetearFormularioML();
+  document.getElementById('gp-mes').value = new Date().toISOString().slice(0,7);
   cargarVentasML();
+  cargarGastosPeriodicosML();
 }
 
-function resetearFormularioML(){
-  document.getElementById('ml-cuenta').value = 'Alberto';
-  document.getElementById('ml-producto').value = '';
-  document.getElementById('ml-fecha').value = new Date().toISOString().slice(0,10);
-  document.getElementById('ml-precio-venta').value = '';
-  document.getElementById('ml-egresos-cont').innerHTML = '';
-  agregarEgresoML('Comisión ML');
-  agregarEgresoML('Envío');
-  recalcularGananciaML();
-}
+let listaGastosPeriodicosML = null;
 
-function agregarEgresoML(conceptoInicial){
-  const cont = document.getElementById('ml-egresos-cont');
-  const id = 'mle-' + (contadorEgresoML++);
-  const row = document.createElement('div');
-  row.className = 'edit-item-row-nuevo';
-  row.id = id;
-  row.style.cssText = 'display:grid;grid-template-columns:1fr 110px 32px;gap:6px;align-items:center;margin-bottom:6px;';
-  row.innerHTML = `
-    <input type="text" placeholder="Concepto (ej: Comisión ML)" class="mle-concepto" value="${conceptoInicial ? escapeAttr(conceptoInicial) : ''}">
-    <input type="number" step="0.01" placeholder="$" class="mle-monto" oninput="recalcularGananciaML()">
-    <button type="button" class="btn-mini" onclick="document.getElementById('${id}').remove(); recalcularGananciaML();">✕</button>
-  `;
-  cont.appendChild(row);
-}
-
-function recalcularGananciaML(){
-  const precioVenta = parseFloat(document.getElementById('ml-precio-venta').value) || 0;
-  let totalEgresos = 0;
-  document.querySelectorAll('#ml-egresos-cont .edit-item-row-nuevo').forEach(row => {
-    totalEgresos += parseFloat(row.querySelector('.mle-monto').value) || 0;
-  });
-  const ganancia = precioVenta - totalEgresos;
-  document.getElementById('ml-total-egresos').textContent = formatPrice(totalEgresos);
-  const gananciaEl = document.getElementById('ml-ganancia-neta');
-  gananciaEl.textContent = formatPrice(ganancia);
-  gananciaEl.style.color = ganancia < 0 ? '#A6432F' : 'var(--purple)';
-}
-
-async function guardarVentaML(){
-  const cuenta = document.getElementById('ml-cuenta').value;
-  const producto = document.getElementById('ml-producto').value.trim();
-  const fecha = document.getElementById('ml-fecha').value;
-  const precioVenta = parseFloat(document.getElementById('ml-precio-venta').value) || 0;
-
-  if(!producto){ alert('Falta el nombre del producto.'); return; }
-  if(precioVenta <= 0){ alert('Falta el precio de venta.'); return; }
-
-  const egresos = [];
-  document.querySelectorAll('#ml-egresos-cont .edit-item-row-nuevo').forEach(row => {
-    const concepto = row.querySelector('.mle-concepto').value.trim();
-    const monto = parseFloat(row.querySelector('.mle-monto').value) || 0;
-    if(concepto || monto > 0) egresos.push({ concepto: concepto || '(sin nombre)', monto });
-  });
-  const totalEgresos = egresos.reduce((s,e) => s+e.monto, 0);
-  const gananciaNeta = precioVenta - totalEgresos;
-
+async function guardarGastoPeriodicoML(){
+  const cuenta = document.getElementById('gp-cuenta').value;
+  const mes = document.getElementById('gp-mes').value;
+  const concepto = document.getElementById('gp-concepto').value.trim();
+  const monto = parseFloat(document.getElementById('gp-monto').value) || 0;
+  if(!mes){ alert('Falta el mes.'); return; }
+  if(!concepto){ alert('Falta el concepto.'); return; }
+  if(monto <= 0){ alert('Falta el monto.'); return; }
   try{
-    await db.collection('ventas_mercadolibre').add({
-      cuenta, producto, fecha, precioVenta, egresos, totalEgresos, gananciaNeta,
-      creado: new Date().toISOString()
-    });
-    alert('Venta guardada. Ganancia neta: ' + formatPrice(gananciaNeta));
-    resetearFormularioML();
-    cargarVentasML();
+    await db.collection('gastos_periodicos_ml').add({ cuenta, mes, concepto, monto, creado: new Date().toISOString() });
+    document.getElementById('gp-monto').value = '';
+    cargarGastosPeriodicosML();
+    renderVentasML();
   } catch(e){
     alert('No se pudo guardar: ' + e.message);
+  }
+}
+
+function cargarGastosPeriodicosML(){
+  db.collection('gastos_periodicos_ml').orderBy('mes', 'desc').get().then(snap => {
+    listaGastosPeriodicosML = snap.docs.map(d => ({...d.data(), id: d.id}));
+    renderGastosPeriodicosML();
+    renderVentasML();
+  }).catch(e => {
+    document.getElementById('gp-lista').innerHTML = '<p class="empty-msg">No se pudo cargar: ' + e.message + '</p>';
+  });
+}
+
+function renderGastosPeriodicosML(){
+  const cont = document.getElementById('gp-lista');
+  if(!listaGastosPeriodicosML || listaGastosPeriodicosML.length === 0){
+    cont.innerHTML = '<p class="empty-msg">Sin gastos periódicos cargados.</p>';
+    return;
+  }
+  cont.innerHTML = listaGastosPeriodicosML.map(g => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:0.85rem;">
+      <span>${g.mes} · ${g.cuenta} · ${g.concepto}</span>
+      <span style="display:flex;align-items:center;gap:8px;">
+        <b>${formatPrice(g.monto)}</b>
+        <button class="btn-mini" onclick="eliminarGastoPeriodicoML('${g.id}')">✕</button>
+      </span>
+    </div>
+  `).join('');
+}
+
+async function eliminarGastoPeriodicoML(id){
+  if(!confirm('¿Eliminar este gasto?')) return;
+  try{
+    await db.collection('gastos_periodicos_ml').doc(id).delete();
+    listaGastosPeriodicosML = listaGastosPeriodicosML.filter(g => g.id !== id);
+    renderGastosPeriodicosML();
+    renderVentasML();
+  } catch(e){
+    alert('No se pudo eliminar: ' + e.message);
   }
 }
 
@@ -3269,9 +3247,16 @@ function renderVentasML(){
 
   const totalVentas = ventas.reduce((s,v) => s+(v.precioVenta||0), 0);
   const totalEgresos = ventas.reduce((s,v) => s+(v.totalEgresos||0), 0);
-  const totalGanancia = ventas.reduce((s,v) => s+(v.gananciaNeta||0), 0);
+  const totalGananciaVentas = ventas.reduce((s,v) => s+(v.gananciaNeta||0), 0);
+
+  const gastosPeriodicos = (listaGastosPeriodicosML || []).filter(g => filtro === 'todas' || g.cuenta === filtro);
+  const totalGastosPeriodicos = gastosPeriodicos.reduce((s,g) => s+g.monto, 0);
+  const totalGanancia = totalGananciaVentas - totalGastosPeriodicos;
+
   document.getElementById('ml-resumen-totales').innerHTML =
-    `<b>${ventas.length}</b> venta(s) — Vendido: <b>${formatPrice(totalVentas)}</b> — Egresos: <b>${formatPrice(totalEgresos)}</b> — Ganancia neta total: <b style="color:${totalGanancia<0?'#A6432F':'var(--purple)'};">${formatPrice(totalGanancia)}</b>`;
+    `<b>${ventas.length}</b> venta(s) — Vendido: <b>${formatPrice(totalVentas)}</b> — Egresos por venta: <b>${formatPrice(totalEgresos)}</b><br>` +
+    `Gastos periódicos (publicidad, etc.): <b>${formatPrice(totalGastosPeriodicos)}</b><br>` +
+    `<span style="font-size:1.05rem;">Ganancia neta real: <b style="color:${totalGanancia<0?'#A6432F':'var(--purple)'};">${formatPrice(totalGanancia)}</b></span>`;
 
   const cont = document.getElementById('ml-lista-ventas');
   if(ventas.length === 0){
