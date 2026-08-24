@@ -858,13 +858,13 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
           <colgroup>
             <col style="width:85px;"><col style="width:110px;"><col style="width:100px;"><col style="width:55px;">
             <col style="width:95px;"><col style="width:95px;"><col style="width:110px;"><col style="width:95px;">
-            <col style="width:95px;"><col style="width:100px;"><col style="width:60px;">
+            <col style="width:105px;"><col style="width:95px;"><col style="width:100px;"><col style="width:60px;">
           </colgroup>
           <thead>
             <tr>
               <th>Fecha</th><th>N° de venta</th><th>SKU</th><th>Cant.</th>
               <th>Venta</th><th>Envío</th><th>Comisión + fijo</th><th>Impuestos/perc.</th>
-              <th>Costo prod.</th><th>Saldo</th><th></th>
+              <th>Saldo ML</th><th>Costo prod.</th><th>Saldo final</th><th></th>
             </tr>
           </thead>
           <tbody id="ml-lista-ventas"></tbody>
@@ -3074,6 +3074,16 @@ let listaVentasML = null;
 // ---------- importar reporte de liquidaciones de Mercado Pago ----------
 let filasImportacionML = null;
 
+function convertirFechaMLaISO(texto){
+  const soloFecha = texto.split(' ')[0]; // saca la hora si viene pegada
+  const partes = soloFecha.split('/');
+  if(partes.length === 3){
+    const [dd, mm, yyyy] = partes;
+    return `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+  }
+  return soloFecha; // si ya viene en otro formato, lo dejamos como esta
+}
+
 function procesarImportacionML(){
   const archivo = document.getElementById('mli-archivo').files[0];
   const errorEl = document.getElementById('mli-error');
@@ -3114,7 +3124,7 @@ function procesarImportacionML(){
         const costoEnvio = colEnvio ? Math.abs(parseFloat(f[colEnvio]) || 0) : 0;
         const comision = Math.max(0, valor - neto - costoEnvio);
         return {
-          fecha: colFecha ? String(f[colFecha]).split(' ')[0] : '',
+          fecha: colFecha ? convertirFechaMLaISO(String(f[colFecha])) : '',
           producto: colProducto ? String(f[colProducto]) : '(sin descripción)',
           sku: colSku ? String(f[colSku]) : '',
           estado: colEstado ? String(f[colEstado]) : '',
@@ -3302,6 +3312,8 @@ function renderVentasML(){
     const comisionEgreso = (v.egresos||[]).find(e => /comisi[oó]n/i.test(e.concepto));
     const envioEgreso = (v.egresos||[]).find(e => /env[ií]o/i.test(e.concepto));
     const productoEgreso = (v.egresos||[]).find(e => /costo del producto/i.test(e.concepto));
+    const impuestos = 0; // no disponible todavia en el archivo importado
+    const saldoML = v.precioVenta - (envioEgreso ? envioEgreso.monto : 0) - (comisionEgreso ? comisionEgreso.monto : 0) - impuestos;
     return `
     <tr style="${esDevolucion ? 'background:#FBEEEA;' : ''}" id="mlv-${v.id}" title="${escapeAttr(v.producto||'')}">
       <td>${v.fecha ? new Date(v.fecha+'T00:00:00').toLocaleDateString('es-AR') : ''}</td>
@@ -3312,6 +3324,7 @@ function renderVentasML(){
       <td>${formatPrice(envioEgreso ? envioEgreso.monto : 0)}</td>
       <td>${formatPrice(comisionEgreso ? comisionEgreso.monto : 0)}</td>
       <td style="color:#B5AC9E;">—</td>
+      <td style="font-weight:600;">${formatPrice(saldoML)}</td>
       <td>
         ${productoEgreso ? formatPrice(productoEgreso.monto) : `<input type="number" step="0.01" placeholder="$" class="mlv-costo-rapido" style="width:65px;padding:4px 5px;border:1px solid var(--line);border-radius:6px;">`}
       </td>
