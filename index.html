@@ -141,6 +141,13 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 .cc-tabla input{width:90px;padding:6px 7px;border:1px solid var(--line);border-radius:6px;font-size:0.8rem;font-family:'Work Sans';}
 .cc-tabla input.cc-articulo{width:130px;}
 .cc-tabla .cc-calculado{font-weight:700;color:var(--purple);white-space:nowrap;}
+.ml-tabla{border-collapse:collapse;font-size:0.78rem;min-width:950px;}
+.ml-tabla th{
+  text-align:left;padding:8px 6px;background:var(--cream);color:#6E6459;
+  font-size:0.65rem;text-transform:uppercase;letter-spacing:0.03em;white-space:nowrap;
+  border-bottom:1px solid var(--line);position:sticky;top:0;
+}
+.ml-tabla td{padding:6px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap;}
 .ni-chip{position:relative;cursor:pointer;}
 .ni-chip input{position:absolute;opacity:0;width:0;height:0;}
 .ni-chip span{
@@ -845,7 +852,18 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       </div>
       <div class="field"><input type="text" id="ml-buscador-ventas" placeholder="Buscar por producto o SKU..." oninput="renderVentasML()"></div>
       <p class="note" id="ml-resumen-totales" style="margin-bottom:10px;"></p>
-      <div id="ml-lista-ventas"></div>
+      <div style="overflow-x:auto;">
+        <table class="ml-tabla" id="ml-tabla-ventas">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>SKU</th><th>Producto</th><th>Cant.</th>
+              <th>Venta</th><th>Comisión/costos ML</th><th>Costo envío</th>
+              <th>Costo producto</th><th>Devuelto</th><th>Neto</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="ml-lista-ventas"></tbody>
+        </table>
+      </div>
 
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
@@ -3074,6 +3092,7 @@ function procesarImportacionML(){
       const colNeto = Object.keys(primera).find(c => /monto recibido/i.test(c));
       const colDevuelto = Object.keys(primera).find(c => /monto devuelto/i.test(c));
       const colOrden = Object.keys(primera).find(c => /n[uú]mero de venta en mercado libre/i.test(c));
+      const colEnvio = Object.keys(primera).find(c => /costo de env[ií]o/i.test(c));
 
       if(!colValor || !colNeto){
         errorEl.textContent = 'No reconocí las columnas de este archivo. ¿Es el "Reporte de Liquidaciones" de Mercado Pago?';
@@ -3085,6 +3104,8 @@ function procesarImportacionML(){
         const valor = parseFloat(f[colValor]) || 0;
         const neto = parseFloat(f[colNeto]) || 0;
         const devuelto = colDevuelto ? (parseFloat(f[colDevuelto]) || 0) : 0;
+        const costoEnvio = colEnvio ? Math.abs(parseFloat(f[colEnvio]) || 0) : 0;
+        const comision = Math.max(0, valor - neto - costoEnvio);
         return {
           fecha: colFecha ? String(f[colFecha]).split(' ')[0] : '',
           producto: colProducto ? String(f[colProducto]) : '(sin descripción)',
@@ -3092,7 +3113,8 @@ function procesarImportacionML(){
           estado: colEstado ? String(f[colEstado]) : '',
           orden: colOrden ? String(f[colOrden]) : '',
           precioVenta: valor,
-          comisionesML: valor - neto,
+          costoEnvio,
+          comisionesML: comision,
           netoML: neto,
           devuelto,
         };
@@ -3137,11 +3159,14 @@ async function importarVentasML(){
       const batch = db.batch();
       lote.forEach(f => {
         const ref = db.collection('ventas_mercadolibre').doc();
-        const egresos = [{ concepto: 'Comisiones y costos Mercado Libre/Pago', monto: Math.round(f.comisionesML*100)/100 }];
+        const egresos = [
+          { concepto: 'Comisión y otros cargos ML/MP', monto: Math.round(f.comisionesML*100)/100 },
+          { concepto: 'Costo de envío', monto: Math.round(f.costoEnvio*100)/100 },
+        ];
         const gananciaNeta = f.netoML;
         batch.set(ref, {
-          cuenta, producto: f.producto, fecha: f.fecha, precioVenta: f.precioVenta,
-          egresos, totalEgresos: f.comisionesML, gananciaNeta,
+          cuenta, producto: f.producto, fecha: f.fecha, precioVenta: f.precioVenta, cantidad: 1,
+          egresos, totalEgresos: f.comisionesML + f.costoEnvio, gananciaNeta,
           skuML: f.sku, ordenML: f.orden, estadoML: f.estado, devueltoML: f.devuelto,
           origen: 'importado_mp', creado: new Date().toISOString()
         });
@@ -3260,34 +3285,38 @@ function renderVentasML(){
 
   const cont = document.getElementById('ml-lista-ventas');
   if(ventas.length === 0){
-    cont.innerHTML = '<p class="empty-msg">Sin ventas cargadas todavía.</p>';
+    cont.innerHTML = '<tr><td colspan="11" class="empty-msg">Sin ventas cargadas todavía.</td></tr>';
     return;
   }
-  const LIMITE = 60;
+  const LIMITE = 150;
   const paraMostrar = ventas.slice(0, LIMITE);
-  cont.innerHTML = paraMostrar.map(v => `
-    <div class="hist-pedido" id="mlv-${v.id}">
-      <div class="hist-head" onclick="document.getElementById('mlv-${v.id}').classList.toggle('open')">
-        <div><div class="num">${v.producto}${v.estadoML && /refund/i.test(v.estadoML) ? ' <span style="color:#A6432F;font-size:0.75rem;">(devuelta)</span>' : ''}</div><div class="meta">${v.cuenta} · ${v.fecha ? new Date(v.fecha+'T00:00:00').toLocaleDateString('es-AR') : ''}${v.skuML ? ' · SKU: '+v.skuML : ''}</div></div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div class="tot" style="color:${v.gananciaNeta<0?'#A6432F':'inherit'};">${formatPrice(v.gananciaNeta)}</div>
-          <span class="hist-chev">▾</span>
-        </div>
-      </div>
-      <div class="hist-body">
-        <p style="margin:0 0 6px;">Precio de venta: ${formatPrice(v.precioVenta)}</p>
-        ${(v.egresos||[]).map(e => `<p style="margin:2px 0;color:#8A8072;">− ${e.concepto}: ${formatPrice(e.monto)}</p>`).join('')}
-        <p style="margin:8px 0 0;font-weight:700;">Ganancia neta: ${formatPrice(v.gananciaNeta)}</p>
-        <div style="display:flex;gap:6px;margin-top:10px;">
-          <input type="number" step="0.01" placeholder="Costo del producto" class="mlv-costo-rapido" style="flex:1;padding:6px 8px;border:1px solid var(--line);border-radius:6px;">
-          <button class="btn-mini" onclick="event.stopPropagation(); agregarCostoRapidoML('${v.id}', this)">Guardar</button>
-        </div>
-        <div class="actions" style="margin-top:10px;">
-          <button class="btn-mini" style="background:#A6432F;color:#fff;border-color:#A6432F;" onclick="event.stopPropagation(); eliminarVentaML('${v.id}')">Eliminar</button>
-        </div>
-      </div>
-    </div>
-  `).join('') + (ventas.length > LIMITE ? `<p class="note" style="margin-top:10px;">Mostrando las primeras ${LIMITE} de ${ventas.length} — use el buscador para encontrar una puntual.</p>` : '');
+  cont.innerHTML = paraMostrar.map(v => {
+    const esDevolucion = v.estadoML && /refund/i.test(v.estadoML);
+    const comisionEgreso = (v.egresos||[]).find(e => /comisi[oó]n/i.test(e.concepto));
+    const envioEgreso = (v.egresos||[]).find(e => /env[ií]o/i.test(e.concepto));
+    const productoEgreso = (v.egresos||[]).find(e => /costo del producto/i.test(e.concepto));
+    const otrosEgresos = (v.egresos||[]).filter(e => e !== comisionEgreso && e !== envioEgreso && e !== productoEgreso);
+    return `
+    <tr style="${esDevolucion ? 'background:#FBEEEA;' : ''}" id="mlv-${v.id}">
+      <td>${v.fecha ? new Date(v.fecha+'T00:00:00').toLocaleDateString('es-AR') : ''}</td>
+      <td>${v.skuML || '—'}</td>
+      <td style="max-width:180px;">${v.producto}${esDevolucion ? ' <b style="color:#A6432F;font-size:0.72rem;">DEVUELTA</b>' : ''}</td>
+      <td>${v.cantidad || 1}</td>
+      <td>${formatPrice(v.precioVenta)}</td>
+      <td>${formatPrice(comisionEgreso ? comisionEgreso.monto : 0)}</td>
+      <td>${formatPrice(envioEgreso ? envioEgreso.monto : 0)}</td>
+      <td>
+        ${productoEgreso ? formatPrice(productoEgreso.monto) : `<input type="number" step="0.01" placeholder="$" class="mlv-costo-rapido" style="width:75px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;">`}
+      </td>
+      <td>${v.devueltoML ? formatPrice(v.devueltoML) : '—'}</td>
+      <td style="font-weight:700;color:${v.gananciaNeta<0?'#A6432F':'inherit'};">${formatPrice(v.gananciaNeta)}</td>
+      <td>
+        ${!productoEgreso ? `<button class="btn-mini" onclick="agregarCostoRapidoML('${v.id}', this)">Guardar</button>` : ''}
+        <button class="btn-mini" onclick="eliminarVentaML('${v.id}')">✕</button>
+      </td>
+    </tr>
+  `;
+  }).join('') + (ventas.length > LIMITE ? `<tr><td colspan="11" class="note" style="padding:10px;">Mostrando las primeras ${LIMITE} de ${ventas.length} — use el buscador para encontrar una puntual.</td></tr>` : '');
 }
 
 async function agregarCostoRapidoML(id, btnEl){
