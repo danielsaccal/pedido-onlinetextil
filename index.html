@@ -817,7 +817,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <h2>Ventas Mercado Libre</h2>
 
       <p class="ni-seccion-tit">Importar reporte de Mercado Pago (recomendado)</p>
-      <p class="note" style="margin-bottom:10px;">Suba el "Reporte de Liquidaciones" descargado de Mercado Pago (formato .xlsx) — importa todas las ventas de una vez, con el neto ya calculado por ellos. Solo tiene que completar a mano el costo del producto de cada una si quiere el neto real suyo.</p>
+      <p class="note" style="margin-bottom:10px;">Suba el reporte de "Todas las transacciones" descargado de Mercado Pago (formato .xlsx) — trae comisión, IVA, impuestos/retenciones IIBB, envío, reclamos y devoluciones ya separados por movimiento.</p>
       <div class="field">
         <label>¿De qué cuenta es este archivo?</label>
         <select id="mli-cuenta">
@@ -851,26 +851,33 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
         <label class="ni-chip"><input type="radio" name="ml-filtro-cuenta" value="Alberto" onchange="renderVentasML()"><span>Alberto</span></label>
         <label class="ni-chip"><input type="radio" name="ml-filtro-cuenta" value="Rita" onchange="renderVentasML()"><span>Rita</span></label>
       </div>
+      <div class="ni-chips" style="margin-bottom:10px;">
+        <label class="ni-chip"><input type="radio" name="ml-filtro-tipo" value="todos" checked onchange="renderVentasML()"><span>Todos los movimientos</span></label>
+        <label class="ni-chip"><input type="radio" name="ml-filtro-tipo" value="venta" onchange="renderVentasML()"><span>Ventas</span></label>
+        <label class="ni-chip"><input type="radio" name="ml-filtro-tipo" value="envio" onchange="renderVentasML()"><span>Envíos</span></label>
+        <label class="ni-chip"><input type="radio" name="ml-filtro-tipo" value="reclamo" onchange="renderVentasML()"><span>Reclamos</span></label>
+        <label class="ni-chip"><input type="radio" name="ml-filtro-tipo" value="devolucion" onchange="renderVentasML()"><span>Devoluciones</span></label>
+        <label class="ni-chip"><input type="radio" name="ml-filtro-tipo" value="otro" onchange="renderVentasML()"><span>Otros (cashback, etc.)</span></label>
+      </div>
       <div class="field"><input type="text" id="ml-buscador-ventas" placeholder="Buscar por N° de venta o SKU..." oninput="renderVentasML()"></div>
       <p class="note" id="ml-resumen-totales" style="margin-bottom:10px;"></p>
       <div style="overflow-x:auto;">
         <table class="ml-tabla" id="ml-tabla-ventas">
           <colgroup>
-            <col style="width:85px;"><col style="width:110px;"><col style="width:100px;"><col style="width:55px;">
+            <col style="width:85px;"><col style="width:90px;"><col style="width:95px;"><col style="width:95px;">
             <col style="width:95px;"><col style="width:95px;"><col style="width:110px;"><col style="width:95px;">
             <col style="width:105px;"><col style="width:95px;"><col style="width:100px;"><col style="width:60px;">
           </colgroup>
           <thead>
             <tr>
-              <th>Fecha</th><th>N° de venta</th><th>SKU</th><th>Cant.</th>
-              <th>Venta</th><th>Envío</th><th>Comisión + fijo</th><th>Impuestos/perc.</th>
+              <th>Fecha</th><th>Tipo</th><th>Ref.</th><th>SKU</th>
+              <th>Venta</th><th>Envío</th><th>Comisión + IVA</th><th>Impuestos/perc.</th>
               <th>Saldo ML</th><th>Costo prod.</th><th>Saldo final</th><th></th>
             </tr>
           </thead>
           <tbody id="ml-lista-ventas"></tbody>
         </table>
       </div>
-      <p class="note" style="margin-top:6px;">"Impuestos/percepciones" todavía no está disponible en el archivo importado — cuando consiga el Reporte de Facturación con esa columna, lo sumamos.</p>
 
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
@@ -3084,6 +3091,15 @@ function convertirFechaMLaISO(texto){
   return soloFecha; // si ya viene en otro formato, lo dejamos como esta
 }
 
+function clasificarTipoML(tipo){
+  const t = (tipo||'').toLowerCase();
+  if(t.includes('pago aprobado')) return 'venta';
+  if(t.includes('envío') || t.includes('envio') || t.includes('dispute_shipping')) return 'envio';
+  if(t.includes('reclamo')) return 'reclamo';
+  if(t.includes('devoluci')) return 'devolucion';
+  return 'otro';
+}
+
 function procesarImportacionML(){
   const archivo = document.getElementById('mli-archivo').files[0];
   const errorEl = document.getElementById('mli-error');
@@ -3101,58 +3117,56 @@ function procesarImportacionML(){
       if(filas.length === 0){ errorEl.textContent = 'El archivo está vacío.'; errorEl.style.display = 'block'; return; }
 
       const primera = filas[0];
-      const colFecha = Object.keys(primera).find(c => /fecha de compra/i.test(c));
-      const colProducto = Object.keys(primera).find(c => /descripci[oó]n de la operaci[oó]n/i.test(c));
-      const colSku = Object.keys(primera).find(c => /sku producto/i.test(c));
-      const colEstado = Object.keys(primera).find(c => /estado de la operaci[oó]n/i.test(c) && !/detalle/i.test(c));
-      const colValor = Object.keys(primera).find(c => /valor del producto/i.test(c));
-      const colNeto = Object.keys(primera).find(c => /monto recibido/i.test(c));
-      const colDevuelto = Object.keys(primera).find(c => /monto devuelto/i.test(c));
-      const colOrden = Object.keys(primera).find(c => /n[uú]mero de venta en mercado libre/i.test(c));
+      const colFecha = Object.keys(primera).find(c => /fecha de origen/i.test(c));
+      const colId = Object.keys(primera).find(c => /id de operaci[oó]n/i.test(c));
+      const colTipo = Object.keys(primera).find(c => /tipo de operaci[oó]n/i.test(c));
+      const colValor = Object.keys(primera).find(c => /valor de la compra/i.test(c));
+      const colComision = Object.keys(primera).find(c => /^comisiones \+ iva/i.test(c));
+      const colImpuestos = Object.keys(primera).find(c => /impuestos cobrados por retenciones/i.test(c));
+      const colNeto = Object.keys(primera).find(c => /monto neto de la operaci[oó]n que impact/i.test(c));
       const colEnvio = Object.keys(primera).find(c => /costo de env[ií]o/i.test(c));
+      const colSku = Object.keys(primera).find(c => /c[oó]digo de producto sku/i.test(c));
 
-      if(!colValor || !colNeto){
-        errorEl.textContent = 'No reconocí las columnas de este archivo. ¿Es el "Reporte de Liquidaciones" de Mercado Pago?';
+      if(!colValor || !colNeto || !colTipo){
+        errorEl.textContent = 'No reconocí las columnas de este archivo. ¿Es el reporte de "Todas las transacciones" de Mercado Pago?';
         errorEl.style.display = 'block';
         return;
       }
 
       const procesadas = filas.map(f => {
         const valor = parseFloat(f[colValor]) || 0;
+        const comision = parseFloat(f[colComision]) || 0;
+        const impuestos = parseFloat(f[colImpuestos]) || 0;
+        const envio = parseFloat(f[colEnvio]) || 0;
         const neto = parseFloat(f[colNeto]) || 0;
-        const devuelto = colDevuelto ? (parseFloat(f[colDevuelto]) || 0) : 0;
-        const costoEnvio = colEnvio ? Math.abs(parseFloat(f[colEnvio]) || 0) : 0;
-        const comision = Math.max(0, valor - neto - costoEnvio);
         return {
-          fecha: colFecha ? convertirFechaMLaISO(String(f[colFecha])) : '',
-          producto: colProducto ? String(f[colProducto]) : '(sin descripción)',
+          fecha: colFecha ? String(f[colFecha]).slice(0,10) : '',
+          tipoOriginal: colTipo ? String(f[colTipo]) : '',
+          tipo: clasificarTipoML(colTipo ? f[colTipo] : ''),
           sku: colSku ? String(f[colSku]) : '',
-          estado: colEstado ? String(f[colEstado]) : '',
-          orden: colOrden ? String(f[colOrden]) : '',
+          idOperacion: colId ? String(f[colId]) : '',
           precioVenta: valor,
-          costoEnvio,
-          comisionesML: comision,
+          costoEnvio: envio < 0 ? Math.abs(envio) : 0,
+          comisionesML: comision < 0 ? Math.abs(comision) : 0,
+          impuestos: impuestos < 0 ? Math.abs(impuestos) : 0,
           netoML: neto,
-          devuelto,
         };
-      }).filter(f => f.precioVenta > 0);
+      }).filter(f => f.tipo !== 'otro' || f.precioVenta !== 0); // saca filas totalmente vacias
 
       filasImportacionML = procesadas;
 
-      const totalVenta = procesadas.reduce((s,f) => s+f.precioVenta, 0);
-      const totalComisiones = procesadas.reduce((s,f) => s+f.comisionesML, 0);
+      const porTipo = {};
+      procesadas.forEach(f => { porTipo[f.tipo] = (porTipo[f.tipo]||0) + 1; });
       const totalNeto = procesadas.reduce((s,f) => s+f.netoML, 0);
-      const devueltas = procesadas.filter(f => /refund/i.test(f.estado)).length;
 
       previewEl.innerHTML = `
         <div style="padding:12px;background:var(--cream);border-radius:10px;margin-bottom:12px;">
-          <p style="margin:0;"><b>${procesadas.length}</b> ventas encontradas (<b>${devueltas}</b> marcadas como devueltas)</p>
-          <p style="margin:6px 0 0;">Total vendido: <b>${formatPrice(totalVenta)}</b></p>
-          <p style="margin:4px 0 0;">Total comisiones/costos de ML y MP: <b>${formatPrice(totalComisiones)}</b></p>
-          <p style="margin:4px 0 0;">Total neto recibido (antes de descontar costo de producto): <b style="color:var(--purple);">${formatPrice(totalNeto)}</b></p>
+          <p style="margin:0;"><b>${procesadas.length}</b> movimientos encontrados:</p>
+          <p style="margin:4px 0 0;">Ventas: <b>${porTipo.venta||0}</b> · Envíos: <b>${porTipo.envio||0}</b> · Reclamos: <b>${porTipo.reclamo||0}</b> · Devoluciones: <b>${porTipo.devolucion||0}</b> · Otros: <b>${porTipo.otro||0}</b></p>
+          <p style="margin:6px 0 0;">Saldo neto total del período (ya con comisión, IVA, impuestos y envío descontados): <b style="color:var(--purple);">${formatPrice(totalNeto)}</b></p>
         </div>
-        <p class="note" style="margin-bottom:10px;">Esto todavía NO incluye el costo de cada producto ni publicidad — esos los va a poder cargar después, editando cada venta en el listado de abajo.</p>
-        <div class="actions"><button class="btn btn-gold" id="mli-btn-importar" onclick="importarVentasML()">Importar estas ${procesadas.length} ventas</button></div>
+        <p class="note" style="margin-bottom:10px;">Esto todavía NO incluye el costo de cada producto — lo va a poder cargar después, en cada fila del listado de abajo.</p>
+        <div class="actions"><button class="btn btn-gold" id="mli-btn-importar" onclick="importarVentasML()">Importar estos ${procesadas.length} movimientos</button></div>
       `;
     } catch(err){
       errorEl.textContent = 'No se pudo leer el archivo: ' + err.message;
@@ -3177,14 +3191,15 @@ async function importarVentasML(){
       lote.forEach(f => {
         const ref = db.collection('ventas_mercadolibre').doc();
         const egresos = [
-          { concepto: 'Comisión y otros cargos ML/MP', monto: Math.round(f.comisionesML*100)/100 },
+          { concepto: 'Comisión + IVA', monto: Math.round(f.comisionesML*100)/100 },
+          { concepto: 'Impuestos y percepciones (IIBB)', monto: Math.round(f.impuestos*100)/100 },
           { concepto: 'Costo de envío', monto: Math.round(f.costoEnvio*100)/100 },
         ];
         const gananciaNeta = f.netoML;
         batch.set(ref, {
-          cuenta, producto: f.producto, fecha: f.fecha, precioVenta: f.precioVenta, cantidad: 1,
-          egresos, totalEgresos: f.comisionesML + f.costoEnvio, gananciaNeta,
-          skuML: f.sku, ordenML: f.orden, estadoML: f.estado, devueltoML: f.devuelto,
+          cuenta, fecha: f.fecha, precioVenta: f.precioVenta, cantidad: 1,
+          egresos, totalEgresos: f.comisionesML + f.impuestos + f.costoEnvio, gananciaNeta,
+          skuML: f.sku, ordenML: f.idOperacion, tipoML: f.tipo, tipoOriginalML: f.tipoOriginal,
           origen: 'importado_mp', creado: new Date().toISOString()
         });
       });
@@ -3283,8 +3298,11 @@ function renderVentasML(){
   if(!listaVentasML) return;
   const filtroEl = document.querySelector('input[name="ml-filtro-cuenta"]:checked');
   const filtro = filtroEl ? filtroEl.value : 'todas';
+  const filtroTipoEl = document.querySelector('input[name="ml-filtro-tipo"]:checked');
+  const filtroTipo = filtroTipoEl ? filtroTipoEl.value : 'todos';
   const texto = (document.getElementById('ml-buscador-ventas')?.value || '').trim().toLowerCase();
   let ventas = listaVentasML.filter(v => filtro === 'todas' || v.cuenta === filtro);
+  if(filtroTipo !== 'todos') ventas = ventas.filter(v => (v.tipoML || 'venta') === filtroTipo);
   if(texto) ventas = ventas.filter(v => ((v.ordenML||'')+' '+(v.skuML||'')).toLowerCase().includes(texto));
 
   const totalVentas = ventas.reduce((s,v) => s+(v.precioVenta||0), 0);
@@ -3296,39 +3314,42 @@ function renderVentasML(){
   const totalGanancia = totalGananciaVentas - totalGastosPeriodicos;
 
   document.getElementById('ml-resumen-totales').innerHTML =
-    `<b>${ventas.length}</b> venta(s) — Vendido: <b>${formatPrice(totalVentas)}</b> — Egresos por venta: <b>${formatPrice(totalEgresos)}</b><br>` +
+    `<b>${ventas.length}</b> movimiento(s) — Bruto: <b>${formatPrice(totalVentas)}</b> — Egresos: <b>${formatPrice(totalEgresos)}</b><br>` +
     `Gastos periódicos (publicidad, etc.): <b>${formatPrice(totalGastosPeriodicos)}</b><br>` +
     `<span style="font-size:1.05rem;">Ganancia neta real: <b style="color:${totalGanancia<0?'#A6432F':'var(--purple)'};">${formatPrice(totalGanancia)}</b></span>`;
 
   const cont = document.getElementById('ml-lista-ventas');
   if(ventas.length === 0){
-    cont.innerHTML = '<tr><td colspan="11" class="empty-msg">Sin ventas cargadas todavía.</td></tr>';
+    cont.innerHTML = '<tr><td colspan="12" class="empty-msg">Sin movimientos cargados todavía.</td></tr>';
     return;
   }
+  const ETIQUETAS_TIPO = { venta:['Venta','inherit'], envio:['Envío','#8A6D3B'], reclamo:['Reclamo','#A6432F'], devolucion:['Devolución','#A6432F'], otro:['Otro','#8A8072'] };
   const LIMITE = 150;
   const paraMostrar = ventas.slice(0, LIMITE);
   cont.innerHTML = paraMostrar.map(v => {
-    const esDevolucion = v.estadoML && /refund/i.test(v.estadoML);
+    const tipo = v.tipoML || 'venta';
+    const [etiquetaTipo, colorTipo] = ETIQUETAS_TIPO[tipo] || ETIQUETAS_TIPO.otro;
+    const esNegativo = tipo === 'reclamo' || tipo === 'devolucion';
     const comisionEgreso = (v.egresos||[]).find(e => /comisi[oó]n/i.test(e.concepto));
     const envioEgreso = (v.egresos||[]).find(e => /env[ií]o/i.test(e.concepto));
+    const impuestosEgreso = (v.egresos||[]).find(e => /impuesto/i.test(e.concepto));
     const productoEgreso = (v.egresos||[]).find(e => /costo del producto/i.test(e.concepto));
-    const impuestos = 0; // no disponible todavia en el archivo importado
-    const saldoML = v.precioVenta - (envioEgreso ? envioEgreso.monto : 0) - (comisionEgreso ? comisionEgreso.monto : 0) - impuestos;
+    const saldoML = v.gananciaNeta; // ya viene neto de todo (comision, impuestos, envio) desde la importacion
     return `
-    <tr style="${esDevolucion ? 'background:#FBEEEA;' : ''}" id="mlv-${v.id}" title="${escapeAttr(v.producto||'')}">
+    <tr style="${esNegativo ? 'background:#FBEEEA;' : ''}" id="mlv-${v.id}" title="${escapeAttr(v.tipoOriginalML||'')}">
       <td>${v.fecha ? new Date(v.fecha+'T00:00:00').toLocaleDateString('es-AR') : ''}</td>
-      <td>${v.ordenML || '—'}${esDevolucion ? ' <b style="color:#A6432F;">(dev.)</b>' : ''}</td>
+      <td style="color:${colorTipo};font-weight:600;">${etiquetaTipo}</td>
+      <td>${v.ordenML || '—'}</td>
       <td>${v.skuML || '—'}</td>
-      <td>${v.cantidad || 1}</td>
       <td>${formatPrice(v.precioVenta)}</td>
       <td>${formatPrice(envioEgreso ? envioEgreso.monto : 0)}</td>
       <td>${formatPrice(comisionEgreso ? comisionEgreso.monto : 0)}</td>
-      <td style="color:#B5AC9E;">—</td>
+      <td>${formatPrice(impuestosEgreso ? impuestosEgreso.monto : 0)}</td>
       <td style="font-weight:600;">${formatPrice(saldoML)}</td>
       <td>
         ${productoEgreso ? formatPrice(productoEgreso.monto) : `<input type="number" step="0.01" placeholder="$" class="mlv-costo-rapido" style="width:65px;padding:4px 5px;border:1px solid var(--line);border-radius:6px;">`}
       </td>
-      <td style="font-weight:700;color:${v.gananciaNeta<0?'#A6432F':'inherit'};">${formatPrice(v.gananciaNeta)}</td>
+      <td style="font-weight:700;color:${v.gananciaNeta<0?'#A6432F':'inherit'};">${formatPrice(v.gananciaNeta - (productoEgreso ? productoEgreso.monto : 0))}</td>
       <td>
         ${!productoEgreso ? `<button class="btn-mini" onclick="agregarCostoRapidoML('${v.id}', this)">✓</button>` : ''}
         <button class="btn-mini" onclick="eliminarVentaML('${v.id}')">✕</button>
