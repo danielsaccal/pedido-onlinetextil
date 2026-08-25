@@ -895,6 +895,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       </div>
       <div class="field"><input type="text" id="ml-buscador-ventas" placeholder="Buscar por SKU (agrupa todo lo vendido de ese SKU) u operación..." oninput="renderVentasML()"></div>
       <p class="note" id="ml-resumen-totales" style="margin-bottom:10px;"></p>
+      <button type="button" class="btn-mini" style="margin-bottom:10px;" onclick="detectarYBorrarDuplicadosML()">🧹 Detectar y borrar duplicados</button>
       <div id="ml-modo-agrupado" style="display:none;"></div>
       <div id="ml-resumen-vista" style="display:none;overflow-x:auto;"></div>
       <div id="ml-tabla-wrap" style="overflow-x:auto;">
@@ -3316,9 +3317,14 @@ async function importarFacturasML(){
   const cuenta = document.getElementById('fac-cuenta').value;
   const btn = document.getElementById('fac-btn-importar');
   btn.disabled = true;
+
+  const clavesExistentes = new Set((listaVentasML || []).map(claveMovimiento));
+  const nuevas = facturasParaImportar.filter(l => !clavesExistentes.has(claveMovimiento({...l, cuenta})));
+  const saltadas = facturasParaImportar.length - nuevas.length;
+
   try{
     const batch = db.batch();
-    facturasParaImportar.forEach(l => {
+    nuevas.forEach(l => {
       const ref = db.collection('movimientos_ml').doc();
       batch.set(ref, {
         cuenta, fecha: l.fecha, operacion: l.operacion, sku: l.sku,
@@ -3327,7 +3333,7 @@ async function importarFacturasML(){
       });
     });
     await batch.commit();
-    alert('Se importaron ' + facturasParaImportar.length + ' líneas de facturas.');
+    alert('Se importaron ' + nuevas.length + ' líneas nuevas de facturas.' + (saltadas > 0 ? ' (' + saltadas + ' ya existían y se saltearon)' : ''));
     document.getElementById('fac-archivos').value = '';
     document.getElementById('fac-preview').innerHTML = '';
     facturasParaImportar = null;
@@ -3457,11 +3463,15 @@ async function importarVentasML(){
   const btn = document.getElementById('mli-btn-importar');
   btn.disabled = true;
 
+  const clavesExistentes = new Set((listaVentasML || []).map(claveMovimiento));
+  const nuevas = filasImportacionML.filter(m => !clavesExistentes.has(claveMovimiento({...m, cuenta})));
+  const saltadas = filasImportacionML.length - nuevas.length;
+
   const CHUNK = 400;
   let importadas = 0;
   try{
-    for(let i=0; i<filasImportacionML.length; i+=CHUNK){
-      const lote = filasImportacionML.slice(i, i+CHUNK);
+    for(let i=0; i<nuevas.length; i+=CHUNK){
+      const lote = nuevas.slice(i, i+CHUNK);
       const batch = db.batch();
       lote.forEach(m => {
         const ref = db.collection('movimientos_ml').doc();
@@ -3473,9 +3483,9 @@ async function importarVentasML(){
       });
       await batch.commit();
       importadas += lote.length;
-      btn.textContent = 'Importando... ' + importadas + '/' + filasImportacionML.length;
+      btn.textContent = 'Importando... ' + importadas + '/' + nuevas.length;
     }
-    alert('Se importaron ' + importadas + ' líneas de ' + cuenta + '.');
+    alert('Se importaron ' + importadas + ' líneas nuevas de ' + cuenta + '.' + (saltadas > 0 ? ' (' + saltadas + ' ya existían y se saltearon)' : ''));
     document.getElementById('mli-archivo').value = '';
     document.getElementById('mli-preview').innerHTML = '';
     filasImportacionML = null;
@@ -3660,6 +3670,47 @@ function renderResumenSku(movs, cont){
       </tr></tfoot>
     </table>
   `;
+}
+
+function claveMovimiento(m){
+  return [m.cuenta, m.operacion, m.concepto, Math.round((m.monto||0)*100), m.fecha].join('|');
+}
+
+async function detectarYBorrarDuplicadosML(){
+  if(!listaVentasML){ alert('Todavía no cargaron los movimientos.'); return; }
+  const porClave = {};
+  listaVentasML.forEach(m => {
+    const clave = claveMovimiento(m);
+    if(!porClave[clave]) porClave[clave] = [];
+    porClave[clave].push(m);
+  });
+  const grupos = Object.values(porClave).filter(g => g.length > 1);
+  const totalSobrantes = grupos.reduce((s,g) => s + (g.length - 1), 0);
+
+  if(totalSobrantes === 0){
+    alert('No encontré duplicados.');
+    return;
+  }
+  if(!confirm(`Encontré ${totalSobrantes} línea(s) duplicada(s) (mismo movimiento cargado más de una vez). Se va a conservar una sola copia de cada una y se borran las demás. ¿Continuar?`)) return;
+
+  try{
+    const idsABorrar = [];
+    grupos.forEach(g => {
+      // conservamos la primera, borramos el resto
+      g.slice(1).forEach(m => idsABorrar.push(m.id));
+    });
+    const CHUNK = 400;
+    for(let i=0; i<idsABorrar.length; i+=CHUNK){
+      const lote = idsABorrar.slice(i, i+CHUNK);
+      const batch = db.batch();
+      lote.forEach(id => batch.delete(db.collection('movimientos_ml').doc(id)));
+      await batch.commit();
+    }
+    alert('Se borraron ' + idsABorrar.length + ' líneas duplicadas.');
+    cargarVentasML();
+  } catch(e){
+    alert('No se pudo terminar la limpieza: ' + e.message);
+  }
 }
 
 function cargarVentasML(){
