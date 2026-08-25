@@ -3579,24 +3579,37 @@ function renderResumenActividad(movs, cont){
   `;
 }
 
+function clasificarMovimientosPorSku(movsDeUnSku){
+  const cat = { unidades: 0, ingresoProducto: 0, ingresoFlex: 0, costoEnvio: 0, percepciones: 0, comisiones: 0, otros: 0 };
+  movsDeUnSku.forEach(m => {
+    const c = m.concepto || '';
+    if(c === 'Venta'){
+      cat.unidades++;
+      cat.ingresoProducto += m.monto;
+    } else if(/flex|env[ií]o/i.test(c)){
+      if(m.monto >= 0) cat.ingresoFlex += m.monto;
+      else cat.costoEnvio += m.monto;
+    } else if(/impuesto|percepci[oó]n|retenci[oó]n/i.test(c)){
+      cat.percepciones += m.monto;
+    } else if(/comisi[oó]n/i.test(c)){
+      cat.comisiones += m.monto;
+    } else {
+      cat.otros += m.monto;
+    }
+  });
+  cat.neto = cat.ingresoProducto + cat.ingresoFlex + cat.costoEnvio + cat.percepciones + cat.comisiones + cat.otros;
+  return cat;
+}
+
 function renderResumenSku(movs, cont){
   const conSku = movs.filter(m => m.sku);
   const porSku = {};
   conSku.forEach(m => {
-    if(!porSku[m.sku]) porSku[m.sku] = { cantidadVentas: 0, ingreso: 0, impuestos: 0, egresos: 0 };
-    const s = porSku[m.sku];
-    if(m.concepto === 'Venta') s.cantidadVentas++;
-    if(m.monto >= 0){
-      s.ingreso += m.monto;
-    } else if(/impuesto|percepci[oó]n/i.test(m.concepto)){
-      s.impuestos += m.monto;
-    } else {
-      s.egresos += m.monto;
-    }
+    if(!porSku[m.sku]) porSku[m.sku] = [];
+    porSku[m.sku].push(m);
   });
-  const filas = Object.entries(porSku).map(([sku, s]) => ({
-    sku, ...s, neto: s.ingreso + s.impuestos + s.egresos
-  })).sort((a,b) => b.ingreso - a.ingreso);
+  const filas = Object.entries(porSku).map(([sku, lista]) => ({ sku, ...clasificarMovimientosPorSku(lista) }))
+    .sort((a,b) => b.ingresoProducto - a.ingresoProducto);
 
   if(filas.length === 0){
     cont.innerHTML = '<p class="empty-msg">No hay movimientos con SKU para agrupar (las líneas de facturas generales no tienen SKU asociado).</p>';
@@ -3604,36 +3617,47 @@ function renderResumenSku(movs, cont){
   }
 
   const totales = filas.reduce((acc,f) => ({
-    cantidadVentas: acc.cantidadVentas+f.cantidadVentas, ingreso: acc.ingreso+f.ingreso,
-    impuestos: acc.impuestos+f.impuestos, egresos: acc.egresos+f.egresos, neto: acc.neto+f.neto
-  }), {cantidadVentas:0, ingreso:0, impuestos:0, egresos:0, neto:0});
+    unidades: acc.unidades+f.unidades, ingresoProducto: acc.ingresoProducto+f.ingresoProducto,
+    ingresoFlex: acc.ingresoFlex+f.ingresoFlex, costoEnvio: acc.costoEnvio+f.costoEnvio,
+    percepciones: acc.percepciones+f.percepciones, comisiones: acc.comisiones+f.comisiones,
+    otros: acc.otros+f.otros, neto: acc.neto+f.neto
+  }), {unidades:0, ingresoProducto:0, ingresoFlex:0, costoEnvio:0, percepciones:0, comisiones:0, otros:0, neto:0});
+
+  const filaHtml = (f) => `
+    <tr>
+      <td>${f.unidades}</td>
+      <td>${f.sku}</td>
+      <td class="ml-monto-pos" style="text-align:right;">${formatPrice(f.ingresoProducto)}</td>
+      <td class="ml-monto-pos" style="text-align:right;">${f.ingresoFlex ? formatPrice(f.ingresoFlex) : '—'}</td>
+      <td class="ml-monto-neg" style="text-align:right;">${f.costoEnvio ? formatPrice(f.costoEnvio) : '—'}</td>
+      <td class="ml-monto-neg" style="text-align:right;">${f.percepciones ? formatPrice(f.percepciones) : '—'}</td>
+      <td class="ml-monto-neg" style="text-align:right;">${f.comisiones ? formatPrice(f.comisiones) : '—'}</td>
+      <td class="${f.neto<0?'ml-monto-neg':'ml-monto-pos'}" style="text-align:right;font-weight:700;">${formatPrice(f.neto)}</td>
+    </tr>
+  `;
 
   cont.innerHTML = `
-    <p class="note" style="margin-bottom:8px;">"Cantidad" cuenta operaciones de venta de ese SKU (el archivo no trae unidades por línea, así que si una venta fue de varias unidades juntas, cuenta como 1).</p>
+    <p class="note" style="margin-bottom:8px;">"Unidades vendidas" cuenta operaciones de venta de ese SKU (el archivo no trae unidades por línea, así que si una venta fue de varias unidades juntas, cuenta como 1).</p>
     <table class="ml-tabla" style="width:100%;table-layout:auto;">
-      <thead><tr><th>SKU</th><th style="text-align:right;">Cant.</th><th style="text-align:right;">Ingreso total</th><th style="text-align:right;">Impuestos total</th><th style="text-align:right;">Otros egresos</th><th style="text-align:right;">Neto</th></tr></thead>
-      <tbody>
-        ${filas.map(f => `
-          <tr>
-            <td>${f.sku}</td>
-            <td style="text-align:right;">${f.cantidadVentas}</td>
-            <td class="ml-monto-pos" style="text-align:right;">${formatPrice(f.ingreso)}</td>
-            <td class="ml-monto-neg" style="text-align:right;">${formatPrice(f.impuestos)}</td>
-            <td class="ml-monto-neg" style="text-align:right;">${formatPrice(f.egresos)}</td>
-            <td class="${f.neto<0?'ml-monto-neg':'ml-monto-pos'}" style="text-align:right;font-weight:700;">${formatPrice(f.neto)}</td>
-          </tr>
-        `).join('')}
-      </tbody>
-      <tfoot>
-        <tr style="font-weight:700;border-top:2px solid var(--line);">
-          <td>Total</td>
-          <td style="text-align:right;">${totales.cantidadVentas}</td>
-          <td class="ml-monto-pos" style="text-align:right;">${formatPrice(totales.ingreso)}</td>
-          <td class="ml-monto-neg" style="text-align:right;">${formatPrice(totales.impuestos)}</td>
-          <td class="ml-monto-neg" style="text-align:right;">${formatPrice(totales.egresos)}</td>
-          <td class="${totales.neto<0?'ml-monto-neg':'ml-monto-pos'}" style="text-align:right;">${formatPrice(totales.neto)}</td>
-        </tr>
-      </tfoot>
+      <thead><tr>
+        <th>Unid. vendidas</th><th>SKU</th>
+        <th style="text-align:right;color:#3D7A2E;">Ingreso producto</th>
+        <th style="text-align:right;color:#3D7A2E;">Ingreso Flex</th>
+        <th style="text-align:right;color:#A6432F;">Costo envío</th>
+        <th style="text-align:right;color:#A6432F;">Percep./retenc.</th>
+        <th style="text-align:right;color:#A6432F;">Comisiones</th>
+        <th style="text-align:right;">Neto</th>
+      </tr></thead>
+      <tbody>${filas.map(filaHtml).join('')}</tbody>
+      <tfoot><tr style="font-weight:700;border-top:2px solid var(--line);">
+        <td colspan="2">Total</td>
+        <td class="ml-monto-pos" style="text-align:right;">${formatPrice(totales.ingresoProducto)}</td>
+        <td class="ml-monto-pos" style="text-align:right;">${totales.ingresoFlex ? formatPrice(totales.ingresoFlex) : '—'}</td>
+        <td class="ml-monto-neg" style="text-align:right;">${totales.costoEnvio ? formatPrice(totales.costoEnvio) : '—'}</td>
+        <td class="ml-monto-neg" style="text-align:right;">${totales.percepciones ? formatPrice(totales.percepciones) : '—'}</td>
+        <td class="ml-monto-neg" style="text-align:right;">${totales.comisiones ? formatPrice(totales.comisiones) : '—'}</td>
+        <td class="${totales.neto<0?'ml-monto-neg':'ml-monto-pos'}" style="text-align:right;">${formatPrice(totales.neto)}</td>
+      </tr></tfoot>
     </table>
   `;
 }
@@ -3688,17 +3712,35 @@ function renderVentasML(){
     tablaWrap.style.display = 'none';
     modoAgrupado.style.display = 'block';
     const delSku = movs.filter(m => (m.sku||'').toLowerCase() === texto);
-    const porConcepto = {};
-    delSku.forEach(m => { porConcepto[m.concepto] = (porConcepto[m.concepto]||0) + m.monto; });
-    const totalSku = delSku.reduce((s,m) => s+m.monto, 0);
+    const cat = clasificarMovimientosPorSku(delSku);
     const operacionesUnicas = new Set(delSku.map(m => m.operacion)).size;
     modoAgrupado.innerHTML = `
-      <div style="padding:12px;background:var(--cream);border-radius:10px;">
-        <p style="margin:0 0 8px;font-weight:700;">SKU: ${delSku[0].sku} — ${operacionesUnicas} operación(es), ${delSku.length} línea(s)</p>
-        ${Object.entries(porConcepto).map(([c,m]) => `<p style="margin:2px 0;" class="${m<0?'ml-monto-neg':'ml-monto-pos'}">${c}: ${formatPrice(m)}</p>`).join('')}
-        <p style="margin:8px 0 0;font-size:1.05rem;">Total: <b class="${totalSku<0?'ml-monto-neg':'ml-monto-pos'}">${formatPrice(totalSku)}</b></p>
-        <button class="btn-mini" style="margin-top:10px;" onclick="document.getElementById('ml-buscador-ventas').value='';renderVentasML();">✕ Volver al listado completo</button>
+      <p class="note" style="margin-bottom:8px;">${operacionesUnicas} operación(es), ${delSku.length} línea(s) para el SKU ${delSku[0].sku}.</p>
+      <div style="overflow-x:auto;">
+        <table class="ml-tabla" style="width:100%;table-layout:auto;">
+          <thead><tr>
+            <th>Unid. vendidas</th><th>SKU</th>
+            <th style="text-align:right;color:#3D7A2E;">Ingreso producto</th>
+            <th style="text-align:right;color:#3D7A2E;">Ingreso Flex</th>
+            <th style="text-align:right;color:#A6432F;">Costo envío</th>
+            <th style="text-align:right;color:#A6432F;">Percep./retenc.</th>
+            <th style="text-align:right;color:#A6432F;">Comisiones</th>
+            <th style="text-align:right;">Neto</th>
+          </tr></thead>
+          <tbody><tr>
+            <td>${cat.unidades}</td>
+            <td>${delSku[0].sku}</td>
+            <td class="ml-monto-pos" style="text-align:right;">${formatPrice(cat.ingresoProducto)}</td>
+            <td class="ml-monto-pos" style="text-align:right;">${cat.ingresoFlex ? formatPrice(cat.ingresoFlex) : '—'}</td>
+            <td class="ml-monto-neg" style="text-align:right;">${cat.costoEnvio ? formatPrice(cat.costoEnvio) : '—'}</td>
+            <td class="ml-monto-neg" style="text-align:right;">${cat.percepciones ? formatPrice(cat.percepciones) : '—'}</td>
+            <td class="ml-monto-neg" style="text-align:right;">${cat.comisiones ? formatPrice(cat.comisiones) : '—'}</td>
+            <td class="${cat.neto<0?'ml-monto-neg':'ml-monto-pos'}" style="text-align:right;font-weight:700;">${formatPrice(cat.neto)}</td>
+          </tr></tbody>
+        </table>
       </div>
+      ${cat.otros ? `<p class="note" style="margin-top:8px;">Otros conceptos (reclamos, devoluciones, cargos de plataforma, etc.): <b class="${cat.otros<0?'ml-monto-neg':'ml-monto-pos'}">${formatPrice(cat.otros)}</b></p>` : ''}
+      <button class="btn-mini" style="margin-top:10px;" onclick="document.getElementById('ml-buscador-ventas').value='';renderVentasML();">✕ Volver al listado completo</button>
     `;
     return;
   } else {
