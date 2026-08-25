@@ -402,15 +402,16 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <span onclick="abrirPedidoIA()">Pedido con IA (texto libre)</span>
       <span onclick="abrirClientes()">Clientes</span>
 
+      <p class="menu-subgrupo-tit">Producto</p>
+      <span class="menu-item-sub" onclick="abrirNuevoProducto()">Agregar producto nuevo</span>
+      <span class="menu-item-sub" onclick="abrirEditarProducto()">Editar producto</span>
+      <span class="menu-item-sub" onclick="abrirActualizarFoto()">Actualizar foto de producto</span>
+
       <p class="menu-subgrupo-tit">Catálogo</p>
       <span class="menu-item-sub" onclick="abrirCompartirRubro()">Compartir catálogo por rubro</span>
       <span class="menu-item-sub" onclick="abrirEnviarCatalogo()">Enviar catálogo a clientes</span>
-      <span class="menu-item-sub" onclick="abrirNuevoProducto()">Agregar producto nuevo</span>
-      <span class="menu-item-sub" onclick="abrirEditarProducto()">Editar producto</span>
-      <span class="menu-item-sub" onclick="abrirEliminarProducto()">Eliminar producto</span>
       <span class="menu-item-sub" onclick="abrirImportarExcel()">Importar precios (Excel)</span>
       <span class="menu-item-sub" onclick="abrirCalculadoraCostos()">Calculadora de costos</span>
-      <span class="menu-item-sub" onclick="abrirActualizarFoto()">Actualizar foto de producto</span>
 
       <p class="menu-subgrupo-tit">Mercado Libre</p>
       <span class="menu-item-sub" onclick="abrirVentasML()">Ventas Mercado Libre</span>
@@ -685,6 +686,10 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
         <p class="error" id="ep-error" style="display:none;"></p>
         <div class="actions">
           <button class="btn btn-gold" onclick="guardarProductoEditado()">Guardar cambios</button>
+        </div>
+
+        <div style="margin-top:24px;padding-top:16px;border-top:1px dashed var(--line);">
+          <button type="button" class="btn-mini" style="background:#A6432F;color:#fff;border-color:#A6432F;" onclick="eliminarDesdeEditar()">🗑️ Eliminar este producto</button>
         </div>
       </div>
 
@@ -3849,6 +3854,14 @@ function buscarHistorialPrecios(){
   }).catch(e => {
     cont.innerHTML = '<p class="empty-msg">No se pudo buscar: ' + e.message + '</p>';
   });
+}
+
+function eliminarDesdeEditar(){
+  const sku = document.getElementById('ep-sku').value.trim();
+  if(!sku) return;
+  mostrarPaso('step-eliminar-producto');
+  document.getElementById('dp-sku').value = sku;
+  buscarProductoParaEliminar();
 }
 
 function abrirEditarProducto(){
