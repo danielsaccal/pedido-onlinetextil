@@ -383,6 +383,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
@@ -843,7 +844,21 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <div id="zf-config"></div>
       <div class="actions"><button class="btn-mini" onclick="guardarZonasFlex()">Guardar zonas</button></div>
 
-      <p class="ni-seccion-tit" style="margin-top:24px;">3. Costos de Envíos Full (almacenamiento, retiros, devoluciones a depósito)</p>
+      <p class="ni-seccion-tit" style="margin-top:24px;">3. Facturas de Mercado Libre / Mercado Envíos (Ads, Full, almacenamiento, percepciones)</p>
+      <p class="note" style="margin-bottom:10px;">Suba las Facturas, Notas de Crédito y Notas de Débito en PDF tal como las descarga — la app las lee sola y agrega cada concepto (cargos, bonificaciones, IVA, percepciones) a la tabla de movimientos.</p>
+      <div class="field">
+        <label>¿De qué cuenta son estas facturas?</label>
+        <select id="fac-cuenta">
+          <option value="Alberto">Alberto</option>
+          <option value="Rita">Rita</option>
+        </select>
+      </div>
+      <div class="field"><input type="file" accept=".pdf" id="fac-archivos" multiple></div>
+      <div class="actions"><button class="btn btn-gold" onclick="procesarFacturasML()">Leer facturas</button></div>
+      <p class="error" id="fac-error" style="display:none;"></p>
+      <div id="fac-preview" style="margin-top:14px;"></div>
+
+      <p class="ni-seccion-tit" style="margin-top:24px;">4. Otros costos (retiros, devoluciones a depósito, y lo que no venga en una factura)</p>
       <p class="note" style="margin-bottom:10px;">Para gastos que no son de una venta puntual.</p>
       <div class="field">
         <label>Cuenta</label>
@@ -867,7 +882,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <div class="actions"><button class="btn btn-gold" onclick="guardarGastoPeriodicoML()">Guardar gasto</button></div>
       <div id="gp-lista" style="margin-top:10px;"></div>
 
-      <p class="ni-seccion-tit" style="margin-top:24px;">4. Movimientos</p>
+      <p class="ni-seccion-tit" style="margin-top:24px;">5. Movimientos</p>
       <div class="ni-chips" style="margin-bottom:10px;">
         <label class="ni-chip"><input type="radio" name="ml-filtro-cuenta" value="todas" checked onchange="renderVentasML()"><span>Ambas cuentas</span></label>
         <label class="ni-chip"><input type="radio" name="ml-filtro-cuenta" value="Alberto" onchange="renderVentasML()"><span>Alberto</span></label>
@@ -3163,6 +3178,160 @@ function detectarZonaPorBonificacion(monto){
   return null;
 }
 
+
+// ---------- leer facturas de Mercado Libre / Mercado Envios en PDF ----------
+if(typeof pdfjsLib !== 'undefined'){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+async function extraerTextoPDF(archivo){
+  const buffer = await archivo.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+  let texto = '';
+  for(let i=1; i<=pdf.numPages; i++){
+    const pagina = await pdf.getPage(i);
+    const contenido = await pagina.getTextContent();
+    // agrupamos por posicion vertical (y) para reconstruir renglones, ya que pdf.js da palabras sueltas
+    const porFila = {};
+    contenido.items.forEach(item => {
+      const y = Math.round(item.transform[5]);
+      if(!porFila[y]) porFila[y] = [];
+      porFila[y].push(item);
+    });
+    const filasOrdenadas = Object.keys(porFila).map(Number).sort((a,b) => b-a);
+    filasOrdenadas.forEach(y => {
+      const fila = porFila[y].sort((a,b) => a.transform[4] - b.transform[4]);
+      texto += fila.map(it => it.str).join(' ').replace(/\s+/g,' ').trim() + '\n';
+    });
+  }
+  return texto;
+}
+
+function parsearFacturaML(texto){
+  let tipo = null;
+  if(/Nota de Cr[eé]dito/i.test(texto)) tipo = 'nota_credito';
+  else if(/Nota de D[eé]bito/i.test(texto)) tipo = 'nota_debito';
+  else if(/Factura/i.test(texto)) tipo = 'factura';
+  if(!tipo) return null;
+
+  const mNum = texto.match(/(\d{4}-\d{8})/);
+  const numero = mNum ? mNum[1] : '';
+
+  const mFecha = texto.match(/Fecha de emisi[oó]n:\s*(\d{2})\.(\d{2})\.(\d{4})/i);
+  const fecha = mFecha ? `${mFecha[3]}-${mFecha[2]}-${mFecha[1]}` : '';
+
+  const idxNombre = texto.search(/Nombre:/i);
+  const idxSubtotal = texto.search(/SUBTOTAL:/i);
+  const idxTotal = texto.search(/\bTOTAL:/i);
+  if(idxNombre === -1 || idxSubtotal === -1 || idxTotal === -1) return null;
+
+  const patronLinea = /^(.+?)\s+([\d.]+,\d{2})$/;
+
+  // lineas de concepto: entre el nombre del cliente y SUBTOTAL
+  const bloqueConceptos = texto.slice(idxNombre, idxSubtotal).split('\n').slice(1);
+  const items = [];
+  bloqueConceptos.forEach(linea => {
+    linea = linea.trim();
+    const m = linea.match(patronLinea);
+    if(m){
+      const concepto = m[1].trim();
+      const monto = parseFloat(m[2].replace(/\./g,'').replace(',','.'));
+      const esBonif = /BONIFICA/i.test(concepto) && !/ANULACI[OÓ]N/i.test(concepto);
+      items.push({ concepto, monto: monto * (esBonif ? 1 : -1) });
+    }
+  });
+
+  // percepciones e IVA: entre SUBTOTAL y TOTAL, siguen el signo general del documento
+  const signoDoc = tipo === 'nota_credito' ? 1 : -1;
+  const bloqueImpuestos = texto.slice(idxSubtotal, idxTotal).split('\n').slice(1);
+  bloqueImpuestos.forEach(linea => {
+    linea = linea.trim();
+    const m = linea.match(patronLinea);
+    if(m){
+      const concepto = m[1].trim();
+      const monto = parseFloat(m[2].replace(/\./g,'').replace(',','.'));
+      items.push({ concepto, monto: monto * signoDoc });
+    }
+  });
+
+  return { tipo, numero, fecha, items };
+}
+
+let facturasParaImportar = null;
+
+async function procesarFacturasML(){
+  const archivos = document.getElementById('fac-archivos').files;
+  const errorEl = document.getElementById('fac-error');
+  const previewEl = document.getElementById('fac-preview');
+  errorEl.style.display = 'none';
+  previewEl.innerHTML = '<p class="note">Leyendo...</p>';
+  if(!archivos || archivos.length === 0){ errorEl.textContent = 'Elija al menos un PDF.'; errorEl.style.display = 'block'; previewEl.innerHTML=''; return; }
+
+  const todasLasLineas = [];
+  const noReconocidos = [];
+  for(const archivo of archivos){
+    try{
+      const texto = await extraerTextoPDF(archivo);
+      const datos = parsearFacturaML(texto);
+      if(!datos || datos.items.length === 0){
+        noReconocidos.push(archivo.name);
+        continue;
+      }
+      datos.items.forEach(it => {
+        todasLasLineas.push({ fecha: datos.fecha, operacion: datos.numero, sku: '', concepto: it.concepto, monto: Math.round(it.monto*100)/100 });
+      });
+    } catch(err){
+      noReconocidos.push(archivo.name + ' (' + err.message + ')');
+    }
+  }
+
+  facturasParaImportar = todasLasLineas;
+  const total = todasLasLineas.reduce((s,l) => s+l.monto, 0);
+
+  previewEl.innerHTML = `
+    <div style="padding:12px;background:var(--cream);border-radius:10px;margin-bottom:12px;">
+      <p style="margin:0;"><b>${archivos.length - noReconocidos.length}</b> factura(s) leídas, <b>${todasLasLineas.length}</b> línea(s) de concepto encontradas.</p>
+      <p style="margin:6px 0 0;">Efecto neto total: <b class="${total<0?'ml-monto-neg':'ml-monto-pos'}">${formatPrice(total)}</b></p>
+      ${noReconocidos.length ? `<p style="margin:6px 0 0;color:#A6432F;">⚠️ No se pudieron leer: ${noReconocidos.join(', ')}</p>` : ''}
+    </div>
+    ${todasLasLineas.length ? `
+      <div style="max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;margin-bottom:10px;">
+        ${todasLasLineas.map(l => `<div style="padding:6px 10px;border-bottom:1px solid var(--line);font-size:0.8rem;display:flex;justify-content:space-between;">
+          <span>${l.concepto}</span><span class="${l.monto<0?'ml-monto-neg':'ml-monto-pos'}">${formatPrice(l.monto)}</span>
+        </div>`).join('')}
+      </div>
+      <div class="actions"><button class="btn btn-gold" id="fac-btn-importar" onclick="importarFacturasML()">Importar estas ${todasLasLineas.length} líneas</button></div>
+    ` : ''}
+  `;
+}
+
+async function importarFacturasML(){
+  if(!facturasParaImportar || facturasParaImportar.length === 0) return;
+  const cuenta = document.getElementById('fac-cuenta').value;
+  const btn = document.getElementById('fac-btn-importar');
+  btn.disabled = true;
+  try{
+    const batch = db.batch();
+    facturasParaImportar.forEach(l => {
+      const ref = db.collection('movimientos_ml').doc();
+      batch.set(ref, {
+        cuenta, fecha: l.fecha, operacion: l.operacion, sku: l.sku,
+        concepto: l.concepto, monto: l.monto,
+        origen: 'importado_factura_ml', creado: new Date().toISOString()
+      });
+    });
+    await batch.commit();
+    alert('Se importaron ' + facturasParaImportar.length + ' líneas de facturas.');
+    document.getElementById('fac-archivos').value = '';
+    document.getElementById('fac-preview').innerHTML = '';
+    facturasParaImportar = null;
+    cargarVentasML();
+  } catch(e){
+    alert('No se pudo importar: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
 
 function abrirVentasML(){
   mostrarPaso('step-ventas-ml');
