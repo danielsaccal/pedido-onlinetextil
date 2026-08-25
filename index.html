@@ -3648,10 +3648,10 @@ function renderResumenSku(movs, cont){
   `;
 
   cont.innerHTML = `
-    <p class="note" style="margin-bottom:8px;">"Unidades vendidas" cuenta operaciones de venta de ese SKU (el archivo no trae unidades por línea, así que si una venta fue de varias unidades juntas, cuenta como 1).</p>
+    <p class="note" style="margin-bottom:8px;color:#A6432F;">⚠️ "Operaciones" es la cantidad de pagos/ventas con ese SKU, NO la cantidad de unidades físicas — el archivo de Mercado Pago no informa cuántas unidades hubo dentro de cada pago. Por eso <b>no se puede dividir "Ingreso producto" por esta columna</b> para sacar un precio por unidad: si una operación incluyó varias unidades juntas, el ingreso de esa operación ya es el total de todas, no de una sola.</p>
     <table class="ml-tabla" style="width:100%;table-layout:auto;">
       <thead><tr>
-        <th>Unid. vendidas</th><th>SKU</th>
+        <th>Operaciones</th><th>SKU</th>
         <th style="text-align:right;color:#3D7A2E;">Ingreso producto</th>
         <th style="text-align:right;color:#3D7A2E;">Ingreso Flex</th>
         <th style="text-align:right;color:#A6432F;">Costo envío</th>
@@ -3792,10 +3792,11 @@ function renderVentasML(){
     const operacionesUnicas = new Set(delSku.map(m => m.operacion)).size;
     modoAgrupado.innerHTML = `
       <p class="note" style="margin-bottom:8px;">${operacionesUnicas} operación(es), ${delSku.length} línea(s) para el SKU ${delSku[0].sku}.</p>
+      <p class="note" style="margin-bottom:8px;color:#A6432F;">⚠️ "Operaciones" es la cantidad de pagos con ese SKU, NO la cantidad de unidades físicas — no se puede dividir "Ingreso producto" por esta columna para sacar un precio por unidad.</p>
       <div style="overflow-x:auto;">
         <table class="ml-tabla" style="width:100%;table-layout:auto;">
           <thead><tr>
-            <th>Unid. vendidas</th><th>SKU</th>
+            <th>Operaciones</th><th>SKU</th>
             <th style="text-align:right;color:#3D7A2E;">Ingreso producto</th>
             <th style="text-align:right;color:#3D7A2E;">Ingreso Flex</th>
             <th style="text-align:right;color:#A6432F;">Costo envío</th>
