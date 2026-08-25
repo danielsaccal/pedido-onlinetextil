@@ -825,7 +825,22 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
     <div class="form-card">
       <h2>Ventas Mercado Libre</h2>
 
-      <p class="ni-seccion-tit">1. Importar reporte de Mercado Pago</p>
+      <p class="ni-seccion-tit">1. Importar reporte de Ventas de Mercado Libre (recomendado — trae unidades reales)</p>
+      <p class="note" style="margin-bottom:10px;">Descárguelo desde vendedores.mercadolibre.com.ar → Ventas → Descargar/Exportar. Trae la cantidad real de unidades por venta, precio unitario, comisión, envío y bonificación Flex — y hasta a qué mes de facturación corresponde cada línea, así que no hace falta que usted lo indique.</p>
+      <div class="field">
+        <label>¿De qué cuenta es este archivo?</label>
+        <select id="vta-cuenta">
+          <option value="Alberto">Alberto</option>
+          <option value="Rita">Rita</option>
+        </select>
+      </div>
+      <div class="field"><input type="file" accept=".xlsx,.xls" id="vta-archivo"></div>
+      <div class="actions"><button class="btn btn-gold" onclick="procesarVentasAR()">Procesar archivo</button></div>
+      <p class="error" id="vta-error" style="display:none;"></p>
+      <div id="vta-preview" style="margin-top:14px;"></div>
+
+      <p class="ni-seccion-tit" style="margin-top:24px;">1b. (Opcional) Reporte de Mercado Pago</p>
+      <p class="note" style="margin-bottom:10px;color:#A6432F;">⚠️ No suba este Y el de arriba para el mismo período — se contaría la venta dos veces. Use solo uno de los dos por período (recomendamos el de arriba).</p>
       <p class="note" style="margin-bottom:10px;">Suba el reporte de "Todas las transacciones" (.xlsx). Cada movimiento (venta, comisión, impuesto, envío, reclamo, devolución) queda como su propia línea en la tabla de abajo.</p>
       <div class="field">
         <label>¿De qué cuenta es este archivo?</label>
@@ -3355,6 +3370,154 @@ function abrirVentasML(){
 }
 
 // --- importar reporte ---
+// ---------- importar reporte de "Ventas" de Mercado Libre (con unidades reales) ----------
+function parsearFechaVentaAR(texto){
+  // formato: "31 de julio de 2026 22:52 hs."
+  const meses = {enero:'01',febrero:'02',marzo:'03',abril:'04',mayo:'05',junio:'06',julio:'07',agosto:'08',septiembre:'09',octubre:'10',noviembre:'11',diciembre:'12'};
+  const m = String(texto||'').match(/(\d{1,2}) de (\w+) de (\d{4})/i);
+  if(!m) return '';
+  const dia = m[1].padStart(2,'0');
+  const mes = meses[m[2].toLowerCase()] || '01';
+  return `${m[3]}-${mes}-${dia}`;
+}
+
+let filasVentasAR = null;
+
+function procesarVentasAR(){
+  const archivo = document.getElementById('vta-archivo').files[0];
+  const errorEl = document.getElementById('vta-error');
+  const previewEl = document.getElementById('vta-preview');
+  errorEl.style.display = 'none';
+  previewEl.innerHTML = '';
+  if(!archivo){ errorEl.textContent = 'Elija un archivo primero.'; errorEl.style.display = 'block'; return; }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try{
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const hoja = wb.Sheets[wb.SheetNames[0]];
+      const filasCrudas = XLSX.utils.sheet_to_json(hoja, {header:1, defval:''});
+
+      // buscar la fila de encabezados reales (la que empieza con "# de venta")
+      const idxHeader = filasCrudas.findIndex(f => String(f[0]).trim() === '# de venta');
+      if(idxHeader === -1){
+        errorEl.textContent = 'No reconocí este archivo. ¿Es el reporte de "Ventas" de Mercado Libre?';
+        errorEl.style.display = 'block';
+        return;
+      }
+      const headers = filasCrudas[idxHeader];
+      const idx = (regex) => headers.findIndex(h => regex.test(String(h)));
+
+      const iVenta = idx(/^# de venta$/i);
+      const iFecha = idx(/^Fecha de venta$/i);
+      const iEstado = idx(/^Estado$/i);
+      const iUnidades = idx(/^Unidades$/i);
+      const iIngresoProd = idx(/Ingresos por productos/i);
+      const iCargo = idx(/Cargo por venta e impuestos/i);
+      const iIngresoEnvio = idx(/Ingresos por env[ií]o/i);
+      const iCostoEnvio = idx(/Costos de env[ií]o \(ARS\)/i);
+      const iDescBonif = idx(/Descuentos y bonificaciones/i);
+      const iAnulaciones = idx(/Anulaciones y reembolsos/i);
+      const iMes = idx(/Mes de facturaci[oó]n/i);
+      const iSku = idx(/^SKU$/i);
+      const iTitulo = idx(/T[ií]tulo de la publicaci[oó]n/i);
+      const iPrecioUnit = idx(/Precio unitario de venta/i);
+
+      if(iVenta===-1 || iSku===-1 || iUnidades===-1){
+        errorEl.textContent = 'No reconocí las columnas necesarias en este archivo.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      const movimientos = [];
+      for(let i=idxHeader+1; i<filasCrudas.length; i++){
+        const f = filasCrudas[i];
+        const sku = String(f[iSku]||'').trim();
+        const unidades = parseFloat(f[iUnidades]) || 0;
+        const precioUnit = parseFloat(f[iPrecioUnit]) || 0;
+        if(!sku || unidades <= 0) continue; // saltamos filas resumen de paquete (sin SKU) o vacias
+
+        const numeroVenta = String(f[iVenta]||'');
+        const fecha = parsearFechaVentaAR(f[iFecha]);
+        const estado = String(f[iEstado]||'');
+        const mesFacturacion = String(f[iMes]||'').trim();
+        const ingresoProdCelda = parseFloat(f[iIngresoProd]);
+        const ingresoProducto = !isNaN(ingresoProdCelda) && ingresoProdCelda !== 0 ? ingresoProdCelda : (unidades * precioUnit);
+        const cargo = parseFloat(f[iCargo]) || 0;
+        const ingresoEnvio = parseFloat(f[iIngresoEnvio]) || 0;
+        const costoEnvio = parseFloat(f[iCostoEnvio]) || 0;
+        const descBonif = parseFloat(f[iDescBonif]) || 0;
+        const anulaciones = parseFloat(f[iAnulaciones]) || 0;
+
+        if(ingresoProducto !== 0) movimientos.push({ fecha, operacion:numeroVenta, sku, concepto:'Venta', monto: ingresoProducto, unidades, mesFacturacion, estado });
+        if(cargo !== 0) movimientos.push({ fecha, operacion:numeroVenta, sku, concepto:'Comisión + IVA', monto: cargo, mesFacturacion });
+        if(ingresoEnvio !== 0) movimientos.push({ fecha, operacion:numeroVenta, sku, concepto:'Ingreso por envío', monto: ingresoEnvio, mesFacturacion });
+        if(costoEnvio !== 0) movimientos.push({ fecha, operacion:numeroVenta, sku, concepto:'Costo de envío', monto: -Math.abs(costoEnvio), mesFacturacion });
+        if(descBonif !== 0) movimientos.push({ fecha, operacion:numeroVenta, sku, concepto:'Bonificación Flex', monto: descBonif, mesFacturacion });
+        if(anulaciones !== 0) movimientos.push({ fecha, operacion:numeroVenta, sku, concepto:'Anulación/Reembolso', monto: anulaciones, mesFacturacion });
+      }
+
+      filasVentasAR = movimientos;
+      const totalUnidades = movimientos.filter(m => m.concepto==='Venta').reduce((s,m) => s+m.unidades, 0);
+      const totalNeto = movimientos.reduce((s,m) => s+m.monto, 0);
+
+      previewEl.innerHTML = `
+        <div style="padding:12px;background:var(--cream);border-radius:10px;margin-bottom:12px;">
+          <p style="margin:0;"><b>${movimientos.length}</b> línea(s) de movimiento, <b>${totalUnidades}</b> unidades vendidas en total.</p>
+          <p style="margin:6px 0 0;">Saldo neto de estas líneas: <b style="color:var(--purple);">${formatPrice(totalNeto)}</b></p>
+        </div>
+        <div class="actions"><button class="btn btn-gold" id="vta-btn-importar" onclick="importarVentasAR()">Importar estas ${movimientos.length} líneas</button></div>
+      `;
+    } catch(err){
+      errorEl.textContent = 'No se pudo leer el archivo: ' + err.message;
+      errorEl.style.display = 'block';
+    }
+  };
+  reader.readAsArrayBuffer(archivo);
+}
+
+async function importarVentasAR(){
+  if(!filasVentasAR || filasVentasAR.length === 0) return;
+  const cuenta = document.getElementById('vta-cuenta').value;
+  const btn = document.getElementById('vta-btn-importar');
+  btn.disabled = true;
+
+  const clavesExistentes = new Set((listaVentasML || []).map(claveMovimiento));
+  const nuevas = filasVentasAR.filter(m => !clavesExistentes.has(claveMovimiento({...m, cuenta})));
+  const saltadas = filasVentasAR.length - nuevas.length;
+
+  const CHUNK = 400;
+  let importadas = 0;
+  try{
+    for(let i=0; i<nuevas.length; i+=CHUNK){
+      const lote = nuevas.slice(i, i+CHUNK);
+      const batch = db.batch();
+      lote.forEach(m => {
+        const ref = db.collection('movimientos_ml').doc();
+        batch.set(ref, {
+          cuenta, fecha: m.fecha, operacion: m.operacion, sku: m.sku,
+          concepto: m.concepto, monto: Math.round(m.monto*100)/100,
+          unidades: m.unidades || null, mesFacturacion: m.mesFacturacion || null, estadoVenta: m.estado || null,
+          origen: 'importado_ventas_ar', creado: new Date().toISOString()
+        });
+      });
+      await batch.commit();
+      importadas += lote.length;
+      btn.textContent = 'Importando... ' + importadas + '/' + nuevas.length;
+    }
+    alert('Se importaron ' + importadas + ' líneas nuevas de ' + cuenta + '.' + (saltadas > 0 ? ' (' + saltadas + ' ya existían y se saltearon)' : ''));
+    document.getElementById('vta-archivo').value = '';
+    document.getElementById('vta-preview').innerHTML = '';
+    filasVentasAR = null;
+    cargarVentasML();
+  } catch(e){
+    alert('Se cortó en la línea ' + importadas + ': ' + e.message + '. Lo que ya se importó quedó guardado.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Importar';
+  }
+}
+
 function clasificarTipoML(tipo){
   const t = (tipo||'').toLowerCase();
   if(t.includes('pago aprobado')) return 'venta';
@@ -3591,11 +3754,12 @@ function renderResumenActividad(movs, cont){
 }
 
 function clasificarMovimientosPorSku(movsDeUnSku){
-  const cat = { unidades: 0, ingresoProducto: 0, ingresoFlex: 0, costoEnvio: 0, percepciones: 0, comisiones: 0, otros: 0 };
+  const cat = { unidades: 0, unidadesReales: false, ingresoProducto: 0, ingresoFlex: 0, costoEnvio: 0, percepciones: 0, comisiones: 0, otros: 0 };
   movsDeUnSku.forEach(m => {
     const c = m.concepto || '';
     if(c === 'Venta'){
-      cat.unidades++;
+      if(m.unidades){ cat.unidades += m.unidades; cat.unidadesReales = true; }
+      else cat.unidades += 1;
       cat.ingresoProducto += m.monto;
     } else if(/flex|env[ií]o/i.test(c)){
       if(m.monto >= 0) cat.ingresoFlex += m.monto;
@@ -3636,7 +3800,7 @@ function renderResumenSku(movs, cont){
 
   const filaHtml = (f) => `
     <tr>
-      <td>${f.unidades}</td>
+      <td>${f.unidades}${f.unidadesReales ? '' : ' <span style="color:#B5AC9E;font-size:0.7rem;">(aprox.)</span>'}</td>
       <td>${f.sku}</td>
       <td class="ml-monto-pos" style="text-align:right;">${formatPrice(f.ingresoProducto)}</td>
       <td class="ml-monto-pos" style="text-align:right;">${f.ingresoFlex ? formatPrice(f.ingresoFlex) : '—'}</td>
@@ -3648,10 +3812,10 @@ function renderResumenSku(movs, cont){
   `;
 
   cont.innerHTML = `
-    <p class="note" style="margin-bottom:8px;color:#A6432F;">⚠️ "Operaciones" es la cantidad de pagos/ventas con ese SKU, NO la cantidad de unidades físicas — el archivo de Mercado Pago no informa cuántas unidades hubo dentro de cada pago. Por eso <b>no se puede dividir "Ingreso producto" por esta columna</b> para sacar un precio por unidad: si una operación incluyó varias unidades juntas, el ingreso de esa operación ya es el total de todas, no de una sola.</p>
+    <p class="note" style="margin-bottom:8px;color:#A6432F;">⚠️ Cuando dice "(aprox.)" es porque ese SKU viene solo del reporte de Mercado Pago (sin unidades reales) y esa columna cuenta operaciones, no unidades — ahí no divida "Ingreso producto" por esa cantidad. Si NO dice "(aprox.)", es la cantidad real de unidades (viene del reporte de Ventas).</p>
     <table class="ml-tabla" style="width:100%;table-layout:auto;">
       <thead><tr>
-        <th>Operaciones</th><th>SKU</th>
+        <th>Unidades</th><th>SKU</th>
         <th style="text-align:right;color:#3D7A2E;">Ingreso producto</th>
         <th style="text-align:right;color:#3D7A2E;">Ingreso Flex</th>
         <th style="text-align:right;color:#A6432F;">Costo envío</th>
@@ -3792,11 +3956,11 @@ function renderVentasML(){
     const operacionesUnicas = new Set(delSku.map(m => m.operacion)).size;
     modoAgrupado.innerHTML = `
       <p class="note" style="margin-bottom:8px;">${operacionesUnicas} operación(es), ${delSku.length} línea(s) para el SKU ${delSku[0].sku}.</p>
-      <p class="note" style="margin-bottom:8px;color:#A6432F;">⚠️ "Operaciones" es la cantidad de pagos con ese SKU, NO la cantidad de unidades físicas — no se puede dividir "Ingreso producto" por esta columna para sacar un precio por unidad.</p>
+      <p class="note" style="margin-bottom:8px;color:#A6432F;">⚠️ Si dice "(aprox.)", esa cantidad cuenta operaciones, no unidades reales — no divida "Ingreso producto" por esa cantidad en ese caso.</p>
       <div style="overflow-x:auto;">
         <table class="ml-tabla" style="width:100%;table-layout:auto;">
           <thead><tr>
-            <th>Operaciones</th><th>SKU</th>
+            <th>Unidades</th><th>SKU</th>
             <th style="text-align:right;color:#3D7A2E;">Ingreso producto</th>
             <th style="text-align:right;color:#3D7A2E;">Ingreso Flex</th>
             <th style="text-align:right;color:#A6432F;">Costo envío</th>
@@ -3805,7 +3969,7 @@ function renderVentasML(){
             <th style="text-align:right;">Neto</th>
           </tr></thead>
           <tbody><tr>
-            <td>${cat.unidades}</td>
+            <td>${cat.unidades}${cat.unidadesReales ? '' : ' <span style="color:#B5AC9E;font-size:0.7rem;">(aprox.)</span>'}</td>
             <td>${delSku[0].sku}</td>
             <td class="ml-monto-pos" style="text-align:right;">${formatPrice(cat.ingresoProducto)}</td>
             <td class="ml-monto-pos" style="text-align:right;">${cat.ingresoFlex ? formatPrice(cat.ingresoFlex) : '—'}</td>
