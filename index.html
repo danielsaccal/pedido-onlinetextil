@@ -896,6 +896,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <div class="field"><input type="text" id="ml-buscador-ventas" placeholder="Buscar por SKU (agrupa todo lo vendido de ese SKU) u operación..." oninput="renderVentasML()"></div>
       <p class="note" id="ml-resumen-totales" style="margin-bottom:10px;"></p>
       <button type="button" class="btn-mini" style="margin-bottom:10px;" onclick="detectarYBorrarDuplicadosML()">🧹 Detectar y borrar duplicados</button>
+      <button type="button" class="btn-mini" style="margin-bottom:10px;margin-left:8px;background:#A6432F;color:#fff;border-color:#A6432F;" onclick="borrarTodosLosMovimientosML()">🗑️ Borrar TODOS los movimientos</button>
       <div id="ml-modo-agrupado" style="display:none;"></div>
       <div id="ml-resumen-vista" style="display:none;overflow-x:auto;"></div>
       <div id="ml-tabla-wrap" style="overflow-x:auto;">
@@ -3674,6 +3675,30 @@ function renderResumenSku(movs, cont){
 
 function claveMovimiento(m){
   return [m.cuenta, m.operacion, m.concepto, Math.round((m.monto||0)*100), m.fecha].join('|');
+}
+
+async function borrarTodosLosMovimientosML(){
+  if(!listaVentasML || listaVentasML.length === 0){ alert('No hay movimientos cargados.'); return; }
+  const total = listaVentasML.length;
+  if(!confirm(`Esto borra las ${total} líneas de TODOS los movimientos importados (Excel y facturas), de las dos cuentas. No se puede deshacer. ¿Continuar?`)) return;
+  if(!confirm('Confirmo de nuevo: se va a borrar TODO el historial de movimientos de Mercado Libre. ¿Está seguro?')) return;
+
+  try{
+    const ids = listaVentasML.map(m => m.id);
+    const CHUNK = 400;
+    let borrados = 0;
+    for(let i=0; i<ids.length; i+=CHUNK){
+      const lote = ids.slice(i, i+CHUNK);
+      const batch = db.batch();
+      lote.forEach(id => batch.delete(db.collection('movimientos_ml').doc(id)));
+      await batch.commit();
+      borrados += lote.length;
+    }
+    alert('Se borraron ' + borrados + ' líneas. Ya puede volver a importar los archivos.');
+    cargarVentasML();
+  } catch(e){
+    alert('No se pudo terminar el borrado: ' + e.message);
+  }
 }
 
 async function detectarYBorrarDuplicadosML(){
