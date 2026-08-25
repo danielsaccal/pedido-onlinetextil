@@ -839,7 +839,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <div id="mli-preview" style="margin-top:14px;"></div>
 
       <p class="ni-seccion-tit" style="margin-top:24px;">2. Zonas de envío Flex (para calcular el costo real)</p>
-      <p class="note" style="margin-bottom:10px;">El archivo de Mercado Pago no dice a qué zona corresponde cada envío, pero sí la provincia del comprador. Asigne cada provincia a una de sus 3 zonas, y cargue lo que paga en cada una — el sistema va a calcular esto solo en cada importación.</p>
+      <p class="note" style="margin-bottom:10px;">Mercado Libre le paga una bonificación fija según la zona (cercana/media/lejana/muy lejana) — el sistema detecta la zona por ese monto exacto en el archivo, y calcula la diferencia contra lo que usted paga de verdad por el flete en cada una.</p>
       <div id="zf-config"></div>
       <div class="actions"><button class="btn-mini" onclick="guardarZonasFlex()">Guardar zonas</button></div>
 
@@ -3096,21 +3096,73 @@ function convertirFechaMLaISO(texto){
 }
 
 // ---------- ventas mercado libre (formato libro: un renglon por movimiento, verde/rojo) ----------
-const PROVINCIAS_ML = [
-  ['iibb_caba','CABA'], ['iibb_buenos_aires','Buenos Aires'], ['iibb_cordoba','Córdoba'],
-  ['iibb_santa_fe','Santa Fe'], ['iibb_mendoza','Mendoza'], ['iibb_tucuman','Tucumán'],
-  ['iibb_entre_rios','Entre Ríos'], ['iibb_salta','Salta'], ['iibb_chaco','Chaco'],
-  ['iibb_corrientes','Corrientes'], ['iibb_misiones','Misiones'], ['iibb_santiago_del_estero','Santiago del Estero'],
-  ['iibb_jujuy','Jujuy'], ['iibb_rio_negro','Río Negro'], ['iibb_neuquen','Neuquén'],
-  ['iibb_formosa','Formosa'], ['iibb_chubut','Chubut'], ['iibb_san_juan','San Juan'],
-  ['iibb_san_luis','San Luis'], ['iibb_la_pampa','La Pampa'], ['iibb_catamarca','Catamarca'],
-  ['iibb_la_rioja','La Rioja'], ['iibb_santa_cruz','Santa Cruz'], ['iibb_tierra_del_fuego','Tierra del Fuego'],
+const ZONAS_FLEX_DEFAULT = [
+  { id:'cercana', nombre:'Zona cercana', bonificacion: 4490 },
+  { id:'media', nombre:'Zona media distancia', bonificacion: 6490 },
+  { id:'lejana', nombre:'Zona lejana', bonificacion: 8690 },
+  { id:'muy_lejana', nombre:'Zona muy lejana', bonificacion: 9990 },
 ];
 
 let configZonasFlex = null;
-let listaVentasML = null;
-let listaGastosPeriodicosML = null;
-let filasImportacionML = null;
+
+function cargarZonasFlex(){
+  db.collection('config').doc('zonas_flex').get().then(doc => {
+    configZonasFlex = doc.exists ? doc.data() : { zonas: ZONAS_FLEX_DEFAULT.map(z => ({...z, pago: 0})) };
+    if(!configZonasFlex.zonas) configZonasFlex.zonas = ZONAS_FLEX_DEFAULT.map(z => ({...z, pago: 0}));
+    renderConfigZonasFlex();
+  }).catch(e => {
+    configZonasFlex = { zonas: ZONAS_FLEX_DEFAULT.map(z => ({...z, pago: 0})) };
+    renderConfigZonasFlex();
+  });
+}
+
+function renderConfigZonasFlex(){
+  const cont = document.getElementById('zf-config');
+  cont.innerHTML = `
+    <div class="zf-fila" style="font-weight:700;font-size:0.7rem;color:#6E6459;grid-template-columns:1fr 120px 100px;">
+      <span>ZONA</span><span>ML LE PAGA</span><span>USTED PAGA</span>
+    </div>
+    ${configZonasFlex.zonas.map((z,i) => `
+      <div class="zf-fila" style="grid-template-columns:1fr 120px 100px;">
+        <span>${z.nombre}</span>
+        <input type="number" step="1" id="zf-bonif-${i}" value="${z.bonificacion}">
+        <input type="number" step="0.01" id="zf-pago-${i}" value="${z.pago || ''}" placeholder="$">
+      </div>
+    `).join('')}
+  `;
+}
+
+async function guardarZonasFlex(){
+  const zonas = configZonasFlex.zonas.map((z,i) => ({
+    id: z.id, nombre: z.nombre,
+    bonificacion: parseFloat(document.getElementById('zf-bonif-'+i).value) || z.bonificacion,
+    pago: parseFloat(document.getElementById('zf-pago-'+i).value) || 0,
+  }));
+  configZonasFlex = { zonas };
+  try{
+    await db.collection('config').doc('zonas_flex').set(configZonasFlex);
+    alert('Zonas guardadas.');
+  } catch(e){
+    alert('No se pudo guardar: ' + e.message);
+  }
+}
+
+function detectarZonaPorBonificacion(monto){
+  if(!configZonasFlex || !configZonasFlex.zonas) return null;
+  const montoAbs = Math.abs(monto);
+  // primero intenta exacto, despues el mas cercano dentro de una tolerancia (las tarifas oficiales cambian con el tiempo)
+  let exacta = configZonasFlex.zonas.find(z => Math.abs(z.bonificacion - montoAbs) < 1);
+  if(exacta) return exacta;
+  let mejor = null, mejorDist = Infinity;
+  configZonasFlex.zonas.forEach(z => {
+    const dist = Math.abs(z.bonificacion - montoAbs);
+    if(dist < mejorDist){ mejorDist = dist; mejor = z; }
+  });
+  // solo la damos por buena si esta razonablemente cerca (menos del 15% de diferencia)
+  if(mejor && mejorDist / mejor.bonificacion < 0.15) return mejor;
+  return null;
+}
+
 
 function abrirVentasML(){
   mostrarPaso('step-ventas-ml');
@@ -3118,71 +3170,6 @@ function abrirVentasML(){
   cargarZonasFlex();
   cargarVentasML();
   cargarGastosPeriodicosML();
-}
-
-// --- zonas de flete ---
-function cargarZonasFlex(){
-  db.collection('config').doc('zonas_flex').get().then(doc => {
-    configZonasFlex = doc.exists ? doc.data() : { porProvincia: {}, precios: {1:0, 2:0, 3:0} };
-    renderConfigZonasFlex();
-  }).catch(e => {
-    configZonasFlex = { porProvincia: {}, precios: {1:0, 2:0, 3:0} };
-    renderConfigZonasFlex();
-  });
-}
-
-function renderConfigZonasFlex(){
-  const cont = document.getElementById('zf-config');
-  const precios = configZonasFlex.precios || {1:0,2:0,3:0};
-  let html = `
-    <div class="zf-fila" style="font-weight:700;font-size:0.72rem;color:#6E6459;">
-      <span>PROVINCIA</span><span>ZONA</span><span></span>
-    </div>
-  `;
-  PROVINCIAS_ML.forEach(([codigo, nombre]) => {
-    const zonaActual = (configZonasFlex.porProvincia || {})[codigo] || '';
-    html += `
-      <div class="zf-fila">
-        <span>${nombre}</span>
-        <select id="zf-prov-${codigo}">
-          <option value="">Sin asignar</option>
-          <option value="1" ${zonaActual==='1'?'selected':''}>Zona 1</option>
-          <option value="2" ${zonaActual==='2'?'selected':''}>Zona 2</option>
-          <option value="3" ${zonaActual==='3'?'selected':''}>Zona 3</option>
-        </select>
-        <span></span>
-      </div>
-    `;
-  });
-  html += `
-    <div class="zf-fila" style="margin-top:10px;font-weight:700;font-size:0.72rem;color:#6E6459;">
-      <span>PRECIO POR ZONA</span><span></span><span></span>
-    </div>
-    <div class="zf-fila"><span>Zona 1</span><input type="number" step="0.01" id="zf-precio-1" value="${precios[1]||''}"><span></span></div>
-    <div class="zf-fila"><span>Zona 2</span><input type="number" step="0.01" id="zf-precio-2" value="${precios[2]||''}"><span></span></div>
-    <div class="zf-fila"><span>Zona 3</span><input type="number" step="0.01" id="zf-precio-3" value="${precios[3]||''}"><span></span></div>
-  `;
-  cont.innerHTML = html;
-}
-
-async function guardarZonasFlex(){
-  const porProvincia = {};
-  PROVINCIAS_ML.forEach(([codigo]) => {
-    const val = document.getElementById('zf-prov-'+codigo).value;
-    if(val) porProvincia[codigo] = val;
-  });
-  const precios = {
-    1: parseFloat(document.getElementById('zf-precio-1').value) || 0,
-    2: parseFloat(document.getElementById('zf-precio-2').value) || 0,
-    3: parseFloat(document.getElementById('zf-precio-3').value) || 0,
-  };
-  configZonasFlex = { porProvincia, precios };
-  try{
-    await db.collection('config').doc('zonas_flex').set(configZonasFlex);
-    alert('Zonas guardadas.');
-  } catch(e){
-    alert('No se pudo guardar: ' + e.message);
-  }
 }
 
 // --- importar reporte ---
@@ -3221,7 +3208,6 @@ function procesarImportacionML(){
       const colNeto = Object.keys(primera).find(c => /monto neto de la operaci[oó]n que impact/i.test(c));
       const colEnvio = Object.keys(primera).find(c => /costo de env[ií]o/i.test(c));
       const colSku = Object.keys(primera).find(c => /c[oó]digo de producto sku/i.test(c));
-      const colProvincia = Object.keys(primera).find(c => /detalle de impuestos/i.test(c));
 
       if(!colValor || !colNeto || !colTipo){
         errorEl.textContent = 'No reconocí las columnas de este archivo. ¿Es el reporte de "Todas las transacciones" de Mercado Pago?';
@@ -3230,6 +3216,7 @@ function procesarImportacionML(){
       }
 
       const movimientos = [];
+      let sinZonaDetectada = 0;
       filas.forEach(f => {
         const tipoOriginal = colTipo ? String(f[colTipo]) : '';
         const tipo = clasificarTipoML(tipoOriginal);
@@ -3241,24 +3228,23 @@ function procesarImportacionML(){
         const impuestos = parseFloat(f[colImpuestos]) || 0;
         const envio = parseFloat(f[colEnvio]) || 0;
         const neto = parseFloat(f[colNeto]) || 0;
-        const provincia = colProvincia ? String(f[colProvincia]) : '';
 
         if(tipo === 'venta'){
           if(valor !== 0) movimientos.push({ fecha, operacion, sku, concepto:'Venta', monto: valor, esVenta:true });
           if(comision < 0) movimientos.push({ fecha, operacion, sku, concepto:'Comisión + IVA', monto: comision });
           if(impuestos < 0) movimientos.push({ fecha, operacion, sku, concepto:'Impuestos y percepciones (IIBB)', monto: impuestos });
           if(envio < 0) movimientos.push({ fecha, operacion, sku, concepto:'Envío (ML)', monto: envio });
-
-          // envio flex real, segun zona configurada por provincia
-          if(provincia && configZonasFlex && configZonasFlex.porProvincia){
-            const zona = configZonasFlex.porProvincia[provincia];
-            const precioZona = zona ? (configZonasFlex.precios[zona] || 0) : 0;
-            if(zona && precioZona > 0){
-              movimientos.push({ fecha, operacion, sku, concepto:`Envío Flex real (Zona ${zona})`, monto: -precioZona });
-            }
-          }
         } else if(tipo === 'envio'){
           if(neto !== 0) movimientos.push({ fecha, operacion, sku, concepto: tipoOriginal || 'Envío', monto: neto });
+          // el "valor de la compra" de este movimiento es la bonificacion que ML paga por flex: sirve para detectar la zona
+          if(valor > 0){
+            const zona = detectarZonaPorBonificacion(valor);
+            if(zona && zona.pago > 0){
+              movimientos.push({ fecha, operacion, sku, concepto: `Costo real de Flex (${zona.nombre})`, monto: -zona.pago });
+            } else if(!zona){
+              sinZonaDetectada++;
+            }
+          }
         } else if(tipo === 'reclamo'){
           if(neto !== 0 || valor !== 0) movimientos.push({ fecha, operacion, sku, concepto: 'Reclamo', monto: neto || valor });
         } else if(tipo === 'devolucion'){
@@ -3277,7 +3263,8 @@ function procesarImportacionML(){
         <div style="padding:12px;background:var(--cream);border-radius:10px;margin-bottom:12px;">
           <p style="margin:0;"><b>${movimientos.length}</b> líneas de movimiento se van a crear.</p>
           <p style="margin:4px 0 0;">Total vendido (bruto): <b>${formatPrice(totalVenta)}</b></p>
-          <p style="margin:4px 0 0;">Saldo neto del período (con todo restado, incluyendo flex por zona si configuró precios): <b style="color:var(--purple);">${formatPrice(totalNeto)}</b></p>
+          <p style="margin:4px 0 0;">Saldo neto del período (con todo restado, incluyendo Flex real si configuró las zonas): <b style="color:var(--purple);">${formatPrice(totalNeto)}</b></p>
+          ${sinZonaDetectada > 0 ? `<p style="margin:6px 0 0;color:#A6432F;">⚠️ ${sinZonaDetectada} envío(s) con una bonificación que no coincide con ninguna zona configurada — revise los montos en el paso 2.</p>` : ''}
         </div>
         <div class="actions"><button class="btn btn-gold" id="mli-btn-importar" onclick="importarVentasML()">Importar estas ${movimientos.length} líneas</button></div>
       `;
