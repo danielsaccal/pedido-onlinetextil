@@ -3501,6 +3501,25 @@ function abrirImportarExcel(){
   cambiosImportacionExcel = [];
 }
 
+function normalizarPrecioAArgentino(valorCelda){
+  let numero;
+  if(typeof valorCelda === 'number'){
+    numero = valorCelda;
+  } else {
+    const texto = String(valorCelda || '').trim();
+    if(!texto) return '';
+    if(/,\d{1,2}$/.test(texto)){
+      // termina en coma + 1 o 2 digitos: formato argentino (ej "11.168,80")
+      numero = parseFloat(texto.replace(/\./g,'').replace(',','.'));
+    } else {
+      // formato con punto decimal (ej "11168.8", tal como lo entrega Excel para celdas numericas)
+      numero = parseFloat(texto.replace(/,/g,''));
+    }
+  }
+  if(isNaN(numero)) return '';
+  return numero.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
 function procesarExcelImportado(){
   const errorEl = document.getElementById('ie-error');
   const previewEl = document.getElementById('ie-preview');
@@ -3534,7 +3553,7 @@ function procesarExcelImportado(){
         const sku = String(fila[colSku] || '').trim();
         if(!sku) return;
         const nuevoDesc = colDesc ? String(fila[colDesc] || '').trim() : '';
-        const nuevoPrecio = String(fila[colPrecio] || '').trim();
+        const nuevoPrecio = normalizarPrecioAArgentino(fila[colPrecio]);
         const match = buscarProductoPorSku(sku);
         if(match){
           encontrados.push({ sku, nuevoDesc, nuevoPrecio, match });
