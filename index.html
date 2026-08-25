@@ -888,9 +888,15 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
         <label class="ni-chip"><input type="radio" name="ml-filtro-cuenta" value="Alberto" onchange="renderVentasML()"><span>Alberto</span></label>
         <label class="ni-chip"><input type="radio" name="ml-filtro-cuenta" value="Rita" onchange="renderVentasML()"><span>Rita</span></label>
       </div>
+      <div class="ni-chips" style="margin-bottom:10px;">
+        <label class="ni-chip"><input type="radio" name="ml-vista" value="movimientos" checked onchange="renderVentasML()"><span>Movimientos</span></label>
+        <label class="ni-chip"><input type="radio" name="ml-vista" value="actividad" onchange="renderVentasML()"><span>Resumen por actividad</span></label>
+        <label class="ni-chip"><input type="radio" name="ml-vista" value="sku" onchange="renderVentasML()"><span>Resumen por SKU</span></label>
+      </div>
       <div class="field"><input type="text" id="ml-buscador-ventas" placeholder="Buscar por SKU (agrupa todo lo vendido de ese SKU) u operación..." oninput="renderVentasML()"></div>
       <p class="note" id="ml-resumen-totales" style="margin-bottom:10px;"></p>
       <div id="ml-modo-agrupado" style="display:none;"></div>
+      <div id="ml-resumen-vista" style="display:none;overflow-x:auto;"></div>
       <div id="ml-tabla-wrap" style="overflow-x:auto;">
         <table class="ml-tabla" id="ml-tabla-ventas">
           <colgroup>
@@ -3539,6 +3545,99 @@ async function eliminarGastoPeriodicoML(id){
 }
 
 // --- tabla de movimientos (libro) ---
+function renderResumenActividad(movs, cont){
+  const porConcepto = {};
+  movs.forEach(m => {
+    if(!porConcepto[m.concepto]) porConcepto[m.concepto] = { monto: 0, cantidad: 0 };
+    porConcepto[m.concepto].monto += m.monto;
+    porConcepto[m.concepto].cantidad++;
+  });
+  const ingresos = Object.entries(porConcepto).filter(([,v]) => v.monto >= 0).sort((a,b) => b[1].monto - a[1].monto);
+  const egresos = Object.entries(porConcepto).filter(([,v]) => v.monto < 0).sort((a,b) => a[1].monto - b[1].monto);
+  const totalIngresos = ingresos.reduce((s,[,v]) => s+v.monto, 0);
+  const totalEgresos = egresos.reduce((s,[,v]) => s+v.monto, 0);
+
+  const filaHtml = ([concepto, v]) => `
+    <tr>
+      <td>${concepto}</td>
+      <td style="text-align:right;">${v.cantidad}</td>
+      <td class="${v.monto<0?'ml-monto-neg':'ml-monto-pos'}" style="text-align:right;">${formatPrice(v.monto)}</td>
+    </tr>
+  `;
+
+  cont.innerHTML = `
+    <table class="ml-tabla" style="width:100%;table-layout:auto;margin-bottom:20px;">
+      <thead><tr><th colspan="3" style="color:#3D7A2E;">INGRESOS</th></tr><tr><th>Concepto</th><th style="text-align:right;">Líneas</th><th style="text-align:right;">Total</th></tr></thead>
+      <tbody>${ingresos.map(filaHtml).join('') || '<tr><td colspan="3" class="empty-msg">Sin ingresos.</td></tr>'}</tbody>
+      <tfoot><tr style="font-weight:700;border-top:2px solid var(--line);"><td>Total ingresos</td><td></td><td class="ml-monto-pos" style="text-align:right;">${formatPrice(totalIngresos)}</td></tr></tfoot>
+    </table>
+    <table class="ml-tabla" style="width:100%;table-layout:auto;">
+      <thead><tr><th colspan="3" style="color:#A6432F;">EGRESOS</th></tr><tr><th>Concepto</th><th style="text-align:right;">Líneas</th><th style="text-align:right;">Total</th></tr></thead>
+      <tbody>${egresos.map(filaHtml).join('') || '<tr><td colspan="3" class="empty-msg">Sin egresos.</td></tr>'}</tbody>
+      <tfoot><tr style="font-weight:700;border-top:2px solid var(--line);"><td>Total egresos</td><td></td><td class="ml-monto-neg" style="text-align:right;">${formatPrice(totalEgresos)}</td></tr></tfoot>
+    </table>
+  `;
+}
+
+function renderResumenSku(movs, cont){
+  const conSku = movs.filter(m => m.sku);
+  const porSku = {};
+  conSku.forEach(m => {
+    if(!porSku[m.sku]) porSku[m.sku] = { cantidadVentas: 0, ingreso: 0, impuestos: 0, egresos: 0 };
+    const s = porSku[m.sku];
+    if(m.concepto === 'Venta') s.cantidadVentas++;
+    if(m.monto >= 0){
+      s.ingreso += m.monto;
+    } else if(/impuesto|percepci[oó]n/i.test(m.concepto)){
+      s.impuestos += m.monto;
+    } else {
+      s.egresos += m.monto;
+    }
+  });
+  const filas = Object.entries(porSku).map(([sku, s]) => ({
+    sku, ...s, neto: s.ingreso + s.impuestos + s.egresos
+  })).sort((a,b) => b.ingreso - a.ingreso);
+
+  if(filas.length === 0){
+    cont.innerHTML = '<p class="empty-msg">No hay movimientos con SKU para agrupar (las líneas de facturas generales no tienen SKU asociado).</p>';
+    return;
+  }
+
+  const totales = filas.reduce((acc,f) => ({
+    cantidadVentas: acc.cantidadVentas+f.cantidadVentas, ingreso: acc.ingreso+f.ingreso,
+    impuestos: acc.impuestos+f.impuestos, egresos: acc.egresos+f.egresos, neto: acc.neto+f.neto
+  }), {cantidadVentas:0, ingreso:0, impuestos:0, egresos:0, neto:0});
+
+  cont.innerHTML = `
+    <p class="note" style="margin-bottom:8px;">"Cantidad" cuenta operaciones de venta de ese SKU (el archivo no trae unidades por línea, así que si una venta fue de varias unidades juntas, cuenta como 1).</p>
+    <table class="ml-tabla" style="width:100%;table-layout:auto;">
+      <thead><tr><th>SKU</th><th style="text-align:right;">Cant.</th><th style="text-align:right;">Ingreso total</th><th style="text-align:right;">Impuestos total</th><th style="text-align:right;">Otros egresos</th><th style="text-align:right;">Neto</th></tr></thead>
+      <tbody>
+        ${filas.map(f => `
+          <tr>
+            <td>${f.sku}</td>
+            <td style="text-align:right;">${f.cantidadVentas}</td>
+            <td class="ml-monto-pos" style="text-align:right;">${formatPrice(f.ingreso)}</td>
+            <td class="ml-monto-neg" style="text-align:right;">${formatPrice(f.impuestos)}</td>
+            <td class="ml-monto-neg" style="text-align:right;">${formatPrice(f.egresos)}</td>
+            <td class="${f.neto<0?'ml-monto-neg':'ml-monto-pos'}" style="text-align:right;font-weight:700;">${formatPrice(f.neto)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+      <tfoot>
+        <tr style="font-weight:700;border-top:2px solid var(--line);">
+          <td>Total</td>
+          <td style="text-align:right;">${totales.cantidadVentas}</td>
+          <td class="ml-monto-pos" style="text-align:right;">${formatPrice(totales.ingreso)}</td>
+          <td class="ml-monto-neg" style="text-align:right;">${formatPrice(totales.impuestos)}</td>
+          <td class="ml-monto-neg" style="text-align:right;">${formatPrice(totales.egresos)}</td>
+          <td class="${totales.neto<0?'ml-monto-neg':'ml-monto-pos'}" style="text-align:right;">${formatPrice(totales.neto)}</td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+}
+
 function cargarVentasML(){
   db.collection('movimientos_ml').orderBy('fecha', 'desc').get().then(snap => {
     listaVentasML = snap.docs.map(d => ({...d.data(), id: d.id}));
@@ -3567,6 +3666,21 @@ function renderVentasML(){
 
   const modoAgrupado = document.getElementById('ml-modo-agrupado');
   const tablaWrap = document.getElementById('ml-tabla-wrap');
+  const resumenVista = document.getElementById('ml-resumen-vista');
+
+  const vistaEl = document.querySelector('input[name="ml-vista"]:checked');
+  const vista = vistaEl ? vistaEl.value : 'movimientos';
+
+  if(vista === 'actividad' || vista === 'sku'){
+    tablaWrap.style.display = 'none';
+    modoAgrupado.style.display = 'none';
+    resumenVista.style.display = 'block';
+    if(vista === 'actividad') renderResumenActividad(movs, resumenVista);
+    else renderResumenSku(movs, resumenVista);
+    return;
+  } else {
+    resumenVista.style.display = 'none';
+  }
 
   // si el texto buscado coincide exacto con algun SKU, mostramos el modo agrupado (todo lo de ese SKU sumado)
   const skuExacto = texto && movs.some(m => (m.sku||'').toLowerCase() === texto);
