@@ -3334,13 +3334,10 @@ async function importarFacturasML(){
   const btn = document.getElementById('fac-btn-importar');
   btn.disabled = true;
 
-  const clavesExistentes = new Set((listaVentasML || []).map(claveMovimiento));
-  const nuevas = facturasParaImportar.filter(l => !clavesExistentes.has(claveMovimiento({...l, cuenta})));
-  const saltadas = facturasParaImportar.length - nuevas.length;
-
   try{
+    const reemplazadas = await borrarMovimientosViejosQueCoincidan(facturasParaImportar, cuenta);
     const batch = db.batch();
-    nuevas.forEach(l => {
+    facturasParaImportar.forEach(l => {
       const ref = db.collection('movimientos_ml').doc();
       batch.set(ref, {
         cuenta, fecha: l.fecha, operacion: l.operacion, sku: l.sku,
@@ -3349,7 +3346,7 @@ async function importarFacturasML(){
       });
     });
     await batch.commit();
-    alert('Se importaron ' + nuevas.length + ' líneas nuevas de facturas.' + (saltadas > 0 ? ' (' + saltadas + ' ya existían y se saltearon)' : ''));
+    alert('Se importaron ' + facturasParaImportar.length + ' líneas de facturas.' + (reemplazadas > 0 ? ' (' + reemplazadas + ' reemplazaron una versión anterior)' : ''));
     document.getElementById('fac-archivos').value = '';
     document.getElementById('fac-preview').innerHTML = '';
     facturasParaImportar = null;
@@ -3482,15 +3479,13 @@ async function importarVentasAR(){
   const btn = document.getElementById('vta-btn-importar');
   btn.disabled = true;
 
-  const clavesExistentes = new Set((listaVentasML || []).map(claveMovimiento));
-  const nuevas = filasVentasAR.filter(m => !clavesExistentes.has(claveMovimiento({...m, cuenta})));
-  const saltadas = filasVentasAR.length - nuevas.length;
+  const reemplazadas = await borrarMovimientosViejosQueCoincidan(filasVentasAR, cuenta);
 
   const CHUNK = 400;
   let importadas = 0;
   try{
-    for(let i=0; i<nuevas.length; i+=CHUNK){
-      const lote = nuevas.slice(i, i+CHUNK);
+    for(let i=0; i<filasVentasAR.length; i+=CHUNK){
+      const lote = filasVentasAR.slice(i, i+CHUNK);
       const batch = db.batch();
       lote.forEach(m => {
         const ref = db.collection('movimientos_ml').doc();
@@ -3503,9 +3498,9 @@ async function importarVentasAR(){
       });
       await batch.commit();
       importadas += lote.length;
-      btn.textContent = 'Importando... ' + importadas + '/' + nuevas.length;
+      btn.textContent = 'Importando... ' + importadas + '/' + filasVentasAR.length;
     }
-    alert('Se importaron ' + importadas + ' líneas nuevas de ' + cuenta + '.' + (saltadas > 0 ? ' (' + saltadas + ' ya existían y se saltearon)' : ''));
+    alert('Se importaron ' + importadas + ' líneas de ' + cuenta + '.' + (reemplazadas > 0 ? ' (' + reemplazadas + ' reemplazaron una versión anterior)' : ''));
     document.getElementById('vta-archivo').value = '';
     document.getElementById('vta-preview').innerHTML = '';
     filasVentasAR = null;
@@ -3627,15 +3622,13 @@ async function importarVentasML(){
   const btn = document.getElementById('mli-btn-importar');
   btn.disabled = true;
 
-  const clavesExistentes = new Set((listaVentasML || []).map(claveMovimiento));
-  const nuevas = filasImportacionML.filter(m => !clavesExistentes.has(claveMovimiento({...m, cuenta})));
-  const saltadas = filasImportacionML.length - nuevas.length;
+  const reemplazadas = await borrarMovimientosViejosQueCoincidan(filasImportacionML, cuenta);
 
   const CHUNK = 400;
   let importadas = 0;
   try{
-    for(let i=0; i<nuevas.length; i+=CHUNK){
-      const lote = nuevas.slice(i, i+CHUNK);
+    for(let i=0; i<filasImportacionML.length; i+=CHUNK){
+      const lote = filasImportacionML.slice(i, i+CHUNK);
       const batch = db.batch();
       lote.forEach(m => {
         const ref = db.collection('movimientos_ml').doc();
@@ -3647,9 +3640,9 @@ async function importarVentasML(){
       });
       await batch.commit();
       importadas += lote.length;
-      btn.textContent = 'Importando... ' + importadas + '/' + nuevas.length;
+      btn.textContent = 'Importando... ' + importadas + '/' + filasImportacionML.length;
     }
-    alert('Se importaron ' + importadas + ' líneas nuevas de ' + cuenta + '.' + (saltadas > 0 ? ' (' + saltadas + ' ya existían y se saltearon)' : ''));
+    alert('Se importaron ' + importadas + ' líneas de ' + cuenta + '.' + (reemplazadas > 0 ? ' (' + reemplazadas + ' reemplazaron una versión anterior)' : ''));
     document.getElementById('mli-archivo').value = '';
     document.getElementById('mli-preview').innerHTML = '';
     filasImportacionML = null;
@@ -3838,7 +3831,25 @@ function renderResumenSku(movs, cont){
 }
 
 function claveMovimiento(m){
-  return [m.cuenta, m.operacion, m.concepto, Math.round((m.monto||0)*100), m.fecha].join('|');
+  // identifica el "mismo movimiento" por cuenta+operacion+concepto+SKU, sin importar si el monto o la fecha cambiaron
+  // (para poder reemplazar por una version actualizada en vez de duplicar o ignorar)
+  return [m.cuenta, m.operacion, m.concepto, m.sku||''].join('|');
+}
+
+async function borrarMovimientosViejosQueCoincidan(nuevosMovs, cuenta){
+  const clavesNuevas = new Set(nuevosMovs.map(m => claveMovimiento({...m, cuenta})));
+  const idsABorrar = (listaVentasML || [])
+    .filter(m => clavesNuevas.has(claveMovimiento(m)))
+    .map(m => m.id);
+  if(idsABorrar.length === 0) return 0;
+  const CHUNK = 400;
+  for(let i=0; i<idsABorrar.length; i+=CHUNK){
+    const lote = idsABorrar.slice(i, i+CHUNK);
+    const batch = db.batch();
+    lote.forEach(id => batch.delete(db.collection('movimientos_ml').doc(id)));
+    await batch.commit();
+  }
+  return idsABorrar.length;
 }
 
 async function borrarTodosLosMovimientosML(){
