@@ -67,25 +67,28 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 .menu-toggle:hover{background:rgba(245,243,239,0.22);}
 .menu-dropdown{
   display:none;position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);
-  background:var(--white);border:1px solid var(--line);border-radius:10px;
-  box-shadow:0 8px 20px rgba(0,0,0,0.18);min-width:230px;z-index:30;overflow:hidden;
+  background:var(--white);border:1px solid var(--line);border-radius:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.2);width:270px;max-height:70vh;overflow-y:auto;z-index:30;
 }
 .menu-dropdown.open{display:block;}
-.menu-grupo-tit{
-  margin:0;padding:10px 16px 4px;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;
-  color:#A8A092;font-weight:600;background:var(--cream);
+.menu-cat{border-bottom:1px solid var(--line);}
+.menu-cat:last-child{border-bottom:none;}
+.menu-cat-head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:13px 16px;cursor:pointer;user-select:none;
 }
-.menu-subgrupo-tit{
-  margin:0;padding:6px 16px 2px 26px;font-size:0.64rem;text-transform:uppercase;letter-spacing:0.04em;
-  color:#B5AC9E;font-weight:600;background:var(--white);
+.menu-cat-head span:first-child{
+  font-size:0.78rem;font-weight:700;color:var(--purple);letter-spacing:0.01em;
 }
-.menu-dropdown span{
-  display:block;padding:11px 16px;font-size:0.82rem;color:var(--ink);cursor:pointer;
-  border-bottom:1px solid var(--line);text-align:left;
+.menu-cat-chev{font-size:0.7rem;color:#B5AC9E;transition:transform 0.15s;}
+.menu-cat.open .menu-cat-chev{transform:rotate(180deg);}
+.menu-cat-body{display:none;background:var(--cream);}
+.menu-cat.open .menu-cat-body{display:block;}
+.menu-dropdown span.menu-item{
+  display:flex;align-items:center;gap:9px;padding:10px 16px 10px 24px;font-size:0.8rem;color:var(--ink);
+  cursor:pointer;border-top:1px solid rgba(0,0,0,0.05);
 }
-.menu-dropdown span.menu-item-sub{padding-left:26px;font-size:0.78rem;}
-.menu-dropdown span:last-child{border-bottom:none;}
-.menu-dropdown span:hover{background:var(--cream);color:var(--purple);}
+.menu-dropdown span.menu-item:hover{background:var(--white);color:var(--purple);}
 
 .hist-search{margin-bottom:14px;}
 .hist-search input{width:100%;padding:11px 14px;border-radius:8px;border:1px solid var(--line);font-family:'Work Sans';font-size:0.95rem;background:var(--white);}
@@ -393,32 +396,66 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
   <div class="menu-herramientas">
     <button class="menu-toggle" onclick="toggleMenuHerramientas()">⚙ Herramientas ▾</button>
     <div class="menu-dropdown" id="menu-dropdown">
-      <p class="menu-grupo-tit">Redes sociales y Mercado Libre</p>
-      <span onclick="abrirNuevoIngreso()">Nuevo ingreso (flyers, video)</span>
-      <span onclick="abrirGrilla()">Vista previa de grilla IG</span>
-      <span onclick="abrirRompecabezas()">Rompecabezas para grilla</span>
-      <span onclick="abrirAnuncio()">Anuncios y promociones</span>
-      <span onclick="abrirVentasML()">Ventas Mercado Libre</span>
 
-      <p class="menu-grupo-tit">Mayorista</p>
-      <span onclick="abrirHistorial()">Historial de pedidos</span>
-      <span onclick="abrirClientesInactivos()">Clientes inactivos</span>
-      <span onclick="abrirPendientesEntrega()">Pendientes de entrega</span>
-      <span onclick="abrirHistorialPrecios()">Historial de precios</span>
-      <span onclick="abrirConfigPush()">Avisos push</span>
-      <span onclick="abrirPedidoIA()">Pedido con IA (texto libre)</span>
-      <span onclick="abrirClientes()">Clientes</span>
+      <div class="menu-cat">
+        <div class="menu-cat-head" onclick="this.parentElement.classList.toggle('open')">
+          <span>📱 Redes y Mercado Libre</span><span class="menu-cat-chev">▾</span>
+        </div>
+        <div class="menu-cat-body">
+          <span class="menu-item" onclick="abrirNuevoIngreso()">🖼️ Nuevo ingreso (flyers, video)</span>
+          <span class="menu-item" onclick="abrirGrilla()">📱 Vista previa de grilla IG</span>
+          <span class="menu-item" onclick="abrirRompecabezas()">🧩 Rompecabezas para grilla</span>
+          <span class="menu-item" onclick="abrirAnuncio()">📣 Anuncios y promociones</span>
+          <span class="menu-item" onclick="abrirVentasML()">💰 Ventas Mercado Libre</span>
+        </div>
+      </div>
 
-      <p class="menu-subgrupo-tit">Producto</p>
-      <span class="menu-item-sub" onclick="abrirNuevoProducto()">Agregar producto nuevo</span>
-      <span class="menu-item-sub" onclick="abrirEditarProducto()">Editar producto</span>
-      <span class="menu-item-sub" onclick="abrirActualizarFoto()">Actualizar foto de producto</span>
+      <div class="menu-cat">
+        <div class="menu-cat-head" onclick="this.parentElement.classList.toggle('open')">
+          <span>📋 Pedidos y clientes</span><span class="menu-cat-chev">▾</span>
+        </div>
+        <div class="menu-cat-body">
+          <span class="menu-item" onclick="abrirHistorial()">📋 Historial de pedidos</span>
+          <span class="menu-item" onclick="abrirPedidoIA()">🤖 Pedido con IA (texto libre)</span>
+          <span class="menu-item" onclick="abrirPendientesEntrega()">🚚 Pendientes de entrega</span>
+          <span class="menu-item" onclick="abrirClientesInactivos()">😴 Clientes inactivos</span>
+          <span class="menu-item" onclick="abrirClientes()">👥 Clientes</span>
+        </div>
+      </div>
 
-      <p class="menu-subgrupo-tit">Catálogo</p>
-      <span class="menu-item-sub" onclick="abrirCompartirRubro()">Compartir catálogo por rubro</span>
-      <span class="menu-item-sub" onclick="abrirEnviarCatalogo()">Enviar catálogo a clientes</span>
-      <span class="menu-item-sub" onclick="abrirImportarExcel()">Importar precios (Excel)</span>
-      <span class="menu-item-sub" onclick="abrirCalculadoraCostos()">Calculadora de costos</span>
+      <div class="menu-cat">
+        <div class="menu-cat-head" onclick="this.parentElement.classList.toggle('open')">
+          <span>🏷️ Producto</span><span class="menu-cat-chev">▾</span>
+        </div>
+        <div class="menu-cat-body">
+          <span class="menu-item" onclick="abrirNuevoProducto()">➕ Agregar producto nuevo</span>
+          <span class="menu-item" onclick="abrirEditarProducto()">✏️ Editar producto</span>
+          <span class="menu-item" onclick="abrirActualizarFoto()">📷 Actualizar foto de producto</span>
+        </div>
+      </div>
+
+      <div class="menu-cat">
+        <div class="menu-cat-head" onclick="this.parentElement.classList.toggle('open')">
+          <span>📊 Catálogo y precios</span><span class="menu-cat-chev">▾</span>
+        </div>
+        <div class="menu-cat-body">
+          <span class="menu-item" onclick="abrirCompartirRubro()">🔗 Compartir catálogo por rubro</span>
+          <span class="menu-item" onclick="abrirEnviarCatalogo()">📤 Enviar catálogo a clientes</span>
+          <span class="menu-item" onclick="abrirImportarExcel()">📥 Importar precios (Excel)</span>
+          <span class="menu-item" onclick="abrirCalculadoraCostos()">🧮 Calculadora de costos</span>
+          <span class="menu-item" onclick="abrirHistorialPrecios()">📈 Historial de precios</span>
+        </div>
+      </div>
+
+      <div class="menu-cat">
+        <div class="menu-cat-head" onclick="this.parentElement.classList.toggle('open')">
+          <span>🔔 Configuración</span><span class="menu-cat-chev">▾</span>
+        </div>
+        <div class="menu-cat-body">
+          <span class="menu-item" onclick="abrirConfigPush()">🔔 Avisos push</span>
+        </div>
+      </div>
+
     </div>
   </div>
 </header>
@@ -1264,7 +1301,7 @@ document.addEventListener('click', (e) => {
     menu.classList.remove('open');
   }
 });
-document.querySelectorAll('.menu-dropdown span').forEach(item => {
+document.querySelectorAll('.menu-dropdown span.menu-item').forEach(item => {
   item.addEventListener('click', () => document.getElementById('menu-dropdown').classList.remove('open'));
 });
 
