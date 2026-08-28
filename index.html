@@ -877,6 +877,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       </div>
       <div class="field"><label>El título contiene</label><input type="text" id="am-titulo" placeholder="Ej: sábana"></div>
       <div class="field"><label>El SKU contiene</label><input type="text" id="am-sku" placeholder="Ej: TOA"></div>
+      <div class="field"><label>O elija SKU puntuales (separados por coma)</label><textarea id="am-skus-puntuales" rows="2" placeholder="Ej: TOA100, TOA200, SAB050" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:'Work Sans';"></textarea></div>
       <div class="field" style="max-width:180px;">
         <label>% de aumento</label>
         <input type="number" id="am-porcentaje" step="0.01" placeholder="Ej: 8 (o -5 para bajar)">
@@ -4261,6 +4262,7 @@ function abrirAumentoMasivo(){
   mostrarPaso('step-aumento-masivo');
   document.getElementById('am-titulo').value = '';
   document.getElementById('am-sku').value = '';
+  document.getElementById('am-skus-puntuales').value = '';
   document.getElementById('am-porcentaje').value = '';
   document.getElementById('am-preview').innerHTML = '';
   document.getElementById('am-error').style.display = 'none';
@@ -4289,14 +4291,21 @@ function previsualizarAumentoMasivo(){
   const categoriaFiltro = document.getElementById('am-categoria').value;
   const tituloFiltro = document.getElementById('am-titulo').value.trim().toLowerCase();
   const skuFiltro = document.getElementById('am-sku').value.trim().toLowerCase();
+  const skusPuntuales = document.getElementById('am-skus-puntuales').value
+    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 
   const matches = [];
+  const skusEncontrados = new Set();
   CATALOGO.forEach(cat => {
     if(categoriaFiltro && cat.categoria !== categoriaFiltro) return;
     cat.productos.forEach(prod => {
       if(tituloFiltro && !prod.nombre.toLowerCase().includes(tituloFiltro)) return;
       prod.variantes.forEach(v => {
         if(skuFiltro && !v.sku.toLowerCase().includes(skuFiltro)) return;
+        if(skusPuntuales.length > 0){
+          if(!skusPuntuales.includes(v.sku.toLowerCase())) return;
+          skusEncontrados.add(v.sku.toLowerCase());
+        }
         const precioViejo = parsePrice(v.precio);
         if(precioViejo === null) return; // "Consultar", no tiene precio numerico
         const precioNuevo = Math.round(precioViejo * (1 + pct/100) * 100) / 100;
@@ -4306,6 +4315,12 @@ function previsualizarAumentoMasivo(){
   });
 
   matchesAumentoMasivo = matches;
+
+  const skusNoEncontrados = skusPuntuales.filter(s => !skusEncontrados.has(s));
+  if(skusNoEncontrados.length > 0){
+    errorEl.textContent = 'No encontré estos SKU: ' + skusNoEncontrados.join(', ') + ' (revise que estén bien escritos).';
+    errorEl.style.display = 'block';
+  }
 
   if(matches.length === 0){
     previewEl.innerHTML = '<p class="empty-msg">No hay ningún producto que coincida con esos filtros.</p>';
