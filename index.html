@@ -453,6 +453,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
           <span class="menu-item" onclick="abrirCompartirRubro()">🔗 Compartir catálogo por rubro</span>
           <span class="menu-item" onclick="abrirEnviarCatalogo()">📤 Enviar catálogo a clientes</span>
           <span class="menu-item" onclick="abrirImportarExcel()">📥 Importar precios (Excel)</span>
+          <span class="menu-item" onclick="abrirAumentoMasivo()">📈 Aumentar precios masivamente</span>
           <span class="menu-item" onclick="abrirCalculadoraCostos()">🧮 Calculadora de costos</span>
           <span class="menu-item" onclick="abrirHistorialPrecios()">📈 Historial de precios</span>
         </div>
@@ -860,6 +861,31 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <div class="actions"><button class="btn btn-gold" onclick="procesarExcelImportado()">Procesar archivo</button></div>
       <p class="error" id="ie-error" style="display:none;"></p>
       <div id="ie-preview" style="margin-top:16px;"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <!-- STEP: AUMENTO MASIVO DE PRECIOS -->
+  <div class="step" id="step-aumento-masivo">
+    <div class="form-card">
+      <h2>Aumentar precios masivamente</h2>
+      <p class="note" style="margin-bottom:14px;">Combine los filtros que necesite (déjelos vacíos para no filtrar por ese criterio) y vea antes qué productos van a cambiar.</p>
+
+      <div class="field">
+        <label>Categoría</label>
+        <select id="am-categoria"><option value="">Todas las categorías</option></select>
+      </div>
+      <div class="field"><label>El título contiene</label><input type="text" id="am-titulo" placeholder="Ej: sábana"></div>
+      <div class="field"><label>El SKU contiene</label><input type="text" id="am-sku" placeholder="Ej: TOA"></div>
+      <div class="field" style="max-width:180px;">
+        <label>% de aumento</label>
+        <input type="number" id="am-porcentaje" step="0.01" placeholder="Ej: 8 (o -5 para bajar)">
+      </div>
+
+      <div class="actions"><button class="btn btn-gold" onclick="previsualizarAumentoMasivo()">Ver qué va a cambiar</button></div>
+      <p class="error" id="am-error" style="display:none;"></p>
+      <div id="am-preview" style="margin-top:16px;"></div>
+
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
@@ -4226,6 +4252,116 @@ async function eliminarFilaCostos(id){
   if(document.getElementById('cc-filas').children.length === 0){
     agregarFilaCostos();
   }
+}
+
+// ---------- aumento masivo de precios ----------
+let matchesAumentoMasivo = null;
+
+function abrirAumentoMasivo(){
+  mostrarPaso('step-aumento-masivo');
+  document.getElementById('am-titulo').value = '';
+  document.getElementById('am-sku').value = '';
+  document.getElementById('am-porcentaje').value = '';
+  document.getElementById('am-preview').innerHTML = '';
+  document.getElementById('am-error').style.display = 'none';
+  matchesAumentoMasivo = null;
+
+  const sel = document.getElementById('am-categoria');
+  if(sel.options.length <= 1){
+    CATALOGO.forEach(cat => {
+      const opt = document.createElement('option');
+      opt.value = cat.categoria;
+      opt.textContent = cat.categoria.toLowerCase();
+      sel.appendChild(opt);
+    });
+  }
+}
+
+function previsualizarAumentoMasivo(){
+  const errorEl = document.getElementById('am-error');
+  const previewEl = document.getElementById('am-preview');
+  errorEl.style.display = 'none';
+  previewEl.innerHTML = '';
+
+  const pct = parseFloat(document.getElementById('am-porcentaje').value);
+  if(isNaN(pct) || pct === 0){ errorEl.textContent = 'Cargue un % de aumento distinto de 0.'; errorEl.style.display = 'block'; return; }
+
+  const categoriaFiltro = document.getElementById('am-categoria').value;
+  const tituloFiltro = document.getElementById('am-titulo').value.trim().toLowerCase();
+  const skuFiltro = document.getElementById('am-sku').value.trim().toLowerCase();
+
+  const matches = [];
+  CATALOGO.forEach(cat => {
+    if(categoriaFiltro && cat.categoria !== categoriaFiltro) return;
+    cat.productos.forEach(prod => {
+      if(tituloFiltro && !prod.nombre.toLowerCase().includes(tituloFiltro)) return;
+      prod.variantes.forEach(v => {
+        if(skuFiltro && !v.sku.toLowerCase().includes(skuFiltro)) return;
+        const precioViejo = parsePrice(v.precio);
+        if(precioViejo === null) return; // "Consultar", no tiene precio numerico
+        const precioNuevo = Math.round(precioViejo * (1 + pct/100) * 100) / 100;
+        matches.push({ producto: prod, variante: v, precioViejo, precioNuevo });
+      });
+    });
+  });
+
+  matchesAumentoMasivo = matches;
+
+  if(matches.length === 0){
+    previewEl.innerHTML = '<p class="empty-msg">No hay ningún producto que coincida con esos filtros.</p>';
+    return;
+  }
+
+  previewEl.innerHTML = `
+    <p class="note" style="margin-bottom:10px;">${matches.length} variante(s) van a cambiar:</p>
+    <div style="max-height:300px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;margin-bottom:14px;">
+      ${matches.map(m => `
+        <div style="padding:8px 10px;border-bottom:1px solid var(--line);font-size:0.82rem;">
+          <b>${m.variante.sku}</b> — ${m.producto.nombre} ${m.variante.desc}<br>
+          <span style="color:#8A8072;">$ ${m.precioViejo}</span> → <span style="color:var(--purple);font-weight:700;">$ ${m.precioNuevo}</span>
+        </div>
+      `).join('')}
+    </div>
+    <div class="actions"><button class="btn btn-gold" id="am-btn-aplicar" onclick="aplicarAumentoMasivo()">Aplicar a estas ${matches.length} variantes</button></div>
+  `;
+}
+
+async function aplicarAumentoMasivo(){
+  if(!matchesAumentoMasivo || matchesAumentoMasivo.length === 0) return;
+  const btn = document.getElementById('am-btn-aplicar');
+  btn.disabled = true;
+  btn.textContent = 'Aplicando...';
+
+  const porProducto = new Map();
+  matchesAumentoMasivo.forEach(m => {
+    if(!porProducto.has(m.producto)) porProducto.set(m.producto, []);
+    porProducto.get(m.producto).push(m);
+  });
+
+  let actualizados = 0;
+  for(const [producto, cambios] of porProducto){
+    cambios.forEach(c => {
+      registrarCambioPrecio(c.variante.sku, c.precioViejo, c.precioNuevo);
+      c.variante.precio = String(c.precioNuevo);
+    });
+    try{
+      if(producto._editKey && producto._editKey.startsWith('nuevo-')){
+        await db.collection('productos_nuevos').doc(producto._docId).update({ variantes: producto.variantes });
+      } else {
+        await db.collection('productos_editados').doc(producto._editKey).set({
+          nombre: producto.nombre, composicion: producto.composicion,
+          variantes: producto.variantes, metros: producto.metros || null
+        }, { merge: true });
+      }
+      actualizados++;
+    } catch(e){
+      console.error('Error actualizando producto', producto.nombre, e);
+    }
+  }
+
+  alert('Se actualizaron ' + matchesAumentoMasivo.length + ' variante(s) en ' + actualizados + ' de ' + porProducto.size + ' producto(s).');
+  renderCatalogo(document.getElementById('buscador').value);
+  abrirAumentoMasivo();
 }
 
 function abrirImportarExcel(){
