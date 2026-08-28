@@ -518,6 +518,20 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       </div>
       <p class="note" id="ec-copiado" style="display:none;margin-top:8px;">¡Copiado!</p>
 
+      <p class="ni-seccion-tit" style="margin-top:20px;">Link con descuento para un cliente puntual</p>
+      <p class="note" style="margin-bottom:10px;">Genera un link donde los precios ya aparecen con el % que elija aplicado, y el cliente no puede agregar ningún descuento extra por su cuenta.</p>
+      <div class="field" style="max-width:160px;">
+        <label>% de descuento</label>
+        <input type="number" id="ec-desc-pct" min="1" max="90" step="1" placeholder="Ej: 15" oninput="actualizarLinkDescuento()">
+      </div>
+      <div class="field">
+        <input type="text" id="ec-link-desc" readonly style="background:var(--cream);" placeholder="Cargue un % arriba para generar el link">
+      </div>
+      <div class="actions">
+        <button class="btn btn-gold" onclick="compartirCatalogoDescuento()">Compartir por WhatsApp</button>
+        <button class="btn btn-ghost" onclick="copiarLinkDescuento()">Copiar link</button>
+      </div>
+
       <p class="ni-seccion-tit" style="margin-top:20px;">O como archivo Excel</p>
       <p class="note" style="margin-bottom:10px;">Baja el catálogo completo (o solo un rubro) en un archivo .xlsx, para mandar directo por WhatsApp o email a quien no quiera entrar al link.</p>
       <div class="field">
@@ -2858,6 +2872,29 @@ function compartirCatalogoClientes(){
 
 function copiarLinkCatalogoClientes(){
   const link = document.getElementById('ec-link').value;
+  navigator.clipboard.writeText(link).then(() => {
+    const nota = document.getElementById('ec-copiado');
+    nota.style.display = 'block';
+    setTimeout(() => nota.style.display = 'none', 2000);
+  });
+}
+
+function actualizarLinkDescuento(){
+  const pct = Math.min(90, Math.max(0, parseFloat(document.getElementById('ec-desc-pct').value) || 0));
+  const linkEl = document.getElementById('ec-link-desc');
+  linkEl.value = pct > 0 ? `https://danielsaccal.github.io/pedido-onlinetextil/cliente/?descuento=${pct}` : '';
+}
+
+function compartirCatalogoDescuento(){
+  const link = document.getElementById('ec-link-desc').value;
+  if(!link){ alert('Cargue primero el % de descuento.'); return; }
+  const texto = encodeURIComponent('Hola! Te paso nuestro catálogo con tu descuento ya aplicado, para hacer tu pedido: ' + link);
+  window.open('https://wa.me/?text=' + texto, '_blank');
+}
+
+function copiarLinkDescuento(){
+  const link = document.getElementById('ec-link-desc').value;
+  if(!link){ alert('Cargue primero el % de descuento.'); return; }
   navigator.clipboard.writeText(link).then(() => {
     const nota = document.getElementById('ec-copiado');
     nota.style.display = 'block';

@@ -643,7 +643,10 @@ function renderCatalogo(filtro){
         const enCarrito = cart[id] ? cart[id].cantidad : 0;
         const notaActual = notas[id] || '';
         const descItemActual = descuentosItem[id] || '';
-        const precioEfectivo = (precioNum !== null && p.metros) ? (precioNum * p.metros) : precioNum;
+        let precioEfectivo = (precioNum !== null && p.metros) ? (precioNum * p.metros) : precioNum;
+        if(precioEfectivo !== null && descuentoGlobalPct > 0){
+          precioEfectivo = precioEfectivo * (1 - descuentoGlobalPct/100);
+        }
         const rolloNota = (precioNum !== null && p.metros)
           ? `<span class="sku">Rollo de ${p.metros} m: ${formatPrice(precioEfectivo)}</span>`
           : '';
@@ -651,7 +654,7 @@ function renderCatalogo(filtro){
           <div class="variante">
             <div class="variante-fila">
               <div class="desc">${v.desc}<span class="sku">SKU ${v.sku}</span>${rolloNota}</div>
-              <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioNum) + (p.metros ? ' /m' : '')}</div>
+              <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioEfectivo) + (p.metros ? ' /m' : '')}</div>
               ${precioNum===null ? '<div></div>' : `
               <div class="qty">
                 <button type="button" onclick="cambiarCantidad('${id}', -1, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioEfectivo})">−</button>
@@ -662,10 +665,11 @@ function renderCatalogo(filtro){
             ${precioNum===null ? '' : `
             <div class="variante-extra">
               <input type="text" class="variante-nota" placeholder="Nota para este producto (opcional): surtido, color..." value="${escapeAttr(notaActual)}" oninput="actualizarNota('${id}', this.value)">
+              ${descuentoGlobalPct > 0 ? '' : `
               <div class="variante-desc-item">
                 <input type="number" min="0" max="100" step="0.01" placeholder="0" value="${descItemActual}" oninput="actualizarDescuentoItem('${id}', this.value)">
                 <span>% desc. este ítem</span>
-              </div>
+              </div>`}
             </div>`}
           </div>
         `;
@@ -1969,6 +1973,7 @@ function nuevoPedido(){
 }
 
 // ---------- init ----------
+const descuentoGlobalPct = Math.min(90, Math.max(0, parseFloat(new URLSearchParams(location.search).get('descuento')) || 0));
 const rubroURL = new URLSearchParams(location.search).get('rubro');
 if(rubroURL){
   document.getElementById('buscador').value = rubroURL;
@@ -1978,6 +1983,11 @@ if(rubroURL){
   banner.innerHTML = `Mostrando solo: <b>${rubroURL}</b> — <a onclick="quitarFiltroRubro()">Ver catálogo completo</a>`;
 } else {
   renderCatalogo('');
+}
+if(descuentoGlobalPct > 0){
+  const banner = document.getElementById('filtro-banner');
+  banner.style.display = 'block';
+  banner.innerHTML = (banner.innerHTML ? banner.innerHTML + '<br>' : '') + `✨ Precios mostrados ya incluyen ${descuentoGlobalPct}% de descuento.`;
 }
 actualizarCartbar();
 
