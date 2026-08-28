@@ -205,6 +205,17 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 }
 .search-wrap input:focus{outline:2px solid var(--gold-dark);outline-offset:1px;}
 
+.catalogo-toggle-wrap{margin:10px 0;}
+.catalogo-toggle-head{
+  display:flex;align-items:center;justify-content:space-between;cursor:pointer;
+  background:var(--white);border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px 16px;user-select:none;
+}
+.catalogo-toggle-head h2{margin:0;font-size:1rem;color:var(--purple);}
+.catalogo-toggle-head .chev{font-size:0.8rem;color:#B5AC9E;transition:transform 0.15s;}
+.catalogo-toggle-wrap #categorias{display:none;}
+.catalogo-toggle-wrap.open #categorias{display:block;}
+.catalogo-toggle-wrap.open .catalogo-toggle-head .chev{transform:rotate(180deg);}
 .category{margin:18px 0;background:var(--white);border-radius:var(--radius);overflow:hidden;border:1px solid var(--line);}
 .category-head{
   display:flex;justify-content:space-between;align-items:center;
@@ -473,7 +484,13 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
     <input type="file" accept="image/*" capture="environment" id="escaner-foto" style="display:none;" onchange="procesarEscaneoEtiqueta(this.files[0])">
     <input type="file" accept="image/*" capture="environment" id="escaner-foto-producto" style="display:none;" onchange="procesarBusquedaVisualIA(this.files[0])">
     <div id="escaner-resultado"></div>
-    <div id="categorias"></div>
+    <div class="catalogo-toggle-wrap">
+      <div class="catalogo-toggle-head" onclick="this.parentElement.classList.toggle('open')">
+        <h2>📚 Catálogo</h2>
+        <span class="chev">▾</span>
+      </div>
+      <div id="categorias"></div>
+    </div>
     <p class="empty-msg" id="sin-resultados" style="display:none;">No se encontraron productos.</p>
   </div>
 
@@ -1507,7 +1524,11 @@ function actualizarCartbar(){
   document.getElementById('btn-continuar').disabled = totalItems === 0;
 }
 
-document.getElementById('buscador').addEventListener('input', (e) => renderCatalogo(e.target.value));
+document.getElementById('buscador').addEventListener('input', (e) => {
+  const wrap = document.querySelector('.catalogo-toggle-wrap');
+  if(wrap) wrap.classList.toggle('open', e.target.value.trim().length > 0);
+  renderCatalogo(e.target.value);
+});
 
 // ---------- navegacion entre pasos ----------
 function mostrarPaso(id){
@@ -2765,6 +2786,7 @@ const rubroURL = new URLSearchParams(location.search).get('rubro');
 if(rubroURL){
   document.getElementById('buscador').value = rubroURL;
   renderCatalogo(rubroURL);
+  document.querySelector('.catalogo-toggle-wrap')?.classList.add('open');
   const banner = document.getElementById('filtro-banner');
   banner.style.display = 'block';
   banner.innerHTML = `Mostrando solo: <b>${rubroURL}</b> — <a onclick="quitarFiltroRubro()">Ver catálogo completo</a>`;
@@ -2776,6 +2798,7 @@ actualizarCartbar();
 function quitarFiltroRubro(){
   document.getElementById('buscador').value = '';
   document.getElementById('filtro-banner').style.display = 'none';
+  document.querySelector('.catalogo-toggle-wrap')?.classList.remove('open');
   renderCatalogo('');
   history.replaceState(null, '', location.pathname);
 }
