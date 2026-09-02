@@ -5222,6 +5222,15 @@ function denominadorComun(grupos){
   return comunMaterial || null;
 }
 
+function truncarTexto(ctx, texto, maxWidth){
+  if(ctx.measureText(texto).width <= maxWidth) return texto;
+  let t = texto;
+  while(t.length > 0 && ctx.measureText(t + '…').width > maxWidth){
+    t = t.slice(0, -1);
+  }
+  return t + '…';
+}
+
 function envolverTexto(ctx, texto, maxWidth){
   const palabras = texto.split(' ');
   const lineas = [];
@@ -5683,10 +5692,17 @@ function dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoP
     const precioMostrado = tieneDescuento ? formatPrice(precioNum * (1 - descuentoPct/100)) : ('$ ' + v.precio);
     ctx.fillStyle = '#FFFFFF';
     dibujarRectRedondeado(ctx, multi ? 246 : 70, y, multi ? 764 : 940, 72, 12); ctx.fill();
+
+    ctx.font = "700 32px 'IBM Plex Mono'";
+    const precioWidth = ctx.measureText(precioMostrado).width;
+    const descStartX = multi ? 276 : 100;
+    const maxDescWidth = (980 - precioWidth - 24) - descStartX;
+
     ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.font = "28px 'Work Sans'";
-    ctx.fillText(v.desc, multi ? 276 : 100, y+46);
+    const descTruncado = truncarTexto(ctx, v.desc, maxDescWidth);
+    ctx.fillText(descTruncado, descStartX, y+46);
     ctx.fillStyle = PURPLE; ctx.textAlign = 'right'; ctx.font = "700 32px 'IBM Plex Mono'";
-    ctx.fillText(precioMostrado, multi ? 980 : 980, y+46);
+    ctx.fillText(precioMostrado, 980, y+46);
     ctx.textAlign = 'center';
     y += 84;
   }
