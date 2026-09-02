@@ -5690,21 +5690,29 @@ function dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoP
     const precioNum = parsePrice(v.precio);
     const tieneDescuento = descuentoPct > 0 && precioNum !== null;
     const precioMostrado = tieneDescuento ? formatPrice(precioNum * (1 - descuentoPct/100)) : ('$ ' + v.precio);
-    ctx.fillStyle = '#FFFFFF';
-    dibujarRectRedondeado(ctx, multi ? 246 : 70, y, multi ? 764 : 940, 72, 12); ctx.fill();
 
     ctx.font = "700 32px 'IBM Plex Mono'";
     const precioWidth = ctx.measureText(precioMostrado).width;
-    const descStartX = multi ? 276 : 100;
-    const maxDescWidth = (980 - precioWidth - 24) - descStartX;
+    const boxX = multi ? 246 : 70, boxW = multi ? 764 : 940;
+    const descStartX = boxX + 30;
+    const maxDescWidth = (boxX + boxW - 20 - precioWidth - 24) - descStartX;
+
+    ctx.font = "28px 'Work Sans'";
+    const lineasDesc = envolverTexto(ctx, v.desc, maxDescWidth);
+    const lineHeight = 34;
+    const boxH = Math.max(72, 26 + lineasDesc.length*lineHeight);
+
+    ctx.fillStyle = '#FFFFFF';
+    dibujarRectRedondeado(ctx, boxX, y, boxW, boxH, 12); ctx.fill();
 
     ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.font = "28px 'Work Sans'";
-    const descTruncado = truncarTexto(ctx, v.desc, maxDescWidth);
-    ctx.fillText(descTruncado, descStartX, y+46);
+    const primeraLineaY = y + 42;
+    lineasDesc.forEach((linea, i) => ctx.fillText(linea, descStartX, primeraLineaY + i*lineHeight));
+
     ctx.fillStyle = PURPLE; ctx.textAlign = 'right'; ctx.font = "700 32px 'IBM Plex Mono'";
-    ctx.fillText(precioMostrado, 980, y+46);
+    ctx.fillText(precioMostrado, boxX + boxW - 20, primeraLineaY);
     ctx.textAlign = 'center';
-    y += 84;
+    y += boxH + 12;
   }
 
   if(multi){
