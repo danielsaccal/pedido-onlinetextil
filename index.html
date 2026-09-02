@@ -613,7 +613,11 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
           </div>
           <div id="ni-opciones-texto" style="margin-top:8px;"></div>
         </div>
-        <div class="field"><label>Variantes de diseño/color</label><input type="text" id="ni-variantes" placeholder="Ej: Beige, Gris, Terracota"></div>
+        <div class="field"><label>Variantes de diseño/color (una sola, para todo el flyer)</label><input type="text" id="ni-variantes" placeholder="Ej: Beige, Gris, Terracota"></div>
+        <div class="field">
+          <label>O una variante distinta para cada SKU (opcional)</label>
+          <textarea id="ni-variantes-sku" rows="3" placeholder="Una línea por SKU, así: TOA171B: Beige, Gris&#10;IC3504V: Crudo" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:'Work Sans';"></textarea>
+        </div>
         <div class="field"><label>Descuento % (solo flyer de WhatsApp)</label><input type="number" id="ni-descuento" min="0" max="100" step="0.01" placeholder="Ej: 15"></div>
       </div>
 
@@ -5361,12 +5365,25 @@ async function generarFlyersNuevoIngreso(){
   cont.innerHTML = '<p class="note">Generando...</p>';
 
   try{
+    // notas de variante propias por SKU (opcional): "SKU: nota", una por linea
+    const notasPorSku = {};
+    document.getElementById('ni-variantes-sku').value.trim().split('\n').forEach(linea => {
+      const idx = linea.indexOf(':');
+      if(idx === -1) return;
+      const sku = linea.slice(0, idx).trim().toUpperCase();
+      const nota = linea.slice(idx+1).trim();
+      if(sku && nota) notasPorSku[sku] = nota;
+    });
+
     // agrupar los SKU por producto real (puede haber varios productos distintos)
     const gruposMap = {};
     matches.forEach(m => {
       const key = m.ci + '-' + m.pi;
-      if(!gruposMap[key]) gruposMap[key] = { ci: m.ci, pi: m.pi, producto: m.producto, variantes: [] };
+      if(!gruposMap[key]) gruposMap[key] = { ci: m.ci, pi: m.pi, producto: m.producto, variantes: [], notaVariante: '' };
       gruposMap[key].variantes.push({ desc: m.variante.desc, precio: m.variante.precio });
+      if(!gruposMap[key].notaVariante && notasPorSku[m.variante.sku.toUpperCase()]){
+        gruposMap[key].notaVariante = notasPorSku[m.variante.sku.toUpperCase()];
+      }
     });
     const grupos = Object.values(gruposMap);
 
@@ -5673,9 +5690,10 @@ function dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoP
     y += 16;
   }
 
-  if(variantesColor){
+  const textoVariantesAMostrar = variantesColor || (!multi && grupos[0].notaVariante) || '';
+  if(textoVariantesAMostrar){
     ctx.font = "26px 'Work Sans'";
-    const lineas = envolverTexto(ctx, variantesColor, 880);
+    const lineas = envolverTexto(ctx, textoVariantesAMostrar, 880);
     const boxH = 30 + lineas.length*36;
     ctx.strokeStyle = PURPLE; ctx.lineWidth = 2; ctx.fillStyle = '#FFFFFF';
     dibujarRectRedondeado(ctx, 90, y, 900, boxH, 14); ctx.fill(); ctx.stroke();
@@ -5735,6 +5753,19 @@ function dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoP
 
       y += photoS + 20;
       g.variantes.forEach(v => dibujarFilaPrecio(v));
+
+      if(g.notaVariante){
+        ctx.font = "22px 'Work Sans'";
+        const lineasNota = envolverTexto(ctx, g.notaVariante, 900);
+        const notaH = 16 + lineasNota.length*28;
+        ctx.fillStyle = '#EFE0A8';
+        dibujarRectRedondeado(ctx, 70, y+6, 940, notaH, 10); ctx.fill();
+        ctx.fillStyle = PURPLE; ctx.textAlign = 'left';
+        lineasNota.forEach((linea,i) => ctx.fillText(linea, 90, y+6+22+i*28));
+        ctx.textAlign = 'center';
+        y += notaH + 16;
+      }
+
       if(idx < grupos.length-1){
         ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 2; ctx.setLineDash([10,8]);
         ctx.beginPath(); ctx.moveTo(70,y+10); ctx.lineTo(1010,y+10); ctx.stroke();
@@ -6727,6 +6758,7 @@ function abrirNuevoIngreso(){
   document.getElementById('ni-skus').value = '';
   document.getElementById('ni-texto').value = '';
   document.getElementById('ni-variantes').value = '';
+  document.getElementById('ni-variantes-sku').value = '';
   document.getElementById('ni-descuento').value = '';
   document.getElementById('ni-fmt-story').checked = true;
   document.getElementById('ni-fmt-post').checked = false;
