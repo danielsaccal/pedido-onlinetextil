@@ -5245,6 +5245,13 @@ function truncarTexto(ctx, texto, maxWidth){
   return t + '…';
 }
 
+function conLimiteDeTiempo(promesa, ms, mensaje){
+  return Promise.race([
+    promesa,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(mensaje || 'Tardó demasiado')), ms))
+  ]);
+}
+
 function envolverTexto(ctx, texto, maxWidth){
   const palabras = texto.split(' ');
   const lineas = [];
@@ -5559,8 +5566,8 @@ async function generarFlyersNuevoIngreso(){
         const estiloVideo = document.querySelector('input[name="ni-video-estilo"]:checked')?.value || 'zoom';
         const descVariantePrincipal = grupos[0].variantes && grupos[0].variantes[0] ? grupos[0].variantes[0].desc : '';
         const blobVideo = estiloVideo === 'dinamico'
-          ? await generarVideoDinamico(grupos, textoAdicional, 'violeta')
-          : await generarVideoKenBurns(producto, img, textoAdicional, 'violeta', estiloVideo, descVariantePrincipal);
+          ? await conLimiteDeTiempo(generarVideoDinamico(grupos, textoAdicional, 'violeta'), 20000, 'El video dinámico tardó demasiado y se canceló.')
+          : await conLimiteDeTiempo(generarVideoKenBurns(producto, img, textoAdicional, 'violeta', estiloVideo, descVariantePrincipal), 20000, 'El video tardó demasiado y se canceló.');
         const urlVideo = URL.createObjectURL(blobVideo);
         const extVideo = blobVideo.type.includes('mp4') ? 'mp4' : 'webm';
         const nombreVideo = 'video_' + producto.nombre.replace(/\s+/g,'_') + '.' + extVideo;
@@ -5604,7 +5611,7 @@ async function generarFlyersNuevoIngreso(){
       videoMLWrap.innerHTML = '<p class="note">Generando video para Mercado Libre (10 seg)...</p>';
       cont.appendChild(videoMLWrap);
       try{
-        const blobVideoML = await generarVideoMercadoLibre(img, producto.composicion || '');
+        const blobVideoML = await conLimiteDeTiempo(generarVideoMercadoLibre(img, producto.composicion || ''), 25000, 'El video para Mercado Libre tardó demasiado y se canceló.');
         const urlVideoML = URL.createObjectURL(blobVideoML);
         const extVideoML = blobVideoML.type.includes('mp4') ? 'mp4' : 'webm';
         const nombreVideoML = 'ml_' + producto.nombre.replace(/\s+/g,'_') + '.' + extVideoML;
@@ -6200,14 +6207,19 @@ async function generarVideoDinamico(grupos, textoAdicional, paletaKey){
   recorder.start();
 
   const inicio = performance.now();
-  await new Promise(resolveAnim => {
+  await new Promise((resolveAnim, rejectAnim) => {
     function frame(t){
-      const elapsed = t - inicio;
-      dibujarFrameVideoDinamico(ctx, grupos, textoAdicional, paletaKey, Math.min(elapsed, duracionTotal-1), duracionTotal, segDuration, crossfadeMs);
-      if(elapsed < duracionTotal){
-        requestAnimationFrame(frame);
-      } else {
-        resolveAnim();
+      try{
+        const elapsed = t - inicio;
+        dibujarFrameVideoDinamico(ctx, grupos, textoAdicional, paletaKey, Math.min(elapsed, duracionTotal-1), duracionTotal, segDuration, crossfadeMs);
+        if(elapsed < duracionTotal){
+          requestAnimationFrame(frame);
+        } else {
+          resolveAnim();
+        }
+      } catch(errFrame){
+        recorder.stop();
+        rejectAnim(errFrame);
       }
     }
     requestAnimationFrame(frame);
@@ -6327,15 +6339,20 @@ async function generarVideoKenBurns(producto, img, textoAdicional, paletaKey, es
 
   const duracionMs = 5000;
   const inicio = performance.now();
-  await new Promise(resolveAnim => {
+  await new Promise((resolveAnim, rejectAnim) => {
     function frame(t){
-      const elapsed = t - inicio;
-      const progreso = Math.min(1, elapsed / duracionMs);
-      dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progreso, estilo, descVariante);
-      if(elapsed < duracionMs){
-        requestAnimationFrame(frame);
-      } else {
-        resolveAnim();
+      try{
+        const elapsed = t - inicio;
+        const progreso = Math.min(1, elapsed / duracionMs);
+        dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progreso, estilo, descVariante);
+        if(elapsed < duracionMs){
+          requestAnimationFrame(frame);
+        } else {
+          resolveAnim();
+        }
+      } catch(errFrame){
+        recorder.stop();
+        rejectAnim(errFrame);
       }
     }
     requestAnimationFrame(frame);
@@ -6402,15 +6419,20 @@ async function generarVideoMercadoLibre(img, caracteristicas){
 
   const duracionMs = 10000; // minimo exigido por Mercado Libre
   const inicio = performance.now();
-  await new Promise(resolveAnim => {
+  await new Promise((resolveAnim, rejectAnim) => {
     function frame(t){
-      const elapsed = t - inicio;
-      const progreso = Math.min(1, elapsed / duracionMs);
-      dibujarFrameVideoSinMarca(ctx, img, progreso, caracteristicas);
-      if(elapsed < duracionMs){
-        requestAnimationFrame(frame);
-      } else {
-        resolveAnim();
+      try{
+        const elapsed = t - inicio;
+        const progreso = Math.min(1, elapsed / duracionMs);
+        dibujarFrameVideoSinMarca(ctx, img, progreso, caracteristicas);
+        if(elapsed < duracionMs){
+          requestAnimationFrame(frame);
+        } else {
+          resolveAnim();
+        }
+      } catch(errFrame){
+        recorder.stop();
+        rejectAnim(errFrame);
       }
     }
     requestAnimationFrame(frame);
