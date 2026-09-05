@@ -654,10 +654,17 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
           <label class="ni-chip"><input type="radio" name="ni-diseno" value="texto"><span>Solo texto</span></label>
         </div>
         <p class="note" style="margin-top:4px;">El diseño elegido arriba aplica a Story/Posteo/Reel. El carrusel siempre varía entre los 3 estilos, para que no se vea repetitivo.</p>
-        <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video"><span>🎬 Video simple (zoom, ~5 seg)</span></label>
+        <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video" onchange="document.getElementById('ni-video-estilo-wrap').style.display=this.checked?'block':'none';"><span>🎬 Video simple (~5 seg)</span></label>
+        <div id="ni-video-estilo-wrap" style="display:none;margin:8px 0 0 26px;">
+          <div class="ni-chips">
+            <label class="ni-chip"><input type="radio" name="ni-video-estilo" value="zoom" checked><span>Zoom (Ken Burns)</span></label>
+            <label class="ni-chip"><input type="radio" name="ni-video-estilo" value="paneo"><span>Paneo lateral</span></label>
+            <label class="ni-chip"><input type="radio" name="ni-video-estilo" value="zoom-paneo"><span>Zoom + paneo combinado</span></label>
+          </div>
+        </div>
         <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video-ml"><span>🛒 Video para Mercado Libre (10 seg, sin marca)</span></label>
         <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video-ia-reel"><span>🤖 Video con IA real para Reel</span></label>
-        <p class="note" style="margin-top:4px;">Los de IA real tardan 1-2 minutos y tienen costo por uso (Google) — a diferencia de los de zoom, que son gratis e instantáneos.</p>
+        <p class="note" style="margin-top:4px;">Los de IA real tardan 1-2 minutos y tienen costo por uso (Google) — a diferencia de los de zoom/paneo, que son gratis e instantáneos.</p>
       </div>
 
       <p class="error" id="ni-error" style="display:none;">No encontré ningún producto con esos SKU.</p>
@@ -5548,7 +5555,8 @@ async function generarFlyersNuevoIngreso(){
       videoWrap.innerHTML = '<p class="note">Generando video (unos segundos)...</p>';
       cont.appendChild(videoWrap);
 
-      const blobVideo = await generarVideoKenBurns(producto, img, textoAdicional, 'violeta');
+      const estiloVideo = document.querySelector('input[name="ni-video-estilo"]:checked')?.value || 'zoom';
+      const blobVideo = await generarVideoKenBurns(producto, img, textoAdicional, 'violeta', estiloVideo);
       const urlVideo = URL.createObjectURL(blobVideo);
       const extVideo = blobVideo.type.includes('mp4') ? 'mp4' : 'webm';
       const nombreVideo = 'video_' + producto.nombre.replace(/\s+/g,'_') + '.' + extVideo;
@@ -6050,7 +6058,7 @@ function dibujarPiezaAnuncio(titulo, subtitulo, formato, paletaKey, tipografia, 
 // ---------- video simple (sin IA, animacion tipo Ken Burns) ----------
 function facilInOut(t){ return t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2; }
 
-function dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progreso){
+function dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progreso, estilo){
   const P = PALETAS[paletaKey] || PALETAS.violeta;
   const W = 1080, H = 1920;
   ctx.clearRect(0,0,W,H);
@@ -6074,17 +6082,29 @@ function dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progre
   ctx.fillText('NUEVO INGRESO', 540, 307);
   ctx.globalAlpha = 1;
 
-  // foto con zoom suave (efecto Ken Burns)
+  // foto animada segun el estilo elegido: zoom, paneo, o los dos combinados
   const photoW=780, photoH=900, px=(W-photoW)/2, py=390;
   ctx.fillStyle = P.tarjeta;
   dibujarRectRedondeado(ctx, px-14, py-14, photoW+28, photoH+28, 36); ctx.fill();
   ctx.save();
   dibujarRectRedondeado(ctx, px, py, photoW, photoH, 22);
   ctx.clip();
-  const zoom = 1 + 0.12*facilInOut(progreso);
+
+  const t = facilInOut(progreso);
+  let zoom, offsetXFactor;
+  if(estilo === 'paneo'){
+    zoom = 1.22; offsetXFactor = t;
+  } else if(estilo === 'zoom-paneo'){
+    zoom = 1 + 0.14*t; offsetXFactor = t;
+  } else { // zoom clasico, centrado
+    zoom = 1 + 0.12*t; offsetXFactor = 0.5;
+  }
   const ratio = Math.max(photoW/img.width, photoH/img.height) * zoom;
   const nw = img.width*ratio, nh = img.height*ratio;
-  ctx.drawImage(img, px+(photoW-nw)/2, py+(photoH-nh)/2, nw, nh);
+  const maxOffsetX = Math.max(0, nw - photoW);
+  const drawX = px - maxOffsetX*offsetXFactor;
+  const drawY = py + (photoH-nh)/2;
+  ctx.drawImage(img, drawX, drawY, nw, nh);
   ctx.restore();
 
   let y = py + photoH + 90;
@@ -6122,7 +6142,8 @@ function dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progre
   ctx.globalAlpha = 1;
 }
 
-async function generarVideoKenBurns(producto, img, textoAdicional, paletaKey){
+async function generarVideoKenBurns(producto, img, textoAdicional, paletaKey, estilo){
+  estilo = estilo || 'zoom';
   const canvas = document.createElement('canvas');
   canvas.width = 1080; canvas.height = 1920;
   const ctx = canvas.getContext('2d');
@@ -6148,7 +6169,7 @@ async function generarVideoKenBurns(producto, img, textoAdicional, paletaKey){
     function frame(t){
       const elapsed = t - inicio;
       const progreso = Math.min(1, elapsed / duracionMs);
-      dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progreso);
+      dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progreso, estilo);
       if(elapsed < duracionMs){
         requestAnimationFrame(frame);
       } else {
@@ -6168,11 +6189,15 @@ function dibujarFrameVideoSinMarca(ctx, img, progreso){
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0,0,W,H);
 
-  // solo el producto, con un zoom suave — sin texto, sin logo, sin nombre del negocio
-  const zoom = 1 + 0.12*facilInOut(progreso);
+  // producto con zoom + paneo lateral combinados — sin texto, sin logo, sin nombre del negocio
+  const t = facilInOut(progreso);
+  const zoom = 1 + 0.16*t;
   const ratio = Math.max(W/img.width, H/img.height) * zoom;
   const nw = img.width*ratio, nh = img.height*ratio;
-  ctx.drawImage(img, (W-nw)/2, (H-nh)/2, nw, nh);
+  const maxOffsetX = Math.max(0, nw - W);
+  const drawX = -maxOffsetX*t;
+  const drawY = (H-nh)/2;
+  ctx.drawImage(img, drawX, drawY, nw, nh);
 }
 
 async function generarVideoMercadoLibre(img){
@@ -6766,6 +6791,8 @@ function abrirNuevoIngreso(){
   document.getElementById('ni-fmt-post').checked = false;
   document.getElementById('ni-fmt-reel').checked = false;
   document.getElementById('ni-video').checked = false;
+  document.getElementById('ni-video-estilo-wrap').style.display = 'none';
+  document.querySelector('input[name="ni-video-estilo"][value="zoom"]').checked = true;
   document.getElementById('ni-video-ml').checked = false;
   document.getElementById('ni-video-ia-reel').checked = false;
   document.getElementById('ni-fmt-carrusel').checked = false;
