@@ -660,6 +660,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
             <label class="ni-chip"><input type="radio" name="ni-video-estilo" value="zoom" checked><span>Zoom (Ken Burns)</span></label>
             <label class="ni-chip"><input type="radio" name="ni-video-estilo" value="paneo"><span>Paneo lateral</span></label>
             <label class="ni-chip"><input type="radio" name="ni-video-estilo" value="zoom-paneo"><span>Zoom + paneo combinado</span></label>
+            <label class="ni-chip"><input type="radio" name="ni-video-estilo" value="dinamico"><span>✨ Dinámico (varias fotos + texto progresivo)</span></label>
           </div>
         </div>
         <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video-ml"><span>🛒 Video para Mercado Libre (10 seg, sin marca)</span></label>
@@ -5556,7 +5557,9 @@ async function generarFlyersNuevoIngreso(){
       cont.appendChild(videoWrap);
 
       const estiloVideo = document.querySelector('input[name="ni-video-estilo"]:checked')?.value || 'zoom';
-      const blobVideo = await generarVideoKenBurns(producto, img, textoAdicional, 'violeta', estiloVideo);
+      const blobVideo = estiloVideo === 'dinamico'
+        ? await generarVideoDinamico(grupos, textoAdicional, 'violeta')
+        : await generarVideoKenBurns(producto, img, textoAdicional, 'violeta', estiloVideo);
       const urlVideo = URL.createObjectURL(blobVideo);
       const extVideo = blobVideo.type.includes('mp4') ? 'mp4' : 'webm';
       const nombreVideo = 'video_' + producto.nombre.replace(/\s+/g,'_') + '.' + extVideo;
@@ -5596,7 +5599,7 @@ async function generarFlyersNuevoIngreso(){
       videoMLWrap.innerHTML = '<p class="note">Generando video para Mercado Libre (10 seg)...</p>';
       cont.appendChild(videoMLWrap);
 
-      const blobVideoML = await generarVideoMercadoLibre(img);
+      const blobVideoML = await generarVideoMercadoLibre(img, producto.composicion || '');
       const urlVideoML = URL.createObjectURL(blobVideoML);
       const extVideoML = blobVideoML.type.includes('mp4') ? 'mp4' : 'webm';
       const nombreVideoML = 'ml_' + producto.nombre.replace(/\s+/g,'_') + '.' + extVideoML;
@@ -6055,6 +6058,146 @@ function dibujarPiezaAnuncio(titulo, subtitulo, formato, paletaKey, tipografia, 
   return canvas;
 }
 
+// ---------- video dinamico: varias fotos en secuencia, con texto que aparece progresivamente ----------
+function dibujarFrameVideoDinamico(ctx, grupos, textoAdicional, paletaKey, tGlobal, duracionTotal, segDuration, crossfadeMs){
+  const P = PALETAS[paletaKey] || PALETAS.violeta;
+  const W = 1080, H = 1920;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = P.bg; ctx.fillRect(0,0,W,H);
+  ctx.textAlign = 'center';
+
+  ctx.fillStyle = P.texto; ctx.font = "600 58px 'Fraunces'";
+  ctx.fillText('OnLineTextil', 540, 130);
+  ctx.strokeStyle = P.accent; ctx.lineWidth = 5; ctx.setLineDash([18,12]);
+  ctx.beginPath(); ctx.moveTo(100,205); ctx.lineTo(980,205); ctx.stroke();
+  ctx.setLineDash([]);
+
+  const idxActual = Math.min(grupos.length-1, Math.floor(tGlobal / segDuration));
+  const tSeg = tGlobal - idxActual*segDuration;
+  const g = grupos[idxActual];
+  const gAnterior = idxActual > 0 ? grupos[idxActual-1] : null;
+
+  const photoW=800, photoH=980, px=(W-photoW)/2, py=290;
+  ctx.fillStyle = P.tarjeta;
+  dibujarRectRedondeado(ctx, px-14, py-14, photoW+28, photoH+28, 30); ctx.fill();
+  ctx.save();
+  dibujarRectRedondeado(ctx, px, py, photoW, photoH, 20);
+  ctx.clip();
+
+  function dibujarFotoConMovimiento(img, tLocal){
+    const t = facilInOut(Math.max(0,Math.min(1,tLocal)));
+    const zoom = 1 + 0.14*t;
+    const ratio = Math.max(photoW/img.width, photoH/img.height) * zoom;
+    const nw = img.width*ratio, nh = img.height*ratio;
+    const maxOffsetX = Math.max(0, nw-photoW);
+    ctx.drawImage(img, px - maxOffsetX*t, py + (photoH-nh)/2, nw, nh);
+  }
+
+  // crossfade con la foto anterior durante los primeros crossfadeMs de este segmento
+  if(gAnterior && tSeg < crossfadeMs){
+    dibujarFotoConMovimiento(gAnterior.img, 1);
+    ctx.globalAlpha = tSeg / crossfadeMs;
+    dibujarFotoConMovimiento(g.img, tSeg/segDuration);
+    ctx.globalAlpha = 1;
+  } else {
+    dibujarFotoConMovimiento(g.img, tSeg/segDuration);
+  }
+  ctx.restore();
+
+  // texto progresivo: nombre, luego composicion/nota, luego texto adicional (sin precio ni marca)
+  const tCaption = Math.max(0, tSeg - crossfadeMs);
+  let y = py + photoH + 80;
+
+  const aNombre = Math.max(0, Math.min(1, (tCaption-150)/350));
+  if(aNombre > 0){
+    ctx.globalAlpha = aNombre;
+    ctx.fillStyle = P.titulo; ctx.font = "600 58px 'Fraunces'";
+    const lineas = envolverTexto(ctx, g.producto.nombre, 940);
+    let yy = y + (1-aNombre)*16;
+    lineas.forEach(l => { ctx.fillText(l, 540, yy); yy += 62; });
+    ctx.globalAlpha = 1;
+    y = yy - 10;
+  }
+
+  const aComp = Math.max(0, Math.min(1, (tCaption-650)/350));
+  if(aComp > 0){
+    ctx.globalAlpha = aComp;
+    ctx.fillStyle = P.texto; ctx.font = "30px 'Work Sans'";
+    const texto = g.notaVariante || g.producto.composicion || '';
+    const lineas = envolverTexto(ctx, texto, 940);
+    let yy = y + (1-aComp)*14;
+    lineas.forEach(l => { ctx.fillText(l, 540, yy); yy += 38; });
+    ctx.globalAlpha = 1;
+    y = yy;
+  }
+
+  if(textoAdicional && idxActual === grupos.length-1){
+    const aTxt = Math.max(0, Math.min(1, (tCaption-1150)/350));
+    if(aTxt > 0){
+      ctx.globalAlpha = aTxt;
+      ctx.fillStyle = P.accent; ctx.font = "italic 700 32px 'Work Sans'";
+      const lineas = envolverTexto(ctx, textoAdicional, 900);
+      lineas.forEach(l => { ctx.fillText(l, 540, y+34); y += 42; });
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  ctx.fillStyle = P.accent; ctx.font = "700 28px 'Work Sans'";
+  ctx.fillText('onlinetextil.com.ar', 540, 1860);
+
+  if(grupos.length > 1){
+    const totalW = grupos.length*22;
+    let dx = 540 - totalW/2 + 11;
+    grupos.forEach((_, i) => {
+      ctx.fillStyle = i === idxActual ? P.accent : 'rgba(0,0,0,0.15)';
+      ctx.beginPath(); ctx.arc(dx, 1895, 6, 0, Math.PI*2); ctx.fill();
+      dx += 22;
+    });
+  }
+}
+
+async function generarVideoDinamico(grupos, textoAdicional, paletaKey){
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080; canvas.height = 1920;
+  const ctx = canvas.getContext('2d');
+
+  const segDuration = grupos.length === 1 ? 5000 : 2600;
+  const crossfadeMs = grupos.length === 1 ? 0 : 400;
+  const duracionTotal = grupos.length * segDuration;
+
+  const stream = canvas.captureStream(30);
+  const candidatos = [
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+  ];
+  let mimeType = candidatos.find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
+  const recorder = new MediaRecorder(stream, {mimeType});
+  const chunks = [];
+  recorder.ondataavailable = e => { if(e.data.size > 0) chunks.push(e.data); };
+  const terminado = new Promise(resolve => recorder.onstop = resolve);
+  recorder.start();
+
+  const inicio = performance.now();
+  await new Promise(resolveAnim => {
+    function frame(t){
+      const elapsed = t - inicio;
+      dibujarFrameVideoDinamico(ctx, grupos, textoAdicional, paletaKey, Math.min(elapsed, duracionTotal-1), duracionTotal, segDuration, crossfadeMs);
+      if(elapsed < duracionTotal){
+        requestAnimationFrame(frame);
+      } else {
+        resolveAnim();
+      }
+    }
+    requestAnimationFrame(frame);
+  });
+  recorder.stop();
+  await terminado;
+  return new Blob(chunks, {type: mimeType.split(';')[0]});
+}
+
 // ---------- video simple (sin IA, animacion tipo Ken Burns) ----------
 function facilInOut(t){ return t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2; }
 
@@ -6184,12 +6327,12 @@ async function generarVideoKenBurns(producto, img, textoAdicional, paletaKey, es
 }
 
 // ---------- video para Mercado Libre (sin marca, sin logo, 10 seg) ----------
-function dibujarFrameVideoSinMarca(ctx, img, progreso){
+function dibujarFrameVideoSinMarca(ctx, img, progreso, caracteristicas){
   const W = 1080, H = 1920;
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0,0,W,H);
 
-  // producto con zoom + paneo lateral combinados — sin texto, sin logo, sin nombre del negocio
+  // producto con zoom + paneo lateral combinados — sin logo, sin nombre del negocio, sin precio
   const t = facilInOut(progreso);
   const zoom = 1 + 0.16*t;
   const ratio = Math.max(W/img.width, H/img.height) * zoom;
@@ -6198,9 +6341,27 @@ function dibujarFrameVideoSinMarca(ctx, img, progreso){
   const drawX = -maxOffsetX*t;
   const drawY = (H-nh)/2;
   ctx.drawImage(img, drawX, drawY, nw, nh);
+
+  // texto de caracteristicas del producto, apareciendo progresivamente sobre la parte inferior
+  if(caracteristicas){
+    const tMs = progreso * 10000; // duracion total real, para calcular cuando aparece cada linea
+    const alpha = Math.max(0, Math.min(1, (tMs-800)/500));
+    if(alpha > 0){
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.55;
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, H-260, W, 260);
+      ctx.globalAlpha = alpha;
+      ctx.textAlign = 'center'; ctx.fillStyle = '#FFFFFF'; ctx.font = "500 34px 'Work Sans'";
+      const lineas = envolverTexto(ctx, caracteristicas, 900);
+      let yy = H - 260 + 70 + (1-alpha)*14;
+      lineas.slice(0,3).forEach(l => { ctx.fillText(l, 540, yy); yy += 44; });
+      ctx.restore();
+    }
+  }
 }
 
-async function generarVideoMercadoLibre(img){
+async function generarVideoMercadoLibre(img, caracteristicas){
   const canvas = document.createElement('canvas');
   canvas.width = 1080; canvas.height = 1920;
   const ctx = canvas.getContext('2d');
@@ -6226,7 +6387,7 @@ async function generarVideoMercadoLibre(img){
     function frame(t){
       const elapsed = t - inicio;
       const progreso = Math.min(1, elapsed / duracionMs);
-      dibujarFrameVideoSinMarca(ctx, img, progreso);
+      dibujarFrameVideoSinMarca(ctx, img, progreso, caracteristicas);
       if(elapsed < duracionMs){
         requestAnimationFrame(frame);
       } else {
