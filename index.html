@@ -5327,6 +5327,26 @@ async function generarFlyersNuevoIngreso(){
 
     const temasUnicos = [...new Set(catIndices.map(ci => TEMAS_CATEGORIA[CATALOGO[ci].categoria]).filter(Boolean))];
     temaCategoriaTexto = temasUnicos.join(' · ');
+
+    // en vez de repetir tal cual lo que el usuario escribió, se lo pasamos a la IA como inspiración
+    // y usamos el texto atractivo que arme ella para las piezas de redes
+    try{
+      const nombresProductos = matches.map(m => m.producto.nombre).join(', ');
+      const nombreCatIA = obtenerCategoriaAmigable(matches[0]?.producto) || CATALOGO[catIndices[0]].categoria;
+      const descripcionIA = `Categoría: ${nombreCatIA}. Productos destacados: ${nombresProductos}.` +
+        (textoAdicional ? ` Idea del vendedor a tener en cuenta: ${textoAdicional}.` : '');
+      const respIA = await fetch(URL_WORKER_IA, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ accion: 'generarContenidoAnuncio', descripcion: descripcionIA })
+      });
+      const datosIA = await respIA.json();
+      if(respIA.ok && !datosIA.error && datosIA.subtitulo){
+        textoAdicional = datosIA.subtitulo;
+      }
+    } catch(errIA){
+      console.error('No se pudo generar texto con IA, se usa el texto tal cual lo escribió:', errIA);
+    }
   } else if(modo === 'foto'){
     const archivoFoto = document.getElementById('ni-foto-suelta').files[0];
     const titulo = document.getElementById('ni-foto-titulo').value.trim();
@@ -5414,7 +5434,9 @@ async function generarFlyersNuevoIngreso(){
 
     const primerProducto = grupos[0].producto;
     const nombreArchivoBase = grupos.map(g => g.producto.nombre).join('_').replace(/\s+/g,'_').slice(0,60);
-    const piezas = [{canvas: dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoPct), nombre:'flyer_whatsapp_' + nombreArchivoBase + '.png', etiqueta:'flyer WhatsApp'}];
+    const esModoCategoria = modo === 'categoria';
+    const nombreCategoriaFlyer = esModoCategoria ? obtenerCategoriaAmigable(primerProducto) : null;
+    const piezas = [{canvas: dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoPct, esModoCategoria, nombreCategoriaFlyer), nombre:'flyer_whatsapp_' + nombreArchivoBase + '.png', etiqueta:'flyer WhatsApp'}];
 
     const formatosElegidos = [];
     if(document.getElementById('ni-fmt-story').checked) formatosElegidos.push(['story','Story']);
@@ -5668,7 +5690,7 @@ async function generarFlyersNuevoIngreso(){
   }
 }
 
-function dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoPct){
+function dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoPct, esCategoria, nombreCategoria){
   const W = 1080, H = 1900;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
@@ -5770,7 +5792,37 @@ function dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoP
     y += boxH + 12;
   }
 
-  if(multi){
+  if(multi && esCategoria){
+    const preciosValidos = grupos.flatMap(g => g.variantes.map(v => parsePrice(v.precio)).filter(p => p !== null));
+    const precioMin = preciosValidos.length ? Math.min(...preciosValidos) : null;
+
+    if(nombreCategoria){
+      ctx.textAlign = 'center'; ctx.fillStyle = PURPLE; ctx.font = "600 44px 'Fraunces'";
+      ctx.fillText(nombreCategoria, 540, y+10);
+      y += 60;
+    }
+
+    // grilla de fotos representativas (hasta 4)
+    const fotos = grupos.slice(0,4);
+    const gap = 16, cols = fotos.length;
+    const fotoS = Math.floor((940 - gap*(cols-1)) / cols);
+    let fx = 70;
+    fotos.forEach(g => {
+      dibujarFotoContain(ctx, g.img, fx, y, fotoS, fotoS, "#FFFFFF");
+      ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 2;
+      dibujarRectRedondeado(ctx, fx, y, fotoS, fotoS, 16); ctx.stroke();
+      fx += fotoS + gap;
+    });
+    y += fotoS + 34;
+
+    ctx.fillStyle = '#FFFFFF';
+    dibujarRectRedondeado(ctx, 70, y, 940, 90, 14); ctx.fill();
+    ctx.textAlign = 'center'; ctx.fillStyle = '#6E6459'; ctx.font = "26px 'Work Sans'";
+    ctx.fillText('Desde', 540, y+38);
+    ctx.fillStyle = PURPLE; ctx.font = "700 46px 'IBM Plex Mono'";
+    ctx.fillText(precioMin !== null ? formatPrice(precioMin) : 'Consultar', 540, y+78);
+    y += 90 + 20;
+  } else if(multi){
     grupos.forEach((g, idx) => {
       const photoS = 180;
       const px = 70, py = y;
