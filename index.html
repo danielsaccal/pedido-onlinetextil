@@ -5555,43 +5555,47 @@ async function generarFlyersNuevoIngreso(){
       videoWrap.className = 'ni-video-wrap'; videoWrap.style.cssText = 'text-align:center;background:var(--cream);border-radius:10px;padding:12px;';
       videoWrap.innerHTML = '<p class="note">Generando video (unos segundos)...</p>';
       cont.appendChild(videoWrap);
+      try{
+        const estiloVideo = document.querySelector('input[name="ni-video-estilo"]:checked')?.value || 'zoom';
+        const descVariantePrincipal = grupos[0].variantes && grupos[0].variantes[0] ? grupos[0].variantes[0].desc : '';
+        const blobVideo = estiloVideo === 'dinamico'
+          ? await generarVideoDinamico(grupos, textoAdicional, 'violeta')
+          : await generarVideoKenBurns(producto, img, textoAdicional, 'violeta', estiloVideo, descVariantePrincipal);
+        const urlVideo = URL.createObjectURL(blobVideo);
+        const extVideo = blobVideo.type.includes('mp4') ? 'mp4' : 'webm';
+        const nombreVideo = 'video_' + producto.nombre.replace(/\s+/g,'_') + '.' + extVideo;
 
-      const estiloVideo = document.querySelector('input[name="ni-video-estilo"]:checked')?.value || 'zoom';
-      const descVariantePrincipal = grupos[0].variantes && grupos[0].variantes[0] ? grupos[0].variantes[0].desc : '';
-      const blobVideo = estiloVideo === 'dinamico'
-        ? await generarVideoDinamico(grupos, textoAdicional, 'violeta')
-        : await generarVideoKenBurns(producto, img, textoAdicional, 'violeta', estiloVideo, descVariantePrincipal);
-      const urlVideo = URL.createObjectURL(blobVideo);
-      const extVideo = blobVideo.type.includes('mp4') ? 'mp4' : 'webm';
-      const nombreVideo = 'video_' + producto.nombre.replace(/\s+/g,'_') + '.' + extVideo;
-
-      videoWrap.innerHTML = '';
-      const videoEl = document.createElement('video');
-      videoEl.src = urlVideo; videoEl.controls = true; videoEl.loop = true;
-      videoEl.style.cssText = 'max-width:100%;border-radius:10px;border:1px solid var(--line);margin-bottom:8px;';
-      const btnVideo = document.createElement('button');
-      btnVideo.className = 'btn btn-gold';
-      btnVideo.textContent = 'Compartir/Descargar video';
-      btnVideo.onclick = async () => {
-        const file = new File([blobVideo], nombreVideo, {type: blobVideo.type});
-        try{
-          if(navigator.canShare && navigator.canShare({files:[file]})){
-            await navigator.share({files:[file], title:'OnLineTextil'});
-            return;
-          }
-        } catch(e){ /* sigue al fallback */ }
-        const a = document.createElement('a');
-        a.href = urlVideo; a.download = nombreVideo; a.click();
-      };
-      const notaVideo = document.createElement('p');
-      notaVideo.className = 'note';
-      notaVideo.textContent = extVideo === 'mp4'
-        ? 'Formato .mp4 — Instagram lo acepta directo.'
-        : 'Su navegador generó el video en .webm — si Instagram no lo acepta directo, ábralo y grábelo de nuevo desde la app de Reels, o use un conversor a .mp4.';
-      videoWrap.appendChild(videoEl);
-      videoWrap.appendChild(document.createElement('br'));
-      videoWrap.appendChild(btnVideo);
-      videoWrap.appendChild(notaVideo);
+        videoWrap.innerHTML = '';
+        const videoEl = document.createElement('video');
+        videoEl.src = urlVideo; videoEl.controls = true; videoEl.loop = true;
+        videoEl.style.cssText = 'max-width:100%;border-radius:10px;border:1px solid var(--line);margin-bottom:8px;';
+        const btnVideo = document.createElement('button');
+        btnVideo.className = 'btn btn-gold';
+        btnVideo.textContent = 'Compartir/Descargar video';
+        btnVideo.onclick = async () => {
+          const file = new File([blobVideo], nombreVideo, {type: blobVideo.type});
+          try{
+            if(navigator.canShare && navigator.canShare({files:[file]})){
+              await navigator.share({files:[file], title:'OnLineTextil'});
+              return;
+            }
+          } catch(e){ /* sigue al fallback */ }
+          const a = document.createElement('a');
+          a.href = urlVideo; a.download = nombreVideo; a.click();
+        };
+        const notaVideo = document.createElement('p');
+        notaVideo.className = 'note';
+        notaVideo.textContent = extVideo === 'mp4'
+          ? 'Formato .mp4 — Instagram lo acepta directo.'
+          : 'Su navegador generó el video en .webm — si Instagram no lo acepta directo, ábralo y grábelo de nuevo desde la app de Reels, o use un conversor a .mp4.';
+        videoWrap.appendChild(videoEl);
+        videoWrap.appendChild(document.createElement('br'));
+        videoWrap.appendChild(btnVideo);
+        videoWrap.appendChild(notaVideo);
+      } catch(errVideo){
+        console.error('Error generando video simple:', errVideo);
+        videoWrap.innerHTML = '<p class="error" style="display:block;">No se pudo generar este video: ' + errVideo.message + '</p>';
+      }
     }
 
     if(document.getElementById('ni-video-ml').checked){
@@ -5599,44 +5603,56 @@ async function generarFlyersNuevoIngreso(){
       videoMLWrap.className = 'ni-video-wrap'; videoMLWrap.style.cssText = 'text-align:center;background:var(--cream);border-radius:10px;padding:12px;';
       videoMLWrap.innerHTML = '<p class="note">Generando video para Mercado Libre (10 seg)...</p>';
       cont.appendChild(videoMLWrap);
+      try{
+        const blobVideoML = await generarVideoMercadoLibre(img, producto.composicion || '');
+        const urlVideoML = URL.createObjectURL(blobVideoML);
+        const extVideoML = blobVideoML.type.includes('mp4') ? 'mp4' : 'webm';
+        const nombreVideoML = 'ml_' + producto.nombre.replace(/\s+/g,'_') + '.' + extVideoML;
 
-      const blobVideoML = await generarVideoMercadoLibre(img, producto.composicion || '');
-      const urlVideoML = URL.createObjectURL(blobVideoML);
-      const extVideoML = blobVideoML.type.includes('mp4') ? 'mp4' : 'webm';
-      const nombreVideoML = 'ml_' + producto.nombre.replace(/\s+/g,'_') + '.' + extVideoML;
-
-      videoMLWrap.innerHTML = '';
-      const videoMLEl = document.createElement('video');
-      videoMLEl.src = urlVideoML; videoMLEl.controls = true; videoMLEl.loop = true;
-      videoMLEl.style.cssText = 'max-width:100%;border-radius:10px;border:1px solid var(--line);margin-bottom:8px;';
-      const btnVideoML = document.createElement('button');
-      btnVideoML.className = 'btn btn-gold';
-      btnVideoML.textContent = 'Descargar video para ML';
-      btnVideoML.onclick = () => {
-        const a = document.createElement('a');
-        a.href = urlVideoML; a.download = nombreVideoML; a.click();
-      };
-      const notaVideoML = document.createElement('p');
-      notaVideoML.className = 'note';
-      notaVideoML.textContent = 'Sin marca de agua ni logo, 10 segundos, formato vertical — listo para subir a Mercado Libre Clips.' +
-        (extVideoML !== 'mp4' ? ' Su navegador lo generó en .webm; si Mercado Libre le pide .mp4, conviértalo antes de subirlo.' : '');
-      videoMLWrap.appendChild(videoMLEl);
-      videoMLWrap.appendChild(document.createElement('br'));
-      videoMLWrap.appendChild(btnVideoML);
-      videoMLWrap.appendChild(notaVideoML);
+        videoMLWrap.innerHTML = '';
+        const videoMLEl = document.createElement('video');
+        videoMLEl.src = urlVideoML; videoMLEl.controls = true; videoMLEl.loop = true;
+        videoMLEl.style.cssText = 'max-width:100%;border-radius:10px;border:1px solid var(--line);margin-bottom:8px;';
+        const btnVideoML = document.createElement('button');
+        btnVideoML.className = 'btn btn-gold';
+        btnVideoML.textContent = 'Descargar video para ML';
+        btnVideoML.onclick = () => {
+          const a = document.createElement('a');
+          a.href = urlVideoML; a.download = nombreVideoML; a.click();
+        };
+        const notaVideoML = document.createElement('p');
+        notaVideoML.className = 'note';
+        notaVideoML.textContent = 'Sin marca de agua ni logo, 10 segundos, formato vertical — listo para subir a Mercado Libre Clips.' +
+          (extVideoML !== 'mp4' ? ' Su navegador lo generó en .webm; si Mercado Libre le pide .mp4, conviértalo antes de subirlo.' : '');
+        videoMLWrap.appendChild(videoMLEl);
+        videoMLWrap.appendChild(document.createElement('br'));
+        videoMLWrap.appendChild(btnVideoML);
+        videoMLWrap.appendChild(notaVideoML);
+      } catch(errVideoML){
+        console.error('Error generando video ML:', errVideoML);
+        videoMLWrap.innerHTML = '<p class="error" style="display:block;">No se pudo generar este video: ' + errVideoML.message + '</p>';
+      }
     }
 
     if(document.getElementById('ni-video-ia-reel').checked){
-      const descripcionProducto = `${producto.nombre}, ${producto.composicion || ''}`.trim();
+      try{
+        const descripcionProducto = `${producto.nombre}, ${producto.composicion || ''}`.trim();
 
-      // convertir la foto ya cargada (img) a base64 para pasarla como referencia
-      const canvasRef = document.createElement('canvas');
-      canvasRef.width = img.naturalWidth || img.width;
-      canvasRef.height = img.naturalHeight || img.height;
-      canvasRef.getContext('2d').drawImage(img, 0, 0);
-      const imagenRefBase64 = canvasRef.toDataURL('image/jpeg', 0.85).split(',')[1];
+        // convertir la foto ya cargada (img) a base64 para pasarla como referencia
+        const canvasRef = document.createElement('canvas');
+        canvasRef.width = img.naturalWidth || img.width;
+        canvasRef.height = img.naturalHeight || img.height;
+        canvasRef.getContext('2d').drawImage(img, 0, 0);
+        const imagenRefBase64 = canvasRef.toDataURL('image/jpeg', 0.85).split(',')[1];
 
-      await generarYMostrarVideoIA(cont, 'reel', descripcionProducto, imagenRefBase64, producto.nombre);
+        await generarYMostrarVideoIA(cont, 'reel', descripcionProducto, imagenRefBase64, producto.nombre);
+      } catch(errVideoIA){
+        console.error('Error generando video con IA:', errVideoIA);
+        const errWrap = document.createElement('p');
+        errWrap.className = 'error'; errWrap.style.display = 'block';
+        errWrap.textContent = 'No se pudo generar el video con IA: ' + errVideoIA.message;
+        cont.appendChild(errWrap);
+      }
     }
   } catch(e){
     cont.innerHTML = '';
