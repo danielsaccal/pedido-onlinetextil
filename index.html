@@ -5557,9 +5557,10 @@ async function generarFlyersNuevoIngreso(){
       cont.appendChild(videoWrap);
 
       const estiloVideo = document.querySelector('input[name="ni-video-estilo"]:checked')?.value || 'zoom';
+      const descVariantePrincipal = grupos[0].variantes && grupos[0].variantes[0] ? grupos[0].variantes[0].desc : '';
       const blobVideo = estiloVideo === 'dinamico'
         ? await generarVideoDinamico(grupos, textoAdicional, 'violeta')
-        : await generarVideoKenBurns(producto, img, textoAdicional, 'violeta', estiloVideo);
+        : await generarVideoKenBurns(producto, img, textoAdicional, 'violeta', estiloVideo, descVariantePrincipal);
       const urlVideo = URL.createObjectURL(blobVideo);
       const extVideo = blobVideo.type.includes('mp4') ? 'mp4' : 'webm';
       const nombreVideo = 'video_' + producto.nombre.replace(/\s+/g,'_') + '.' + extVideo;
@@ -6112,7 +6113,9 @@ function dibujarFrameVideoDinamico(ctx, grupos, textoAdicional, paletaKey, tGlob
   if(aNombre > 0){
     ctx.globalAlpha = aNombre;
     ctx.fillStyle = P.titulo; ctx.font = "600 58px 'Fraunces'";
-    const lineas = envolverTexto(ctx, g.producto.nombre, 940);
+    const descVariante = g.variantes && g.variantes[0] ? g.variantes[0].desc : '';
+    const tituloCompleto = descVariante ? `${g.producto.nombre} — ${descVariante}` : g.producto.nombre;
+    const lineas = envolverTexto(ctx, tituloCompleto, 940);
     let yy = y + (1-aNombre)*16;
     lineas.forEach(l => { ctx.fillText(l, 540, yy); yy += 62; });
     ctx.globalAlpha = 1;
@@ -6201,7 +6204,7 @@ async function generarVideoDinamico(grupos, textoAdicional, paletaKey){
 // ---------- video simple (sin IA, animacion tipo Ken Burns) ----------
 function facilInOut(t){ return t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2; }
 
-function dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progreso, estilo){
+function dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progreso, estilo, descVariante){
   const P = PALETAS[paletaKey] || PALETAS.violeta;
   const W = 1080, H = 1920;
   ctx.clearRect(0,0,W,H);
@@ -6255,7 +6258,7 @@ function dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progre
   const nombreY = y + (1-nombreAlpha)*20;
   ctx.globalAlpha = nombreAlpha;
   ctx.fillStyle = P.titulo; ctx.font = "600 64px 'Fraunces'";
-  const lineasNombre = envolverTexto(ctx, producto.nombre, 940);
+  const lineasNombre = envolverTexto(ctx, descVariante ? `${producto.nombre} — ${descVariante}` : producto.nombre, 940);
   let yy = nombreY;
   lineasNombre.forEach(linea => { ctx.fillText(linea, 540, yy); yy += 66; });
   ctx.globalAlpha = 1;
@@ -6285,7 +6288,7 @@ function dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progre
   ctx.globalAlpha = 1;
 }
 
-async function generarVideoKenBurns(producto, img, textoAdicional, paletaKey, estilo){
+async function generarVideoKenBurns(producto, img, textoAdicional, paletaKey, estilo, descVariante){
   estilo = estilo || 'zoom';
   const canvas = document.createElement('canvas');
   canvas.width = 1080; canvas.height = 1920;
@@ -6312,7 +6315,7 @@ async function generarVideoKenBurns(producto, img, textoAdicional, paletaKey, es
     function frame(t){
       const elapsed = t - inicio;
       const progreso = Math.min(1, elapsed / duracionMs);
-      dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progreso, estilo);
+      dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progreso, estilo, descVariante);
       if(elapsed < duracionMs){
         requestAnimationFrame(frame);
       } else {
