@@ -5036,10 +5036,12 @@ async function guardarProductoNuevoInterno(){
 
     const cat = CATALOGO.find(c => c.categoria === categoria);
     if(cat) cat.productos.push(nuevoProducto);
-
-    alert('Producto agregado al catálogo.');
     renderCatalogo(document.getElementById('buscador').value);
-    abrirNuevoProducto();
+
+    const skusRecienCargados = variantes.map(v => v.sku).join(', ');
+    abrirNuevoIngreso();
+    document.getElementById('ni-skus').value = skusRecienCargados;
+    alert('Producto agregado. Le dejé listo el SKU para generar el contenido de redes — solo falta que toque "Generar" cuando quiera.');
   } catch(e){
     errorEl.textContent = 'No se pudo guardar: ' + e.message;
     errorEl.style.display = 'block';
