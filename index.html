@@ -6170,14 +6170,18 @@ function dibujarFrameVideoDinamico(ctx, grupos, textoAdicional, paletaKey, tGlob
   mostrarTexto = mostrarTexto !== false;
   const P = PALETAS[paletaKey] || PALETAS.violeta;
   const W = 1080, H = 1920;
+  const SAFE_TOP = 260, SAFE_BOTTOM = 1560, SAFE_LEFT = 70, SAFE_RIGHT = 900;
+  const centroX = (SAFE_LEFT + SAFE_RIGHT) / 2;
+  const anchoUtil = SAFE_RIGHT - SAFE_LEFT;
+
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle = P.bg; ctx.fillRect(0,0,W,H);
   ctx.textAlign = 'center';
 
-  ctx.fillStyle = P.texto; ctx.font = "600 58px 'Fraunces'";
-  ctx.fillText('OnLineTextil', 540, 130);
+  ctx.fillStyle = P.texto; ctx.font = "600 52px 'Fraunces'";
+  ctx.fillText('OnLineTextil', centroX, SAFE_TOP+30);
   ctx.strokeStyle = P.accent; ctx.lineWidth = 5; ctx.setLineDash([18,12]);
-  ctx.beginPath(); ctx.moveTo(100,205); ctx.lineTo(980,205); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(SAFE_LEFT, SAFE_TOP+85); ctx.lineTo(SAFE_RIGHT, SAFE_TOP+85); ctx.stroke();
   ctx.setLineDash([]);
 
   const idxActual = Math.max(0, Math.min(grupos.length-1, Math.floor(Math.max(0,tGlobal) / segDuration)));
@@ -6185,7 +6189,7 @@ function dibujarFrameVideoDinamico(ctx, grupos, textoAdicional, paletaKey, tGlob
   const g = grupos[idxActual];
   const gAnterior = idxActual > 0 ? grupos[idxActual-1] : null;
 
-  const photoW=800, photoH=980, px=(W-photoW)/2, py=290;
+  const photoW = anchoUtil, photoH = 720, px = SAFE_LEFT, py = SAFE_TOP + 120;
   ctx.fillStyle = P.tarjeta;
   dibujarRectRedondeado(ctx, px-14, py-14, photoW+28, photoH+28, 30); ctx.fill();
   ctx.save();
@@ -6214,55 +6218,55 @@ function dibujarFrameVideoDinamico(ctx, grupos, textoAdicional, paletaKey, tGlob
 
   // texto progresivo: nombre, luego composicion/nota, luego texto adicional (sin precio ni marca)
   const tCaption = Math.max(0, tSeg - crossfadeMs);
-  let y = py + photoH + 80;
+  let y = py + photoH + 55;
 
   if(mostrarTexto){
     const aNombre = Math.max(0, Math.min(1, (tCaption-150)/350));
     if(aNombre > 0){
       ctx.globalAlpha = aNombre;
-      ctx.fillStyle = P.titulo; ctx.font = "600 58px 'Fraunces'";
+      ctx.fillStyle = P.titulo; ctx.font = "600 44px 'Fraunces'";
       const descVariante = g.variantes && g.variantes[0] ? g.variantes[0].desc : '';
       const tituloCompleto = descVariante ? `${g.producto.nombre} — ${descVariante}` : g.producto.nombre;
-      const lineas = envolverTexto(ctx, tituloCompleto, 940);
+      const lineas = envolverTexto(ctx, tituloCompleto, anchoUtil);
       let yy = y + (1-aNombre)*16;
-      lineas.forEach(l => { ctx.fillText(l, 540, yy); yy += 62; });
+      lineas.slice(0,2).forEach(l => { ctx.fillText(l, centroX, yy); yy += 48; });
       ctx.globalAlpha = 1;
-      y = yy - 10;
+      y = yy - 8;
     }
 
     const aComp = Math.max(0, Math.min(1, (tCaption-650)/350));
-    if(aComp > 0){
+    if(aComp > 0 && y < SAFE_BOTTOM - 40){
       ctx.globalAlpha = aComp;
-      ctx.fillStyle = P.texto; ctx.font = "30px 'Work Sans'";
+      ctx.fillStyle = P.texto; ctx.font = "26px 'Work Sans'";
       const texto = g.notaVariante || g.producto.composicion || '';
-      const lineas = envolverTexto(ctx, texto, 940);
+      const lineas = envolverTexto(ctx, texto, anchoUtil);
       let yy = y + (1-aComp)*14;
-      lineas.forEach(l => { ctx.fillText(l, 540, yy); yy += 38; });
+      lineas.slice(0,2).forEach(l => { ctx.fillText(l, centroX, yy); yy += 32; });
       ctx.globalAlpha = 1;
       y = yy;
     }
 
-    if(textoAdicional && idxActual === grupos.length-1){
+    if(textoAdicional && idxActual === grupos.length-1 && y < SAFE_BOTTOM - 40){
       const aTxt = Math.max(0, Math.min(1, (tCaption-1150)/350));
       if(aTxt > 0){
         ctx.globalAlpha = aTxt;
-        ctx.fillStyle = P.accent; ctx.font = "italic 700 32px 'Work Sans'";
-        const lineas = envolverTexto(ctx, textoAdicional, 900);
-        lineas.forEach(l => { ctx.fillText(l, 540, y+34); y += 42; });
+        ctx.fillStyle = P.accent; ctx.font = "italic 700 28px 'Work Sans'";
+        const lineas = envolverTexto(ctx, textoAdicional, anchoUtil);
+        lineas.slice(0,2).forEach(l => { ctx.fillText(l, centroX, y+30); y += 36; });
         ctx.globalAlpha = 1;
       }
     }
   }
 
-  ctx.fillStyle = P.accent; ctx.font = "700 28px 'Work Sans'";
-  ctx.fillText('onlinetextil.com.ar', 540, 1860);
+  ctx.fillStyle = P.accent; ctx.font = "700 24px 'Work Sans'";
+  ctx.fillText('onlinetextil.com.ar', centroX, SAFE_BOTTOM);
 
   if(grupos.length > 1){
     const totalW = grupos.length*22;
-    let dx = 540 - totalW/2 + 11;
+    let dx = centroX - totalW/2 + 11;
     grupos.forEach((_, i) => {
       ctx.fillStyle = i === idxActual ? P.accent : 'rgba(0,0,0,0.15)';
-      ctx.beginPath(); ctx.arc(dx, 1895, 6, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(dx, SAFE_BOTTOM+40, 6, 0, Math.PI*2); ctx.fill();
       dx += 22;
     });
   }
@@ -6272,19 +6276,26 @@ function dibujarFrameVideoDinamico(ctx, grupos, textoAdicional, paletaKey, tGlob
 function dibujarFrameVideoCategoria(ctx, grupos, nombreCategoria, textoAdicional, paletaKey, tGlobal, duracionTotal, tandaDuration, mostrarTexto){
   const P = PALETAS[paletaKey] || PALETAS.violeta;
   const W = 1080, H = 1920;
+  // zona segura de Reels/Stories: Instagram tapa arriba (usuario/volver), abajo (caption/musica/botones) y a la derecha (like/compartir)
+  const SAFE_TOP = 260, SAFE_BOTTOM = 1560, SAFE_LEFT = 70, SAFE_RIGHT = 900;
+  const centroX = (SAFE_LEFT + SAFE_RIGHT) / 2;
+  const anchoUtil = SAFE_RIGHT - SAFE_LEFT;
+
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle = P.bg; ctx.fillRect(0,0,W,H);
   ctx.textAlign = 'center';
 
-  ctx.fillStyle = P.texto; ctx.font = "600 56px 'Fraunces'";
-  ctx.fillText('OnLineTextil', 540, 110);
+  ctx.fillStyle = P.texto; ctx.font = "600 50px 'Fraunces'";
+  ctx.fillText('OnLineTextil', centroX, SAFE_TOP+30);
   ctx.strokeStyle = P.accent; ctx.lineWidth = 5; ctx.setLineDash([18,12]);
-  ctx.beginPath(); ctx.moveTo(100,175); ctx.lineTo(980,175); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(SAFE_LEFT, SAFE_TOP+85); ctx.lineTo(SAFE_RIGHT, SAFE_TOP+85); ctx.stroke();
   ctx.setLineDash([]);
 
+  let y = SAFE_TOP + 150;
   if(mostrarTexto && nombreCategoria){
-    ctx.fillStyle = P.titulo; ctx.font = "600 50px 'Fraunces'";
-    ctx.fillText(nombreCategoria, 540, 240);
+    ctx.fillStyle = P.titulo; ctx.font = "600 46px 'Fraunces'";
+    ctx.fillText(nombreCategoria, centroX, y);
+    y += 60;
   }
 
   const totalTandas = Math.ceil(grupos.length / 4);
@@ -6296,15 +6307,15 @@ function dibujarFrameVideoCategoria(ctx, grupos, nombreCategoria, textoAdicional
   const alphaEntrada = Math.max(0, Math.min(1, tTanda/300));
   ctx.globalAlpha = alphaEntrada;
 
-  const gap = 20, cols = 2, filas = 2;
-  const celdaW = (900-gap)/cols, fotoS = celdaW;
-  const inicioX = (W - (celdaW*cols + gap*(cols-1)))/2;
-  const inicioY = mostrarTexto && nombreCategoria ? 290 : 240;
+  const gap = 18, cols = 2;
+  const fotoS = (anchoUtil - gap) / cols;
+  const inicioX = SAFE_LEFT;
+  const inicioY = y + 20;
 
   grupoTanda.forEach((g, i) => {
     const col = i % cols, fila = Math.floor(i / cols);
-    const gx = inicioX + col*(celdaW+gap);
-    const gy = inicioY + fila*(fotoS+70+gap);
+    const gx = inicioX + col*(fotoS+gap);
+    const gy = inicioY + fila*(fotoS+64+gap);
     dibujarFotoContain(ctx, g.img, gx, gy, fotoS, fotoS, "#FFFFFF");
     ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 2;
     dibujarRectRedondeado(ctx, gx, gy, fotoS, fotoS, 16); ctx.stroke();
@@ -6312,36 +6323,37 @@ function dibujarFrameVideoCategoria(ctx, grupos, nombreCategoria, textoAdicional
     if(mostrarTexto){
       const precioNum = parsePrice(g.variantes[0].precio);
       const precioTxt = precioNum !== null ? formatPrice(precioNum) : 'Consultar';
-      ctx.fillStyle = P.titulo; ctx.font = "600 26px 'Fraunces'";
+      ctx.fillStyle = P.titulo; ctx.font = "600 24px 'Fraunces'";
       const nombreCorto = truncarTexto(ctx, g.producto.nombre, fotoS);
-      ctx.fillText(nombreCorto, gx+fotoS/2, gy+fotoS+34);
-      ctx.fillStyle = P.accent; ctx.font = "700 28px 'IBM Plex Mono'";
-      ctx.fillText(precioTxt, gx+fotoS/2, gy+fotoS+66);
+      ctx.fillText(nombreCorto, gx+fotoS/2, gy+fotoS+30);
+      ctx.fillStyle = P.accent; ctx.font = "700 25px 'IBM Plex Mono'";
+      ctx.fillText(precioTxt, gx+fotoS/2, gy+fotoS+60);
     }
   });
   ctx.globalAlpha = 1;
+  y = inicioY + 2*(fotoS+64+gap) - 20;
 
-  if(mostrarTexto && textoAdicional && idxTanda === totalTandas-1){
+  if(mostrarTexto && textoAdicional && idxTanda === totalTandas-1 && y < SAFE_BOTTOM - 60){
     const aTxt = Math.max(0, Math.min(1, (tTanda-tandaDuration*0.4)/400));
     if(aTxt > 0){
       ctx.globalAlpha = aTxt;
-      ctx.fillStyle = P.accent; ctx.font = "italic 700 30px 'Work Sans'";
-      const lineas = envolverTexto(ctx, textoAdicional, 900);
-      let yy = 1720;
-      lineas.forEach(l => { ctx.fillText(l, 540, yy); yy += 38; });
+      ctx.fillStyle = P.accent; ctx.font = "italic 700 28px 'Work Sans'";
+      const lineas = envolverTexto(ctx, textoAdicional, anchoUtil);
+      let yy = y + 30;
+      lineas.slice(0,2).forEach(l => { ctx.fillText(l, centroX, yy); yy += 36; });
       ctx.globalAlpha = 1;
     }
   }
 
-  ctx.fillStyle = P.accent; ctx.font = "700 26px 'Work Sans'";
-  ctx.fillText('onlinetextil.com.ar', 540, 1860);
+  ctx.fillStyle = P.accent; ctx.font = "700 24px 'Work Sans'";
+  ctx.fillText('onlinetextil.com.ar', centroX, SAFE_BOTTOM);
 
   if(totalTandas > 1){
     const totalW = totalTandas*22;
-    let dx = 540 - totalW/2 + 11;
+    let dx = centroX - totalW/2 + 11;
     for(let i=0; i<totalTandas; i++){
       ctx.fillStyle = i === idxTanda ? P.accent : 'rgba(0,0,0,0.15)';
-      ctx.beginPath(); ctx.arc(dx, 1895, 6, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(dx, SAFE_BOTTOM+40, 6, 0, Math.PI*2); ctx.fill();
       dx += 22;
     }
   }
@@ -6448,33 +6460,37 @@ function dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progre
   mostrarTexto = mostrarTexto !== false;
   const P = PALETAS[paletaKey] || PALETAS.violeta;
   const W = 1080, H = 1920;
+  const SAFE_TOP = 260, SAFE_BOTTOM = 1560, SAFE_LEFT = 70, SAFE_RIGHT = 900;
+  const centroX = (SAFE_LEFT + SAFE_RIGHT) / 2;
+  const anchoUtil = SAFE_RIGHT - SAFE_LEFT;
+
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle = P.bg; ctx.fillRect(0,0,W,H);
   ctx.textAlign = 'center';
 
-  ctx.fillStyle = P.texto; ctx.font = "600 62px 'Fraunces'";
+  ctx.fillStyle = P.texto; ctx.font = "600 54px 'Fraunces'";
   ctx.globalAlpha = Math.min(1, progreso*4);
-  ctx.fillText('OnLineTextil', 540, 140);
+  ctx.fillText('OnLineTextil', centroX, SAFE_TOP+30);
   ctx.globalAlpha = 1;
 
   ctx.strokeStyle = P.accent; ctx.lineWidth = 6; ctx.setLineDash([20,14]);
-  ctx.beginPath(); ctx.moveTo(90,220); ctx.lineTo(990,220); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(SAFE_LEFT,SAFE_TOP+85); ctx.lineTo(SAFE_RIGHT,SAFE_TOP+85); ctx.stroke();
   ctx.setLineDash([]);
 
   const badgeAlpha = Math.max(0, Math.min(1, (progreso-0.05)*6));
   ctx.globalAlpha = badgeAlpha;
   ctx.fillStyle = P.badgeBg;
-  dibujarRectRedondeado(ctx, 330, 264, 420, 66, 33); ctx.fill();
-  ctx.fillStyle = P.badgeText; ctx.font = "700 34px 'Work Sans'";
-  ctx.fillText('NUEVO INGRESO', 540, 307);
+  dibujarRectRedondeado(ctx, centroX-190, SAFE_TOP+115, 380, 62, 31); ctx.fill();
+  ctx.fillStyle = P.badgeText; ctx.font = "700 30px 'Work Sans'";
+  ctx.fillText('NUEVO INGRESO', centroX, SAFE_TOP+156);
   ctx.globalAlpha = 1;
 
   // foto animada segun el estilo elegido: zoom, paneo, o los dos combinados
-  const photoW=780, photoH=900, px=(W-photoW)/2, py=390;
+  const photoW = anchoUtil, photoH = 660, px = SAFE_LEFT, py = SAFE_TOP + 210;
   ctx.fillStyle = P.tarjeta;
-  dibujarRectRedondeado(ctx, px-14, py-14, photoW+28, photoH+28, 36); ctx.fill();
+  dibujarRectRedondeado(ctx, px-14, py-14, photoW+28, photoH+28, 30); ctx.fill();
   ctx.save();
-  dibujarRectRedondeado(ctx, px, py, photoW, photoH, 22);
+  dibujarRectRedondeado(ctx, px, py, photoW, photoH, 20);
   ctx.clip();
 
   const t = facilInOut(progreso);
@@ -6494,40 +6510,42 @@ function dibujarFrameVideo(ctx, producto, img, textoAdicional, paletaKey, progre
   ctx.drawImage(img, drawX, drawY, nw, nh);
   ctx.restore();
 
-  let y = py + photoH + 90;
+  let y = py + photoH + 60;
   if(mostrarTexto){
     const nombreAlpha = Math.max(0, Math.min(1, (progreso-0.25)*4));
     const nombreY = y + (1-nombreAlpha)*20;
     ctx.globalAlpha = nombreAlpha;
-    ctx.fillStyle = P.titulo; ctx.font = "600 64px 'Fraunces'";
-    const lineasNombre = envolverTexto(ctx, descVariante ? `${producto.nombre} — ${descVariante}` : producto.nombre, 940);
+    ctx.fillStyle = P.titulo; ctx.font = "600 46px 'Fraunces'";
+    const lineasNombre = envolverTexto(ctx, descVariante ? `${producto.nombre} — ${descVariante}` : producto.nombre, anchoUtil);
     let yy = nombreY;
-    lineasNombre.forEach(linea => { ctx.fillText(linea, 540, yy); yy += 66; });
+    lineasNombre.slice(0,2).forEach(linea => { ctx.fillText(linea, centroX, yy); yy += 50; });
     ctx.globalAlpha = 1;
-    y = yy - 16;
+    y = yy - 12;
 
-    const compAlpha = Math.max(0, Math.min(1, (progreso-0.4)*4));
-    ctx.globalAlpha = compAlpha;
-    ctx.fillStyle = P.texto; ctx.font = "30px 'Work Sans'";
-    const lineasComp = envolverTexto(ctx, producto.composicion || '', 940);
-    lineasComp.forEach(linea => { ctx.fillText(linea, 540, y); y += 36; });
-    ctx.globalAlpha = 1;
-    y += 10;
+    if(y < SAFE_BOTTOM - 40){
+      const compAlpha = Math.max(0, Math.min(1, (progreso-0.4)*4));
+      ctx.globalAlpha = compAlpha;
+      ctx.fillStyle = P.texto; ctx.font = "26px 'Work Sans'";
+      const lineasComp = envolverTexto(ctx, producto.composicion || '', anchoUtil);
+      lineasComp.slice(0,2).forEach(linea => { ctx.fillText(linea, centroX, y); y += 32; });
+      ctx.globalAlpha = 1;
+      y += 8;
+    }
 
-    if(textoAdicional){
+    if(textoAdicional && y < SAFE_BOTTOM - 40){
       const txtAlpha = Math.max(0, Math.min(1, (progreso-0.55)*4));
       ctx.globalAlpha = txtAlpha;
-      ctx.fillStyle = P.accent; ctx.font = "italic 700 34px 'Work Sans'";
-      const lineasTxt = envolverTexto(ctx, textoAdicional, 900);
-      lineasTxt.forEach(linea => { ctx.fillText(linea, 540, y); y += 44; });
+      ctx.fillStyle = P.accent; ctx.font = "italic 700 28px 'Work Sans'";
+      const lineasTxt = envolverTexto(ctx, textoAdicional, anchoUtil);
+      lineasTxt.slice(0,2).forEach(linea => { ctx.fillText(linea, centroX, y); y += 36; });
       ctx.globalAlpha = 1;
     }
   }
 
   const footAlpha = Math.max(0, Math.min(1, (progreso-0.75)*4));
   ctx.globalAlpha = footAlpha;
-  ctx.fillStyle = P.accent; ctx.font = "700 30px 'Work Sans'";
-  ctx.fillText('onlinetextil.com.ar', 540, 1850);
+  ctx.fillStyle = P.accent; ctx.font = "700 26px 'Work Sans'";
+  ctx.fillText('onlinetextil.com.ar', centroX, SAFE_BOTTOM);
   ctx.globalAlpha = 1;
 }
 
