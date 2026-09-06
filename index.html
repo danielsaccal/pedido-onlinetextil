@@ -568,6 +568,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
             <div class="ni-chips" id="ni-categorias-chips"></div>
           </div>
           <div class="field"><label>Cantidad de productos a usar</label><input type="number" id="ni-cat-cantidad" min="2" max="24" value="4"></div>
+          <div class="field"><label>Filtrar por variante (opcional)</label><input type="text" id="ni-cat-filtro" placeholder="Ej: 1 1/2, toallón, rostro"></div>
         </div>
         <div id="ni-modo-foto" style="display:none;">
           <p class="note" style="margin-bottom:10px;">Para un producto que todavía no está en el catálogo. Genera el flyer igual, y si además quiere que quede guardado, use el botón de abajo.</p>
@@ -5309,10 +5310,21 @@ async function generarFlyersNuevoIngreso(){
     catIndicesGlobal = catIndices;
     if(catIndices.length === 0) return;
     const cantidad = Math.min(24, Math.max(2, parseInt(document.getElementById('ni-cat-cantidad').value, 10) || 4));
+    const filtroVariante = document.getElementById('ni-cat-filtro').value.trim().toLowerCase();
 
     const porCategoria = {};
     catIndices.forEach(ci => {
-      porCategoria[ci] = CATALOGO[ci].productos.map((p, pi) => ({ci, pi, producto: p}));
+      porCategoria[ci] = CATALOGO[ci].productos
+        .map((p, pi) => {
+          if(!p.variantes || !p.variantes.length) return null;
+          let varianteElegida = p.variantes[0];
+          if(filtroVariante){
+            varianteElegida = p.variantes.find(v => v.desc.toLowerCase().includes(filtroVariante));
+            if(!varianteElegida) return null; // este producto no tiene ninguna variante que coincida, se descarta
+          }
+          return { ci, pi, producto: p, varianteElegida };
+        })
+        .filter(Boolean);
     });
     const elegidos = [];
     let idx = 0;
@@ -5321,9 +5333,15 @@ async function generarFlyersNuevoIngreso(){
       if(porCategoria[ci].length > 0) elegidos.push(porCategoria[ci].shift());
       idx++;
     }
-    matches = elegidos
-      .filter(e => e.producto.variantes && e.producto.variantes.length)
-      .map(e => ({ ci: e.ci, pi: e.pi, producto: e.producto, variante: e.producto.variantes[0] }));
+    matches = elegidos.map(e => ({ ci: e.ci, pi: e.pi, producto: e.producto, variante: e.varianteElegida }));
+
+    if(matches.length === 0){
+      document.getElementById('ni-error').textContent = filtroVariante
+        ? `No encontré ninguna variante que contenga "${filtroVariante}" en las categorías elegidas.`
+        : 'No encontré productos en esas categorías.';
+      document.getElementById('ni-error').style.display = 'block';
+      return;
+    }
 
     const temasUnicos = [...new Set(catIndices.map(ci => TEMAS_CATEGORIA[CATALOGO[ci].categoria]).filter(Boolean))];
     temaCategoriaTexto = temasUnicos.join(' · ');
@@ -7057,6 +7075,7 @@ function abrirNuevoIngreso(){
   document.getElementById('ni-fmt-carrusel').checked = false;
   document.getElementById('ni-carrusel-cant').value = '5';
   document.getElementById('ni-cat-cantidad').value = '4';
+  document.getElementById('ni-cat-filtro').value = '';
   document.getElementById('ni-foto-suelta').value = '';
   document.getElementById('ni-foto-titulo').value = '';
   document.getElementById('ni-foto-subtitulo').value = '';
