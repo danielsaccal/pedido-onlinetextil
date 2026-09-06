@@ -560,7 +560,8 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
           <label class="ni-chip"><input type="radio" name="ni-modo" value="foto" onchange="toggleModoNI()"><span>Foto suelta (sin catálogo)</span></label>
         </div>
         <div id="ni-modo-sku">
-          <div class="field"><label>SKU(s)</label><input type="text" id="ni-skus" placeholder="Ej: TOA171B, TOA171C"></div>
+          <div class="field" style="max-width:220px;"><label>¿Cuántos productos?</label><input type="number" id="ni-sku-cantidad" min="1" max="24" value="1" onchange="generarCamposSku()"></div>
+          <div id="ni-sku-campos"></div>
         </div>
         <div id="ni-modo-categoria" style="display:none;">
           <div class="field">
@@ -5051,9 +5052,9 @@ async function guardarProductoNuevoInterno(){
     if(cat) cat.productos.push(nuevoProducto);
     renderCatalogo(document.getElementById('buscador').value);
 
-    const skusRecienCargados = variantes.map(v => v.sku).join(', ');
+    const skusRecienCargados = variantes.map(v => v.sku);
     abrirNuevoIngreso();
-    document.getElementById('ni-skus').value = skusRecienCargados;
+    setCamposSku(skusRecienCargados);
     alert('Producto agregado. Le dejé listo el SKU para generar el contenido de redes — solo falta que toque "Generar" cuando quiera.');
   } catch(e){
     errorEl.textContent = 'No se pudo guardar: ' + e.message;
@@ -5403,9 +5404,8 @@ async function generarFlyersNuevoIngreso(){
     const productoSuelto = { nombre: titulo, composicion: subtitulo, variantes: variantesFoto, imagen: imagenBase64 };
     matches = variantesFoto.map(v => ({ ci: -1, pi: -1, producto: productoSuelto, variante: v }));
   } else {
-    const skusTexto = document.getElementById('ni-skus').value.trim();
-    if(!skusTexto) return;
-    const skus = skusTexto.split(',').map(s => s.trim()).filter(Boolean);
+    const skus = [...document.querySelectorAll('#ni-sku-campos input')].map(inp => inp.value.trim()).filter(Boolean);
+    if(skus.length === 0) return;
     matches = skus.map(sku => buscarProductoPorSku(sku)).filter(Boolean);
   }
 
@@ -5611,7 +5611,9 @@ async function generarFlyersNuevoIngreso(){
         const mostrarTextoVideo = document.getElementById('ni-video-texto').checked;
         const descVariantePrincipal = grupos[0].variantes && grupos[0].variantes[0] ? grupos[0].variantes[0].desc : '';
         const blobVideo = estiloVideo === 'dinamico'
-          ? await conLimiteDeTiempo(generarVideoDinamico(grupos, textoAdicional, 'violeta', mostrarTextoVideo), 20000, 'El video dinámico tardó demasiado y se canceló.')
+          ? (esModoCategoria && grupos.length > 1
+              ? await conLimiteDeTiempo(generarVideoCategoria(grupos, nombreCategoriaFlyer, textoAdicional, 'violeta', mostrarTextoVideo), 30000, 'El video tardó demasiado y se canceló.')
+              : await conLimiteDeTiempo(generarVideoDinamico(grupos, textoAdicional, 'violeta', mostrarTextoVideo), 20000, 'El video dinámico tardó demasiado y se canceló.'))
           : await conLimiteDeTiempo(generarVideoKenBurns(producto, img, textoAdicional, 'violeta', estiloVideo, descVariantePrincipal, mostrarTextoVideo), 20000, 'El video tardó demasiado y se canceló.');
         const urlVideo = URL.createObjectURL(blobVideo);
         const extVideo = blobVideo.type.includes('mp4') ? 'mp4' : 'webm';
@@ -6266,6 +6268,132 @@ function dibujarFrameVideoDinamico(ctx, grupos, textoAdicional, paletaKey, tGlob
   }
 }
 
+// ---------- video para modo categoria: tandas de 4 productos a la vez ----------
+function dibujarFrameVideoCategoria(ctx, grupos, nombreCategoria, textoAdicional, paletaKey, tGlobal, duracionTotal, tandaDuration, mostrarTexto){
+  const P = PALETAS[paletaKey] || PALETAS.violeta;
+  const W = 1080, H = 1920;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = P.bg; ctx.fillRect(0,0,W,H);
+  ctx.textAlign = 'center';
+
+  ctx.fillStyle = P.texto; ctx.font = "600 56px 'Fraunces'";
+  ctx.fillText('OnLineTextil', 540, 110);
+  ctx.strokeStyle = P.accent; ctx.lineWidth = 5; ctx.setLineDash([18,12]);
+  ctx.beginPath(); ctx.moveTo(100,175); ctx.lineTo(980,175); ctx.stroke();
+  ctx.setLineDash([]);
+
+  if(mostrarTexto && nombreCategoria){
+    ctx.fillStyle = P.titulo; ctx.font = "600 50px 'Fraunces'";
+    ctx.fillText(nombreCategoria, 540, 240);
+  }
+
+  const totalTandas = Math.ceil(grupos.length / 4);
+  const tGlobalClamp = Math.max(0, Math.min(tGlobal, duracionTotal-1));
+  const idxTanda = Math.min(totalTandas-1, Math.floor(tGlobalClamp / tandaDuration));
+  const tTanda = tGlobalClamp - idxTanda*tandaDuration;
+  const grupoTanda = grupos.slice(idxTanda*4, idxTanda*4+4);
+
+  const alphaEntrada = Math.max(0, Math.min(1, tTanda/300));
+  ctx.globalAlpha = alphaEntrada;
+
+  const gap = 20, cols = 2, filas = 2;
+  const celdaW = (900-gap)/cols, fotoS = celdaW;
+  const inicioX = (W - (celdaW*cols + gap*(cols-1)))/2;
+  const inicioY = mostrarTexto && nombreCategoria ? 290 : 240;
+
+  grupoTanda.forEach((g, i) => {
+    const col = i % cols, fila = Math.floor(i / cols);
+    const gx = inicioX + col*(celdaW+gap);
+    const gy = inicioY + fila*(fotoS+70+gap);
+    dibujarFotoContain(ctx, g.img, gx, gy, fotoS, fotoS, "#FFFFFF");
+    ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 2;
+    dibujarRectRedondeado(ctx, gx, gy, fotoS, fotoS, 16); ctx.stroke();
+
+    if(mostrarTexto){
+      const precioNum = parsePrice(g.variantes[0].precio);
+      const precioTxt = precioNum !== null ? formatPrice(precioNum) : 'Consultar';
+      ctx.fillStyle = P.titulo; ctx.font = "600 26px 'Fraunces'";
+      const nombreCorto = truncarTexto(ctx, g.producto.nombre, fotoS);
+      ctx.fillText(nombreCorto, gx+fotoS/2, gy+fotoS+34);
+      ctx.fillStyle = P.accent; ctx.font = "700 28px 'IBM Plex Mono'";
+      ctx.fillText(precioTxt, gx+fotoS/2, gy+fotoS+66);
+    }
+  });
+  ctx.globalAlpha = 1;
+
+  if(mostrarTexto && textoAdicional && idxTanda === totalTandas-1){
+    const aTxt = Math.max(0, Math.min(1, (tTanda-tandaDuration*0.4)/400));
+    if(aTxt > 0){
+      ctx.globalAlpha = aTxt;
+      ctx.fillStyle = P.accent; ctx.font = "italic 700 30px 'Work Sans'";
+      const lineas = envolverTexto(ctx, textoAdicional, 900);
+      let yy = 1720;
+      lineas.forEach(l => { ctx.fillText(l, 540, yy); yy += 38; });
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  ctx.fillStyle = P.accent; ctx.font = "700 26px 'Work Sans'";
+  ctx.fillText('onlinetextil.com.ar', 540, 1860);
+
+  if(totalTandas > 1){
+    const totalW = totalTandas*22;
+    let dx = 540 - totalW/2 + 11;
+    for(let i=0; i<totalTandas; i++){
+      ctx.fillStyle = i === idxTanda ? P.accent : 'rgba(0,0,0,0.15)';
+      ctx.beginPath(); ctx.arc(dx, 1895, 6, 0, Math.PI*2); ctx.fill();
+      dx += 22;
+    }
+  }
+}
+
+async function generarVideoCategoria(grupos, nombreCategoria, textoAdicional, paletaKey, mostrarTexto){
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080; canvas.height = 1920;
+  const ctx = canvas.getContext('2d');
+
+  const totalTandas = Math.ceil(grupos.length / 4);
+  const tandaDuration = 3500;
+  const duracionTotal = totalTandas * tandaDuration;
+
+  const stream = canvas.captureStream(30);
+  const candidatos = [
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+  ];
+  let mimeType = candidatos.find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
+  const recorder = new MediaRecorder(stream, {mimeType});
+  const chunks = [];
+  recorder.ondataavailable = e => { if(e.data.size > 0) chunks.push(e.data); };
+  const terminado = new Promise(resolve => recorder.onstop = resolve);
+  recorder.start();
+
+  const inicio = performance.now();
+  await new Promise((resolveAnim, rejectAnim) => {
+    function frame(t){
+      try{
+        const elapsed = t - inicio;
+        dibujarFrameVideoCategoria(ctx, grupos, nombreCategoria, textoAdicional, paletaKey, Math.max(0, Math.min(elapsed, duracionTotal-1)), duracionTotal, tandaDuration, mostrarTexto);
+        if(elapsed < duracionTotal){
+          requestAnimationFrame(frame);
+        } else {
+          resolveAnim();
+        }
+      } catch(errFrame){
+        recorder.stop();
+        rejectAnim(errFrame);
+      }
+    }
+    requestAnimationFrame(frame);
+  });
+  recorder.stop();
+  await terminado;
+  return new Blob(chunks, {type: mimeType.split(';')[0]});
+}
+
 async function generarVideoDinamico(grupos, textoAdicional, paletaKey, mostrarTexto){
   const canvas = document.createElement('canvas');
   canvas.width = 1080; canvas.height = 1920;
@@ -6572,8 +6700,7 @@ function generarCopyPosteo(producto, matches){
 }
 
 function generarTextoConIA(){
-  const skusTexto = document.getElementById('ni-skus').value.trim();
-  const skus = skusTexto.split(',').map(s => s.trim()).filter(Boolean);
+  const skus = [...document.querySelectorAll('#ni-sku-campos input')].map(inp => inp.value.trim()).filter(Boolean);
   const matches = skus.map(sku => buscarProductoPorSku(sku)).filter(Boolean);
   const match = matches[0];
   const nombreProd = match ? match.producto.nombre : '';
@@ -6612,7 +6739,7 @@ function generarTextoConIA(){
 
 function irAFlyerConSku(sku){
   abrirNuevoIngreso();
-  document.getElementById('ni-skus').value = sku;
+  setCamposSku([sku]);
 }
 
 // ---------- grilla IG (vista previa) ----------
@@ -6937,6 +7064,28 @@ const TEMAS_CATEGORIA = {
   'ALMOHADAS': 'Para un descanso de verdad',
 };
 
+function setCamposSku(arraySkus){
+  document.getElementById('ni-sku-cantidad').value = Math.max(1, arraySkus.length);
+  generarCamposSku();
+  const inputs = document.querySelectorAll('#ni-sku-campos input');
+  arraySkus.forEach((sku, i) => { if(inputs[i]) inputs[i].value = sku; });
+}
+
+function generarCamposSku(){
+  const cantidad = Math.min(24, Math.max(1, parseInt(document.getElementById('ni-sku-cantidad').value, 10) || 1));
+  const cont = document.getElementById('ni-sku-campos');
+  const valoresActuales = [...cont.querySelectorAll('input')].map(inp => inp.value);
+  cont.innerHTML = '';
+  for(let i=0; i<cantidad; i++){
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.placeholder = 'SKU ' + (i+1) + (i===0 ? ' — ej: TOA171B' : '');
+    inp.value = valoresActuales[i] || '';
+    inp.style.cssText = "width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:'Work Sans';margin-bottom:8px;";
+    cont.appendChild(inp);
+  }
+}
+
 function toggleModoNI(){
   const modo = document.querySelector('input[name="ni-modo"]:checked').value;
   document.getElementById('ni-modo-sku').style.display = modo === 'sku' ? 'block' : 'none';
@@ -7071,7 +7220,8 @@ function poblarCategoriasNI(){
 
 function abrirNuevoIngreso(){
   mostrarPaso('step-nuevo-ingreso');
-  document.getElementById('ni-skus').value = '';
+  document.getElementById('ni-sku-cantidad').value = '1';
+  generarCamposSku();
   document.getElementById('ni-texto').value = '';
   document.getElementById('ni-variantes').value = '';
   document.getElementById('ni-variantes-sku').value = '';
@@ -7111,8 +7261,8 @@ function irAFormatoGrafico(){
   const modo = document.querySelector('input[name="ni-modo"]:checked').value;
   const errorEl = document.getElementById('ni-error-contenido');
   if(modo === 'sku'){
-    const skusTexto = document.getElementById('ni-skus').value.trim();
-    if(!skusTexto){
+    const haySku = [...document.querySelectorAll('#ni-sku-campos input')].some(inp => inp.value.trim());
+    if(!haySku){
       errorEl.textContent = 'Escriba al menos un SKU.';
       errorEl.style.display = 'block';
       return;
