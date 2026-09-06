@@ -567,7 +567,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
             <label>Categoría(s) — elija una o combine varias</label>
             <div class="ni-chips" id="ni-categorias-chips"></div>
           </div>
-          <div class="field"><label>Cantidad de productos a usar</label><input type="number" id="ni-cat-cantidad" min="2" max="8" value="4"></div>
+          <div class="field"><label>Cantidad de productos a usar</label><input type="number" id="ni-cat-cantidad" min="2" max="24" value="4"></div>
         </div>
         <div id="ni-modo-foto" style="display:none;">
           <p class="note" style="margin-bottom:10px;">Para un producto que todavía no está en el catálogo. Genera el flyer igual, y si además quiere que quede guardado, use el botón de abajo.</p>
@@ -5308,7 +5308,7 @@ async function generarFlyersNuevoIngreso(){
     const catIndices = [...document.querySelectorAll('.ni-cat-check:checked')].map(el => parseInt(el.value, 10));
     catIndicesGlobal = catIndices;
     if(catIndices.length === 0) return;
-    const cantidad = Math.min(8, Math.max(2, parseInt(document.getElementById('ni-cat-cantidad').value, 10) || 4));
+    const cantidad = Math.min(24, Math.max(2, parseInt(document.getElementById('ni-cat-cantidad').value, 10) || 4));
 
     const porCategoria = {};
     catIndices.forEach(ci => {
@@ -5691,7 +5691,9 @@ async function generarFlyersNuevoIngreso(){
 }
 
 function dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoPct, esCategoria, nombreCategoria){
-  const W = 1080, H = 1900;
+  const W = 1080;
+  const multiCategoriaFilas = esCategoria && grupos.length > 1 ? Math.ceil(grupos.length / 4) : 1;
+  const H = esCategoria && grupos.length > 1 ? (500 + multiCategoriaFilas*330 + 200) : 1900;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -5799,24 +5801,32 @@ function dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoP
       y += 60;
     }
 
-    // grilla de fotos representativas (hasta 4)
-    const fotos = grupos.slice(0,4);
-    const gap = 16, cols = fotos.length;
+    // grilla de a 4 columnas, cada celda con su foto, nombre corto y precio propio
+    const gap = 16, cols = 4;
     const fotoS = Math.floor((940 - gap*(cols-1)) / cols);
-    let fx = 70;
-    fotos.forEach(g => {
-      dibujarFotoContain(ctx, g.img, fx, y, fotoS, fotoS, "#FFFFFF");
-      ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 2;
-      dibujarRectRedondeado(ctx, fx, y, fotoS, fotoS, 16); ctx.stroke();
-      fx += fotoS + gap;
-    });
-    y += fotoS + 26;
+    const celdaH = fotoS + 34 + 44; // foto + nombre + precio
+    for(let i=0; i<grupos.length; i += cols){
+      const filaGrupos = grupos.slice(i, i+cols);
+      let fx = 70;
+      filaGrupos.forEach(g => {
+        dibujarFotoContain(ctx, g.img, fx, y, fotoS, fotoS, "#FFFFFF");
+        ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 2;
+        dibujarRectRedondeado(ctx, fx, y, fotoS, fotoS, 16); ctx.stroke();
 
-    // una linea de precio por cada producto (nombre corto + precio), no un unico "desde"
-    fotos.forEach(g => {
-      const primeraVariante = g.variantes[0];
-      dibujarFilaPrecio({ desc: g.producto.nombre, precio: primeraVariante.precio });
-    });
+        const precioNum = parsePrice(g.variantes[0].precio);
+        const precioTxt = precioNum !== null ? formatPrice(precioNum) : 'Consultar';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = PURPLE; ctx.font = "600 21px 'Fraunces'";
+        const nombreCorto = truncarTexto(ctx, g.producto.nombre, fotoS);
+        ctx.fillText(nombreCorto, fx+fotoS/2, y+fotoS+28);
+        ctx.fillStyle = PURPLE; ctx.font = "700 24px 'IBM Plex Mono'";
+        ctx.fillText(precioTxt, fx+fotoS/2, y+fotoS+58);
+
+        fx += fotoS + gap;
+      });
+      y += celdaH + 10;
+    }
+    y += 10;
   } else if(multi){
     grupos.forEach((g, idx) => {
       const photoS = 180;
