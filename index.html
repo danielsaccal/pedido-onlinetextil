@@ -5793,9 +5793,6 @@ function dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoP
   }
 
   if(multi && esCategoria){
-    const preciosValidos = grupos.flatMap(g => g.variantes.map(v => parsePrice(v.precio)).filter(p => p !== null));
-    const precioMin = preciosValidos.length ? Math.min(...preciosValidos) : null;
-
     if(nombreCategoria){
       ctx.textAlign = 'center'; ctx.fillStyle = PURPLE; ctx.font = "600 44px 'Fraunces'";
       ctx.fillText(nombreCategoria, 540, y+10);
@@ -5813,15 +5810,13 @@ function dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoP
       dibujarRectRedondeado(ctx, fx, y, fotoS, fotoS, 16); ctx.stroke();
       fx += fotoS + gap;
     });
-    y += fotoS + 34;
+    y += fotoS + 26;
 
-    ctx.fillStyle = '#FFFFFF';
-    dibujarRectRedondeado(ctx, 70, y, 940, 90, 14); ctx.fill();
-    ctx.textAlign = 'center'; ctx.fillStyle = '#6E6459'; ctx.font = "26px 'Work Sans'";
-    ctx.fillText('Desde', 540, y+38);
-    ctx.fillStyle = PURPLE; ctx.font = "700 46px 'IBM Plex Mono'";
-    ctx.fillText(precioMin !== null ? formatPrice(precioMin) : 'Consultar', 540, y+78);
-    y += 90 + 20;
+    // una linea de precio por cada producto (nombre corto + precio), no un unico "desde"
+    fotos.forEach(g => {
+      const primeraVariante = g.variantes[0];
+      dibujarFilaPrecio({ desc: g.producto.nombre, precio: primeraVariante.precio });
+    });
   } else if(multi){
     grupos.forEach((g, idx) => {
       const photoS = 180;
