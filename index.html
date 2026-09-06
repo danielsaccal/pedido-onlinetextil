@@ -6148,8 +6148,8 @@ function dibujarFrameVideoDinamico(ctx, grupos, textoAdicional, paletaKey, tGlob
   ctx.beginPath(); ctx.moveTo(100,205); ctx.lineTo(980,205); ctx.stroke();
   ctx.setLineDash([]);
 
-  const idxActual = Math.min(grupos.length-1, Math.floor(tGlobal / segDuration));
-  const tSeg = tGlobal - idxActual*segDuration;
+  const idxActual = Math.max(0, Math.min(grupos.length-1, Math.floor(Math.max(0,tGlobal) / segDuration)));
+  const tSeg = Math.max(0, tGlobal) - idxActual*segDuration;
   const g = grupos[idxActual];
   const gAnterior = idxActual > 0 ? grupos[idxActual-1] : null;
 
@@ -6263,7 +6263,7 @@ async function generarVideoDinamico(grupos, textoAdicional, paletaKey){
     function frame(t){
       try{
         const elapsed = t - inicio;
-        dibujarFrameVideoDinamico(ctx, grupos, textoAdicional, paletaKey, Math.min(elapsed, duracionTotal-1), duracionTotal, segDuration, crossfadeMs);
+        dibujarFrameVideoDinamico(ctx, grupos, textoAdicional, paletaKey, Math.max(0, Math.min(elapsed, duracionTotal-1)), duracionTotal, segDuration, crossfadeMs);
         if(elapsed < duracionTotal){
           requestAnimationFrame(frame);
         } else {
