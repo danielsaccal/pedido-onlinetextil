@@ -319,7 +319,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 .form-card{background:var(--white);border:1px solid var(--line);border-radius:var(--radius);padding:22px;}
 .form-card h2{margin-top:0;}
 .field{margin-bottom:14px;}
-.field label{display:block;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;color:#6B6258;margin-bottom:5px;}
+.field label{display:block;font-size:0.82rem;color:#8A6D3B;margin-bottom:6px;font-weight:600;}
 .field input,.field select{
   width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;
   font-family:'Work Sans';font-size:0.92rem;background:var(--cream);
@@ -6613,42 +6613,41 @@ function generarCopyPosteo(producto, matches){
   return lineas.join('\n');
 }
 
-function generarTextoConIA(){
+async function generarTextoConIA(){
   const skus = [...document.querySelectorAll('#ni-sku-campos input')].map(inp => inp.value.trim()).filter(Boolean);
   const matches = skus.map(sku => buscarProductoPorSku(sku)).filter(Boolean);
   const match = matches[0];
-  const nombreProd = match ? match.producto.nombre : '';
-  const composicion = match ? (match.producto.composicion || '') : '';
-
-  // extraer datos tecnicos puntuales: % de material, gramaje, y medidas de las variantes
-  const materiales = [...composicion.matchAll(/(\d+%\s*[A-Za-zÁÉÍÓÚáéíóúñÑ]+)/g)].map(m => m[1]);
-  const gramajeMatch = composicion.match(/(\d+\s*gr(?:s|\/m2)?)/i);
-  const gramaje = gramajeMatch ? gramajeMatch[1] : null;
-  const medidas = matches.map(m => m.variante.desc).filter(Boolean);
-  const materialPrincipal = materiales[0] || null;
-
-  // combinar solo datos tecnicos reales, sin adjetivos ni frases de marketing
-  const datosBase = [materialPrincipal, gramaje].filter(Boolean);
-  const opciones = [];
-  if(datosBase.length) opciones.push(datosBase.join(' — '));
-  if(nombreProd && datosBase.length) opciones.push(nombreProd + ': ' + datosBase.join(', '));
-  if(medidas.length) opciones.push(medidas.join(' / '));
-  if(materialPrincipal && medidas.length) opciones.push(materialPrincipal + ' — ' + medidas[0]);
-  if(gramaje && medidas.length) opciones.push(gramaje + ' — ' + medidas[0]);
-  if(materiales.length > 1) opciones.push(materiales.join(' / '));
-
   const cont = document.getElementById('ni-opciones-texto');
+
   if(!match){
-    cont.innerHTML = '<p class="note">Escribí primero el SKU para poder generar frases con sus datos reales.</p>';
+    cont.innerHTML = '<p class="note">Escribí primero el SKU para poder generar el texto.</p>';
     return;
   }
-  if(opciones.length === 0){
-    cont.innerHTML = '<p class="note">Este producto no tiene datos técnicos suficientes (% material, gramaje o medidas) para generar texto.</p>';
-    return;
+
+  cont.innerHTML = '<p class="note">✨ Escribiendo con IA...</p>';
+
+  const nombresProductos = matches.map(m => m.producto.nombre).join(', ');
+  const medidas = matches.map(m => m.variante.desc).filter(Boolean).join(' / ');
+  const descripcionIA = `Producto: ${nombresProductos}. Composición: ${match.producto.composicion || ''}. Variantes/medidas: ${medidas}.`;
+
+  try{
+    const resp = await fetch(URL_WORKER_IA, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ accion: 'generarContenidoAnuncio', descripcion: descripcionIA })
+    });
+    const datos = await resp.json();
+    if(!resp.ok || datos.error || !datos.subtitulo){
+      cont.innerHTML = '<p class="error" style="display:block;">No se pudo generar con IA: ' + (datos.error || 'sin respuesta') + '</p>';
+      return;
+    }
+    cont.innerHTML = `
+      <button type="button" class="btn-mini" style="display:block;width:100%;text-align:left;margin-bottom:6px;" onclick="document.getElementById('ni-texto').value = this.textContent; document.getElementById('ni-opciones-texto').innerHTML='';">${datos.subtitulo}</button>
+      <button type="button" class="btn-mini" onclick="generarTextoConIA()">🔁 Generar otra opción</button>
+    `;
+  } catch(err){
+    cont.innerHTML = '<p class="error" style="display:block;">No se pudo conectar con la IA: ' + err.message + '</p>';
   }
-  cont.innerHTML = [...new Set(opciones)].slice(0,5).map(op => `
-    <button type="button" class="btn-mini" style="display:block;width:100%;text-align:left;margin-bottom:6px;" onclick="document.getElementById('ni-texto').value = this.textContent; document.getElementById('ni-opciones-texto').innerHTML='';">${op}</button>
-  `).join('');
 }
 
 function irAFlyerConSku(sku){
