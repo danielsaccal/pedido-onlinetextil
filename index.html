@@ -682,10 +682,6 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
           </div>
           <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video-texto" checked><span>Incluir texto (nombre/composición) sobre el video</span></label>
         </div>
-        <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video-ml"><span>🛒 Video para Mercado Libre (10 seg, sin marca)</span></label>
-        <div id="ni-video-ml-texto-wrap" style="margin:6px 0 0 26px;">
-          <label class="ni-chip"><input type="checkbox" id="ni-video-ml-texto" checked><span>Incluir texto de características sobre el video</span></label>
-        </div>
         <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video-ia-reel"><span>🤖 Video con IA real para Reel</span></label>
         <p class="note" style="margin-top:4px;">Los de IA real tardan 1-2 minutos y tienen costo por uso (Google) — a diferencia de los de zoom/paneo, que son gratis e instantáneos.</p>
       </div>
@@ -5668,43 +5664,6 @@ async function generarFlyersNuevoIngreso(){
       }
     }
 
-    if(document.getElementById('ni-video-ml').checked){
-      const videoMLWrap = document.createElement('div');
-      videoMLWrap.className = 'ni-video-wrap'; videoMLWrap.style.cssText = 'text-align:center;background:var(--cream);border-radius:10px;padding:12px;';
-      videoMLWrap.innerHTML = '<p class="note">Generando video para Mercado Libre (10 seg)...</p>';
-      cont.appendChild(videoMLWrap);
-      try{
-        const mostrarTextoML = document.getElementById('ni-video-ml-texto').checked;
-        const blobVideoML = await conLimiteDeTiempo(generarVideoMercadoLibre(img, mostrarTextoML ? (producto.composicion || '') : ''), 25000, 'El video para Mercado Libre tardó demasiado y se canceló.');
-        const urlVideoML = URL.createObjectURL(blobVideoML);
-        const extVideoML = blobVideoML.type.includes('mp4') ? 'mp4' : 'webm';
-        const nombreVideoML = 'ml_' + producto.nombre.replace(/\s+/g,'_') + '.' + extVideoML;
-
-        videoMLWrap.innerHTML = '';
-        const videoMLEl = document.createElement('video');
-        videoMLEl.src = urlVideoML; videoMLEl.controls = true; videoMLEl.loop = true;
-        videoMLEl.style.cssText = 'max-width:100%;border-radius:10px;border:1px solid var(--line);margin-bottom:8px;';
-        const btnVideoML = document.createElement('button');
-        btnVideoML.className = 'btn btn-gold';
-        btnVideoML.textContent = 'Descargar video para ML';
-        btnVideoML.onclick = () => {
-          const a = document.createElement('a');
-          a.href = urlVideoML; a.download = nombreVideoML; a.click();
-        };
-        const notaVideoML = document.createElement('p');
-        notaVideoML.className = 'note';
-        notaVideoML.textContent = 'Sin marca de agua ni logo, 10 segundos, formato vertical — listo para subir a Mercado Libre Clips.' +
-          (extVideoML !== 'mp4' ? ' Su navegador lo generó en .webm; si Mercado Libre le pide .mp4, conviértalo antes de subirlo.' : '');
-        videoMLWrap.appendChild(videoMLEl);
-        videoMLWrap.appendChild(document.createElement('br'));
-        videoMLWrap.appendChild(btnVideoML);
-        videoMLWrap.appendChild(notaVideoML);
-      } catch(errVideoML){
-        console.error('Error generando video ML:', errVideoML);
-        videoMLWrap.innerHTML = '<p class="error" style="display:block;">No se pudo generar este video: ' + errVideoML.message + '</p>';
-      }
-    }
-
     if(document.getElementById('ni-video-ia-reel').checked){
       try{
         const descripcionProducto = `${producto.nombre}, ${producto.composicion || ''}`.trim();
@@ -6612,85 +6571,6 @@ async function generarVideoKenBurns(producto, img, textoAdicional, paletaKey, es
 }
 
 // ---------- video para Mercado Libre (sin marca, sin logo, 10 seg) ----------
-function dibujarFrameVideoSinMarca(ctx, img, progreso, caracteristicas){
-  const W = 1080, H = 1920;
-  ctx.clearRect(0,0,W,H);
-  ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0,0,W,H);
-
-  // producto con zoom + paneo lateral combinados — sin logo, sin nombre del negocio, sin precio
-  const t = facilInOut(progreso);
-  const zoom = 1 + 0.16*t;
-  const ratio = Math.max(W/img.width, H/img.height) * zoom;
-  const nw = img.width*ratio, nh = img.height*ratio;
-  const maxOffsetX = Math.max(0, nw - W);
-  const drawX = -maxOffsetX*t;
-  const drawY = (H-nh)/2;
-  ctx.drawImage(img, drawX, drawY, nw, nh);
-
-  // texto de caracteristicas del producto, apareciendo progresivamente sobre la parte inferior
-  if(caracteristicas){
-    const tMs = progreso * 10000; // duracion total real, para calcular cuando aparece cada linea
-    const alpha = Math.max(0, Math.min(1, (tMs-800)/500));
-    if(alpha > 0){
-      ctx.save();
-      ctx.globalAlpha = alpha * 0.55;
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(0, H-260, W, 260);
-      ctx.globalAlpha = alpha;
-      ctx.textAlign = 'center'; ctx.fillStyle = '#FFFFFF'; ctx.font = "500 34px 'Work Sans'";
-      const lineas = envolverTexto(ctx, caracteristicas, 900);
-      let yy = H - 260 + 70 + (1-alpha)*14;
-      lineas.slice(0,3).forEach(l => { ctx.fillText(l, 540, yy); yy += 44; });
-      ctx.restore();
-    }
-  }
-}
-
-async function generarVideoMercadoLibre(img, caracteristicas){
-  const canvas = document.createElement('canvas');
-  canvas.width = 1080; canvas.height = 1920;
-  const ctx = canvas.getContext('2d');
-
-  const stream = canvas.captureStream(30);
-  const candidatos = [
-    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
-    'video/mp4',
-    'video/webm;codecs=vp9',
-    'video/webm;codecs=vp8',
-    'video/webm',
-  ];
-  let mimeType = candidatos.find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
-  const recorder = new MediaRecorder(stream, {mimeType});
-  const chunks = [];
-  recorder.ondataavailable = e => { if(e.data.size > 0) chunks.push(e.data); };
-  const terminado = new Promise(resolve => recorder.onstop = resolve);
-  recorder.start();
-
-  const duracionMs = 10000; // minimo exigido por Mercado Libre
-  const inicio = performance.now();
-  await new Promise((resolveAnim, rejectAnim) => {
-    function frame(t){
-      try{
-        const elapsed = t - inicio;
-        const progreso = Math.min(1, elapsed / duracionMs);
-        dibujarFrameVideoSinMarca(ctx, img, progreso, caracteristicas);
-        if(elapsed < duracionMs){
-          requestAnimationFrame(frame);
-        } else {
-          resolveAnim();
-        }
-      } catch(errFrame){
-        recorder.stop();
-        rejectAnim(errFrame);
-      }
-    }
-    requestAnimationFrame(frame);
-  });
-  recorder.stop();
-  await terminado;
-  return new Blob(chunks, {type: mimeType.split(';')[0]});
-}
-
 function generarCopyPosteo(producto, matches){
   const composicion = producto.composicion || '';
   const materiales = [...composicion.matchAll(/(\d+%\s*[A-Za-zÁÉÍÓÚáéíóúñÑ]+)/g)].map(m => m[1]);
@@ -7266,7 +7146,6 @@ function abrirNuevoIngreso(){
   document.getElementById('ni-video').checked = false;
   document.getElementById('ni-video-estilo-wrap').style.display = 'none';
   document.querySelector('input[name="ni-video-estilo"][value="zoom"]').checked = true;
-  document.getElementById('ni-video-ml').checked = false;
   document.getElementById('ni-video-ia-reel').checked = false;
   document.getElementById('ni-fmt-carrusel').checked = false;
   document.getElementById('ni-carrusel-cant').value = '5';
