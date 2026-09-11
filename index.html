@@ -5419,6 +5419,13 @@ async function generarFlyersNuevoIngreso(){
     const skus = [...document.querySelectorAll('#ni-sku-campos input')].map(inp => inp.value.trim()).filter(Boolean);
     if(skus.length === 0) return;
     matches = skus.map(sku => buscarProductoPorSku(sku)).filter(Boolean);
+    const skusNoEncontrados = skus.filter(sku => !buscarProductoPorSku(sku));
+    if(skusNoEncontrados.length > 0){
+      const errorEl = document.getElementById('ni-error');
+      errorEl.textContent = '⚠️ No encontré estos SKU (revíselos): ' + skusNoEncontrados.join(', ') +
+        (matches.length > 0 ? '. Sigo con los que sí encontré.' : '');
+      errorEl.style.display = 'block';
+    }
   }
 
   const textoAdicionalOriginal = textoAdicional;
