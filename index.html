@@ -5719,22 +5719,22 @@ function dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoP
   let y = 248;
 
   if(!multi){
-    // un solo producto: foto grande centrada, como antes
+    // un solo producto: foto MUY grande, protagonista, con el resto mas chico debajo
     const { producto, img, variantes } = grupos[0];
-    const photoW=580, photoH=400, px=(W-photoW)/2, py=y;
+    const photoW=940, photoH=760, px=(W-photoW)/2, py=y;
     dibujarFotoContain(ctx, img, px, py, photoW, photoH, "#FFFFFF");
     ctx.strokeStyle = '#DCD4C4'; ctx.lineWidth = 2;
     dibujarRectRedondeado(ctx, px, py, photoW, photoH, 22); ctx.stroke();
 
-    y = py + photoH + 56;
-    ctx.fillStyle = PURPLE; ctx.font = "600 46px 'Fraunces'";
+    y = py + photoH + 34;
+    ctx.fillStyle = PURPLE; ctx.font = "600 34px 'Fraunces'";
     const lineasNombre = envolverTexto(ctx, producto.nombre, 940);
-    lineasNombre.forEach(linea => { ctx.fillText(linea, 540, y); y += 50; });
-    y -= 12;
-    ctx.fillStyle = '#6E6459'; ctx.font = "24px 'Work Sans'";
+    lineasNombre.forEach(linea => { ctx.fillText(linea, 540, y); y += 38; });
+    y -= 8;
+    ctx.fillStyle = '#6E6459'; ctx.font = "19px 'Work Sans'";
     const lineasComp = envolverTexto(ctx, producto.composicion || '', 940);
-    lineasComp.forEach(linea => { ctx.fillText(linea, 540, y); y += 30; });
-    y += 4;
+    lineasComp.forEach(linea => { ctx.fillText(linea, 540, y); y += 24; });
+    y += 6;
   }
 
   if(textoAdicional){
@@ -5771,28 +5771,28 @@ function dibujarFlyerWhatsApp(grupos, textoAdicional, variantesColor, descuentoP
     const tieneDescuento = descuentoPct > 0 && precioNum !== null;
     const precioMostrado = tieneDescuento ? formatPrice(precioNum * (1 - descuentoPct/100)) : ('$ ' + v.precio);
 
-    ctx.font = "700 32px 'IBM Plex Mono'";
+    const fontDesc = multi ? 28 : 22, fontPrecio = multi ? 32 : 26, lineHeight = multi ? 34 : 28;
+    ctx.font = `700 ${fontPrecio}px 'IBM Plex Mono'`;
     const precioWidth = ctx.measureText(precioMostrado).width;
     const boxX = multi ? 246 : 70, boxW = multi ? 764 : 940;
     const descStartX = boxX + 30;
     const maxDescWidth = (boxX + boxW - 20 - precioWidth - 24) - descStartX;
 
-    ctx.font = "28px 'Work Sans'";
+    ctx.font = `${fontDesc}px 'Work Sans'`;
     const lineasDesc = envolverTexto(ctx, v.desc, maxDescWidth);
-    const lineHeight = 34;
-    const boxH = Math.max(72, 26 + lineasDesc.length*lineHeight);
+    const boxH = Math.max(multi ? 72 : 58, 22 + lineasDesc.length*lineHeight);
 
     ctx.fillStyle = '#FFFFFF';
     dibujarRectRedondeado(ctx, boxX, y, boxW, boxH, 12); ctx.fill();
 
-    ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.font = "28px 'Work Sans'";
-    const primeraLineaY = y + 42;
+    ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.font = `${fontDesc}px 'Work Sans'`;
+    const primeraLineaY = y + (multi ? 42 : 34);
     lineasDesc.forEach((linea, i) => ctx.fillText(linea, descStartX, primeraLineaY + i*lineHeight));
 
-    ctx.fillStyle = PURPLE; ctx.textAlign = 'right'; ctx.font = "700 32px 'IBM Plex Mono'";
+    ctx.fillStyle = PURPLE; ctx.textAlign = 'right'; ctx.font = `700 ${fontPrecio}px 'IBM Plex Mono'`;
     ctx.fillText(precioMostrado, boxX + boxW - 20, primeraLineaY);
     ctx.textAlign = 'center';
-    y += boxH + 12;
+    y += boxH + (multi ? 12 : 8);
   }
 
   if(multi && esCategoria){
