@@ -1398,6 +1398,7 @@ document.querySelectorAll('.menu-dropdown span.menu-item').forEach(item => {
 // ---------- estado ----------
 const cart = {}; // key: rowId -> {sku, desc, nombreProducto, precio, cantidad, imagen}
 let fotosOverride = {}; // key: "ci-pi" -> foto reemplazada en base64 (se carga antes de renderizar el catalogo)
+let videosOverride = {}; // key: "ci-pi" -> array de links de video (Drive/YouTube)
 const notas = {}; // key: rowId -> texto de la nota (independiente de si hay cantidad cargada)
 function actualizarNota(id, valor){
   notas[id] = valor;
@@ -1502,10 +1503,12 @@ function renderCatalogo(filtro){
       });
       const imgEfectiva = imagenEfectiva(ci, pi, p);
       const totalFotos = imagenesEfectivas(ci, pi, p).length;
+      const totalVideos = (videosOverride[`${ci}-${pi}`] || []).length;
       const imagenHtml = imgEfectiva
         ? `<div style="position:relative;">
              <img class="producto-img" src="${imgEfectiva}" alt="${escapeAttr(p.nombre)}" loading="lazy" ${totalFotos>1?`onclick="abrirGaleriaCatalogo(${ci},${pi})" style="cursor:pointer;"`:''}>
              ${totalFotos>1 ? `<span style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.6);color:#fff;font-size:0.68rem;padding:2px 7px;border-radius:10px;">📷 ${totalFotos}</span>` : ''}
+             ${totalVideos>0 ? `<span style="position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,0.6);color:#fff;font-size:0.68rem;padding:2px 7px;border-radius:10px;">🎬 ${totalVideos}</span>` : ''}
            </div>`
         : `<div class="producto-img producto-img-vacia">Sin foto</div>`;
       const primerSku = p.variantes[0]?.sku || '';
@@ -2988,11 +2991,13 @@ function abrirCompartirRubro(){
 function cargarFotosOverride(){
   return db.collection('fotos').get().then(snap => {
     fotosOverride = {};
+    videosOverride = {};
     snap.docs.forEach(d => {
       const data = d.data();
       fotosOverride[d.id] = data.imagenesBase64 && data.imagenesBase64.length
         ? data.imagenesBase64
         : (data.imagenBase64 ? [data.imagenBase64] : []);
+      videosOverride[d.id] = data.videoLinks || [];
     });
   }).catch(e => console.error('Error cargando fotos override:', e));
 }
@@ -5201,6 +5206,7 @@ function buscarProductoParaFoto(){
 function renderGaleriaFoto(ci, pi, producto){
   const cont = document.getElementById('fs-resultado');
   const fotos = imagenesEfectivas(ci, pi, producto);
+  const videos = videosOverride[`${ci}-${pi}`] || [];
   cont.innerHTML = `
     <p style="margin-bottom:10px;"><b>${producto.nombre}</b> (${producto.composicion||''})</p>
     <div id="fs-galeria" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
@@ -5217,7 +5223,55 @@ function renderGaleriaFoto(ci, pi, producto){
       <input type="file" accept="image/*" id="fs-archivo" multiple>
     </div>
     <button class="btn btn-gold" onclick="agregarFotosProducto(${ci}, ${pi})">Agregar a la galería</button>
+
+    <p class="ni-seccion-tit" style="margin-top:22px;">🎬 Videos (link de Drive o YouTube)</p>
+    <div id="fs-videos" style="margin-bottom:12px;">
+      ${videos.length === 0 ? '<p class="note">Todavía no hay ningún link cargado.</p>' : videos.map((v, i) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);">
+          <a href="${v.url}" target="_blank" style="flex:1;color:var(--purple);text-decoration:underline;word-break:break-all;">${v.nota || v.url}</a>
+          <button type="button" onclick="eliminarVideoLink(${ci},${pi},${i})" style="background:#B5453A;color:#fff;border:none;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:0.8rem;flex-shrink:0;">×</button>
+        </div>
+      `).join('')}
+    </div>
+    <div class="field"><label>Link (Google Drive o YouTube)</label><input type="text" id="fs-video-url" placeholder="https://..."></div>
+    <div class="field"><label>Nota (opcional, ej: "video del proveedor")</label><input type="text" id="fs-video-nota" placeholder="Opcional"></div>
+    <button class="btn-mini" onclick="agregarVideoLink(${ci}, ${pi})">Agregar link de video</button>
   `;
+}
+
+async function agregarVideoLink(ci, pi){
+  const url = document.getElementById('fs-video-url').value.trim();
+  const nota = document.getElementById('fs-video-nota').value.trim();
+  if(!url){ alert('Pegue el link primero.'); return; }
+  if(!/^https?:\/\//i.test(url)){ alert('El link tiene que empezar con http:// o https://'); return; }
+
+  const key = `${ci}-${pi}`;
+  const actuales = videosOverride[key] || [];
+  const nuevos = [...actuales, { url, nota }];
+  try{
+    await db.collection('fotos').doc(key).set({
+      videoLinks: nuevos,
+      sku: CATALOGO[ci].productos[pi].variantes[0]?.sku || '',
+      nombreProducto: CATALOGO[ci].productos[pi].nombre,
+      actualizado: new Date().toISOString()
+    }, { merge: true });
+    videosOverride[key] = nuevos;
+    renderGaleriaFoto(ci, pi, CATALOGO[ci].productos[pi]);
+  } catch(err){
+    alert('No se pudo guardar el link: ' + err.message);
+  }
+}
+
+async function eliminarVideoLink(ci, pi, indice){
+  const key = `${ci}-${pi}`;
+  const nuevos = (videosOverride[key] || []).filter((_, i) => i !== indice);
+  try{
+    await db.collection('fotos').doc(key).set({ videoLinks: nuevos }, { merge: true });
+    videosOverride[key] = nuevos;
+    renderGaleriaFoto(ci, pi, CATALOGO[ci].productos[pi]);
+  } catch(err){
+    alert('No se pudo borrar: ' + err.message);
+  }
 }
 
 async function comprimirImagenAFotoBase64(file){
