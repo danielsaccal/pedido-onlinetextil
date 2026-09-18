@@ -12,7 +12,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OnLineTextil — Pedido Mayorista</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
@@ -831,21 +831,6 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       </div>
 
       <div class="ni-seccion">
-        <p class="ni-seccion-tit">Ángulo de contenido (opcional, guía a la IA)</p>
-        <select id="an-angulo">
-          <option value="">Sin ángulo puntual</option>
-          <option value="Pregunta gancho: arrancar con una pregunta directa que enganche, no una afirmación">Pregunta gancho</option>
-          <option value="Problema / solución: plantear un problema cotidiano y mostrar el producto como la solución">Problema / solución</option>
-          <option value="Propuesta de valor: una frase corta y contundente que resuma por qué comprarle a esta empresa">Propuesta de valor</option>
-          <option value="Mito vs realidad: contrastar una creencia común equivocada con la realidad">Mito vs realidad</option>
-          <option value="Beneficios en 3 claves: tres ventajas cortas, cada una de pocas palabras">Beneficios en 3 claves</option>
-          <option value="Estadística o dato: arrancar con un número o dato concreto que sorprenda">Estadística / dato</option>
-          <option value="Dejá de hacerlo: señalar un error común que la gente comete, en tono directo">Dejá de hacerlo</option>
-          <option value="Error común: nombrar un error típico al comprar este tipo de producto y cómo evitarlo">Error común</option>
-        </select>
-      </div>
-
-      <div class="ni-seccion">
         <p class="ni-seccion-tit">✨ Generar con IA (opcional)</p>
         <div class="field">
           <label>Describa qué quiere anunciar</label>
@@ -865,14 +850,6 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       </div>
 
       <div class="ni-seccion">
-        <p class="ni-seccion-tit">Estilo de diseño</p>
-        <div class="ni-chips">
-          <label class="ni-chip"><input type="radio" name="an-estilo" value="clasico" checked onchange="toggleEstiloAnuncio()"><span>Clásico (marco fino, serif)</span></label>
-          <label class="ni-chip"><input type="radio" name="an-estilo" value="bold" onchange="toggleEstiloAnuncio()"><span>✨ Bold (gradiente, letra gigante)</span></label>
-        </div>
-      </div>
-
-      <div class="ni-seccion" id="an-seccion-clasico">
         <p class="ni-seccion-tit">Estilo visual</p>
         <div class="field">
           <label>Paleta de color</label>
@@ -898,14 +875,6 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
           </select>
         </div>
         <label class="ni-chip" style="display:inline-flex;"><input type="checkbox" id="an-sombra" checked><span>Sombra detrás del texto</span></label>
-      </div>
-
-      <div class="ni-seccion" id="an-seccion-bold" style="display:none;">
-        <p class="ni-seccion-tit">Gradiente</p>
-        <select id="an-gradiente">
-          <option value="violeta">Violeta a vino (clásico de marca)</option>
-          <option value="dorado">Dorado a violeta (festivo/promo)</option>
-        </select>
       </div>
 
       <p class="error" id="an-error" style="display:none;">Escriba al menos el título.</p>
@@ -6283,59 +6252,6 @@ function dibujarPiezaTexto(producto, textoAdicional, formato, paletaKey){
   return canvas;
 }
 
-function toggleEstiloAnuncio(){
-  const esBold = document.querySelector('input[name="an-estilo"]:checked').value === 'bold';
-  document.getElementById('an-seccion-clasico').style.display = esBold ? 'none' : 'block';
-  document.getElementById('an-seccion-bold').style.display = esBold ? 'block' : 'none';
-}
-
-const GRADIENTES_BOLD = {
-  violeta: ['#2A1D38', '#3D2B4E', '#6B3450'],
-  dorado: ['#8A6D3B', '#B58A2E', '#3D2B4E'],
-};
-
-function dibujarPiezaBoldGradient(titulo, subtitulo, formato, gradienteKey){
-  const colores = GRADIENTES_BOLD[gradienteKey] || GRADIENTES_BOLD.violeta;
-  const esPost = formato === 'post';
-  const esReel = formato === 'reel';
-  const W = 1080, H = esPost ? 1350 : 1920;
-  const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
-
-  const grad = ctx.createLinearGradient(0, 0, W*0.3, H);
-  grad.addColorStop(0, colores[0]);
-  grad.addColorStop(0.45, colores[1]);
-  grad.addColorStop(1, colores[2]);
-  ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
-  ctx.textAlign = 'left';
-
-  const topSafe = esPost ? 90 : (esReel ? 150 : 260);
-  const bottomSafe = esPost ? 110 : (esReel ? 380 : 320);
-  const sideSafe = 70;
-  const anchoUtil = W - sideSafe*2;
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = "900 84px 'Work Sans'";
-  const lineasTitulo = envolverTexto(ctx, titulo.toUpperCase(), anchoUtil);
-  const interlineado = 90;
-  let y = topSafe + 84;
-  lineasTitulo.forEach(linea => { ctx.fillText(linea, sideSafe, y); y += interlineado; });
-
-  if(subtitulo){
-    y += 30;
-    ctx.fillStyle = '#F5D470'; ctx.font = "800 42px 'Work Sans'";
-    const lineasSub = envolverTexto(ctx, subtitulo, anchoUtil);
-    lineasSub.forEach(linea => { ctx.fillText(linea, sideSafe, y); y += 52; });
-  }
-
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#FFFFFF'; ctx.font = "800 30px 'Work Sans'";
-  ctx.fillText('OnLineTextil', W/2, H - bottomSafe);
-
-  return canvas;
-}
-
 function dibujarPiezaAnuncio(titulo, subtitulo, formato, paletaKey, tipografia, tamanoTitulo, conSombra){
   const P = PALETAS[paletaKey] || PALETAS.violeta;
   const fuenteTitulo = tipografia === 'sans' ? "'Work Sans'" : "'Fraunces'";
@@ -6966,14 +6882,11 @@ function moverEnGrilla(idx, direccion){
 // ---------- rompecabezas / triptico ----------
 // ---------- anuncios y promociones (sin producto puntual) ----------
 async function generarContenidoConIA(){
-  const descripcionBase = document.getElementById('an-ia-desc').value.trim();
-  const angulo = document.getElementById('an-angulo').value;
+  const descripcion = document.getElementById('an-ia-desc').value.trim();
   const errorEl = document.getElementById('an-ia-error');
   const btn = document.getElementById('an-ia-btn');
   errorEl.style.display = 'none';
-  if(!descripcionBase){ errorEl.textContent = 'Escriba primero qué quiere anunciar.'; errorEl.style.display = 'block'; return; }
-
-  const descripcion = angulo ? `${descripcionBase}. Ángulo/estructura a seguir: ${angulo}.` : descripcionBase;
+  if(!descripcion){ errorEl.textContent = 'Escriba primero qué quiere anunciar.'; errorEl.style.display = 'block'; return; }
 
   btn.disabled = true; btn.textContent = 'Pensando...';
   try{
@@ -7014,10 +6927,6 @@ function abrirAnuncio(){
   document.getElementById('an-tipografia').value = 'serif';
   document.getElementById('an-tamano').value = '110';
   document.getElementById('an-sombra').checked = true;
-  document.getElementById('an-angulo').value = '';
-  document.querySelector('input[name="an-estilo"][value="clasico"]').checked = true;
-  document.getElementById('an-gradiente').value = 'violeta';
-  toggleEstiloAnuncio();
   document.getElementById('an-error').style.display = 'none';
   document.getElementById('an-resultado').innerHTML = '';
 }
@@ -7040,14 +6949,10 @@ function generarAnuncio(){
   const tipografia = document.getElementById('an-tipografia').value;
   const tamanoTitulo = parseInt(document.getElementById('an-tamano').value, 10);
   const conSombra = document.getElementById('an-sombra').checked;
-  const esBold = document.querySelector('input[name="an-estilo"]:checked').value === 'bold';
-  const gradienteKey = document.getElementById('an-gradiente').value;
 
   cont.innerHTML = '';
   formatos.forEach(([formato, etiqueta]) => {
-    const canvas = esBold
-      ? dibujarPiezaBoldGradient(titulo, subtitulo, formato, gradienteKey)
-      : dibujarPiezaAnuncio(titulo, subtitulo, formato, paletaKey, tipografia, tamanoTitulo, conSombra);
+    const canvas = dibujarPiezaAnuncio(titulo, subtitulo, formato, paletaKey, tipografia, tamanoTitulo, conSombra);
     const nombre = 'anuncio_' + formato + '_' + titulo.replace(/\s+/g,'_').slice(0,30) + '.png';
 
     const wrap = document.createElement('div');
