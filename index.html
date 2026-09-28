@@ -480,6 +480,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
           <span>🔔 Configuración</span><span class="menu-cat-chev">▾</span>
         </div>
         <div class="menu-cat-body">
+          <span class="menu-item" onclick="abrirDatosBancarios()">🏦 Datos bancarios</span>
           <span class="menu-item" onclick="abrirConfigPush()">🔔 Avisos push</span>
         </div>
       </div>
@@ -1149,6 +1150,10 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
         <label>Observaciones</label>
         <textarea id="f-observaciones" rows="3" placeholder="Aclaraciones sobre el pedido, colores, horarios de entrega, etc. (opcional)"></textarea>
       </div>
+      <div class="field" id="f-bancarios-wrap">
+        <label class="ni-chip" style="display:inline-flex;"><input type="checkbox" id="f-incluir-bancarios"><span>🏦 Incluir mis datos bancarios en el comprobante y en el mail al cliente</span></label>
+        <p class="note" id="f-bancarios-nota" style="display:none;margin-top:6px;">Todavía no cargó sus datos bancarios. Cárguelos en Herramientas → Configuración → Datos bancarios.</p>
+      </div>
       <p class="error" id="form-error">Completá todos los campos para continuar.</p>
       <div class="actions">
         <button class="btn btn-gold" onclick="confirmarPedido()">Confirmar pedido</button>
@@ -1191,6 +1196,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <label class="ni-chip"><input type="radio" name="hist-filtro-estado" value="completo" onchange="renderHistorial(document.getElementById('hist-buscador').value)"><span>Completos</span></label>
       <label class="ni-chip"><input type="radio" name="hist-filtro-estado" value="cancelado" onchange="renderHistorial(document.getElementById('hist-buscador').value)"><span>Cancelados</span></label>
     </div>
+    <label class="ni-chip" style="display:inline-flex;margin-bottom:12px;"><input type="checkbox" id="hist-incluir-bancarios"><span>🏦 Incluir datos bancarios al compartir, reenviar o imprimir</span></label>
     <div id="hist-lista"><p class="empty-msg">Cargando pedidos...</p></div>
     <div style="display:flex;gap:10px;margin-top:10px;">
       <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
@@ -1253,6 +1259,36 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
         <button class="btn btn-ghost" onclick="guardarConfigPush()">Guardar configuración</button>
       </div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <!-- STEP: DATOS BANCARIOS -->
+  <div class="step" id="step-datos-bancarios">
+    <div class="form-card">
+      <h2>Datos bancarios</h2>
+      <p class="note" style="margin-bottom:14px;">Los carga una sola vez. Después, en cada pedido, elige si los incluye o no en el comprobante PDF y en el mail al cliente.</p>
+      <div class="field"><label>Titular</label><input type="text" id="bk-titular" oninput="actualizarVistaPreviaBancarios()"></div>
+      <div class="field"><label>Banco</label><input type="text" id="bk-banco" oninput="actualizarVistaPreviaBancarios()"></div>
+      <div class="field">
+        <label>Tipo de cuenta</label>
+        <select id="bk-tipo" onchange="actualizarVistaPreviaBancarios()">
+          <option value="">(no indicar)</option>
+          <option value="Caja de ahorro">Caja de ahorro</option>
+          <option value="Cuenta corriente">Cuenta corriente</option>
+          <option value="Cuenta virtual (CVU)">Cuenta virtual (CVU)</option>
+        </select>
+      </div>
+      <div class="field"><label>CBU / CVU (22 dígitos)</label><input type="text" id="bk-cbu" inputmode="numeric" oninput="actualizarVistaPreviaBancarios()"></div>
+      <div class="field"><label>Alias</label><input type="text" id="bk-alias" oninput="actualizarVistaPreviaBancarios()"></div>
+      <div class="field"><label>CUIT / CUIL</label><input type="text" id="bk-cuit" oninput="actualizarVistaPreviaBancarios()"></div>
+      <div class="field"><label>Nota (opcional)</label><textarea id="bk-nota" rows="2" placeholder="Ej: Enviar el comprobante de transferencia por WhatsApp" oninput="actualizarVistaPreviaBancarios()"></textarea></div>
+      <p class="note" style="margin:6px 0 4px;">Así se va a ver:</p>
+      <div id="bk-preview" style="background:var(--cream);border-radius:10px;padding:12px;font-size:0.85rem;line-height:1.6;min-height:24px;"></div>
+      <p class="error" id="bk-error" style="display:none;"></p>
+      <div class="actions" style="margin-top:14px;">
+        <button class="btn btn-gold" onclick="guardarDatosBancarios()">Guardar</button>
+        <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      </div>
     </div>
   </div>
 
@@ -1632,6 +1668,7 @@ function irADatos(){
   document.getElementById('resumen-items').textContent = totalItems + ' productos';
   actualizarResumenDatos();
   precargarClientesParaAutocompletar();
+  actualizarCasillasBancarios();
   mostrarPaso('step-datos');
 }
 
@@ -1681,6 +1718,12 @@ async function confirmarPedido(){
   }
   document.getElementById('form-error').style.display = 'none';
 
+  if(datosBancarios === null) await cargarDatosBancarios();
+  const incluirDatosBancarios = !!document.getElementById('f-incluir-bancarios').checked && hayDatosBancarios();
+  if(hayDatosBancarios()){
+    try{ localStorage.setItem('ot_incluir_bancarios', incluirDatosBancarios ? '1' : '0'); } catch(e){}
+  }
+
   const numero = await siguienteNumeroPedido();
   const numeroFormateado = 'OT-' + String(numero).padStart(5, '0');
 
@@ -1692,6 +1735,7 @@ async function confirmarPedido(){
     descuentoPct,
     observaciones,
     bultos,
+    incluirDatosBancarios,
   };
 
   renderConfirmacion(ordenActual);
@@ -1816,6 +1860,24 @@ async function construirDocPDF(orden){
     doc.setFont('helvetica','normal');
     const obsLines = doc.splitTextToSize(orden.observaciones, 180);
     doc.text(obsLines, 14, y + 6);
+    y += 6 + obsLines.length * 4.6 + 6;
+  }
+
+  if(orden.incluirDatosBancarios && hayDatosBancarios()){
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(10);
+    const lineasB = lineasDatosBancarios().flatMap(l => doc.splitTextToSize(l, 168));
+    const altoBloque = 13 + lineasB.length * 5.6;
+    if(y + altoBloque > 275){ doc.addPage(); y = 20; }
+    doc.setDrawColor(61,43,78);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(14, y, 182, altoBloque, 2, 2);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(61,43,78);
+    doc.text('DATOS PARA TRANSFERENCIA', 19, y + 8);
+    doc.setFont('helvetica','normal');
+    doc.setTextColor(40,40,40);
+    lineasB.forEach((l, i) => doc.text(l, 19, y + 14.5 + i * 5.6));
   }
 
   doc.setFontSize(8);
@@ -1910,6 +1972,110 @@ async function compartirWhatsApp(){
   alert('Tu navegador no permite compartir el archivo directamente. Descargá el PDF y adjuntalo manualmente en WhatsApp.');
 }
 
+// ---------- datos bancarios (opcionales, se eligen pedido por pedido) ----------
+let datosBancarios = null; // null = todavia no cargado; {} = cargado pero vacio
+
+function escaparHtml(t){
+  return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function lineasDeDatosBancarios(d){
+  d = d || {};
+  const pares = [['Titular', d.titular], ['Banco', d.banco], ['Tipo de cuenta', d.tipoCuenta], ['CBU/CVU', d.cbu], ['Alias', d.alias], ['CUIT/CUIL', d.cuit]];
+  const lineas = pares.filter(p => p[1] && String(p[1]).trim()).map(p => p[0] + ': ' + String(p[1]).trim());
+  if(d.nota && String(d.nota).trim()) lineas.push(String(d.nota).trim());
+  return lineas;
+}
+
+function lineasDatosBancarios(){ return lineasDeDatosBancarios(datosBancarios); }
+function hayDatosBancarios(){ return lineasDatosBancarios().length > 0; }
+
+async function cargarDatosBancarios(){
+  try{
+    const doc = await db.collection('config').doc('datos_bancarios').get();
+    datosBancarios = doc.exists ? doc.data() : {};
+  } catch(e){
+    console.error('Error cargando datos bancarios:', e); // se deja en null para reintentar al confirmar un pedido
+  }
+  actualizarCasillasBancarios();
+}
+
+function actualizarCasillasBancarios(){
+  const hay = hayDatosBancarios();
+  const casillaPedido = document.getElementById('f-incluir-bancarios');
+  const notaPedido = document.getElementById('f-bancarios-nota');
+  const casillaHist = document.getElementById('hist-incluir-bancarios');
+  if(casillaPedido){
+    casillaPedido.disabled = !hay;
+    if(hay){
+      let recordado = false;
+      try{ recordado = localStorage.getItem('ot_incluir_bancarios') === '1'; } catch(e){}
+      casillaPedido.checked = recordado;
+    } else {
+      casillaPedido.checked = false;
+    }
+  }
+  if(notaPedido) notaPedido.style.display = hay ? 'none' : 'block';
+  if(casillaHist){
+    casillaHist.disabled = !hay;
+    if(!hay) casillaHist.checked = false;
+  }
+}
+
+async function abrirDatosBancarios(){
+  mostrarPaso('step-datos-bancarios');
+  document.getElementById('bk-error').style.display = 'none';
+  await cargarDatosBancarios();
+  const d = datosBancarios || {};
+  document.getElementById('bk-titular').value = d.titular || '';
+  document.getElementById('bk-banco').value = d.banco || '';
+  document.getElementById('bk-tipo').value = d.tipoCuenta || '';
+  document.getElementById('bk-cbu').value = d.cbu || '';
+  document.getElementById('bk-alias').value = d.alias || '';
+  document.getElementById('bk-cuit').value = d.cuit || '';
+  document.getElementById('bk-nota').value = d.nota || '';
+  actualizarVistaPreviaBancarios();
+}
+
+function leerCamposBancarios(){
+  return {
+    titular: document.getElementById('bk-titular').value.trim(),
+    banco: document.getElementById('bk-banco').value.trim(),
+    tipoCuenta: document.getElementById('bk-tipo').value,
+    cbu: document.getElementById('bk-cbu').value.replace(/[\s-]/g,''),
+    alias: document.getElementById('bk-alias').value.trim(),
+    cuit: document.getElementById('bk-cuit').value.trim(),
+    nota: document.getElementById('bk-nota').value.trim(),
+  };
+}
+
+function actualizarVistaPreviaBancarios(){
+  const lineas = lineasDeDatosBancarios(leerCamposBancarios());
+  document.getElementById('bk-preview').innerHTML = lineas.length
+    ? '<b>Datos para transferencia</b><br>' + lineas.map(escaparHtml).join('<br>')
+    : '<span style="color:#A8A092;">Todavía no cargó ningún dato.</span>';
+}
+
+async function guardarDatosBancarios(){
+  const errorEl = document.getElementById('bk-error');
+  errorEl.style.display = 'none';
+  const datos = leerCamposBancarios();
+  if(datos.cbu && !/^\d{22}$/.test(datos.cbu)){
+    errorEl.textContent = 'El CBU/CVU tiene que tener exactamente 22 dígitos (tiene ' + datos.cbu.length + '). Revíselo antes de guardar, porque es el dato que van a usar sus clientes para transferir.';
+    errorEl.style.display = 'block';
+    return;
+  }
+  try{
+    await db.collection('config').doc('datos_bancarios').set(datos);
+    datosBancarios = datos;
+    actualizarCasillasBancarios();
+    alert('Datos bancarios guardados. En cada pedido va a poder elegir si los incluye o no.');
+  } catch(e){
+    errorEl.textContent = 'No se pudieron guardar: ' + e.message;
+    errorEl.style.display = 'block';
+  }
+}
+
 // ---------- email automatico ----------
 function construirParamsEmail(orden, destinatario){
   const subtotal = subtotalOrden(orden);
@@ -1925,6 +2091,10 @@ function construirParamsEmail(orden, destinatario){
   const descuento_texto = orden.descuentoPct > 0
     ? `${orden.descuentoPct}% (-${formatPrice(subtotal - total)})`
     : 'Sin descuento';
+  let observacionesEmail = (orden.observaciones || '—').replace(/\n/g, '<br>');
+  if(orden.incluirDatosBancarios && hayDatosBancarios() && destinatario !== EMAIL_ONLINETEXTIL){
+    observacionesEmail += '<br><br><b>Datos para transferencia</b><br>' + lineasDatosBancarios().map(escaparHtml).join('<br>');
+  }
   return {
     email: destinatario,
     numero_pedido: orden.numero,
@@ -1938,7 +2108,7 @@ function construirParamsEmail(orden, destinatario){
     subtotal: formatPrice(subtotal),
     descuento_texto,
     total: formatPrice(total),
-    observaciones: (orden.observaciones || '—').replace(/\n/g, '<br>'),
+    observaciones: observacionesEmail,
   };
 }
 
@@ -2290,6 +2460,7 @@ function ordenDesdeHistorial(numero){
     descuentoPct: p.descuentoPct || 0,
     observaciones: p.observaciones || '',
     bultos: p.bultos || 1,
+    incluirDatosBancarios: !!(document.getElementById('hist-incluir-bancarios') && document.getElementById('hist-incluir-bancarios').checked) && hayDatosBancarios(),
   };
 }
 
@@ -7413,7 +7584,7 @@ function irAFormatoGrafico(){
 </script>
 <script>
 etiquetarProductosEstaticos();
-Promise.all([cargarFotosOverride(), cargarProductosNuevos()]).then(() => {
+Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancarios()]).then(() => {
   return cargarProductosEliminados();
 }).then(() => {
   return cargarProductosEditados();
