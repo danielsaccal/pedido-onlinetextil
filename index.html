@@ -451,6 +451,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
           <span class="menu-item" onclick="abrirNuevoProducto()">➕ Agregar producto nuevo</span>
           <span class="menu-item" onclick="abrirEditarProducto()">✏️ Editar producto</span>
           <span class="menu-item" onclick="abrirActualizarFoto()">📷 Actualizar foto de producto</span>
+          <span class="menu-item" onclick="abrirCompartirVideoProducto()">🎬 Compartir video de producto</span>
         </div>
       </div>
 
@@ -706,6 +707,18 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <div class="field"><label>SKU</label><input type="text" id="fs-sku" placeholder="Ej: TOA171B"></div>
       <div class="actions"><button class="btn btn-gold" onclick="buscarProductoParaFoto()">Buscar</button></div>
       <div id="fs-resultado" style="margin-top:16px;"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <!-- STEP: COMPARTIR VIDEO DE PRODUCTO (acceso directo, solo videos) -->
+  <div class="step" id="step-compartir-video">
+    <div class="form-card">
+      <h2>Compartir video de producto</h2>
+      <p class="note" style="margin-bottom:14px;">Busque por SKU y comparta cualquier video ya cargado, o pegue uno nuevo.</p>
+      <div class="field"><label>SKU</label><input type="text" id="cv-sku" placeholder="Ej: IA905"></div>
+      <div class="actions"><button class="btn btn-gold" onclick="buscarProductoParaCompartirVideo()">Buscar</button></div>
+      <div id="cv-resultado" style="margin-top:16px;"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
@@ -5572,6 +5585,54 @@ function abrirActualizarFoto(){
   document.getElementById('fs-sku').value = '';
 }
 
+function abrirCompartirVideoProducto(){
+  mostrarPaso('step-compartir-video');
+  document.getElementById('cv-sku').value = '';
+  document.getElementById('cv-resultado').innerHTML = '';
+}
+
+function buscarProductoParaCompartirVideo(){
+  const sku = document.getElementById('cv-sku').value.trim();
+  const cont = document.getElementById('cv-resultado');
+  if(!sku){ cont.innerHTML = ''; return; }
+  const match = buscarProductoPorSku(sku);
+  if(!match){
+    cont.innerHTML = '<p class="empty-msg">No encontré ningún producto con ese SKU.</p>';
+    return;
+  }
+  renderVideosCompartir(match.ci, match.pi, match.producto);
+}
+
+function renderVideosCompartir(ci, pi, producto){
+  const cont = document.getElementById('cv-resultado');
+  const videos = videosOverride[`${ci}-${pi}`] || [];
+  cont.innerHTML = `
+    <p style="margin-bottom:10px;"><b>${producto.nombre}</b> (${producto.composicion||''})</p>
+    <div id="cv-videos" style="margin-bottom:12px;">
+      ${videos.length === 0 ? '<p class="note">Todavía no hay ningún link cargado para este producto.</p>' : videos.map((v, i) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);">
+          <a href="${v.url}" target="_blank" style="flex:1;color:var(--purple);text-decoration:underline;word-break:break-all;">${v.nota || v.url}</a>
+          <button type="button" onclick="compartirVideoLink('${escapeAttr(producto.nombre)}', ${JSON.stringify(v.url)}, ${JSON.stringify(v.nota||'')})" style="background:var(--gold);color:var(--purple);border:none;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:0.85rem;flex-shrink:0;">📤</button>
+          <button type="button" onclick="eliminarVideoLinkYRefrescar(${ci},${pi},${i})" style="background:#B5453A;color:#fff;border:none;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:0.8rem;flex-shrink:0;">×</button>
+        </div>
+      `).join('')}
+    </div>
+    <div class="field"><label>Link nuevo (Google Drive o YouTube)</label><input type="text" id="cv-video-url" placeholder="https://..."></div>
+    <div class="field"><label>Nota (opcional)</label><input type="text" id="cv-video-nota" placeholder="Opcional"></div>
+    <button class="btn-mini" onclick="agregarVideoLinkYRefrescar(${ci}, ${pi})">Agregar link de video</button>
+  `;
+}
+
+async function agregarVideoLinkYRefrescar(ci, pi){
+  const url = document.getElementById('cv-video-url').value.trim();
+  const nota = document.getElementById('cv-video-nota').value.trim();
+  if(await guardarVideoLink(ci, pi, url, nota)) renderVideosCompartir(ci, pi, CATALOGO[ci].productos[pi]);
+}
+
+async function eliminarVideoLinkYRefrescar(ci, pi, indice){
+  if(await borrarVideoLink(ci, pi, indice)) renderVideosCompartir(ci, pi, CATALOGO[ci].productos[pi]);
+}
+
 function irAFotoConSku(sku){
   mostrarPaso('step-foto-sku');
   document.getElementById('fs-sku').value = sku;
@@ -5632,15 +5693,12 @@ function compartirVideoLink(nombreProducto, url, nota){
   window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
 }
 
-async function agregarVideoLink(ci, pi){
-  const url = document.getElementById('fs-video-url').value.trim();
-  const nota = document.getElementById('fs-video-nota').value.trim();
-  if(!url){ alert('Pegue el link primero.'); return; }
-  if(!/^https?:\/\//i.test(url)){ alert('El link tiene que empezar con http:// o https://'); return; }
-
+// nucleo compartido: no depende de ninguna pantalla puntual (ni IDs de campos, ni que funcion usar para refrescar)
+async function guardarVideoLink(ci, pi, url, nota){
+  if(!url){ alert('Pegue el link primero.'); return false; }
+  if(!/^https?:\/\//i.test(url)){ alert('El link tiene que empezar con http:// o https://'); return false; }
   const key = `${ci}-${pi}`;
-  const actuales = videosOverride[key] || [];
-  const nuevos = [...actuales, { url, nota }];
+  const nuevos = [...(videosOverride[key] || []), { url, nota }];
   try{
     await db.collection('fotos').doc(key).set({
       videoLinks: nuevos,
@@ -5649,22 +5707,34 @@ async function agregarVideoLink(ci, pi){
       actualizado: new Date().toISOString()
     }, { merge: true });
     videosOverride[key] = nuevos;
-    renderGaleriaFoto(ci, pi, CATALOGO[ci].productos[pi]);
+    return true;
   } catch(err){
     alert('No se pudo guardar el link: ' + err.message);
+    return false;
   }
 }
 
-async function eliminarVideoLink(ci, pi, indice){
+async function agregarVideoLink(ci, pi){
+  const url = document.getElementById('fs-video-url').value.trim();
+  const nota = document.getElementById('fs-video-nota').value.trim();
+  if(await guardarVideoLink(ci, pi, url, nota)) renderGaleriaFoto(ci, pi, CATALOGO[ci].productos[pi]);
+}
+
+async function borrarVideoLink(ci, pi, indice){
   const key = `${ci}-${pi}`;
   const nuevos = (videosOverride[key] || []).filter((_, i) => i !== indice);
   try{
     await db.collection('fotos').doc(key).set({ videoLinks: nuevos }, { merge: true });
     videosOverride[key] = nuevos;
-    renderGaleriaFoto(ci, pi, CATALOGO[ci].productos[pi]);
+    return true;
   } catch(err){
     alert('No se pudo borrar: ' + err.message);
+    return false;
   }
+}
+
+async function eliminarVideoLink(ci, pi, indice){
+  if(await borrarVideoLink(ci, pi, indice)) renderGaleriaFoto(ci, pi, CATALOGO[ci].productos[pi]);
 }
 
 async function comprimirImagenAFotoBase64(file){
@@ -6183,10 +6253,30 @@ async function generarFlyersNuevoIngreso(){
         const estiloVideo = document.querySelector('input[name="ni-video-estilo"]:checked')?.value || 'zoom';
         const mostrarTextoVideo = document.getElementById('ni-video-texto').checked;
         const descVariantePrincipal = grupos[0].variantes && grupos[0].variantes[0] ? grupos[0].variantes[0].desc : '';
+
+        // si es un solo producto con varias fotos cargadas, armar diapositivas con TODAS sus fotos
+        // (mismo motor de zoom/paneo que ya cruza entre productos distintos, aca cruza entre fotos del mismo producto)
+        let gruposParaVideo = grupos;
+        if(estiloVideo === 'dinamico' && !esModoCategoria && grupos.length === 1){
+          const MAX_FOTOS_SLIDESHOW = 8; // mas que esto, el Reel se hace demasiado largo para que funcione bien
+          const fotosDelProducto = imagenesEfectivas(grupos[0].ci, grupos[0].pi, grupos[0].producto).slice(0, MAX_FOTOS_SLIDESHOW);
+          if(fotosDelProducto.length > 1){
+            gruposParaVideo = await Promise.all(fotosDelProducto.map(async (fotoUrl) => ({
+              ...grupos[0],
+              img: await cargarImagenParaCanvas(fotoUrl),
+            })));
+          }
+        }
+
+        // el limite de seguridad tiene que ser mayor a la duracion real del video (se graba en tiempo real);
+        // con pocas diapositivas 20s alcanza de sobra, pero con varias fotos el video mismo puede durar mas que eso
+        const segDurVideo = gruposParaVideo.length === 1 ? 5000 : 2600;
+        const limiteDinamico = Math.max(20000, gruposParaVideo.length * segDurVideo + 8000);
+
         const blobVideo = estiloVideo === 'dinamico'
           ? (esModoCategoria && grupos.length > 1
               ? await conLimiteDeTiempo(generarVideoCategoria(grupos, nombreCategoriaFlyer, textoAdicional, 'violeta', mostrarTextoVideo), 30000, 'El video tardó demasiado y se canceló.')
-              : await conLimiteDeTiempo(generarVideoDinamico(grupos, textoAdicional, 'violeta', mostrarTextoVideo), 20000, 'El video dinámico tardó demasiado y se canceló.'))
+              : await conLimiteDeTiempo(generarVideoDinamico(gruposParaVideo, textoAdicional, 'violeta', mostrarTextoVideo), limiteDinamico, 'El video dinámico tardó demasiado y se canceló.'))
           : await conLimiteDeTiempo(generarVideoKenBurns(producto, img, textoAdicional, 'violeta', estiloVideo, descVariantePrincipal, mostrarTextoVideo), 20000, 'El video tardó demasiado y se canceló.');
         const urlVideo = URL.createObjectURL(blobVideo);
         const extVideo = blobVideo.type.includes('mp4') ? 'mp4' : 'webm';
