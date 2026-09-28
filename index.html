@@ -179,6 +179,22 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 .ni-pieza .ni-pieza-acciones{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;}
 .grilla-ig{display:grid;grid-template-columns:repeat(3, 1fr);gap:3px;background:var(--line);}
 .grilla-celda{position:relative;aspect-ratio:1/1;overflow:hidden;background:var(--cream);}
+.ig-mockup{max-width:360px;margin:0 auto 18px;background:#fff;border:10px solid #1a1a1a;border-radius:36px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.25);font-family:-apple-system,'Work Sans',sans-serif;}
+.ig-mockup-status{display:flex;justify-content:space-between;align-items:center;padding:8px 16px 2px;font-size:0.72rem;font-weight:600;color:#000;}
+.ig-mockup-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;}
+.ig-mockup-header b{font-size:0.95rem;}
+.ig-mockup-top{display:flex;align-items:center;gap:22px;padding:6px 16px 10px;}
+.ig-mockup-avatar{width:78px;height:78px;border-radius:50%;object-fit:cover;border:2px solid var(--line);flex-shrink:0;background:var(--cream);}
+.ig-mockup-stats{display:flex;gap:22px;flex:1;justify-content:space-around;text-align:center;}
+.ig-mockup-stats b{display:block;font-size:1rem;}
+.ig-mockup-stats span{font-size:0.72rem;color:#555;}
+.ig-mockup-bio{padding:0 16px 10px;font-size:0.82rem;line-height:1.45;color:#000;}
+.ig-mockup-bio .cat{color:#8a8a8a;}
+.ig-mockup-bio a{color:#00376b;}
+.ig-mockup-buttons{display:flex;gap:8px;padding:0 16px 12px;}
+.ig-mockup-buttons button{flex:1;background:var(--cream);border:1px solid var(--line);border-radius:8px;padding:7px 0;font-size:0.82rem;font-weight:600;color:#000;}
+.ig-mockup-tabs{display:flex;justify-content:space-around;border-top:1px solid var(--line);padding:8px 0;font-size:1.1rem;color:#000;}
+.ig-mockup-tabs span:first-child{border-bottom:2px solid #000;padding-bottom:6px;}
 .grilla-celda img{width:100%;height:100%;object-fit:cover;display:block;}
 .grilla-celda .quitar{
   position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;
@@ -1107,10 +1123,41 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
     <div class="form-card">
       <h2>Vista previa de grilla IG</h2>
       <p class="note" style="margin-bottom:14px;">Cada vez que genera una pieza para redes, puede sumarla acá con "+ Agregar a grilla". Use las flechas ◀▶ de cada foto para reordenarlas.</p>
+      <button class="btn-mini" onclick="abrirPerfilIG()" style="margin-bottom:12px;">⚙️ Configurar datos del perfil</button>
+      <div id="ig-mockup-cont"></div>
       <div id="grilla-cont" class="grilla-ig"></div>
       <div class="actions" style="margin-top:14px;">
         <button class="btn btn-ghost" onclick="vaciarGrilla()">Vaciar grilla</button>
         <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP: CONFIGURAR PERFIL INSTAGRAM (para la vista previa de grilla) -->
+  <div class="step" id="step-perfil-ig">
+    <div class="form-card">
+      <h2>Perfil de Instagram</h2>
+      <p class="note" style="margin-bottom:14px;">Se carga una sola vez. Después, la vista previa de la grilla lo usa para mostrar cómo se vería el perfil real.</p>
+      <div class="field"><label>Usuario (sin @)</label><input type="text" id="pig-usuario" placeholder="onlinetextilok" oninput="actualizarVistaPreviaPerfilIG()"></div>
+      <div class="field">
+        <label>Foto de perfil</label>
+        <input type="file" accept="image/*" id="pig-foto" onchange="cargarFotoPerfilIG()">
+        <img id="pig-foto-preview" style="width:70px;height:70px;border-radius:50%;object-fit:cover;margin-top:8px;display:none;border:1px solid var(--line);">
+      </div>
+      <div class="field"><label>Publicaciones</label><input type="text" id="pig-publicaciones" placeholder="Ej: 411" oninput="actualizarVistaPreviaPerfilIG()"></div>
+      <div class="field"><label>Seguidores</label><input type="text" id="pig-seguidores" placeholder="Ej: 13,6 mil" oninput="actualizarVistaPreviaPerfilIG()"></div>
+      <div class="field"><label>Siguiendo</label><input type="text" id="pig-siguiendo" placeholder="Ej: 1261" oninput="actualizarVistaPreviaPerfilIG()"></div>
+      <div class="field"><label>Nombre a mostrar</label><input type="text" id="pig-nombre" placeholder="Ej: OnLineTextil" oninput="actualizarVistaPreviaPerfilIG()"></div>
+      <div class="field"><label>Categoría (opcional)</label><input type="text" id="pig-categoria" placeholder="Ej: Tienda de artículos para el hogar" oninput="actualizarVistaPreviaPerfilIG()"></div>
+      <div class="field"><label>Biografía (una línea por renglón)</label><textarea id="pig-bio" rows="4" placeholder="Sábanas, toallas y mantelería&#10;Venta mayorista y minorista" oninput="actualizarVistaPreviaPerfilIG()" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:'Work Sans';"></textarea></div>
+      <div class="field"><label>Link en la bio (opcional)</label><input type="text" id="pig-link" placeholder="onlinetextil.com.ar" oninput="actualizarVistaPreviaPerfilIG()"></div>
+      <div class="field"><label>Ubicación (opcional)</label><input type="text" id="pig-ubicacion" placeholder="Buenos Aires, Argentina" oninput="actualizarVistaPreviaPerfilIG()"></div>
+      <p class="note" style="margin:10px 0 4px;">Así se va a ver:</p>
+      <div id="pig-preview"></div>
+      <p class="error" id="pig-error" style="display:none;"></p>
+      <div class="actions" style="margin-top:14px;">
+        <button class="btn btn-gold" onclick="guardarPerfilIG()">Guardar</button>
+        <button class="btn btn-ghost" onclick="abrirGrilla()">Ver grilla completa</button>
       </div>
     </div>
   </div>
@@ -7600,8 +7647,144 @@ async function generarRompecabezas(){
   }
 }
 
-function abrirGrilla(){
+// ---------- perfil de Instagram (para la vista previa de la grilla) ----------
+let perfilIG = null; // null = todavia no se cargo; {} = cargado pero vacio
+
+async function cargarPerfilIG(){
+  try{
+    const doc = await db.collection('config').doc('instagram_perfil').get();
+    perfilIG = doc.exists ? doc.data() : {};
+  } catch(e){
+    console.error('Error cargando perfil de Instagram:', e);
+    perfilIG = perfilIG || {};
+  }
+}
+
+function leerCamposPerfilIG(){
+  return {
+    usuario: document.getElementById('pig-usuario').value.trim(),
+    fotoBase64: (perfilIG && perfilIG.fotoBase64) || null,
+    publicaciones: document.getElementById('pig-publicaciones').value.trim(),
+    seguidores: document.getElementById('pig-seguidores').value.trim(),
+    siguiendo: document.getElementById('pig-siguiendo').value.trim(),
+    nombre: document.getElementById('pig-nombre').value.trim(),
+    categoria: document.getElementById('pig-categoria').value.trim(),
+    bio: document.getElementById('pig-bio').value,
+    link: document.getElementById('pig-link').value.trim(),
+    ubicacion: document.getElementById('pig-ubicacion').value.trim(),
+  };
+}
+
+async function cargarFotoPerfilIG(){
+  const input = document.getElementById('pig-foto');
+  const file = input.files[0];
+  if(!file) return;
+  try{
+    const foto = await comprimirImagenAFotoBase64(file);
+    perfilIG = perfilIG || {};
+    perfilIG.fotoBase64 = foto;
+    const prev = document.getElementById('pig-foto-preview');
+    prev.src = foto; prev.style.display = 'inline-block';
+    actualizarVistaPreviaPerfilIG();
+  } catch(e){
+    alert('No se pudo procesar la foto: ' + e.message);
+  }
+}
+
+function renderMockupIG(perfil, incluirGrilla){
+  const p = perfil || {};
+  const lineasBio = String(p.bio || '').split('\n').map(l => l.trim()).filter(Boolean);
+  const items = incluirGrilla ? leerGrilla() : [];
+  const totalCasilleros = incluirGrilla ? Math.max(9, Math.ceil(items.length/3)*3) : 0;
+
+  return `
+    <div class="ig-mockup">
+      <div class="ig-mockup-status"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="ig-mockup-header">
+        <span>←</span><b>${escaparHtml(p.usuario || 'usuario')}</b><span>☰</span>
+      </div>
+      <div class="ig-mockup-top">
+        <img class="ig-mockup-avatar" src="${escapeAttr(p.fotoBase64 || '')}" onerror="this.style.background='var(--cream)'">
+        <div class="ig-mockup-stats">
+          <div><b>${escaparHtml(p.publicaciones || '0')}</b><span>Publicaciones</span></div>
+          <div><b>${escaparHtml(p.seguidores || '0')}</b><span>Seguidores</span></div>
+          <div><b>${escaparHtml(p.siguiendo || '0')}</b><span>Siguiendo</span></div>
+        </div>
+      </div>
+      <div class="ig-mockup-bio">
+        <b>${escaparHtml(p.nombre || p.usuario || '')}</b>
+        ${p.categoria ? `<div class="cat">${escaparHtml(p.categoria)}</div>` : ''}
+        ${lineasBio.map(l => `<div>${escaparHtml(l)}</div>`).join('')}
+        ${p.link ? `<a href="#">${escaparHtml(p.link)}</a>` : ''}
+        ${p.ubicacion ? `<div>${escaparHtml(p.ubicacion)}</div>` : ''}
+      </div>
+      <div class="ig-mockup-buttons"><button>Seguir</button><button>Mensaje</button></div>
+      <div class="ig-mockup-tabs"><span>▦</span><span>▷</span><span>🏷️</span></div>
+      ${incluirGrilla ? `<div class="grilla-ig">
+        ${items.map(it => `<div class="grilla-celda"><img src="${escapeAttr(it.dataUrl)}" alt="${escapeAttr(it.nombre)}"></div>`).join('')}
+        ${Array.from({length: totalCasilleros - items.length}).map(() => '<div class="grilla-celda grilla-celda-vacia"></div>').join('')}
+      </div>` : ''}
+    </div>
+  `;
+}
+
+function actualizarVistaPreviaPerfilIG(){
+  document.getElementById('pig-preview').innerHTML = renderMockupIG(leerCamposPerfilIG(), false);
+}
+
+async function abrirPerfilIG(){
+  mostrarPaso('step-perfil-ig');
+  document.getElementById('pig-error').style.display = 'none';
+  if(perfilIG === null) await cargarPerfilIG();
+  const p = perfilIG || {};
+  document.getElementById('pig-usuario').value = p.usuario || '';
+  document.getElementById('pig-publicaciones').value = p.publicaciones || '';
+  document.getElementById('pig-seguidores').value = p.seguidores || '';
+  document.getElementById('pig-siguiendo').value = p.siguiendo || '';
+  document.getElementById('pig-nombre').value = p.nombre || '';
+  document.getElementById('pig-categoria').value = p.categoria || '';
+  document.getElementById('pig-bio').value = p.bio || '';
+  document.getElementById('pig-link').value = p.link || '';
+  document.getElementById('pig-ubicacion').value = p.ubicacion || '';
+  const prev = document.getElementById('pig-foto-preview');
+  if(p.fotoBase64){ prev.src = p.fotoBase64; prev.style.display = 'inline-block'; }
+  else { prev.style.display = 'none'; }
+  actualizarVistaPreviaPerfilIG();
+}
+
+async function guardarPerfilIG(){
+  const errorEl = document.getElementById('pig-error');
+  errorEl.style.display = 'none';
+  const datos = leerCamposPerfilIG();
+  try{
+    await db.collection('config').doc('instagram_perfil').set(datos);
+    perfilIG = datos;
+    alert('Perfil guardado. Ya se usa en la vista previa de la grilla.');
+  } catch(e){
+    errorEl.textContent = 'No se pudo guardar: ' + e.message;
+    errorEl.style.display = 'block';
+  }
+}
+
+async function abrirGrilla(){
   mostrarPaso('step-grilla');
+  if(perfilIG === null) await cargarPerfilIG();
+  const contMockup = document.getElementById('ig-mockup-cont');
+  if(perfilIG && perfilIG.usuario){
+    contMockup.innerHTML = renderMockupIG(perfilIG, true);
+  } else {
+    contMockup.innerHTML = '';
+    const aviso = document.createElement('p');
+    aviso.className = 'note';
+    aviso.textContent = 'Todavía no cargó los datos de su perfil — ';
+    const link = document.createElement('a');
+    link.href = '#';
+    link.textContent = 'configúrelos acá';
+    link.onclick = (e) => { e.preventDefault(); abrirPerfilIG(); };
+    aviso.appendChild(link);
+    aviso.appendChild(document.createTextNode(' para ver el mockup completo (por ahora, abajo solo se ve la grilla de fotos).'));
+    contMockup.appendChild(aviso);
+  }
   renderGrilla();
 }
 
@@ -7896,7 +8079,7 @@ function irAFormatoGrafico(){
 </script>
 <script>
 etiquetarProductosEstaticos();
-Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancarios()]).then(() => {
+Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancarios(), cargarPerfilIG()]).then(() => {
   return cargarProductosEliminados();
 }).then(() => {
   return cargarProductosEditados();
