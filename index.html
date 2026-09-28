@@ -1137,7 +1137,8 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
   <div class="step" id="step-perfil-ig">
     <div class="form-card">
       <h2>Perfil de Instagram</h2>
-      <p class="note" style="margin-bottom:14px;">Se carga una sola vez. Después, la vista previa de la grilla lo usa para mostrar cómo se vería el perfil real.</p>
+      <div id="pig-conexion-estado" style="background:var(--cream);border-radius:10px;padding:12px;margin-bottom:16px;"></div>
+      <p class="note" style="margin-bottom:14px;">Si no está conectado, puede cargar los datos a mano acá abajo igual (quedan como respaldo).</p>
       <div class="field"><label>Usuario (sin @)</label><input type="text" id="pig-usuario" placeholder="onlinetextilok" oninput="actualizarVistaPreviaPerfilIG()"></div>
       <div class="field">
         <label>Foto de perfil</label>
@@ -7736,6 +7737,8 @@ async function abrirPerfilIG(){
   mostrarPaso('step-perfil-ig');
   document.getElementById('pig-error').style.display = 'none';
   if(perfilIG === null) await cargarPerfilIG();
+  if(instagramConexion === null) await cargarInstagramConexion();
+  renderEstadoConexionIG();
   const p = perfilIG || {};
   document.getElementById('pig-usuario').value = p.usuario || '';
   document.getElementById('pig-publicaciones').value = p.publicaciones || '';
@@ -7766,17 +7769,123 @@ async function guardarPerfilIG(){
   }
 }
 
+// ---------- conexion real con Instagram (Facebook Login for Business) ----------
+const INSTAGRAM_APP_ID_PUBLICO = '1633756135135341'; // no es secreto, es el mismo id que va en cualquier boton de "iniciar sesion"
+const REDIRECT_URI_INSTAGRAM = 'https://lucky-shape-ec64.danielsaccal.workers.dev/instagram-callback';
+
+let instagramConexion = null; // null = todavia no se reviso; {} = revisado, no conectado; {pageToken, igBusinessId} = conectado
+
+async function cargarInstagramConexion(){
+  try{
+    const doc = await db.collection('config').doc('instagram_conexion').get();
+    instagramConexion = doc.exists ? doc.data() : {};
+  } catch(e){
+    console.error('Error cargando la conexion de Instagram:', e);
+    instagramConexion = instagramConexion || {};
+  }
+}
+
+function conectarInstagram(){
+  const params = new URLSearchParams({
+    client_id: INSTAGRAM_APP_ID_PUBLICO,
+    redirect_uri: REDIRECT_URI_INSTAGRAM,
+    scope: 'pages_show_list,pages_read_engagement,instagram_basic',
+    response_type: 'code',
+  });
+  window.location.href = 'https://www.facebook.com/v21.0/dialog/oauth?' + params.toString();
+}
+
+async function desconectarInstagram(){
+  if(!confirm('¿Desconectar Instagram? La vista previa va a volver a usar los datos cargados a mano.')) return;
+  try{
+    await db.collection('config').doc('instagram_conexion').set({});
+    instagramConexion = {};
+    renderEstadoConexionIG();
+  } catch(e){
+    alert('No se pudo desconectar: ' + e.message);
+  }
+}
+
+// trae los datos reales desde Instagram usando la conexion guardada; null si no hay conexion o falla
+async function obtenerPerfilInstagramEnVivo(){
+  if(!instagramConexion || !instagramConexion.pageToken || !instagramConexion.igBusinessId) return null;
+  try{
+    const resp = await fetch(URL_WORKER_IA, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ accion: 'obtenerPerfilInstagram', pageToken: instagramConexion.pageToken, igBusinessId: instagramConexion.igBusinessId })
+    });
+    const datos = await resp.json();
+    if(!resp.ok || datos.error) throw new Error(datos.error || 'sin respuesta');
+    return datos;
+  } catch(e){
+    console.error('No se pudo traer el perfil en vivo de Instagram:', e);
+    return null;
+  }
+}
+
+function renderEstadoConexionIG(){
+  const cont = document.getElementById('pig-conexion-estado');
+  if(!cont) return;
+  const conectado = instagramConexion && instagramConexion.pageToken;
+  cont.innerHTML = conectado
+    ? '<p style="margin:0 0 8px;">✅ Conectado a Instagram — los seguidores, la foto y la biografía se traen solos.</p><button class="btn-mini" onclick="desconectarInstagram()">Desconectar</button>'
+    : '<p style="margin:0 0 8px;">Todavía no está conectado a Instagram.</p><button class="btn btn-gold" onclick="conectarInstagram()">📸 Conectar con Instagram</button>';
+}
+
+// se fija, al abrir la app, si Meta acaba de redirigir de vuelta con una conexion nueva o un error
+async function revisarRegresoDeInstagram(){
+  const params = new URLSearchParams(window.location.search);
+  const pageToken = params.get('ig_page_token');
+  const igBusinessId = params.get('ig_business_id');
+  const error = params.get('ig_error');
+  const aviso = params.get('ig_aviso');
+
+  if(error){
+    alert('No se pudo conectar Instagram: ' + error);
+    history.replaceState(null, '', window.location.pathname);
+    return;
+  }
+  if(pageToken && igBusinessId){
+    try{
+      await db.collection('config').doc('instagram_conexion').set({ pageToken, igBusinessId, conectadoEl: new Date().toISOString() });
+      instagramConexion = { pageToken, igBusinessId };
+      alert('¡Instagram conectado!' + (aviso ? ' ' + aviso : ''));
+    } catch(e){
+      alert('Se conectó, pero no se pudo guardar: ' + e.message);
+    }
+    history.replaceState(null, '', window.location.pathname);
+  }
+}
+
 async function abrirGrilla(){
   mostrarPaso('step-grilla');
   if(perfilIG === null) await cargarPerfilIG();
+  if(instagramConexion === null) await cargarInstagramConexion();
+
+  let perfilEfectivo = perfilIG || {};
+  const enVivo = await obtenerPerfilInstagramEnVivo();
+  if(enVivo){
+    perfilEfectivo = {
+      ...perfilEfectivo, // conserva link/ubicacion/categoria cargados a mano, que Instagram no informa
+      usuario: enVivo.username || perfilEfectivo.usuario,
+      nombre: enVivo.name || perfilEfectivo.nombre,
+      publicaciones: enVivo.media_count != null ? String(enVivo.media_count) : perfilEfectivo.publicaciones,
+      seguidores: enVivo.followers_count != null ? String(enVivo.followers_count) : perfilEfectivo.seguidores,
+      siguiendo: enVivo.follows_count != null ? String(enVivo.follows_count) : perfilEfectivo.siguiendo,
+      bio: enVivo.biography || perfilEfectivo.bio,
+      fotoBase64: enVivo.profile_picture_url || perfilEfectivo.fotoBase64,
+    };
+  }
+
   const contMockup = document.getElementById('ig-mockup-cont');
-  if(perfilIG && perfilIG.usuario){
-    contMockup.innerHTML = renderMockupIG(perfilIG, true);
+  if(perfilEfectivo && perfilEfectivo.usuario){
+    contMockup.innerHTML = renderMockupIG(perfilEfectivo, true);
   } else {
     contMockup.innerHTML = '';
     const aviso = document.createElement('p');
     aviso.className = 'note';
-    aviso.textContent = 'Todavía no cargó los datos de su perfil — ';
+    aviso.textContent = 'Todavía no conectó Instagram ni cargó los datos a mano — ';
     const link = document.createElement('a');
     link.href = '#';
     link.textContent = 'configúrelos acá';
@@ -8079,6 +8188,7 @@ function irAFormatoGrafico(){
 </script>
 <script>
 etiquetarProductosEstaticos();
+revisarRegresoDeInstagram();
 Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancarios(), cargarPerfilIG()]).then(() => {
   return cargarProductosEliminados();
 }).then(() => {
