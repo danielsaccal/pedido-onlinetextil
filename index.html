@@ -744,7 +744,8 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <div class="ni-seccion">
         <p class="ni-seccion-tit">Foto</p>
         <div class="field">
-          <input type="file" accept="image/*" id="np-foto">
+          <input type="file" accept="image/*" id="np-foto" multiple>
+          <p class="note" style="margin-top:4px;">Puede elegir varias — la primera queda como principal, y el resto se puede reordenar después en "Actualizar foto de producto".</p>
         </div>
       </div>
 
@@ -5386,7 +5387,7 @@ async function guardarProductoNuevoInterno(){
   const subtitulo = document.getElementById('np-subtitulo').value.trim();
   const esTelas = categoria === 'TELAS';
   const metros = esTelas ? (parseInt(document.getElementById('np-metros').value, 10) || null) : null;
-  const archivoFoto = document.getElementById('np-foto').files[0];
+  const archivosFoto = [...document.getElementById('np-foto').files];
 
   const variantes = [];
   document.querySelectorAll('#np-variantes-cont .edit-item-row-nuevo').forEach(row => {
@@ -5419,26 +5420,17 @@ async function guardarProductoNuevoInterno(){
     }
   }
 
-  let imagenBase64 = null;
-  if(archivoFoto){
-    imagenBase64 = await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const maxDim = 480;
-          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-          const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.75));
-        };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(archivoFoto);
-    });
+  let fotosBase64 = [];
+  if(archivosFoto.length > 0){
+    try{
+      fotosBase64 = await Promise.all(archivosFoto.map(comprimirImagenAFotoBase64));
+    } catch(e){
+      errorEl.textContent = 'No se pudo procesar alguna de las fotos: ' + e.message;
+      errorEl.style.display = 'block';
+      return;
+    }
   }
+  const imagenBase64 = fotosBase64[0] || null;
 
   const nuevoProducto = {
     nombre: titulo,
@@ -5456,7 +5448,29 @@ async function guardarProductoNuevoInterno(){
     });
 
     const cat = CATALOGO.find(c => c.categoria === categoria);
-    if(cat) cat.productos.push(nuevoProducto);
+    let ci = -1, pi = -1;
+    if(cat){
+      ci = CATALOGO.indexOf(cat);
+      pi = cat.productos.length;
+      cat.productos.push(nuevoProducto);
+    }
+
+    if(fotosBase64.length > 1 && ci !== -1){
+      const key = `${ci}-${pi}`;
+      try{
+        await db.collection('fotos').doc(key).set({
+          imagenesBase64: fotosBase64,
+          sku: variantes[0].sku,
+          nombreProducto: titulo,
+          actualizado: new Date().toISOString()
+        });
+        fotosOverride[key] = fotosBase64;
+      } catch(e){
+        console.error('Se guardó el producto, pero no se pudieron guardar las fotos extra:', e);
+        errorEl.textContent = 'El producto se guardó bien, con la primera foto. Las demás no se pudieron guardar — agréguelas después en "Actualizar foto de producto".';
+        errorEl.style.display = 'block';
+      }
+    }
     renderCatalogo(document.getElementById('buscador').value);
 
     const skusRecienCargados = variantes.map(v => v.sku);
