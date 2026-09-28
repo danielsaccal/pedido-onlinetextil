@@ -1179,6 +1179,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <button class="btn btn-gold" onclick="descargarPDF()">Descargar comprobante (PDF)</button>
       <button class="btn btn-ghost" id="btn-share" onclick="compartirWhatsApp()">Compartir comprobante por WhatsApp</button>
       <button class="btn btn-ghost" onclick="enviarAOnLineTextil()">Avisar a OnLineTextil por WhatsApp</button>
+      <button class="btn btn-ghost" onclick="compartirDatosBancarios(ordenActual, 'whatsapp')">🏦 Enviar datos bancarios por WhatsApp</button>
       <p class="note">El comprobante en PDF queda descargado en tu dispositivo — adjuntalo en WhatsApp si el botón de compartir no está disponible en tu navegador.</p>
       <button class="btn btn-outline" style="color:var(--purple);border-color:var(--purple);margin-top:6px;" onclick="nuevoPedido()">Hacer otro pedido</button>
     </div>
@@ -1287,6 +1288,8 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <p class="error" id="bk-error" style="display:none;"></p>
       <div class="actions" style="margin-top:14px;">
         <button class="btn btn-gold" onclick="guardarDatosBancarios()">Guardar</button>
+        <button class="btn btn-ghost" onclick="compartirDatosBancariosPantalla('whatsapp')">📤 Compartir por WhatsApp</button>
+        <button class="btn btn-ghost" onclick="compartirDatosBancariosPantalla('copiar')">📋 Copiar el texto</button>
         <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
       </div>
     </div>
@@ -2056,12 +2059,76 @@ function actualizarVistaPreviaBancarios(){
     : '<span style="color:#A8A092;">Todavía no cargó ningún dato.</span>';
 }
 
+function mensajeErrorCbu(datos){
+  if(datos.cbu && !/^\d{22}$/.test(datos.cbu)){
+    return 'El CBU/CVU tiene que tener exactamente 22 dígitos (tiene ' + datos.cbu.length + '). Revíselo, porque es el dato que van a usar sus clientes para transferir.';
+  }
+  return '';
+}
+
+// ---------- compartir los datos bancarios (boton suelto, sin adjuntar a un pedido) ----------
+function armarMensajeDatosBancarios(orden, datos){
+  const encabezado = orden
+    ? 'Hola! Te paso los datos para transferir el pedido ' + orden.numero + ' (total ' + formatPrice(totalOrden(orden)) + '):'
+    : 'Hola! Te paso los datos para hacer la transferencia:';
+  return encabezado + '\n\n' + lineasDeDatosBancarios(datos).join('\n');
+}
+
+function enviarTextoDatosBancarios(texto, modo){
+  if(modo === 'copiar'){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(texto)
+        .then(() => alert('Datos bancarios copiados. Péguelos donde quiera.'))
+        .catch(() => window.prompt('Copie el texto:', texto));
+    } else {
+      window.prompt('Copie el texto:', texto);
+    }
+    return;
+  }
+  window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+}
+
+// desde la pantalla de configuracion: comparte lo que se ve en pantalla (igual que la vista previa)
+function compartirDatosBancariosPantalla(modo){
+  const errorEl = document.getElementById('bk-error');
+  errorEl.style.display = 'none';
+  const datos = leerCamposBancarios();
+  if(lineasDeDatosBancarios(datos).length === 0){
+    errorEl.textContent = 'Cargue al menos un dato antes de compartir.';
+    errorEl.style.display = 'block';
+    return;
+  }
+  const errorCbu = mensajeErrorCbu(datos);
+  if(errorCbu){
+    errorEl.textContent = errorCbu;
+    errorEl.style.display = 'block';
+    return;
+  }
+  enviarTextoDatosBancarios(armarMensajeDatosBancarios(null, datos), modo);
+}
+
+// desde un pedido (confirmacion o historial): comparte lo guardado, con el numero y el total del pedido
+function compartirDatosBancarios(orden, modo){
+  if(datosBancarios === null){
+    alert('Todavía se están cargando los datos bancarios. Intente de nuevo en unos segundos.');
+    cargarDatosBancarios();
+    return;
+  }
+  if(!hayDatosBancarios()){
+    alert('Todavía no cargó sus datos bancarios. Se los abro para que los cargue.');
+    abrirDatosBancarios();
+    return;
+  }
+  enviarTextoDatosBancarios(armarMensajeDatosBancarios(orden, datosBancarios), modo);
+}
+
 async function guardarDatosBancarios(){
   const errorEl = document.getElementById('bk-error');
   errorEl.style.display = 'none';
   const datos = leerCamposBancarios();
-  if(datos.cbu && !/^\d{22}$/.test(datos.cbu)){
-    errorEl.textContent = 'El CBU/CVU tiene que tener exactamente 22 dígitos (tiene ' + datos.cbu.length + '). Revíselo antes de guardar, porque es el dato que van a usar sus clientes para transferir.';
+  const errorCbu = mensajeErrorCbu(datos);
+  if(errorCbu){
+    errorEl.textContent = errorCbu;
     errorEl.style.display = 'block';
     return;
   }
@@ -2702,6 +2769,7 @@ function renderHistorial(filtro){
             <button class="btn-mini" onclick="event.stopPropagation(); reenviarEmailHistorial('${p.numero}')">📧 Reenviar email</button>
             <button class="btn-mini" onclick="event.stopPropagation(); compartirHistorial('${p.numero}')">📤 Compartir</button>
             <button class="btn-mini" onclick="event.stopPropagation(); imprimirHistorial('${p.numero}')">🖨️ Imprimir</button>
+            <button class="btn-mini" onclick="event.stopPropagation(); compartirDatosBancarios(ordenDesdeHistorial('${p.numero}'), 'whatsapp')">🏦 Datos bancarios</button>
             <button class="btn-mini" onclick="event.stopPropagation(); mostrarEdicionHistorial('${p.numero}')">✏️ Modificar</button>
             <button class="btn-mini" style="background:#A6432F;color:#fff;border-color:#A6432F;" onclick="event.stopPropagation(); cancelarPedidoHistorial('${p.numero}')">❌ Cancelar pedido</button>
           </div>
