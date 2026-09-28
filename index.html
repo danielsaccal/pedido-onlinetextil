@@ -5616,6 +5616,7 @@ function renderGaleriaFoto(ci, pi, producto){
       ${videos.length === 0 ? '<p class="note">Todavía no hay ningún link cargado.</p>' : videos.map((v, i) => `
         <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);">
           <a href="${v.url}" target="_blank" style="flex:1;color:var(--purple);text-decoration:underline;word-break:break-all;">${v.nota || v.url}</a>
+          <button type="button" onclick="compartirVideoLink('${escapeAttr(producto.nombre)}', ${JSON.stringify(v.url)}, ${JSON.stringify(v.nota||'')})" style="background:var(--gold);color:var(--purple);border:none;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:0.85rem;flex-shrink:0;">📤</button>
           <button type="button" onclick="eliminarVideoLink(${ci},${pi},${i})" style="background:#B5453A;color:#fff;border:none;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:0.8rem;flex-shrink:0;">×</button>
         </div>
       `).join('')}
@@ -5624,6 +5625,11 @@ function renderGaleriaFoto(ci, pi, producto){
     <div class="field"><label>Nota (opcional, ej: "video del proveedor")</label><input type="text" id="fs-video-nota" placeholder="Opcional"></div>
     <button class="btn-mini" onclick="agregarVideoLink(${ci}, ${pi})">Agregar link de video</button>
   `;
+}
+
+function compartirVideoLink(nombreProducto, url, nota){
+  const texto = 'Hola! Te paso el video de ' + nombreProducto + (nota ? ' (' + nota + ')' : '') + ':\n' + url;
+  window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
 }
 
 async function agregarVideoLink(ci, pi){
