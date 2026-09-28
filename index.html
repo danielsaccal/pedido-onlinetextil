@@ -909,8 +909,15 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
         <select id="am-categoria"><option value="">Todas las categorías</option></select>
       </div>
       <div class="field"><label>El título contiene</label><input type="text" id="am-titulo" placeholder="Ej: sábana"></div>
-      <div class="field"><label>El SKU contiene</label><input type="text" id="am-sku" placeholder="Ej: TOA"></div>
+      <div class="field">
+        <label>El SKU</label>
+        <div style="display:flex;gap:8px;">
+          <select id="am-sku-modo" style="max-width:150px;"><option value="contiene">contiene</option><option value="empieza">empieza con</option></select>
+          <input type="text" id="am-sku" placeholder="Ej: ALD" style="flex:1;">
+        </div>
+      </div>
       <div class="field"><label>O elija SKU puntuales (separados por coma)</label><textarea id="am-skus-puntuales" rows="2" placeholder="Ej: TOA100, TOA200, SAB050" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:'Work Sans';"></textarea></div>
+      <div class="field"><label>Excepto estos SKU (separados por coma)</label><textarea id="am-skus-excluidos" rows="2" placeholder="Ej: ALD106, ALD108" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:'Work Sans';"></textarea></div>
       <div class="field" style="max-width:180px;">
         <label>% de aumento</label>
         <input type="number" id="am-porcentaje" step="0.01" placeholder="Ej: 8 (o -5 para bajar)">
@@ -919,6 +926,11 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
       <div class="actions"><button class="btn btn-gold" onclick="previsualizarAumentoMasivo()">Ver qué va a cambiar</button></div>
       <p class="error" id="am-error" style="display:none;"></p>
       <div id="am-preview" style="margin-top:16px;"></div>
+
+      <p class="ni-seccion-tit" style="margin-top:24px;">Revisión de precios</p>
+      <p class="note" style="margin-bottom:10px;">Busca en el catálogo precios guardados con un formato que hace que se vean multiplicados por 10 o por 100.</p>
+      <button class="btn-mini" onclick="revisarPreciosConFormatoRoto()">🔍 Revisar los precios del catálogo</button>
+      <div id="am-revision" style="margin-top:12px;"></div>
 
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
@@ -4553,9 +4565,12 @@ function abrirAumentoMasivo(){
   mostrarPaso('step-aumento-masivo');
   document.getElementById('am-titulo').value = '';
   document.getElementById('am-sku').value = '';
+  document.getElementById('am-sku-modo').value = 'contiene';
   document.getElementById('am-skus-puntuales').value = '';
+  document.getElementById('am-skus-excluidos').value = '';
   document.getElementById('am-porcentaje').value = '';
   document.getElementById('am-preview').innerHTML = '';
+  document.getElementById('am-revision').innerHTML = '';
   document.getElementById('am-error').style.display = 'none';
   matchesAumentoMasivo = null;
 
@@ -4570,11 +4585,23 @@ function abrirAumentoMasivo(){
   }
 }
 
+// separa por coma, salto de linea o punto y coma (no por espacio: hay SKU con espacios, como "ALD305 x 5")
+function listaDeSkus(texto){
+  return String(texto || '').split(/[,\n;]+/).map(x => x.trim().toLowerCase()).filter(Boolean);
+}
+
+function todosLosSkusDelCatalogo(){
+  const todos = new Set();
+  CATALOGO.forEach(cat => cat.productos.forEach(prod => prod.variantes.forEach(v => todos.add(String(v.sku).toLowerCase()))));
+  return todos;
+}
+
 function previsualizarAumentoMasivo(){
   const errorEl = document.getElementById('am-error');
   const previewEl = document.getElementById('am-preview');
   errorEl.style.display = 'none';
   previewEl.innerHTML = '';
+  matchesAumentoMasivo = null;
 
   const pct = parseFloat(document.getElementById('am-porcentaje').value);
   if(isNaN(pct) || pct === 0){ errorEl.textContent = 'Cargue un % de aumento distinto de 0.'; errorEl.style.display = 'block'; return; }
@@ -4582,49 +4609,70 @@ function previsualizarAumentoMasivo(){
   const categoriaFiltro = document.getElementById('am-categoria').value;
   const tituloFiltro = document.getElementById('am-titulo').value.trim().toLowerCase();
   const skuFiltro = document.getElementById('am-sku').value.trim().toLowerCase();
-  const skusPuntuales = document.getElementById('am-skus-puntuales').value
-    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  const skuEmpieza = document.getElementById('am-sku-modo').value === 'empieza';
+  const skusPuntuales = listaDeSkus(document.getElementById('am-skus-puntuales').value);
+  const skusExcluidos = listaDeSkus(document.getElementById('am-skus-excluidos').value);
 
-  const matches = [];
+  // proteccion: un SKU a excluir mal escrito no se excluiria, y su precio subiria igual sin que se note
+  const existentes = todosLosSkusDelCatalogo();
+  const excluidosInexistentes = skusExcluidos.filter(x => !existentes.has(x));
+  if(excluidosInexistentes.length > 0){
+    errorEl.textContent = 'No encontré estos SKU para excluir: ' + excluidosInexistentes.join(', ') +
+      '. No sigo hasta que los corrija: si están mal escritos, su precio subiría igual.';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  const candidatos = [];
   const skusEncontrados = new Set();
   CATALOGO.forEach(cat => {
     if(categoriaFiltro && cat.categoria !== categoriaFiltro) return;
     cat.productos.forEach(prod => {
       if(tituloFiltro && !prod.nombre.toLowerCase().includes(tituloFiltro)) return;
       prod.variantes.forEach(v => {
-        if(skuFiltro && !v.sku.toLowerCase().includes(skuFiltro)) return;
+        const skuMin = String(v.sku).toLowerCase();
+        if(skuFiltro && !(skuEmpieza ? skuMin.startsWith(skuFiltro) : skuMin.includes(skuFiltro))) return;
         if(skusPuntuales.length > 0){
-          if(!skusPuntuales.includes(v.sku.toLowerCase())) return;
-          skusEncontrados.add(v.sku.toLowerCase());
+          if(!skusPuntuales.includes(skuMin)) return;
+          skusEncontrados.add(skuMin);
         }
         const precioViejo = parsePrice(v.precio);
         if(precioViejo === null) return; // "Consultar", no tiene precio numerico
         const precioNuevo = Math.round(precioViejo * (1 + pct/100) * 100) / 100;
-        matches.push({ producto: prod, variante: v, precioViejo, precioNuevo });
+        candidatos.push({ producto: prod, variante: v, precioViejo, precioNuevo });
       });
     });
   });
 
+  const excluidosSet = new Set(skusExcluidos);
+  const matches = candidatos.filter(m => !excluidosSet.has(String(m.variante.sku).toLowerCase()));
+  const excluidosAplicados = candidatos.filter(m => excluidosSet.has(String(m.variante.sku).toLowerCase())).map(m => m.variante.sku);
+  const excluidosSinEfecto = skusExcluidos.filter(x => !candidatos.some(m => String(m.variante.sku).toLowerCase() === x));
+
   matchesAumentoMasivo = matches;
 
-  const skusNoEncontrados = skusPuntuales.filter(s => !skusEncontrados.has(s));
+  const skusNoEncontrados = skusPuntuales.filter(x => !skusEncontrados.has(x));
   if(skusNoEncontrados.length > 0){
     errorEl.textContent = 'No encontré estos SKU: ' + skusNoEncontrados.join(', ') + ' (revise que estén bien escritos).';
     errorEl.style.display = 'block';
   }
 
+  const notaExcluidos = (excluidosAplicados.length ? `<p class="note" style="margin-bottom:8px;">🚫 No van a cambiar (excluidos): <b>${excluidosAplicados.join(', ')}</b></p>` : '') +
+    (excluidosSinEfecto.length ? `<p class="note" style="margin-bottom:8px;">ℹ️ Estos SKU que pidió excluir no iban a cambiar de todos modos (no coinciden con los filtros o no tienen precio): ${excluidosSinEfecto.join(', ')}</p>` : '');
+
   if(matches.length === 0){
-    previewEl.innerHTML = '<p class="empty-msg">No hay ningún producto que coincida con esos filtros.</p>';
+    previewEl.innerHTML = notaExcluidos + '<p class="empty-msg">No hay ningún producto que coincida con esos filtros.</p>';
     return;
   }
 
   previewEl.innerHTML = `
+    ${notaExcluidos}
     <p class="note" style="margin-bottom:10px;">${matches.length} variante(s) van a cambiar:</p>
     <div style="max-height:300px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;margin-bottom:14px;">
       ${matches.map(m => `
         <div style="padding:8px 10px;border-bottom:1px solid var(--line);font-size:0.82rem;">
           <b>${m.variante.sku}</b> — ${m.producto.nombre} ${m.variante.desc}<br>
-          <span style="color:#8A8072;">$ ${m.precioViejo}</span> → <span style="color:var(--purple);font-weight:700;">$ ${m.precioNuevo}</span>
+          <span style="color:#8A8072;">${formatPrice(m.precioViejo)}</span> → <span style="color:var(--purple);font-weight:700;">${formatPrice(m.precioNuevo)}</span>
         </div>
       `).join('')}
     </div>
@@ -4644,12 +4692,14 @@ async function aplicarAumentoMasivo(){
     porProducto.get(m.producto).push(m);
   });
 
-  let actualizados = 0;
+  let productosGuardados = 0, variantesActualizadas = 0;
+  const fallidos = [];
   for(const [producto, cambios] of porProducto){
-    cambios.forEach(c => {
-      registrarCambioPrecio(c.variante.sku, c.precioViejo, c.precioNuevo);
-      c.variante.precio = String(c.precioNuevo);
-    });
+    // el precio se guarda en formato argentino ("11.168,80"), igual que la importacion por Excel:
+    // con String(numero) quedaria "11168.8" y el catalogo lo leeria diez veces mas caro
+    const anteriores = cambios.map(c => c.variante.precio);
+    const nuevos = cambios.map(c => normalizarPrecioAArgentino(c.precioNuevo));
+    cambios.forEach((c, i) => { c.variante.precio = nuevos[i]; });
     try{
       if(producto._editKey && producto._editKey.startsWith('nuevo-')){
         await db.collection('productos_nuevos').doc(producto._docId).update({ variantes: producto.variantes });
@@ -4659,15 +4709,99 @@ async function aplicarAumentoMasivo(){
           variantes: producto.variantes, metros: producto.metros || null
         }, { merge: true });
       }
-      actualizados++;
+      cambios.forEach((c, i) => registrarCambioPrecio(c.variante.sku, anteriores[i], nuevos[i]));
+      productosGuardados++;
+      variantesActualizadas += cambios.length;
     } catch(e){
       console.error('Error actualizando producto', producto.nombre, e);
+      cambios.forEach((c, i) => { c.variante.precio = anteriores[i]; }); // no se guardo: vuelve al precio de antes
+      fallidos.push(producto.nombre);
     }
   }
 
-  alert('Se actualizaron ' + matchesAumentoMasivo.length + ' variante(s) en ' + actualizados + ' de ' + porProducto.size + ' producto(s).');
+  if(fallidos.length > 0){
+    alert('Se actualizaron ' + variantesActualizadas + ' variante(s) en ' + productosGuardados + ' de ' + porProducto.size + ' producto(s).\n\nNO se pudieron guardar (siguen con el precio de antes): ' + fallidos.join(', ') + '.\nVuelva a intentarlo.');
+  } else {
+    alert('Se actualizaron ' + variantesActualizadas + ' variante(s) en ' + productosGuardados + ' producto(s).');
+  }
   renderCatalogo(document.getElementById('buscador').value);
   abrirAumentoMasivo();
+}
+
+// ---------- revision de precios guardados con formato roto ----------
+// un precio guardado como "11168.8" (punto + 1 o 2 decimales) el catalogo lo lee como 111.688
+function esPrecioConFormatoRoto(precio){
+  return typeof precio === 'string' && /^\d+\.\d{1,2}$/.test(precio.trim());
+}
+
+let preciosRotosDetectados = null;
+
+function revisarPreciosConFormatoRoto(){
+  const cont = document.getElementById('am-revision');
+  const encontrados = [];
+  CATALOGO.forEach(cat => cat.productos.forEach(prod => prod.variantes.forEach(v => {
+    if(esPrecioConFormatoRoto(v.precio)){
+      encontrados.push({ producto: prod, variante: v, actual: v.precio, corregido: normalizarPrecioAArgentino(parseFloat(v.precio)) });
+    }
+  })));
+  preciosRotosDetectados = encontrados;
+
+  if(encontrados.length === 0){
+    cont.innerHTML = '<p class="note">✓ No encontré ningún precio con ese problema. El catálogo está bien.</p>';
+    return;
+  }
+  cont.innerHTML = `
+    <p class="note" style="margin-bottom:8px;color:#A6432F;"><b>Encontré ${encontrados.length} precio(s) mal guardados.</b> Hoy el catálogo los muestra multiplicados por 10 o por 100:</p>
+    <div style="max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;margin-bottom:12px;">
+      ${encontrados.map(x => `
+        <div style="padding:8px 10px;border-bottom:1px solid var(--line);font-size:0.82rem;">
+          <b>${x.variante.sku}</b> — ${x.producto.nombre}<br>
+          <span style="color:#A6432F;">hoy se ve: ${formatPrice(parsePrice(x.actual))}</span> → <span style="color:var(--purple);font-weight:700;">debería ser: ${formatPrice(parseFloat(x.actual))}</span>
+        </div>
+      `).join('')}
+    </div>
+    <div class="actions"><button class="btn btn-gold" id="am-btn-corregir" onclick="corregirPreciosConFormatoRoto()">Corregir estos ${encontrados.length} precios</button></div>
+  `;
+}
+
+async function corregirPreciosConFormatoRoto(){
+  if(!preciosRotosDetectados || preciosRotosDetectados.length === 0) return;
+  const btn = document.getElementById('am-btn-corregir');
+  if(btn){ btn.disabled = true; btn.textContent = 'Corrigiendo...'; }
+
+  const porProducto = new Map();
+  preciosRotosDetectados.forEach(x => {
+    if(!porProducto.has(x.producto)) porProducto.set(x.producto, []);
+    porProducto.get(x.producto).push(x);
+  });
+
+  let productosGuardados = 0, preciosCorregidos = 0;
+  const fallidos = [];
+  for(const [producto, items] of porProducto){
+    items.forEach(x => { x.variante.precio = x.corregido; });
+    try{
+      if(producto._editKey && producto._editKey.startsWith('nuevo-')){
+        await db.collection('productos_nuevos').doc(producto._docId).update({ variantes: producto.variantes });
+      } else {
+        await db.collection('productos_editados').doc(producto._editKey).set({
+          nombre: producto.nombre, composicion: producto.composicion,
+          variantes: producto.variantes, metros: producto.metros || null
+        }, { merge: true });
+      }
+      productosGuardados++;
+      preciosCorregidos += items.length;
+    } catch(e){
+      console.error('Error corrigiendo producto', producto.nombre, e);
+      items.forEach(x => { x.variante.precio = x.actual; });
+      fallidos.push(producto.nombre);
+    }
+  }
+
+  alert(fallidos.length
+    ? 'Se corrigieron ' + preciosCorregidos + ' precio(s). NO se pudieron guardar: ' + fallidos.join(', ') + '. Vuelva a intentarlo.'
+    : 'Se corrigieron ' + preciosCorregidos + ' precio(s) en ' + productosGuardados + ' producto(s).');
+  renderCatalogo(document.getElementById('buscador').value);
+  revisarPreciosConFormatoRoto();
 }
 
 function abrirImportarExcel(){
