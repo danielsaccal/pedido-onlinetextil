@@ -196,6 +196,8 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 .ig-mockup-tabs{display:flex;justify-content:space-around;border-top:1px solid var(--line);padding:8px 0;font-size:1.1rem;color:#000;}
 .ig-mockup-tabs span:first-child{border-bottom:2px solid #000;padding-bottom:6px;}
 .grilla-celda img{width:100%;height:100%;object-fit:cover;display:block;}
+.ig-mockup .grilla-ig{gap:2px;}
+.ig-mockup .grilla-celda{aspect-ratio:3/4;}
 a.grilla-celda{display:block;}
 .ig-marca-tipo{position:absolute;top:4px;right:6px;color:#fff;font-size:0.8rem;text-shadow:0 0 3px rgba(0,0,0,0.7);pointer-events:none;}
 .grilla-celda .quitar{
@@ -1124,7 +1126,7 @@ a.grilla-celda{display:block;}
   <div class="step" id="step-grilla">
     <div class="form-card">
       <h2>Vista previa de grilla IG</h2>
-      <p class="note" style="margin-bottom:14px;">Cada vez que genera una pieza para redes, puede sumarla acá con "+ Agregar a grilla". Use las flechas ◀▶ de cada foto para reordenarlas.</p>
+      <p class="note" style="margin-bottom:14px;">Arriba ve cómo quedaría su perfil de Instagram: primero las piezas que va agregando y después lo que ya está publicado. Abajo puede reordenarlas con ◀▶ o quitarlas con ✕, y el perfil se actualiza al instante.</p>
       <button class="btn-mini" onclick="abrirPerfilIG()" style="margin-bottom:12px;">⚙️ Configurar datos del perfil</button>
       <div id="ig-mockup-cont"></div>
       <div id="grilla-cont" class="grilla-ig"></div>
@@ -7368,7 +7370,7 @@ function agregarAGrilla(dataUrl, nombre){
   const items = leerGrilla();
   items.unshift({dataUrl, nombre, id: Date.now() + '-' + Math.random().toString(36).slice(2)});
   guardarGrilla(items);
-  alert('Agregada a la grilla. Podés verla en "Vista previa de grilla IG".');
+  if(confirm('Agregada a la grilla. ¿Quiere ver ahora cómo queda en el perfil de Instagram?')) abrirGrilla();
 }
 function quitarDeGrilla(id){
   guardarGrilla(leerGrilla().filter(it => it.id !== id));
@@ -7384,6 +7386,7 @@ function renderGrilla(){
   const items = leerGrilla();
   if(items.length === 0){
     cont.innerHTML = '<p class="grilla-vacia">Todavía no agregó ninguna pieza. Genere un posteo o pieza minimalista y toque "+ Agregar a grilla".</p>';
+    refrescarMockupGrilla();
     return;
   }
   const totalCasilleros = Math.max(9, Math.ceil(items.length/3)*3);
@@ -7403,6 +7406,15 @@ function renderGrilla(){
     html += `<div class="grilla-celda grilla-celda-vacia"></div>`;
   }
   cont.innerHTML = html;
+  refrescarMockupGrilla();
+}
+
+// vuelve a dibujar el perfil simulado con las piezas actuales (se llama cada vez que se agrega, quita o mueve algo)
+let perfilEfectivoIG = null;
+function refrescarMockupGrilla(){
+  const contMockup = document.getElementById('ig-mockup-cont');
+  if(!contMockup || !perfilEfectivoIG || !perfilEfectivoIG.usuario) return;
+  contMockup.innerHTML = renderMockupIG(perfilEfectivoIG, true);
 }
 function moverEnGrilla(idx, direccion){
   const items = leerGrilla();
@@ -7896,6 +7908,7 @@ async function abrirGrilla(){
     };
   }
 
+  perfilEfectivoIG = perfilEfectivo;
   const contMockup = document.getElementById('ig-mockup-cont');
   if(perfilEfectivo && perfilEfectivo.usuario){
     contMockup.innerHTML = renderMockupIG(perfilEfectivo, true);
