@@ -435,7 +435,6 @@ a.grilla-celda{display:block;}
         <div class="menu-cat-body">
           <span class="menu-item" onclick="abrirNuevoIngreso()">🖼️ Nuevo ingreso (flyers, video)</span>
           <span class="menu-item" onclick="abrirGrilla()">📱 Vista previa de grilla IG</span>
-          <span class="menu-item" onclick="abrirRompecabezas()">🧩 Rompecabezas para grilla</span>
           <span class="menu-item" onclick="abrirAnuncio()">📣 Anuncios y promociones</span>
         </div>
       </div>
@@ -1163,28 +1162,6 @@ a.grilla-celda{display:block;}
       <div class="actions" style="margin-top:14px;">
         <button class="btn btn-gold" onclick="guardarPerfilIG()">Guardar</button>
         <button class="btn btn-ghost" onclick="abrirGrilla()">Ver grilla completa</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- STEP: ROMPECABEZAS PARA GRILLA -->
-  <div class="step" id="step-rompecabezas">
-    <div class="form-card">
-      <h2>Rompecabezas para grilla</h2>
-      <p class="note" style="margin-bottom:14px;">Corta la foto de un producto en 2 o 3 partes. Publicadas una al lado de la otra, en ese orden, forman una sola imagen continua en la grilla.</p>
-      <div class="field"><label>SKU</label><input type="text" id="rp-sku" placeholder="Ej: TOA171B"></div>
-      <div class="field">
-        <label>Partes</label>
-        <div class="ni-chips">
-          <label class="ni-chip"><input type="radio" name="rp-partes" value="3" checked><span>3 (tríptico)</span></label>
-          <label class="ni-chip"><input type="radio" name="rp-partes" value="2"><span>2</span></label>
-        </div>
-      </div>
-      <div class="actions"><button class="btn btn-gold" onclick="generarRompecabezas()">Generar</button></div>
-      <p class="error" id="rp-error" style="display:none;">No encontré ningún producto con ese SKU.</p>
-      <div id="rp-resultado" class="ni-resultado-grilla"></div>
-      <div class="actions" style="margin-top:14px;">
-        <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
       </div>
     </div>
   </div>
@@ -7424,7 +7401,6 @@ function moverEnGrilla(idx, direccion){
   guardarGrilla(items);
   renderGrilla();
 }
-// ---------- rompecabezas / triptico ----------
 // ---------- anuncios y promociones (sin producto puntual) ----------
 async function generarContenidoConIA(){
   const descripcion = document.getElementById('an-ia-desc').value.trim();
@@ -7535,131 +7511,6 @@ function generarAnuncio(){
     wrap.appendChild(acciones);
     cont.appendChild(wrap);
   });
-}
-
-function abrirRompecabezas(){
-  mostrarPaso('step-rompecabezas');
-  document.getElementById('rp-sku').value = '';
-  document.getElementById('rp-resultado').innerHTML = '';
-  document.getElementById('rp-error').style.display = 'none';
-}
-
-async function generarRompecabezas(){
-  const sku = document.getElementById('rp-sku').value.trim();
-  const partes = parseInt(document.querySelector('input[name="rp-partes"]:checked').value, 10);
-  const errorEl = document.getElementById('rp-error');
-  const cont = document.getElementById('rp-resultado');
-  errorEl.style.display = 'none';
-  if(!sku) return;
-
-  const match = buscarProductoPorSku(sku);
-  if(!match){
-    errorEl.style.display = 'block';
-    cont.innerHTML = '';
-    return;
-  }
-
-  cont.innerHTML = '<p class="note">Generando...</p>';
-  try{
-    const imgSrc = imagenEfectiva(match.ci, match.pi, match.producto);
-    const img = await cargarImagenParaCanvas(imgSrc);
-
-    // armar una tira ancha con la foto (cover) del tamaño de "partes" cuadrados juntos
-    const lado = 1080;
-    const tiraW = lado * partes;
-    const tira = document.createElement('canvas');
-    tira.width = tiraW; tira.height = lado;
-    const ctxTira = tira.getContext('2d');
-    ctxTira.fillStyle = '#FFFFFF'; ctxTira.fillRect(0,0,tiraW,lado);
-    const ratio = Math.max(tiraW / img.width, lado / img.height);
-    const nw = img.width * ratio, nh = img.height * ratio;
-    ctxTira.drawImage(img, (tiraW-nw)/2, (lado-nh)/2, nw, nh);
-
-    // cortar en partes cuadradas, en orden de izquierda a derecha
-    const piezas = [];
-    for(let i=0;i<partes;i++){
-      const recorte = document.createElement('canvas');
-      recorte.width = lado; recorte.height = lado;
-      recorte.getContext('2d').drawImage(tira, i*lado, 0, lado, lado, 0, 0, lado, lado);
-      piezas.push({canvas: recorte, nombre: 'rompecabezas_' + (i+1) + 'de' + partes + '_' + match.producto.nombre.replace(/\s+/g,'_') + '.png'});
-    }
-
-    cont.innerHTML = '';
-
-    const avisoOrden = document.createElement('p');
-    avisoOrden.className = 'note';
-    avisoOrden.style.cssText = 'grid-column:1/-1;flex:0 0 100%;background:var(--cream);padding:10px 12px;border-radius:8px;';
-    avisoOrden.innerHTML = '⚠️ Instagram muestra lo más nuevo primero, así que hay que subirlas <b>al revés</b> para que se lean bien de izquierda a derecha. Fíjese el número de paso en cada una.';
-    cont.appendChild(avisoOrden);
-
-    const copyTexto = generarCopyPosteo(match.producto, [{variante: match.variante}]);
-    const copyWrap = document.createElement('div');
-    copyWrap.className = 'ni-copy-wrap';
-    copyWrap.style.cssText = 'background:var(--cream);border-radius:10px;padding:12px;';
-    const copyLabel = document.createElement('p');
-    copyLabel.innerHTML = '<b>Copy (use el mismo texto en las ' + partes + ' partes):</b>';
-    copyLabel.style.cssText = 'font-size:0.85rem;margin-bottom:6px;';
-    const copyArea = document.createElement('textarea');
-    copyArea.value = copyTexto;
-    copyArea.readOnly = true;
-    copyArea.rows = 8;
-    copyArea.style.cssText = 'width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:\'Work Sans\';font-size:0.85rem;background:var(--white);margin-bottom:8px;';
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'btn-mini';
-    copyBtn.textContent = 'Copiar texto';
-    copyBtn.onclick = () => {
-      navigator.clipboard.writeText(copyTexto);
-      copyBtn.textContent = '¡Copiado!';
-      setTimeout(() => copyBtn.textContent = 'Copiar texto', 1500);
-    };
-    copyWrap.appendChild(copyLabel);
-    copyWrap.appendChild(copyArea);
-    copyWrap.appendChild(copyBtn);
-    cont.appendChild(copyWrap);
-
-    piezas.forEach((p, i) => {
-      const pasoSubida = partes - i; // se sube al reves: la parte de mas a la derecha va primero
-      const wrap = document.createElement('div');
-      wrap.className = 'ni-pieza';
-      const previewImg = document.createElement('img');
-      previewImg.src = p.canvas.toDataURL('image/png');
-      const label = document.createElement('p');
-      label.className = 'note';
-      label.innerHTML = `Parte ${i+1} de ${partes} (posición en la grilla)<br><b>Subir en el paso ${pasoSubida} de ${partes}</b>${pasoSubida===1 ? ' — primera que sube' : (pasoSubida===partes ? ' — última que sube' : '')}`;
-      const acciones = document.createElement('div');
-      acciones.className = 'ni-pieza-acciones';
-      const btn = document.createElement('button');
-      btn.className = 'btn-mini';
-      btn.textContent = 'Descargar';
-      btn.onclick = () => {
-        const a = document.createElement('a');
-        a.href = p.canvas.toDataURL('image/png');
-        a.download = p.nombre;
-        a.click();
-      };
-      acciones.appendChild(btn);
-      wrap.appendChild(previewImg);
-      wrap.appendChild(label);
-      wrap.appendChild(acciones);
-      cont.appendChild(wrap);
-    });
-
-    const btnTodos = document.createElement('button');
-    btnTodos.className = 'btn btn-gold';
-    btnTodos.style.cssText = 'margin-top:14px;';
-    btnTodos.textContent = 'Agregar las ' + partes + ' partes a la grilla, en orden';
-    btnTodos.onclick = () => {
-      const items = leerGrilla();
-      const nuevos = piezas.map(p => ({dataUrl: p.canvas.toDataURL('image/png'), nombre: p.nombre, id: Date.now() + '-' + Math.random().toString(36).slice(2)}));
-      items.unshift(...nuevos);
-      guardarGrilla(items);
-      alert('Se agregaron las ' + partes + ' partes, en orden, al principio de la grilla.');
-    };
-    cont.appendChild(btnTodos);
-  } catch(e){
-    cont.innerHTML = '';
-    alert('No se pudo generar el rompecabezas: ' + e.message);
-  }
 }
 
 // ---------- perfil de Instagram (para la vista previa de la grilla) ----------
