@@ -695,15 +695,16 @@ a.grilla-celda{display:block;}
           <label class="ni-chip"><input type="radio" name="ni-diseno" value="texto"><span>Solo texto</span></label>
         </div>
         <p class="note" style="margin-top:4px;">El diseño elegido arriba aplica a Story/Posteo/Reel. El carrusel siempre varía entre los 3 estilos, para que no se vea repetitivo.</p>
-        <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video" onchange="document.getElementById('ni-video-estilo-wrap').style.display=this.checked?'block':'none';"><span>🎬 Video simple (~5 seg)</span></label>
+        <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video" onchange="document.getElementById('ni-video-estilo-wrap').style.display=this.checked?'block':'none';"><span>🎬 Video para Reel / Historia (con efectos)</span></label>
         <div id="ni-video-estilo-wrap" style="display:none;margin:8px 0 0 26px;">
           <div class="ni-chips">
-            <label class="ni-chip"><input type="radio" name="ni-video-estilo" value="zoom" checked><span>Zoom (Ken Burns)</span></label>
-            <label class="ni-chip"><input type="radio" name="ni-video-estilo" value="paneo"><span>Paneo lateral</span></label>
-            <label class="ni-chip"><input type="radio" name="ni-video-estilo" value="zoom-paneo"><span>Zoom + paneo combinado</span></label>
-            <label class="ni-chip"><input type="radio" name="ni-video-estilo" value="dinamico"><span>✨ Dinámico (varias fotos + texto progresivo)</span></label>
+            <label class="ni-chip"><input type="radio" name="ni-video-estilo" value="pop" checked><span>✨ Aparecer y desaparecer</span></label>
+            <label class="ni-chip"><input type="radio" name="ni-video-estilo" value="impacto"><span>💥 Impacto (golpe de zoom + destello)</span></label>
+            <label class="ni-chip"><input type="radio" name="ni-video-estilo" value="deslizar"><span>➡️ Barrido lateral</span></label>
+            <label class="ni-chip"><input type="radio" name="ni-video-estilo" value="revelado"><span>⭕ Revelado (círculo / diagonal)</span></label>
+            <label class="ni-chip"><input type="radio" name="ni-video-estilo" value="suave"><span>🌙 Suave (zoom + paneo con fundido)</span></label>
           </div>
-          <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video-texto" checked><span>Incluir texto (nombre/composición) sobre el video</span></label>
+          <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video-texto" checked><span>Incluir texto (nombre, composición y cierre con la marca)</span></label>
         </div>
         <label class="ni-chip" style="margin-top:8px;display:inline-flex;"><input type="checkbox" id="ni-video-ia-reel"><span>🤖 Video con IA real para Reel</span></label>
         <p class="note" style="margin-top:4px;">Los de IA real tardan 1-2 minutos y tienen costo por uso (Google) — a diferencia de los de zoom/paneo, que son gratis e instantáneos.</p>
@@ -6279,34 +6280,35 @@ async function generarFlyersNuevoIngreso(){
       videoWrap.innerHTML = '<p class="note">Generando video (unos segundos)...</p>';
       cont.appendChild(videoWrap);
       try{
-        const estiloVideo = document.querySelector('input[name="ni-video-estilo"]:checked')?.value || 'zoom';
+        const estiloVideo = document.querySelector('input[name="ni-video-estilo"]:checked')?.value || 'pop';
         const mostrarTextoVideo = document.getElementById('ni-video-texto').checked;
-        const descVariantePrincipal = grupos[0].variantes && grupos[0].variantes[0] ? grupos[0].variantes[0].desc : '';
 
-        // si es un solo producto con varias fotos cargadas, armar diapositivas con TODAS sus fotos
-        // (mismo motor de zoom/paneo que ya cruza entre productos distintos, aca cruza entre fotos del mismo producto)
-        let gruposParaVideo = grupos;
-        if(estiloVideo === 'dinamico' && !esModoCategoria && grupos.length === 1){
-          const MAX_FOTOS_SLIDESHOW = 8; // mas que esto, el Reel se hace demasiado largo para que funcione bien
-          const fotosDelProducto = imagenesEfectivas(grupos[0].ci, grupos[0].pi, grupos[0].producto).slice(0, MAX_FOTOS_SLIDESHOW);
-          if(fotosDelProducto.length > 1){
-            gruposParaVideo = await Promise.all(fotosDelProducto.map(async (fotoUrl) => ({
-              ...grupos[0],
-              img: await cargarImagenParaCanvas(fotoUrl),
-            })));
+        // fotos del video: si es un solo producto, TODAS sus fotos (empezando por la elegida);
+        // si son varios productos, la foto de cada uno con su nombre como leyenda
+        let fotosVideo, opcionesVideo;
+        if(grupos.length === 1){
+          const g = grupos[0];
+          let urls = imagenesEfectivas(g.ci, g.pi, g.producto);
+          const elegida = fotoElegidaPorProducto[`${g.ci}-${g.pi}`] || 0;
+          if(elegida > 0 && elegida < urls.length) urls = [urls[elegida], ...urls.filter((_, k) => k !== elegida)];
+          urls = urls.slice(0, REEL_MAX_TOMAS);
+          if(urls.length > 1){
+            const cargadas = await Promise.allSettled(urls.map(u => cargarImagenParaCanvas(u)));
+            fotosVideo = cargadas.filter(r => r.status === 'fulfilled').map(r => r.value);
           }
+          if(!fotosVideo || !fotosVideo.length) fotosVideo = [g.img];
+          opcionesVideo = { estilo: estiloVideo, mostrarTexto: mostrarTextoVideo, titulo: g.producto.nombre, subtitulo: g.producto.composicion || '', etiqueta: textoAdicional || '' };
+        } else {
+          const gruposVideo = grupos.slice(0, REEL_MAX_TOMAS);
+          fotosVideo = gruposVideo.map(g => g.img);
+          opcionesVideo = { estilo: estiloVideo, mostrarTexto: mostrarTextoVideo, leyendas: gruposVideo.map(g => g.producto.nombre), etiqueta: (esModoCategoria ? nombreCategoriaFlyer : '') || textoAdicional || '' };
         }
 
-        // el limite de seguridad tiene que ser mayor a la duracion real del video (se graba en tiempo real);
-        // con pocas diapositivas 20s alcanza de sobra, pero con varias fotos el video mismo puede durar mas que eso
-        const segDurVideo = gruposParaVideo.length === 1 ? 5000 : 2600;
-        const limiteDinamico = Math.max(20000, gruposParaVideo.length * segDurVideo + 8000);
-
-        const blobVideo = estiloVideo === 'dinamico'
-          ? (esModoCategoria && grupos.length > 1
-              ? await conLimiteDeTiempo(generarVideoCategoria(grupos, nombreCategoriaFlyer, textoAdicional, 'violeta', mostrarTextoVideo), 30000, 'El video tardó demasiado y se canceló.')
-              : await conLimiteDeTiempo(generarVideoDinamico(gruposParaVideo, textoAdicional, 'violeta', mostrarTextoVideo), limiteDinamico, 'El video dinámico tardó demasiado y se canceló.'))
-          : await conLimiteDeTiempo(generarVideoKenBurns(producto, img, textoAdicional, 'violeta', estiloVideo, descVariantePrincipal, mostrarTextoVideo), 20000, 'El video tardó demasiado y se canceló.');
+        // se graba en tiempo real: el limite de seguridad tiene que superar la duracion del video
+        const tomasEstimadas = Math.max(4, fotosVideo.length);
+        const limiteVideo = duracionTotalReel(tomasEstimadas, estiloVideo, mostrarTextoVideo) + 15000;
+        videoWrap.innerHTML = '<p class="note">Generando video (' + Math.round(limiteVideo/1000 - 15) + ' segundos aprox.). No cambie de pestaña mientras se graba.</p>';
+        const blobVideo = await conLimiteDeTiempo(generarVideoReel(fotosVideo, opcionesVideo), limiteVideo, 'El video tardó demasiado y se canceló.');
         const urlVideo = URL.createObjectURL(blobVideo);
         const extVideo = blobVideo.type.includes('mp4') ? 'mp4' : 'webm';
         const nombreVideo = 'video_' + producto.nombre.replace(/\s+/g,'_') + '.' + extVideo;
@@ -6818,6 +6820,368 @@ function dibujarPiezaAnuncio(titulo, subtitulo, formato, paletaKey, tipografia, 
   ctx.fillText('onlinetextil.com.ar', W/2, H - bottomSafe - 20);
 
   return canvas;
+}
+
+// ---------- motor de video para Reels / Historias (efectos tipo editor: aparecer, impacto, barrido, revelado) ----------
+// Los cortes caen en tiempo a 120 BPM (medio segundo por pulso), que es el ritmo de la mayoria de los audios
+// de moda en Instagram: si al publicar se le agrega musica desde la app, los cambios de foto coinciden con el ritmo.
+const REEL_W = 1080, REEL_H = 1920, REEL_PULSO = 500, REEL_CIERRE_MS = 2200, REEL_MAX_TOMAS = 8;
+const ESTILOS_REEL = {
+  pop:      { pulsosPorToma: 4 },  // la foto aparece como tarjeta con rebote y desaparece
+  impacto:  { pulsosPorToma: 3 },  // golpe de zoom + destello + sacudida en cada corte
+  deslizar: { pulsosPorToma: 4 },  // barrido lateral rapido con estela de movimiento
+  revelado: { pulsosPorToma: 5 },  // la foto siguiente se descubre en circulo o en diagonal, con borde dorado
+  suave:    { pulsosPorToma: 6 },  // zoom + paneo lento con fundido (elegante, sin golpes)
+};
+const EASE_REEL = {
+  inOut: t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2,
+  out: t => 1 - Math.pow(1 - t, 3),
+  outExpo: t => t >= 1 ? 1 : 1 - Math.pow(2, -10*t),
+  outBack: t => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3*Math.pow(t - 1, 3) + c1*Math.pow(t - 1, 2); },
+  in: t => t*t*t,
+};
+const clampReel = v => Math.max(0, Math.min(1, v));
+
+function duracionTomaReel(estilo){ return (ESTILOS_REEL[estilo] || ESTILOS_REEL.pop).pulsosPorToma * REEL_PULSO; }
+
+// dibuja la imagen cubriendo todo el rectangulo, con zoom y un punto de foco (0-1), sin dejar bordes vacios
+function dibujarCubriendoReel(ctx, img, W, H, zoom, fx, fy, dx){
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const s = Math.max(W/iw, H/ih) * zoom;
+  const dw = iw*s, dh = ih*s;
+  let x = W/2 - fx*dw, y = H/2 - fy*dh;
+  x = Math.min(0, Math.max(W - dw, x));
+  y = Math.min(0, Math.max(H - dh, y));
+  ctx.drawImage(img, x + (dx || 0), y, dw, dh);
+}
+
+// fondo difuminado compatible con todos los navegadores (incluido Safari): achicar mucho y volver a agrandar
+function fondoDifuminadoReel(img){
+  const chico = document.createElement('canvas'); chico.width = 27; chico.height = 48;
+  dibujarCubriendoReel(chico.getContext('2d'), img, 27, 48, 1, .5, .5);
+  // agrandar de a pasos: cada paso suaviza el anterior y evita que se noten los cuadraditos
+  let previo = chico;
+  [[54, 96], [135, 240], [270, 480]].forEach(([w, h]) => {
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const cx = c.getContext('2d'); cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high';
+    if(w === 270) cx.filter = 'blur(6px)'; // donde el navegador lo soporta, suaviza todavia mas
+    cx.drawImage(previo, 0, 0, w, h);
+    previo = c;
+  });
+  return previo;
+}
+
+function trazarRectRedondeadoReel(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function partirLineasReel(ctx, texto, anchoMax, maxLineas){
+  const palabras = String(texto || '').split(/\s+/).filter(Boolean);
+  const lineas = []; let actual = '';
+  palabras.forEach(p => {
+    const prueba = actual ? actual + ' ' + p : p;
+    if(ctx.measureText(prueba).width > anchoMax && actual){ lineas.push(actual); actual = p; }
+    else actual = prueba;
+  });
+  if(actual) lineas.push(actual);
+  if(lineas.length > maxLineas){
+    const recortadas = lineas.slice(0, maxLineas);
+    let ultima = recortadas[maxLineas - 1];
+    while(ctx.measureText(ultima + '…').width > anchoMax && ultima.length > 1) ultima = ultima.slice(0, -1);
+    recortadas[maxLineas - 1] = ultima.trim() + '…';
+    return recortadas;
+  }
+  return lineas;
+}
+
+// arma la secuencia de tomas: una por foto; con pocas fotos suma acercamientos a distintas zonas (parecen tomas distintas)
+function armarTomasReel(fotos, leyendas){
+  const bases = fotos.slice(0, REEL_MAX_TOMAS).map((img, i) => ({ img, fondo: fondoDifuminadoReel(img), leyenda: leyendas ? (leyendas[i] || '') : '' }));
+  const tomas = bases.map(b => ({ ...b, detalle: false }));
+  const zonas = [{fx:.32, fy:.42}, {fx:.68, fy:.58}, {fx:.5, fy:.35}];
+  let k = 0;
+  while(tomas.length < 4 && bases.length){
+    const b = bases[k % bases.length], z = zonas[k % zonas.length];
+    tomas.push({ ...b, detalle: true, zfx: z.fx, zfy: z.fy, leyenda: '' });
+    k++;
+  }
+  return tomas.map((t, i) => {
+    const dir = i % 2 === 0 ? 1 : -1;               // alterna la direccion del paneo entre tomas: da ritmo
+    const cx = t.detalle ? t.zfx : .5, zb = t.detalle ? 1.55 : 1;
+    return { ...t, dir, fx0: cx - .12*dir, fx1: cx + .12*dir, fy: t.detalle ? t.zfy : .5,
+             z0: zb * (dir > 0 ? 1 : 1.12), z1: zb * (dir > 0 ? 1.12 : 1) };
+  });
+}
+
+// contenido de pantalla completa de una toma (zoom + paneo lateral continuo)
+function dibujarTomaCompletaReel(ctx, t, p, zoomExtra, dx){
+  const e = EASE_REEL.inOut(clampReel(p));
+  dibujarCubriendoReel(ctx, t.img, REEL_W, REEL_H, (t.z0 + (t.z1 - t.z0)*e) * (zoomExtra || 1), t.fx0 + (t.fx1 - t.fx0)*e, t.fy, dx);
+}
+
+// estilo "pop": fondo difuminado + la foto como tarjeta que aparece con rebote, flota y desaparece
+function geometriaTarjetaReel(t){
+  const iw = t.img.naturalWidth || t.img.width, ih = t.img.naturalHeight || t.img.height;
+  const cw = 800, ch = Math.min(900, Math.max(600, cw * ih / iw));
+  return { cw, ch, cx: REEL_W/2, cy: REEL_H*0.42 };
+}
+function dibujarTarjetaReel(ctx, t, p, escala, alfa, rot, dy){
+  if(alfa <= 0.001) return;
+  const g = geometriaTarjetaReel(t);
+  const e = EASE_REEL.inOut(clampReel(p));
+  ctx.save();
+  ctx.globalAlpha = alfa;
+  ctx.translate(g.cx, g.cy + (dy || 0));
+  ctx.rotate(rot || 0);
+  ctx.scale(escala, escala);
+  ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 50; ctx.shadowOffsetY = 18;
+  trazarRectRedondeadoReel(ctx, -g.cw/2, -g.ch/2, g.cw, g.ch, 34);
+  ctx.fillStyle = '#F5F3EF'; ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.clip();
+  ctx.translate(-g.cw/2, -g.ch/2);
+  dibujarCubriendoReel(ctx, t.img, g.cw, g.ch, t.z0 + (t.z1 - t.z0)*e, t.fx0 + (t.fx1 - t.fx0)*e*0.6, t.fy);
+  ctx.restore();
+}
+
+function dibujarTextosReel(ctx, tms, tomaIdx, local, D, t, opciones){
+  const P = PALETAS.violeta;
+  const esPop = opciones.estilo === 'pop';
+  const baseY = esPop ? Math.min(REEL_H - 470, REEL_H*0.42 + geometriaTarjetaReel(t).ch/2 + 190) : REEL_H - 470;
+
+  // etiqueta arriba (texto adicional o rubro), siempre visible salvo en el cierre
+  if(opciones.etiqueta && String(opciones.etiqueta).length <= 34){ // textos largos no entran en la etiqueta: se omiten
+    const a = EASE_REEL.out(clampReel((tms - 150) / 400));
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.font = "700 34px 'Work Sans'";
+    const txt = String(opciones.etiqueta).toUpperCase();
+    const w = ctx.measureText(txt).width + 64;
+    trazarRectRedondeadoReel(ctx, (REEL_W - w)/2, 190 - (1 - a)*30, w, 72, 36);
+    ctx.fillStyle = P.badgeBg; ctx.fill();
+    ctx.fillStyle = P.badgeText; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, REEL_W/2, 226 - (1 - a)*30);
+    ctx.restore();
+  }
+
+  let titulo = '', sub = '', ta = 0, aparicion = 0;
+  if(opciones.leyendas){
+    titulo = t.leyenda;
+    ta = Math.min(clampReel((local - 180) / 260), clampReel((D - 150 - local) / 200));
+    aparicion = EASE_REEL.out(clampReel((local - 180) / 380));
+  } else if(opciones.titulo){
+    titulo = opciones.titulo; sub = opciones.subtitulo || '';
+    ta = Math.min(clampReel((tms - 300) / 350), clampReel((3400 - tms) / 400));
+    aparicion = EASE_REEL.out(clampReel((tms - 300) / 500));
+  }
+  if(!titulo || ta <= 0.001) return;
+
+  ctx.save();
+  if(!esPop){
+    const grad = ctx.createLinearGradient(0, baseY - 360, 0, REEL_H);
+    grad.addColorStop(0, 'rgba(20,12,28,0)'); grad.addColorStop(0.45, 'rgba(20,12,28,0.55)'); grad.addColorStop(1, 'rgba(20,12,28,0.8)');
+    ctx.globalAlpha = ta; ctx.fillStyle = grad; ctx.fillRect(0, baseY - 360, REEL_W, REEL_H - baseY + 360);
+  }
+  ctx.globalAlpha = ta;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.font = (esPop ? "600 66px" : "600 76px") + " 'Fraunces'";
+  const lineas = partirLineasReel(ctx, titulo, 920, 2);
+  ctx.font = "500 36px 'Work Sans'";
+  const lineasSub = sub ? partirLineasReel(ctx, sub, 900, 1) : [];
+  const altoTitulo = lineas.length * (esPop ? 76 : 86);
+  const altoTotal = altoTitulo + (lineasSub.length ? 60 : 0);
+  let y = baseY - altoTotal + (1 - aparicion) * 50;
+
+  // linea dorada que crece
+  ctx.fillStyle = P.accent;
+  const anchoLinea = 140 * aparicion;
+  ctx.fillRect(REEL_W/2 - anchoLinea/2, y - 34, anchoLinea, 6);
+
+  ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 16;
+  ctx.fillStyle = P.texto;
+  ctx.font = (esPop ? "600 66px" : "600 76px") + " 'Fraunces'";
+  lineas.forEach((l, i) => ctx.fillText(l, REEL_W/2, y + (i + 1) * (esPop ? 76 : 86) - 14));
+  if(lineasSub.length){
+    ctx.font = "500 36px 'Work Sans'"; ctx.fillStyle = P.textoSub;
+    ctx.fillText(lineasSub[0], REEL_W/2, y + altoTitulo + 48);
+  }
+  ctx.restore();
+}
+
+function dibujarCierreReel(ctx, q){
+  const P = PALETAS.violeta;
+  const grad = ctx.createRadialGradient(REEL_W/2, REEL_H*0.45, 60, REEL_W/2, REEL_H*0.45, REEL_H*0.7);
+  grad.addColorStop(0, '#54406A'); grad.addColorStop(1, P.bg);
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, REEL_W, REEL_H);
+  const e = EASE_REEL.outBack(clampReel((q*REEL_CIERRE_MS - 250) / 600));
+  const a = clampReel((q*REEL_CIERRE_MS - 250) / 300);
+  ctx.save();
+  ctx.globalAlpha = a; ctx.textAlign = 'center';
+  ctx.translate(REEL_W/2, REEL_H*0.44); ctx.scale(0.7 + 0.3*e, 0.7 + 0.3*e);
+  ctx.fillStyle = P.titulo; ctx.font = "600 118px 'Fraunces'";
+  ctx.fillText('OnLineTextil', 0, 0);
+  ctx.restore();
+  const a2 = EASE_REEL.out(clampReel((q*REEL_CIERRE_MS - 700) / 500));
+  ctx.save();
+  ctx.globalAlpha = a2; ctx.textAlign = 'center';
+  ctx.fillStyle = P.accent; const wl = 220*a2; ctx.fillRect(REEL_W/2 - wl/2, REEL_H*0.44 + 50, wl, 6);
+  ctx.fillStyle = P.texto; ctx.font = "500 40px 'Work Sans'";
+  ctx.fillText('Textiles para el hogar y hotelería', REEL_W/2, REEL_H*0.44 + 130 + (1 - a2)*30);
+  ctx.fillStyle = P.textoSub; ctx.font = "600 34px 'Work Sans'";
+  ctx.fillText('PEDIDO MAYORISTA · ONLINETEXTIL.COM.AR', REEL_W/2, REEL_H*0.44 + 195 + (1 - a2)*30);
+  ctx.restore();
+}
+
+function dibujarFrameReel(ctx, tomas, tms, opciones){
+  const estilo = opciones.estilo;
+  const D = duracionTomaReel(estilo);
+  const finTomas = tomas.length * D;
+  const W = REEL_W, H = REEL_H;
+
+  if(tms >= finTomas){
+    // cierre de marca que se abre en circulo sobre la ultima toma
+    const q = clampReel((tms - finTomas) / REEL_CIERRE_MS);
+    const qa = EASE_REEL.inOut(clampReel((tms - finTomas) / 450));
+    if(qa < 1){
+      const ult = tomas[tomas.length - 1];
+      if(estilo === 'pop'){ dibujarCubriendoReel(ctx, ult.fondo, W, H, 1.1, .5, .5); }
+      else dibujarTomaCompletaReel(ctx, ult, 1);
+      ctx.save(); ctx.beginPath(); ctx.arc(W/2, H*0.45, qa * Math.hypot(W, H) * 0.6, 0, Math.PI*2); ctx.clip();
+      dibujarCierreReel(ctx, q); ctx.restore();
+    } else dibujarCierreReel(ctx, q);
+    return;
+  }
+
+  const i = Math.min(tomas.length - 1, Math.floor(tms / D));
+  const local = tms - i*D, p = local / D;
+  const t = tomas[i], sig = tomas[i + 1];
+
+  if(estilo === 'pop'){
+    const sale = sig ? clampReel((local - (D - 320)) / 320) : 0;
+    dibujarCubriendoReel(ctx, t.fondo, W, H, 1.1, .5, .5);
+    if(sig && sale > 0){ ctx.save(); ctx.globalAlpha = sale; dibujarCubriendoReel(ctx, sig.fondo, W, H, 1.1, .5, .5); ctx.restore(); }
+    ctx.fillStyle = 'rgba(28,18,38,0.38)'; ctx.fillRect(0, 0, W, H);
+    // aro de luz que se expande detras de la tarjeta al aparecer
+    const ar = clampReel(local / 520);
+    if(ar < 1){
+      ctx.save(); ctx.globalAlpha = (1 - ar) * 0.7; ctx.strokeStyle = PALETAS.violeta.accent; ctx.lineWidth = 14*(1 - ar) + 2;
+      ctx.beginPath(); ctx.arc(W/2, H*0.42, 260 + ar*520, 0, Math.PI*2); ctx.stroke(); ctx.restore();
+    }
+    const entra = EASE_REEL.outBack(clampReel(local / 460));
+    const flota = Math.sin(p * Math.PI * 2) * 8;
+    const escala = (0.55 + 0.45*entra) * (1 - 0.14*EASE_REEL.in(sale));
+    const alfa = clampReel(local / 160) * (1 - sale);
+    const rot = (1 - clampReel(local / 460)) * -0.06 * t.dir;
+    dibujarTarjetaReel(ctx, t, p, escala, alfa, rot, flota - 50*EASE_REEL.in(sale));
+  }
+  else if(estilo === 'impacto'){
+    const golpe = 1 + 0.2 * (1 - EASE_REEL.outExpo(clampReel(local / 300)));
+    const sac = local < 200 ? Math.sin(local * 0.11) * 22 * (1 - local/200) : 0;
+    ctx.save(); ctx.translate(sac, sac*0.4);
+    dibujarTomaCompletaReel(ctx, t, p, golpe * 1.03);
+    ctx.restore();
+    if(local < 140){ ctx.fillStyle = 'rgba(255,255,255,' + (0.85*(1 - local/140)).toFixed(3) + ')'; ctx.fillRect(0, 0, W, H); }
+    // en el ultimo pulso de la toma, un leve acercamiento que "carga" el proximo golpe
+    if(sig){ const carga = clampReel((local - (D - 220)) / 220); if(carga > 0){ ctx.fillStyle = 'rgba(0,0,0,' + (0.25*carga).toFixed(3) + ')'; ctx.fillRect(0, 0, W, H); } }
+  }
+  else if(estilo === 'deslizar'){
+    const WT = 380;
+    const q = sig ? clampReel((local - (D - WT)) / WT) : 0;
+    if(q <= 0){ dibujarTomaCompletaReel(ctx, t, p); }
+    else {
+      const e = EASE_REEL.inOut(q), dir = t.dir;
+      const estela = Math.sin(q * Math.PI) * 140;
+      const dibujar = (toma, pp, dx) => {
+        dibujarTomaCompletaReel(ctx, toma, pp, 1, dx);
+        if(estela > 4){
+          ctx.save(); ctx.globalAlpha = 0.22;
+          [-1, -0.5, 0.5, 1].forEach(k => dibujarTomaCompletaReel(ctx, toma, pp, 1, dx + k*estela));
+          ctx.restore();
+        }
+      };
+      dibujar(t, p, -dir * e * W);
+      dibujar(sig, 0, dir * (1 - e) * W);
+    }
+  }
+  else if(estilo === 'revelado'){
+    const RT = 650;
+    const q = sig ? clampReel((local - (D - RT)) / RT) : 0;
+    dibujarTomaCompletaReel(ctx, t, p);
+    if(q > 0){
+      const e = EASE_REEL.inOut(q);
+      ctx.save();
+      if(i % 2 === 0){
+        const r = e * Math.hypot(W, H) * 0.58;
+        ctx.beginPath(); ctx.arc(W/2, H/2, r, 0, Math.PI*2); ctx.clip();
+        dibujarTomaCompletaReel(ctx, sig, 0);
+        ctx.restore();
+        ctx.save(); ctx.globalAlpha = 1 - q; ctx.strokeStyle = PALETAS.violeta.accent; ctx.lineWidth = 12;
+        ctx.beginPath(); ctx.arc(W/2, H/2, r, 0, Math.PI*2); ctx.stroke(); ctx.restore();
+      } else {
+        const x = -H*0.6 + e * (W + H*1.2); // borde diagonal que cruza la pantalla
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(x, 0); ctx.lineTo(x - H*0.6, H); ctx.lineTo(0, H); ctx.closePath(); ctx.clip();
+        dibujarTomaCompletaReel(ctx, sig, 0);
+        ctx.restore();
+        ctx.save(); ctx.globalAlpha = 1 - q*0.6; ctx.strokeStyle = PALETAS.violeta.accent; ctx.lineWidth = 12;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x - H*0.6, H); ctx.stroke(); ctx.restore();
+      }
+    }
+  }
+  else { // suave
+    const CT = 600;
+    const q = sig ? clampReel((local - (D - CT)) / CT) : 0;
+    dibujarTomaCompletaReel(ctx, t, p);
+    if(q > 0){ ctx.save(); ctx.globalAlpha = EASE_REEL.inOut(q); dibujarTomaCompletaReel(ctx, sig, 0); ctx.restore(); }
+  }
+
+  if(opciones.mostrarTexto) dibujarTextosReel(ctx, tms, i, local, D, t, opciones);
+}
+
+function duracionTotalReel(cantidadTomas, estilo, mostrarTexto){
+  return cantidadTomas * duracionTomaReel(estilo) + (mostrarTexto ? REEL_CIERRE_MS : 0);
+}
+
+// opciones: { estilo, mostrarTexto, titulo, subtitulo, etiqueta, leyendas }
+async function generarVideoReel(fotos, opciones){
+  opciones = { estilo: 'pop', mostrarTexto: true, ...opciones };
+  if(!ESTILOS_REEL[opciones.estilo]) opciones.estilo = 'pop';
+  const tomas = armarTomasReel(fotos, opciones.leyendas);
+  const duracion = duracionTotalReel(tomas.length, opciones.estilo, opciones.mostrarTexto);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = REEL_W; canvas.height = REEL_H;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  dibujarFrameReel(ctx, tomas, 0, opciones);
+
+  const stream = canvas.captureStream(30);
+  const candidatos = ['video/mp4;codecs=avc1.640028', 'video/mp4;codecs=avc1.42E01E', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  const mimeType = candidatos.find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
+  // calidad alta: sin esto el navegador graba con la tasa minima y las texturas (toallas, sabanas) salen borrosas
+  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 10000000 });
+  const chunks = [];
+  recorder.ondataavailable = e => { if(e.data.size > 0) chunks.push(e.data); };
+  const terminado = new Promise(resolve => recorder.onstop = resolve);
+  recorder.start();
+
+  const inicio = performance.now();
+  await new Promise((resolver, rechazar) => {
+    function cuadro(ahora){
+      try{
+        const tms = ahora - inicio;
+        dibujarFrameReel(ctx, tomas, Math.min(tms, duracion - 1), opciones);
+        if(tms < duracion) requestAnimationFrame(cuadro); else resolver();
+      } catch(err){ recorder.stop(); rechazar(err); }
+    }
+    requestAnimationFrame(cuadro);
+  });
+  recorder.stop();
+  await terminado;
+  return new Blob(chunks, { type: mimeType.split(';')[0] });
 }
 
 // ---------- video dinamico: varias fotos en secuencia, con texto que aparece progresivamente ----------
