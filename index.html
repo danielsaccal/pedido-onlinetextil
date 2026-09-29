@@ -7770,18 +7770,25 @@ async function guardarPerfilIG(){
 }
 
 // ---------- conexion real con Instagram (Facebook Login for Business) ----------
-const INSTAGRAM_APP_ID_PUBLICO = '1633756135135341'; // no es secreto, es el mismo id que va en cualquier boton de "iniciar sesion"
+// El token de la Pagina vive SOLO en el Worker (Cloudflare KV). La app nunca lo ve ni lo guarda.
+const INSTAGRAM_APP_ID_PUBLICO = '1072292468923475'; // App ID de la app de Meta (Configuracion > Basica); no es secreto
 const REDIRECT_URI_INSTAGRAM = 'https://lucky-shape-ec64.danielsaccal.workers.dev/instagram-callback';
 
-let instagramConexion = null; // null = todavia no se reviso; {} = revisado, no conectado; {pageToken, igBusinessId} = conectado
+let instagramConexion = null; // null = todavia no se reviso; {conectado:false} o {conectado:true, username, pagina}
 
 async function cargarInstagramConexion(){
   try{
-    const doc = await db.collection('config').doc('instagram_conexion').get();
-    instagramConexion = doc.exists ? doc.data() : {};
+    const resp = await fetch(URL_WORKER_IA, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ accion: 'estadoInstagram' })
+    });
+    const datos = await resp.json();
+    if(!resp.ok || datos.error) throw new Error(datos.error || 'sin respuesta');
+    instagramConexion = datos;
   } catch(e){
-    console.error('Error cargando la conexion de Instagram:', e);
-    instagramConexion = instagramConexion || {};
+    console.error('Error consultando la conexion de Instagram:', e);
+    instagramConexion = instagramConexion || { conectado: false };
   }
 }
 
@@ -7798,22 +7805,28 @@ function conectarInstagram(){
 async function desconectarInstagram(){
   if(!confirm('¿Desconectar Instagram? La vista previa va a volver a usar los datos cargados a mano.')) return;
   try{
-    await db.collection('config').doc('instagram_conexion').set({});
-    instagramConexion = {};
+    const resp = await fetch(URL_WORKER_IA, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ accion: 'desconectarInstagram' })
+    });
+    const datos = await resp.json();
+    if(!resp.ok || datos.error) throw new Error(datos.error || 'sin respuesta');
+    instagramConexion = { conectado: false };
     renderEstadoConexionIG();
   } catch(e){
     alert('No se pudo desconectar: ' + e.message);
   }
 }
 
-// trae los datos reales desde Instagram usando la conexion guardada; null si no hay conexion o falla
+// trae los datos reales desde Instagram a traves del Worker; null si no hay conexion o falla
 async function obtenerPerfilInstagramEnVivo(){
-  if(!instagramConexion || !instagramConexion.pageToken || !instagramConexion.igBusinessId) return null;
+  if(!instagramConexion || !instagramConexion.conectado) return null;
   try{
     const resp = await fetch(URL_WORKER_IA, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ accion: 'obtenerPerfilInstagram', pageToken: instagramConexion.pageToken, igBusinessId: instagramConexion.igBusinessId })
+      body: JSON.stringify({ accion: 'obtenerPerfilInstagram' })
     });
     const datos = await resp.json();
     if(!resp.ok || datos.error) throw new Error(datos.error || 'sin respuesta');
@@ -7827,35 +7840,31 @@ async function obtenerPerfilInstagramEnVivo(){
 function renderEstadoConexionIG(){
   const cont = document.getElementById('pig-conexion-estado');
   if(!cont) return;
-  const conectado = instagramConexion && instagramConexion.pageToken;
+  const conectado = instagramConexion && instagramConexion.conectado;
+  const cuenta = conectado && instagramConexion.username ? ' (@' + instagramConexion.username + ')' : '';
   cont.innerHTML = conectado
-    ? '<p style="margin:0 0 8px;">✅ Conectado a Instagram — los seguidores, la foto y la biografía se traen solos.</p><button class="btn-mini" onclick="desconectarInstagram()">Desconectar</button>'
+    ? '<p style="margin:0 0 8px;">✅ Conectado a Instagram' + cuenta + ' — los seguidores, la foto y la biografía se traen solos.</p><button class="btn-mini" onclick="desconectarInstagram()">Desconectar</button>'
     : '<p style="margin:0 0 8px;">Todavía no está conectado a Instagram.</p><button class="btn btn-gold" onclick="conectarInstagram()">📸 Conectar con Instagram</button>';
 }
 
-// se fija, al abrir la app, si Meta acaba de redirigir de vuelta con una conexion nueva o un error
+// se fija, al abrir la app, si el Worker acaba de redirigir de vuelta con una conexion nueva o un error
 async function revisarRegresoDeInstagram(){
   const params = new URLSearchParams(window.location.search);
-  const pageToken = params.get('ig_page_token');
-  const igBusinessId = params.get('ig_business_id');
+  const ok = params.get('ig_ok');
+  const usuario = params.get('ig_usuario');
   const error = params.get('ig_error');
-  const aviso = params.get('ig_aviso');
+  if(!ok && !error) return;
+
+  history.replaceState(null, '', window.location.pathname);
 
   if(error){
     alert('No se pudo conectar Instagram: ' + error);
-    history.replaceState(null, '', window.location.pathname);
     return;
   }
-  if(pageToken && igBusinessId){
-    try{
-      await db.collection('config').doc('instagram_conexion').set({ pageToken, igBusinessId, conectadoEl: new Date().toISOString() });
-      instagramConexion = { pageToken, igBusinessId };
-      alert('¡Instagram conectado!' + (aviso ? ' ' + aviso : ''));
-    } catch(e){
-      alert('Se conectó, pero no se pudo guardar: ' + e.message);
-    }
-    history.replaceState(null, '', window.location.pathname);
-  }
+  instagramConexion = null; // fuerza a volver a consultar el estado real al Worker
+  // limpia la version anterior, que guardaba el token en Firestore a la vista
+  try{ await db.collection('config').doc('instagram_conexion').delete(); } catch(e){}
+  alert('Instagram conectado' + (usuario ? ': @' + usuario : '') + '.');
 }
 
 async function abrirGrilla(){
