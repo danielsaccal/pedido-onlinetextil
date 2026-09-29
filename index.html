@@ -196,6 +196,8 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 .ig-mockup-tabs{display:flex;justify-content:space-around;border-top:1px solid var(--line);padding:8px 0;font-size:1.1rem;color:#000;}
 .ig-mockup-tabs span:first-child{border-bottom:2px solid #000;padding-bottom:6px;}
 .grilla-celda img{width:100%;height:100%;object-fit:cover;display:block;}
+a.grilla-celda{display:block;}
+.ig-marca-tipo{position:absolute;top:4px;right:6px;color:#fff;font-size:0.8rem;text-shadow:0 0 3px rgba(0,0,0,0.7);pointer-events:none;}
 .grilla-celda .quitar{
   position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;
   border:none;border-radius:50%;width:24px;height:24px;font-size:0.8rem;cursor:pointer;line-height:1;
@@ -7696,7 +7698,10 @@ function renderMockupIG(perfil, incluirGrilla){
   const p = perfil || {};
   const lineasBio = String(p.bio || '').split('\n').map(l => l.trim()).filter(Boolean);
   const items = incluirGrilla ? leerGrilla() : [];
-  const totalCasilleros = incluirGrilla ? Math.max(9, Math.ceil(items.length/3)*3) : 0;
+  // publicaciones reales ya subidas a Instagram (van despues de las piezas planificadas, como quedarian en el feed)
+  const reales = incluirGrilla ? (publicacionesIG || []) : [];
+  const ocupados = items.length + reales.length;
+  const totalCasilleros = incluirGrilla ? Math.max(9, Math.ceil(ocupados/3)*3) : 0;
 
   return `
     <div class="ig-mockup">
@@ -7723,7 +7728,8 @@ function renderMockupIG(perfil, incluirGrilla){
       <div class="ig-mockup-tabs"><span>▦</span><span>▷</span><span>🏷️</span></div>
       ${incluirGrilla ? `<div class="grilla-ig">
         ${items.map(it => `<div class="grilla-celda"><img src="${escapeAttr(it.dataUrl)}" alt="${escapeAttr(it.nombre)}"></div>`).join('')}
-        ${Array.from({length: totalCasilleros - items.length}).map(() => '<div class="grilla-celda grilla-celda-vacia"></div>').join('')}
+        ${reales.map(m => `<a class="grilla-celda" href="${escapeAttr(m.permalink || '#')}" target="_blank" rel="noopener"><img src="${escapeAttr(m.media_type === 'VIDEO' ? (m.thumbnail_url || '') : (m.media_url || ''))}" alt="Publicación de Instagram" loading="lazy">${m.media_type === 'VIDEO' ? '<span class="ig-marca-tipo">▶</span>' : (m.media_type === 'CAROUSEL_ALBUM' ? '<span class="ig-marca-tipo">❐</span>' : '')}</a>`).join('')}
+        ${Array.from({length: totalCasilleros - ocupados}).map(() => '<div class="grilla-celda grilla-celda-vacia"></div>').join('')}
       </div>` : ''}
     </div>
   `;
@@ -7774,6 +7780,7 @@ async function guardarPerfilIG(){
 const INSTAGRAM_APP_ID_PUBLICO = '1072292468923475'; // App ID de la app de Meta (Configuracion > Basica); no es secreto
 const REDIRECT_URI_INSTAGRAM = 'https://lucky-shape-ec64.danielsaccal.workers.dev/instagram-callback';
 
+let publicacionesIG = []; // ultimas publicaciones reales, traidas en vivo al abrir la grilla
 let instagramConexion = null; // null = todavia no se reviso; {conectado:false} o {conectado:true, username, pagina}
 
 async function cargarInstagramConexion(){
@@ -7875,6 +7882,7 @@ async function abrirGrilla(){
 
   let perfilEfectivo = perfilIG || {};
   const enVivo = await obtenerPerfilInstagramEnVivo();
+  publicacionesIG = (enVivo && enVivo.media && Array.isArray(enVivo.media.data)) ? enVivo.media.data : [];
   if(enVivo){
     perfilEfectivo = {
       ...perfilEfectivo, // conserva link/ubicacion/categoria cargados a mano, que Instagram no informa
