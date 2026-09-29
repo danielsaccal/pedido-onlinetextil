@@ -7796,7 +7796,8 @@ function conectarInstagram(){
   const params = new URLSearchParams({
     client_id: INSTAGRAM_APP_ID_PUBLICO,
     redirect_uri: REDIRECT_URI_INSTAGRAM,
-    scope: 'pages_show_list,pages_read_engagement,instagram_basic',
+    scope: 'pages_show_list,pages_read_engagement,instagram_basic,business_management',
+    auth_type: 'rerequest', // vuelve a mostrar la eleccion de Paginas aunque ya se haya autorizado antes
     response_type: 'code',
   });
   window.location.href = 'https://www.facebook.com/v21.0/dialog/oauth?' + params.toString();
