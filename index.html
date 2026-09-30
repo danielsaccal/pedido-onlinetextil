@@ -1458,7 +1458,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v17</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v18</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2865,12 +2865,12 @@ function leerPiezasFormularioInstruccion(){
 const TOPE_ENSANCHE = 0.10;
 // 7. Cada pieza se puede cortar derecha o girada (lo que consume del ancho pasa a ser lo que consume
 //    del largo) y el sistema elige la forma que gasta menos tela en ese ancho. Ej: una tapa de
-//    150 x 250 en tela de 250 va con los 250 a lo ancho; en tela de 150 va girada. Las piezas marcadas
-//    "no se gira" (por defecto las fundas) mantienen siempre su sentido.
+//    150 x 250 en tela de 250 va con los 250 a lo ancho; en tela de 150 va girada. Por defecto todas
+//    las piezas se pueden girar; las marcadas "no se gira" mantienen siempre su sentido.
 function puedeGirar(p){
   if(p.girar === true || p.girar === 'si') return true;
   if(p.girar === false || p.girar === 'no') return false;
-  return !/funda/i.test(p.nombre || '');
+  return true; // por defecto todas se pueden girar (fundas incluidas) si eso ahorra tela
 }
 function calcularCorte(piezas, W){
   const girables = piezas.map((p, i) => i).filter(i => puedeGirar(piezas[i]) && Math.abs(piezas[i].ancho - piezas[i].largo) > 0.01);
@@ -10555,7 +10555,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-09-30-v17';
+const APP_VERSION = '2026-09-30-v18';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
