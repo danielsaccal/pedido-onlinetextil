@@ -1453,7 +1453,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v11</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v12</p>
       <div id="ic-lista" style="margin-top:8px;"></div>
 
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
@@ -3140,10 +3140,10 @@ function agregarPiezaFicha(p){
   div.style.cssText = 'border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;';
   div.innerHTML = `
     <div class="field"><label>Nombre de la pieza</label><input type="text" class="fa-p-nombre" value="${escapeAttr(p.nombre||'')}" placeholder="Ej: Plana" oninput="calcularVistaFicha()"></div>
-    <div>
-      <div class="field"><label>Consume del ancho de la tela (cm, mínimo)</label><input type="number" step="0.1" class="fa-p-ancho" value="${p.ancho||''}" placeholder="150" oninput="calcularVistaFicha()"></div>
-      <div class="field"><label>Consume del largo de la tela (cm)</label><input type="number" step="0.1" class="fa-p-largo" value="${p.largo||''}" placeholder="260" oninput="calcularVistaFicha()"></div>
-      <div class="field"><label>¿Cuántas de esta pieza? (ej: funda = 2 tapas)</label><input type="number" min="1" step="1" class="fa-p-partes" value="${p.partes||1}" oninput="calcularVistaFicha()"></div>
+    <div style="display:flex;gap:8px;">
+      <div class="field" style="flex:1;"><label>Ancho mínimo (cm)</label><input type="number" step="0.1" class="fa-p-ancho" value="${p.ancho||''}" placeholder="150" oninput="calcularVistaFicha()"></div>
+      <div class="field" style="flex:1;"><label>Largo (cm)</label><input type="number" step="0.1" class="fa-p-largo" value="${p.largo||''}" placeholder="260" oninput="calcularVistaFicha()"></div>
+      <div class="field" style="flex:1;"><label>Cuántas (tapas)</label><input type="number" min="1" step="1" class="fa-p-partes" value="${p.partes||1}" oninput="calcularVistaFicha()"></div>
     </div>
     <button type="button" class="btn-mini" onclick="this.closest('.fa-pieza').remove(); calcularVistaFicha();">🗑️ Quitar pieza</button>`;
   document.getElementById('fa-piezas').appendChild(div);
