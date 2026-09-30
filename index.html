@@ -1458,7 +1458,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v18</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v19</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2863,6 +2863,10 @@ function leerPiezasFormularioInstruccion(){
 //    ese sobrante se reparte entre las piezas mas anchas de la franja (ej: 2 planas de 150 en 315
 //    quedan de 157,5). Tope: cada pieza crece como mucho un 10 %; si el sobrante es mayor, queda libre.
 const TOPE_ENSANCHE = 0.10;
+// 8. Si una pieza (o las piezas de una franja juntas) se pasan un poco del ancho de la tela, se
+//    achican para entrar, hasta un 5 %. Ej: una plana que en tela de 250 consume 250 de ancho, en tela
+//    de 240 se corta de 240. Si hay que achicar mas, se busca otra forma de cortarla.
+const TOPE_ACHIQUE = 0.05;
 // 7. Cada pieza se puede cortar derecha o girada (lo que consume del ancho pasa a ser lo que consume
 //    del largo) y el sistema elige la forma que gasta menos tela en ese ancho. Ej: una tapa de
 //    150 x 250 en tela de 250 va con los 250 a lo ancho; en tela de 150 va girada. Por defecto todas
@@ -2896,11 +2900,11 @@ function calcularCorteFijo(piezas, W){
   const avisos = [];
   const nuevaFranja = largo => { const f = { largo, cols: [], usado: 0 }; franjas.push(f); return f; };
   const colocar = (col, p, sobrante) => { col.items.push({ p, sobrante, y: col.alto }); col.alto += p.largo; };
-  const nuevaCol = (f, p) => { const col = { p, x: f.usado, w: p.ancho, alto: 0, items: [] }; f.cols.push(col); f.usado += p.ancho; return col; };
+  const nuevaCol = (f, p) => { const col = { p, x: f.usado, w: p.ancho, orig: p.ancho, alto: 0, items: [] }; f.cols.push(col); f.usado += p.ancho; return col; };
 
   porTamano.forEach(t => {
     const p = t.p;
-    if(p.ancho > W + EPS) avisos.push(`${p.nombre} mide ${p.ancho} cm de ancho, más que los ${W} cm de la tela.`);
+    if(p.ancho * (1 - TOPE_ACHIQUE) > W + EPS) avisos.push(`${p.nombre} consume ${p.ancho} cm de ancho, más que los ${W} cm de la tela.`);
     for(let k = 0; k < t.n; k++){
       let ok = false;
       // 1) arriba de otra igual, en una columna que todavia tiene largo libre
@@ -2912,6 +2916,10 @@ function calcularCorteFijo(piezas, W){
       if(!ok) for(const f of franjas){
         if(W - f.usado >= p.ancho - EPS && p.largo <= f.largo + EPS){ colocar(nuevaCol(f, p), p, false); ok = true; break; }
       }
+      // 2b) al costado achicando un poco toda la franja (regla 8)
+      if(!ok) for(const f of franjas){
+        if((f.usado + p.ancho) * (1 - TOPE_ACHIQUE) <= W + EPS && p.largo <= f.largo + EPS){ colocar(nuevaCol(f, p), p, false); ok = true; break; }
+      }
       // 3) franja nueva mas abajo
       if(!ok) colocar(nuevaCol(nuevaFranja(p.largo), p), p, false);
     }
@@ -2921,6 +2929,12 @@ function calcularCorteFijo(piezas, W){
   let y = 0;
   franjas.forEach(f => {
     f.y = y; y += f.largo;
+    // regla 8: si la franja se pasa del ancho (dentro del tope), todas sus piezas se achican parejo
+    if(f.usado > W + EPS){
+      const k = W / f.usado;
+      let x = 0; f.cols.forEach(c => { c.w = Math.round(c.w * k * 100) / 100; c.x = x; x += c.w; });
+      f.usado = W;
+    }
     const tiposEnFranja = [...new Set(f.cols.map(c => c.p))];
     f.unTipo = tiposEnFranja.length === 1;
     // llenar lo libre: columnas a medio llenar, y despues columnas nuevas en el ancho libre
@@ -2997,6 +3011,9 @@ function textoCorte(articulo, piezas, ancho, nota){
       ? ` Sobran ${n} tapa(s) de ${p.nombre}` + (Math.floor(n/partes) ? ` = ${Math.floor(n/partes)} ${p.nombre} de más` : '') + '.'
       : ` Sobran ${n} ${p.nombre}.`;
   });
+  const ajustes = new Map();
+  c.franjas.forEach(f => f.cols.forEach(col => { if(col.orig && col.w < col.orig - 0.01 && col.items.some(it => !it.sobrante)) ajustes.set(col.p.nombre + '|' + col.orig, `${col.p.nombre} de ${fmtCm(col.orig)} a ${fmtCm(col.w)} cm`); }));
+  if(ajustes.size) texto += ` Ajustado al ancho de la tela: ${[...ajustes.values()].join(', ')}.`;
   texto += ` Largo total de tela: ${fmtCm(c.largoTotal)} cm. Consumo por unidad: ${fmtMetros(c.metros)} m (${c.detalle}); lo que sobra no se cuenta en el artículo.`;
   c.avisos.forEach(a => texto += ' ⚠️ ' + a);
   if(nota) texto += ' ' + nota;
@@ -10555,7 +10572,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-09-30-v18';
+const APP_VERSION = '2026-09-30-v19';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
