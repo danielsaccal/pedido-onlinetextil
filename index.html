@@ -112,6 +112,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 .estado-pedido.estado-parcial{background:#F3C9A0;color:#8A4A12;}
 .estado-pedido.estado-completo{background:#C9DDB8;color:#3D6122;}
 .estado-pedido.estado-cancelado{background:#E0B8B0;color:#7A2E1E;}
+.estado-pedido.estado-entregado{background:#C9DDB8;color:#3D6122;}
 .hist-acciones{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);}
 .btn-mini{
   background:var(--cream);border:1px solid var(--line);border-radius:7px;
@@ -507,6 +508,7 @@ a.grilla-celda{display:block;}
         <div class="menu-cat-body">
           <span class="menu-item" onclick="abrirTablaConsumo()">📐 Tabla de consumo de tela</span>
           <span class="menu-item" onclick="abrirOrdenTrabajo()">📋 Generar orden de trabajo</span>
+          <span class="menu-item" onclick="abrirHistorialOT()">📦 Historial de órdenes de trabajo</span>
         </div>
       </div>
 
@@ -1365,6 +1367,11 @@ a.grilla-celda{display:block;}
     <div class="form-card">
       <h2>Orden de trabajo para taller</h2>
       <p class="note" id="ot-sin-tabla" style="display:none;margin-bottom:14px;color:#A6432F;">Todavía no cargó la tabla de consumo — <a href="#" onclick="event.preventDefault(); abrirTablaConsumo();">cárguela acá</a> antes de seguir.</p>
+      <div class="field">
+        <label>Taller</label>
+        <select id="ot-taller" onchange="manejarCambioTallerOT()"></select>
+      </div>
+      <div class="field" id="ot-taller-nuevo-wrap" style="display:none;"><label>Nombre del taller nuevo</label><input type="text" id="ot-taller-nuevo" placeholder="Ej: Mendez"></div>
       <div class="field"><label>SKU de la tela entregada</label><input type="text" id="ot-sku-tela" placeholder="Ej: MAC315B"></div>
       <div class="field"><label>Metros totales entregados</label><input type="number" id="ot-metros-totales" min="0" step="0.01" placeholder="Ej: 600"></div>
 
@@ -1379,6 +1386,24 @@ a.grilla-celda{display:block;}
       <p class="error" id="ot-error" style="display:none;"></p>
       <div id="ot-resultado" style="margin-top:14px;"></div>
 
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <!-- STEP: HISTORIAL DE ORDENES DE TRABAJO -->
+  <div class="step" id="step-historial-ot">
+    <div class="form-card">
+      <h2>Historial de órdenes de trabajo</h2>
+      <div class="hist-search">
+        <input type="text" id="hot-buscador" placeholder="Buscar por taller, número o artículo..." oninput="renderHistorialOT(this.value)">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px;">
+        <label class="ni-chip"><input type="radio" name="hot-filtro-estado" value="todos" checked onchange="renderHistorialOT(document.getElementById('hot-buscador').value)"><span>Todos</span></label>
+        <label class="ni-chip"><input type="radio" name="hot-filtro-estado" value="pendiente" onchange="renderHistorialOT(document.getElementById('hot-buscador').value)"><span>Pendientes</span></label>
+        <label class="ni-chip"><input type="radio" name="hot-filtro-estado" value="parcial" onchange="renderHistorialOT(document.getElementById('hot-buscador').value)"><span>Parciales</span></label>
+        <label class="ni-chip"><input type="radio" name="hot-filtro-estado" value="entregado" onchange="renderHistorialOT(document.getElementById('hot-buscador').value)"><span>Entregadas</span></label>
+      </div>
+      <div id="hot-lista"><p class="empty-msg">Cargando órdenes...</p></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
@@ -2441,6 +2466,49 @@ function buscarConsumoMasCercano(articuloData, anchoBuscado){
   return { consumo: mejor.consumo, anchoUsado: mejor.ancho, exacto: Math.abs(mejor.ancho - anchoBuscado) < 0.01 };
 }
 
+// ---------- talleres (lista de quienes fabrican) ----------
+const DEFAULT_TALLERES = ['Ali','Gomez','Sandra','Liliana','american','zemborain','caravajal','peverellin','behr','Leo Incaico','Krause','ADRIAN TALLER','Luciano','mariela'];
+let talleresLista = null; // null = no cargada; array = cargada (arranca con los default si no hay nada guardado)
+
+async function cargarTalleres(){
+  try{
+    const doc = await db.collection('config').doc('talleres').get();
+    talleresLista = (doc.exists && Array.isArray(doc.data().nombres) && doc.data().nombres.length) ? doc.data().nombres : [...DEFAULT_TALLERES];
+  } catch(e){
+    console.error('Error cargando talleres:', e);
+    talleresLista = talleresLista || [...DEFAULT_TALLERES];
+  }
+}
+
+function poblarSelectTalleres(){
+  const sel = document.getElementById('ot-taller');
+  const actual = sel.value;
+  sel.innerHTML = '<option value="">Elija un taller</option>' +
+    talleresLista.map(t => `<option value="${escapeAttr(t)}">${t}</option>`).join('') +
+    '<option value="__nuevo__">+ Agregar taller nuevo...</option>';
+  if(actual && talleresLista.includes(actual)) sel.value = actual;
+}
+
+function manejarCambioTallerOT(){
+  const sel = document.getElementById('ot-taller');
+  const wrap = document.getElementById('ot-taller-nuevo-wrap');
+  wrap.style.display = sel.value === '__nuevo__' ? 'block' : 'none';
+}
+
+// agrega el taller nuevo (si corresponde) a la lista guardada, y devuelve el nombre final a usar
+async function resolverTallerParaGuardar(){
+  const sel = document.getElementById('ot-taller');
+  if(sel.value !== '__nuevo__') return sel.value;
+  const nombreNuevo = document.getElementById('ot-taller-nuevo').value.trim();
+  if(!nombreNuevo) return '';
+  if(!talleresLista.includes(nombreNuevo)){
+    talleresLista = [...talleresLista, nombreNuevo];
+    try{ await db.collection('config').doc('talleres').set({ nombres: talleresLista }); }
+    catch(e){ console.error('No se pudo guardar el taller nuevo en la lista (la orden se genera igual):', e); }
+  }
+  return nombreNuevo;
+}
+
 let renglonIdCounterOT = 0;
 
 function opcionesArticuloOT(){
@@ -2474,10 +2542,15 @@ function eliminarRenglonOrdenTrabajo(id){
 async function abrirOrdenTrabajo(){
   mostrarPaso('step-orden-trabajo');
   if(tablaConsumo === null) await cargarTablaConsumo();
+  if(talleresLista === null) await cargarTalleres();
+  poblarSelectTalleres();
 
   const hay = tablaConsumo && tablaConsumo.articulos && Object.keys(tablaConsumo.articulos).length > 0;
   document.getElementById('ot-sin-tabla').style.display = hay ? 'none' : 'block';
 
+  document.getElementById('ot-taller').value = '';
+  document.getElementById('ot-taller-nuevo-wrap').style.display = 'none';
+  document.getElementById('ot-taller-nuevo').value = '';
   document.getElementById('ot-sku-tela').value = '';
   document.getElementById('ot-metros-totales').value = '';
   document.getElementById('ot-nota-general').value = '';
@@ -2512,6 +2585,19 @@ async function generarOrdenTrabajoCompleta(){
   const metrosTotales = parseFloat(document.getElementById('ot-metros-totales').value);
   const notaGeneral = document.getElementById('ot-nota-general').value.trim();
 
+  const selTaller = document.getElementById('ot-taller');
+  if(!selTaller.value){
+    errorEl.textContent = 'Elija el taller que va a hacer este trabajo.';
+    errorEl.style.display = 'block';
+    return;
+  }
+  if(selTaller.value === '__nuevo__' && !document.getElementById('ot-taller-nuevo').value.trim()){
+    errorEl.textContent = 'Escriba el nombre del taller nuevo.';
+    errorEl.style.display = 'block';
+    return;
+  }
+  const taller = await resolverTallerParaGuardar();
+
   if(!skuTela || isNaN(metrosTotales) || metrosTotales <= 0){
     errorEl.textContent = 'Complete el SKU de la tela y los metros totales entregados.';
     errorEl.style.display = 'block';
@@ -2545,7 +2631,7 @@ async function generarOrdenTrabajoCompleta(){
       return;
     }
     const cantidad = Math.floor(metros / resultado.consumo);
-    renglones.push({ articulo, anchoIngresado: ancho, anchoUsado: resultado.anchoUsado, exacto: resultado.exacto, consumo: resultado.consumo, metros, cantidad, sku, nota });
+    renglones.push({ articulo, anchoIngresado: ancho, anchoUsado: resultado.anchoUsado, exacto: resultado.exacto, consumo: resultado.consumo, metros, cantidad, sku, nota, entregado: 0 });
   }
 
   const metrosAsignados = Math.round(renglones.reduce((s,r) => s + r.metros, 0) * 100) / 100;
@@ -2560,6 +2646,7 @@ async function generarOrdenTrabajoCompleta(){
 
   const lineas = [
     `ORDEN DE TRABAJO ${numeroFormateado}`,
+    `Taller: ${taller}`,
     `Tela: ${skuTela} — se entregan ${metrosTotales} metros`,
     '',
     ...renglones.map((r, i) =>
@@ -2587,7 +2674,7 @@ async function generarOrdenTrabajoCompleta(){
   // registro de la orden ya generada y numerada (no bloquea si falla: el texto ya se armo bien igual)
   try{
     await db.collection('ordenes_trabajo').add({
-      numero: numeroFormateado, fecha: new Date().toISOString(), skuTela, metrosTotales, metrosAsignados, renglones, notaGeneral,
+      numero: numeroFormateado, taller, fecha: new Date().toISOString(), skuTela, metrosTotales, metrosAsignados, renglones, notaGeneral,
     });
   } catch(e){
     console.error('No se pudo guardar el registro de la orden (el texto ya se generó bien):', e);
@@ -2604,6 +2691,158 @@ function compartirOrdenTrabajo(modo){
     } else {
       window.prompt('Copie el texto:', texto);
     }
+    return;
+  }
+  window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+}
+
+// ---------- historial de ordenes de trabajo (seguimiento de entregas parciales) ----------
+let historialOT = null; // null = no cargado; array = cargado, cada item con _docId
+
+async function cargarHistorialOT(){
+  try{
+    const snap = await db.collection('ordenes_trabajo').orderBy('fecha', 'desc').get();
+    historialOT = snap.docs.map(d => ({ _docId: d.id, ...d.data() }));
+  } catch(e){
+    console.error('Error cargando el historial de ordenes de trabajo:', e);
+    historialOT = historialOT || [];
+  }
+}
+
+// pendiente = lo que falta entregar de un renglon; entregado nunca se muestra por encima de lo pedido
+function pendienteRenglon(r){
+  return Math.max(0, (r.cantidad||0) - (r.entregado||0));
+}
+
+function estadoOrdenTrabajo(orden){
+  const renglones = orden.renglones || [];
+  if(renglones.length === 0) return 'pendiente';
+  const totalPedido = renglones.reduce((s,r) => s + (r.cantidad||0), 0);
+  const totalEntregado = renglones.reduce((s,r) => s + (r.entregado||0), 0);
+  if(totalEntregado <= 0) return 'pendiente';
+  if(totalEntregado >= totalPedido) return 'entregado';
+  return 'parcial';
+}
+
+async function abrirHistorialOT(){
+  mostrarPaso('step-historial-ot');
+  document.getElementById('hot-buscador').value = '';
+  document.getElementById('hot-lista').innerHTML = '<p class="empty-msg">Cargando órdenes...</p>';
+  await cargarHistorialOT();
+  renderHistorialOT('');
+}
+
+function renderHistorialOT(filtro){
+  filtro = (filtro||'').trim().toLowerCase();
+  const cont = document.getElementById('hot-lista');
+  const ordenes = historialOT || [];
+  const filtroEstadoEl = document.querySelector('input[name="hot-filtro-estado"]:checked');
+  const filtroEstado = filtroEstadoEl ? filtroEstadoEl.value : 'todos';
+
+  const filtradas = ordenes.filter(o => {
+    if(filtroEstado !== 'todos' && estadoOrdenTrabajo(o) !== filtroEstado) return false;
+    if(!filtro) return true;
+    const haystack = [o.numero, o.taller, o.skuTela, ...(o.renglones||[]).map(r => r.articulo + ' ' + r.sku)].join(' ').toLowerCase();
+    return haystack.includes(filtro);
+  });
+
+  if(filtradas.length === 0){
+    cont.innerHTML = '<p class="empty-msg">No hay órdenes que coincidan.</p>';
+    return;
+  }
+
+  cont.innerHTML = filtradas.map(o => {
+    const fecha = o.fecha ? new Date(o.fecha).toLocaleString('es-AR') : '';
+    const estado = estadoOrdenTrabajo(o);
+    const etiquetaEstado = estado === 'entregado' ? 'Entregado' : estado === 'parcial' ? 'Parcial' : 'Pendiente';
+    const renglonesFilas = (o.renglones||[]).map((r, i) => {
+      const pendiente = pendienteRenglon(r);
+      const metrosPendientes = Math.round(pendiente * r.consumo * 100) / 100;
+      return `
+        <tr>
+          <td>${escaparHtml(r.articulo)}<br><span style="color:#8A8072;font-size:0.78rem;">SKU: ${escaparHtml(r.sku||'—')}</span></td>
+          <td class="n">${r.cantidad}</td>
+          <td class="n">${r.entregado||0}</td>
+          <td class="n">${pendiente > 0 ? `<b>${pendiente}</b><br><span style="color:#8A8072;font-size:0.76rem;">≈ ${metrosPendientes} m</span>` : '✓'}</td>
+          <td>
+            ${pendiente > 0 ? `
+              <div style="display:flex;gap:4px;align-items:center;">
+                <input type="number" min="1" max="${pendiente}" id="hot-entrega-${o._docId}-${i}" style="width:60px;padding:4px;border:1px solid var(--line);border-radius:4px;" placeholder="cant.">
+                <button class="btn-mini" onclick="event.stopPropagation(); registrarEntregaRenglonOT('${o._docId}', ${i})">Registrar</button>
+              </div>` : ''}
+          </td>
+        </tr>`;
+    }).join('');
+
+    return `
+      <div class="hist-pedido" id="hot-${o._docId}">
+        <div class="hist-head" onclick="document.getElementById('hot-${o._docId}').classList.toggle('open')">
+          <div>
+            <div class="num">${o.numero||''}</div>
+            <div class="meta">${escaparHtml(o.taller||'(sin taller)')} · ${fecha}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="estado-pedido estado-${estado}">${etiquetaEstado}</span>
+            <span class="hist-chev">▾</span>
+          </div>
+        </div>
+        <div class="hist-body">
+          <div style="margin-bottom:8px;line-height:1.5;">
+            <b>Tela:</b> ${escaparHtml(o.skuTela||'')} — ${o.metrosTotales||0} m entregados
+            ${o.notaGeneral ? `<br><b>Nota:</b> ${escaparHtml(o.notaGeneral)}` : ''}
+          </div>
+          <table>
+            <thead><tr><th>Producto</th><th>Pedido</th><th>Entregado</th><th>Pendiente</th><th>Registrar entrega</th></tr></thead>
+            <tbody>${renglonesFilas}</tbody>
+          </table>
+          <div class="hist-acciones">
+            <button class="btn-mini" onclick="event.stopPropagation(); compartirTextoOrdenGuardada('${o._docId}', 'whatsapp')">📤 Reenviar por WhatsApp</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function registrarEntregaRenglonOT(docId, renglonIdx){
+  const input = document.getElementById(`hot-entrega-${docId}-${renglonIdx}`);
+  const cantidadRecibida = parseInt(input.value, 10);
+  if(isNaN(cantidadRecibida) || cantidadRecibida <= 0){
+    alert('Escriba cuántas unidades llegaron (un número mayor a 0).');
+    return;
+  }
+  const orden = historialOT.find(o => o._docId === docId);
+  if(!orden) return;
+  const renglon = orden.renglones[renglonIdx];
+  const pendienteAntes = pendienteRenglon(renglon);
+  if(cantidadRecibida > pendienteAntes){
+    if(!confirm(`Pidió ${renglon.cantidad} y ya tenía ${renglon.entregado||0} entregadas — quedan ${pendienteAntes} pendientes. ¿Registrar igual ${cantidadRecibida}?`)) return;
+  }
+
+  const nuevosRenglones = orden.renglones.map((r, i) => i === renglonIdx ? { ...r, entregado: (r.entregado||0) + cantidadRecibida } : r);
+  try{
+    await db.collection('ordenes_trabajo').doc(docId).update({ renglones: nuevosRenglones });
+    orden.renglones = nuevosRenglones;
+    renderHistorialOT(document.getElementById('hot-buscador').value);
+  } catch(e){
+    alert('No se pudo registrar la entrega: ' + e.message);
+  }
+}
+
+function compartirTextoOrdenGuardada(docId, modo){
+  const orden = historialOT.find(o => o._docId === docId);
+  if(!orden) return;
+  const lineas = [
+    `ORDEN DE TRABAJO ${orden.numero}`,
+    `Taller: ${orden.taller}`,
+    `Tela: ${orden.skuTela} — se entregan ${orden.metrosTotales} metros`,
+    '',
+    ...(orden.renglones||[]).map((r,i) => `${i+1}) ${r.articulo} — ancho ${r.anchoUsado} cm, consumo ≈ ${r.consumo} m c/u — usa ${r.metros} m de tela → ${r.cantidad} unidades aprox.\n   SKU del producto terminado: ${r.sku || '(sin definir)'}` + (r.nota ? `\n   Nota: ${r.nota}` : '')),
+  ];
+  if(orden.notaGeneral) lineas.push('', orden.notaGeneral);
+  const texto = lineas.join('\n');
+  if(modo === 'copiar'){
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(texto).then(() => alert('Copiado.')).catch(() => window.prompt('Copie el texto:', texto));
+    else window.prompt('Copie el texto:', texto);
     return;
   }
   window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
