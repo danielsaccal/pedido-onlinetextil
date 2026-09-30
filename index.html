@@ -502,6 +502,16 @@ a.grilla-celda{display:block;}
 
       <div class="menu-cat">
         <div class="menu-cat-head" onclick="this.parentElement.classList.toggle('open')">
+          <span>🏭 Talleres</span><span class="menu-cat-chev">▾</span>
+        </div>
+        <div class="menu-cat-body">
+          <span class="menu-item" onclick="abrirTablaConsumo()">📐 Tabla de consumo de tela</span>
+          <span class="menu-item" onclick="abrirOrdenTrabajo()">📋 Generar orden de trabajo</span>
+        </div>
+      </div>
+
+      <div class="menu-cat">
+        <div class="menu-cat-head" onclick="this.parentElement.classList.toggle('open')">
           <span>🔔 Configuración</span><span class="menu-cat-chev">▾</span>
         </div>
         <div class="menu-cat-body">
@@ -1331,6 +1341,44 @@ a.grilla-celda{display:block;}
   </div>
 
   <!-- STEP: DATOS BANCARIOS -->
+  <!-- STEP: TABLA DE CONSUMO DE TELA -->
+  <div class="step" id="step-tabla-consumo">
+    <div class="form-card">
+      <h2>Tabla de consumo de tela</h2>
+      <p class="note" style="margin-bottom:14px;">Pegue la tabla tal cual la tiene (copiada de Excel/Sheets): primera fila con "Articulo" y los anchos, después una fila por artículo. Se guarda una sola vez y queda disponible para armar órdenes de trabajo.</p>
+      <div class="field">
+        <label>Pegar tabla</label>
+        <textarea id="tc-pegado" rows="10" placeholder="Articulo	150	250	240	265	300&#10;Acolchado 2 1/2		4,6	4,6	4,6	" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:monospace;font-size:0.8rem;"></textarea>
+      </div>
+      <div class="actions"><button class="btn btn-gold" onclick="previsualizarTablaConsumo()">Ver antes de guardar</button></div>
+      <p class="error" id="tc-error" style="display:none;"></p>
+      <div id="tc-preview" style="margin-top:14px;"></div>
+      <p class="note" id="tc-estado-actual" style="margin-top:16px;"></p>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <!-- STEP: GENERAR ORDEN DE TRABAJO -->
+  <div class="step" id="step-orden-trabajo">
+    <div class="form-card">
+      <h2>Orden de trabajo para taller</h2>
+      <p class="note" id="ot-sin-tabla" style="display:none;margin-bottom:14px;color:#A6432F;">Todavía no cargó la tabla de consumo — <a href="#" onclick="event.preventDefault(); abrirTablaConsumo();">cárguela acá</a> antes de seguir.</p>
+      <div class="field"><label>SKU de la tela entregada</label><input type="text" id="ot-sku-tela" placeholder="Ej: MAC315B"></div>
+      <div class="field"><label>Metros entregados</label><input type="number" id="ot-metros" min="0" step="0.01" placeholder="Ej: 600" oninput="calcularOrdenTrabajo()"></div>
+      <div class="field">
+        <label>Artículo a fabricar</label>
+        <select id="ot-articulo" onchange="calcularOrdenTrabajo()"><option value="">Elija un artículo</option></select>
+      </div>
+      <div class="field"><label>Ancho real de esta tela (cm)</label><input type="number" id="ot-ancho" min="0" step="0.1" placeholder="Ej: 315" oninput="calcularOrdenTrabajo()"></div>
+      <div class="field"><label>SKU del producto terminado</label><input type="text" id="ot-sku-producto" placeholder="Ej: JQ315B"></div>
+      <div class="field"><label>Nota adicional (opcional)</label><input type="text" id="ot-nota" placeholder="Ej: entregar antes del viernes"></div>
+
+      <div id="ot-resultado" style="margin-top:14px;"></div>
+
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
   <div class="step" id="step-datos-bancarios">
     <div class="form-card">
       <h2>Datos bancarios</h2>
@@ -2111,6 +2159,234 @@ function actualizarCasillasBancarios(){
     casillaHist.disabled = !hay;
     if(!hay) casillaHist.checked = false;
   }
+}
+
+// ---------- tabla de consumo de tela (talleres) ----------
+let tablaConsumo = null; // null = no revisada; {} = revisada, vacia; {anchos:[...], articulos:{...}} = cargada
+
+async function cargarTablaConsumo(){
+  try{
+    const doc = await db.collection('config').doc('tabla_consumo_telas').get();
+    tablaConsumo = doc.exists ? doc.data() : {};
+  } catch(e){
+    console.error('Error cargando la tabla de consumo:', e);
+    tablaConsumo = tablaConsumo || {};
+  }
+}
+
+// separa por tabulador (como se pega desde Excel/Sheets); si alguna fila viniera separada por
+// varios espacios en vez de tabulador, igual funciona porque exige al menos 2 espacios seguidos
+function separarCeldas(linea){
+  if(linea.includes('\t')) return linea.split('\t');
+  return linea.split(/ {2,}/);
+}
+
+function parsearNumeroArgentino(txt){
+  const t = String(txt||'').trim();
+  if(!t) return null;
+  const n = parseFloat(t.replace(',','.'));
+  return isNaN(n) ? null : n;
+}
+
+function parsearTablaConsumoPegada(texto){
+  const lineas = String(texto||'').split('\n').map(l => l.replace(/\r$/,'')).filter(l => l.trim() !== '');
+  if(lineas.length < 2) return { error: 'Pegue al menos la fila de encabezado y una fila de artículo.' };
+
+  const encabezado = separarCeldas(lineas[0]);
+  // columna 0 = "Articulo" (se ignora el texto, solo importa la posicion); el resto son los anchos
+  const anchosPorColumna = encabezado.slice(1).map(h => parsearNumeroArgentino(h));
+  if(anchosPorColumna.every(a => a === null)){
+    return { error: 'No pude leer ningún ancho en la primera fila. Revise que esté separada por tabulaciones (tal cual la copia de Excel).' };
+  }
+
+  const articulos = {};
+  let filasIgnoradas = 0;
+  for(let i=1; i<lineas.length; i++){
+    const celdas = separarCeldas(lineas[i]);
+    const nombre = (celdas[0]||'').trim();
+    // se saltea cualquier fila cuyo "articulo" no tenga ninguna letra (filas de indice/basura, o vacias)
+    if(!nombre || !/[a-zA-ZÀ-ÿ]/.test(nombre)){ filasIgnoradas++; continue; }
+
+    const consumos = {};
+    let algunDato = false;
+    anchosPorColumna.forEach((ancho, idx) => {
+      if(ancho === null) return;
+      const valor = parsearNumeroArgentino(celdas[idx+1]);
+      if(valor !== null){ consumos[ancho] = valor; algunDato = true; }
+    });
+    if(algunDato) articulos[nombre] = { ...(articulos[nombre]||{}), ...consumos }; // si el articulo se repite, se combinan los datos
+  }
+
+  const anchosValidos = [...new Set(anchosPorColumna.filter(a => a !== null))].sort((a,b) => a-b);
+  return { anchos: anchosValidos, articulos, filasIgnoradas, totalArticulos: Object.keys(articulos).length };
+}
+
+let tablaConsumoParaGuardar = null;
+
+function previsualizarTablaConsumo(){
+  const errorEl = document.getElementById('tc-error');
+  const previewEl = document.getElementById('tc-preview');
+  errorEl.style.display = 'none';
+  previewEl.innerHTML = '';
+  tablaConsumoParaGuardar = null;
+
+  const resultado = parsearTablaConsumoPegada(document.getElementById('tc-pegado').value);
+  if(resultado.error){
+    errorEl.textContent = resultado.error;
+    errorEl.style.display = 'block';
+    return;
+  }
+  if(resultado.totalArticulos === 0){
+    errorEl.textContent = 'No encontré ningún artículo con datos. Revise que haya pegado también las filas, no solo el encabezado.';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  tablaConsumoParaGuardar = resultado;
+  const nombresArticulos = Object.keys(resultado.articulos);
+  previewEl.innerHTML = `
+    <p class="note" style="margin-bottom:8px;">Encontré <b>${resultado.totalArticulos}</b> artículo(s), con anchos: ${resultado.anchos.join(', ')} cm.
+    ${resultado.filasIgnoradas > 0 ? ` (${resultado.filasIgnoradas} fila(s) sin nombre de artículo válido, se ignoraron)` : ''}</p>
+    <div style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;margin-bottom:12px;font-size:0.8rem;">
+      ${nombresArticulos.slice(0,15).map(nom => `
+        <div style="padding:6px 10px;border-bottom:1px solid var(--line);">
+          <b>${escaparHtml(nom)}</b> — ${Object.entries(resultado.articulos[nom]).map(([a,c]) => a+'cm: '+c+'m').join(' · ')}
+        </div>
+      `).join('')}
+      ${nombresArticulos.length > 15 ? `<div style="padding:6px 10px;color:#8A8072;">...y ${nombresArticulos.length-15} más</div>` : ''}
+    </div>
+    <button class="btn btn-gold" onclick="guardarTablaConsumo()">Guardar esta tabla</button>
+  `;
+}
+
+async function guardarTablaConsumo(){
+  if(!tablaConsumoParaGuardar) return;
+  try{
+    await db.collection('config').doc('tabla_consumo_telas').set(tablaConsumoParaGuardar);
+    tablaConsumo = tablaConsumoParaGuardar;
+    alert('Tabla guardada: ' + tablaConsumoParaGuardar.totalArticulos + ' artículo(s). Ya está disponible para generar órdenes de trabajo.');
+    mostrarEstadoTablaConsumo();
+  } catch(e){
+    alert('No se pudo guardar: ' + e.message);
+  }
+}
+
+function mostrarEstadoTablaConsumo(){
+  const el = document.getElementById('tc-estado-actual');
+  if(!el) return;
+  const hay = tablaConsumo && tablaConsumo.articulos && Object.keys(tablaConsumo.articulos).length > 0;
+  el.textContent = hay
+    ? `Tabla actual cargada: ${Object.keys(tablaConsumo.articulos).length} artículo(s).`
+    : 'Todavía no hay ninguna tabla guardada.';
+}
+
+async function abrirTablaConsumo(){
+  mostrarPaso('step-tabla-consumo');
+  document.getElementById('tc-pegado').value = '';
+  document.getElementById('tc-preview').innerHTML = '';
+  document.getElementById('tc-error').style.display = 'none';
+  if(tablaConsumo === null) await cargarTablaConsumo();
+  mostrarEstadoTablaConsumo();
+}
+
+// ---------- generar orden de trabajo ----------
+function buscarConsumoMasCercano(articuloData, anchoBuscado){
+  if(!articuloData) return null;
+  const entradas = Object.entries(articuloData)
+    .filter(([k,v]) => v !== null && v !== undefined)
+    .map(([k,v]) => ({ancho: parseFloat(k), consumo: v}));
+  if(entradas.length === 0) return null;
+  let mejor = entradas[0];
+  entradas.forEach(e => { if(Math.abs(e.ancho - anchoBuscado) < Math.abs(mejor.ancho - anchoBuscado)) mejor = e; });
+  return { consumo: mejor.consumo, anchoUsado: mejor.ancho, exacto: Math.abs(mejor.ancho - anchoBuscado) < 0.01 };
+}
+
+async function abrirOrdenTrabajo(){
+  mostrarPaso('step-orden-trabajo');
+  if(tablaConsumo === null) await cargarTablaConsumo();
+
+  const hay = tablaConsumo && tablaConsumo.articulos && Object.keys(tablaConsumo.articulos).length > 0;
+  document.getElementById('ot-sin-tabla').style.display = hay ? 'none' : 'block';
+
+  document.getElementById('ot-sku-tela').value = '';
+  document.getElementById('ot-metros').value = '';
+  document.getElementById('ot-ancho').value = '';
+  document.getElementById('ot-sku-producto').value = '';
+  document.getElementById('ot-nota').value = '';
+  document.getElementById('ot-resultado').innerHTML = '';
+
+  const sel = document.getElementById('ot-articulo');
+  sel.innerHTML = '<option value="">Elija un artículo</option>';
+  if(hay){
+    Object.keys(tablaConsumo.articulos).sort().forEach(nom => {
+      const opt = document.createElement('option');
+      opt.value = nom; opt.textContent = nom;
+      sel.appendChild(opt);
+    });
+  }
+}
+
+function calcularOrdenTrabajo(){
+  const cont = document.getElementById('ot-resultado');
+  const skuTela = document.getElementById('ot-sku-tela').value.trim();
+  const metros = parseFloat(document.getElementById('ot-metros').value);
+  const articuloNombre = document.getElementById('ot-articulo').value;
+  const anchoIngresado = parseFloat(document.getElementById('ot-ancho').value);
+  const skuProducto = document.getElementById('ot-sku-producto').value.trim();
+  const nota = document.getElementById('ot-nota').value.trim();
+
+  if(!articuloNombre || isNaN(metros) || metros <= 0 || isNaN(anchoIngresado) || anchoIngresado <= 0){
+    cont.innerHTML = '';
+    return;
+  }
+
+  const datosArticulo = tablaConsumo.articulos[articuloNombre];
+  const resultado = buscarConsumoMasCercano(datosArticulo, anchoIngresado);
+  if(!resultado){
+    cont.innerHTML = '<p class="error" style="display:block;">Este artículo no tiene ningún ancho cargado en la tabla.</p>';
+    return;
+  }
+
+  const cantidad = Math.floor(metros / resultado.consumo);
+  const sobrante = Math.round((metros - cantidad*resultado.consumo) * 100) / 100;
+
+  const avisoAncho = resultado.exacto ? '' :
+    `⚠️ La tabla no tiene el ancho ${anchoIngresado} cm exacto para "${articuloNombre}" — usé el más cercano (${resultado.anchoUsado} cm). Revíselo antes de mandarlo.`;
+
+  const lineasTexto = [
+    'ORDEN DE TRABAJO',
+    `Tela: ${skuTela || '(sin SKU)'} — se entregan ${metros} metros`,
+    `Fabricar: ${articuloNombre} (ancho ${resultado.anchoUsado} cm, consumo ≈ ${resultado.consumo} m c/u)`,
+    `Cantidad aproximada: ${cantidad} unidades` + (sobrante > 0 ? ` (sobran ≈ ${sobrante} m)` : ''),
+    `SKU del producto terminado: ${skuProducto || '(sin definir)'}`,
+  ];
+  if(nota) lineasTexto.push(nota);
+  const textoOrden = lineasTexto.join('\n');
+
+  cont.innerHTML = `
+    ${avisoAncho ? `<p class="note" style="color:#A6432F;margin-bottom:10px;">${avisoAncho}</p>` : ''}
+    <div style="background:var(--cream);border-radius:10px;padding:14px;white-space:pre-wrap;font-size:0.88rem;margin-bottom:12px;">${escaparHtml(textoOrden)}</div>
+    <div class="actions">
+      <button class="btn btn-gold" onclick="compartirOrdenTrabajo('whatsapp')">📤 Compartir por WhatsApp</button>
+      <button class="btn btn-ghost" onclick="compartirOrdenTrabajo('copiar')">📋 Copiar texto</button>
+    </div>
+  `;
+  cont.dataset.texto = textoOrden;
+}
+
+function compartirOrdenTrabajo(modo){
+  const cont = document.getElementById('ot-resultado');
+  const texto = cont.dataset.texto;
+  if(!texto) return;
+  if(modo === 'copiar'){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(texto).then(() => alert('Copiado.')).catch(() => window.prompt('Copie el texto:', texto));
+    } else {
+      window.prompt('Copie el texto:', texto);
+    }
+    return;
+  }
+  window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
 }
 
 async function abrirDatosBancarios(){
