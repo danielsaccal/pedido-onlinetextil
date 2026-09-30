@@ -1427,14 +1427,14 @@ a.grilla-celda{display:block;}
         <select id="ic-ancho" onchange="cargarInstruccionActual()"><option value="">Elija un ancho</option></select>
       </div>
 
-      <div class="field">
+      <div class="field" style="display:none;">
         <label>Tipo de corte</label>
         <select id="ic-tipo-corte" onchange="cambiarTipoCorteInstruccion()">
+          <option value="personalizado">Personalizado (cada pieza con su propia medida)</option>
           <option value="igual">Tiras iguales (el ancho se reparte parejo)</option>
-          <option value="personalizado">Personalizado (cada tira con su propia medida)</option>
         </select>
       </div>
-      <div class="field"><label id="ic-cant-tiras-label">¿En cuántas tiras iguales divide este ancho?</label><input type="number" id="ic-cant-tiras" min="1" max="12" placeholder="Ej: 2" oninput="generarCamposTiras()"></div>
+      <div class="field"><label id="ic-cant-tiras-label">¿Cuántas piezas lleva el artículo?</label><input type="number" id="ic-cant-tiras" min="1" max="12" placeholder="Ej: 3 (Plana, Ajustable, Funda)" oninput="generarCamposTiras()"></div>
       <div class="field" id="ic-largo-tira-wrap"><label>Largo de esa tira (cm)</label><input type="number" id="ic-largo-tira" min="0" step="0.1" placeholder="Ej: 260" oninput="previsualizarBosquejoCorte()"></div>
 
       <div id="ic-campos-tiras"></div>
@@ -2607,7 +2607,11 @@ function buscarBosquejoCorte(articulo, ancho){
 // plantillas de ejemplo ya confirmadas con el dueño, para precargar el formulario la primera vez
 // que elija ese articulo (si todavia no tiene nada guardado para el ancho elegido)
 const PLANTILLAS_INSTRUCCIONES = {
-  'Juego 1 1/2': { cantTiras: 2, largoTira: 260, nombres: ['Ajustable', 'Plana'], nota: '' },
+  'Juego 1 1/2': { nota: '', piezas: (a) => [
+    { nombre: 'Plana', ancho: Math.round(a/2*100)/100, largo: 260, fila: 1, cantidad: 1 },
+    { nombre: 'Ajustable', ancho: Math.round(a/2*100)/100, largo: 260, fila: 1, cantidad: 1 },
+    { nombre: 'Funda de almohada', ancho: 50, largo: 80, fila: 2, cantidad: 1 },
+  ] },
   'Funda de almohada': { cantTiras: 6, largoTira: 85, nombres: ['Tapa 1','Tapa 2','Tapa 3','Tapa 4','Tapa 5','Tapa 6'], nota: 'Cada 2 tapas forman una funda de 50 x 80 cm terminada (deja margen de costura).' },
 };
 
@@ -2628,7 +2632,7 @@ async function abrirInstruccionesCorte(){
 }
 
 function limpiarFormularioInstruccion(){
-  document.getElementById('ic-tipo-corte').value = 'igual';
+  document.getElementById('ic-tipo-corte').value = 'personalizado';
   document.getElementById('ic-cant-tiras').value = '';
   document.getElementById('ic-largo-tira').value = '';
   document.getElementById('ic-nota').value = '';
@@ -2641,7 +2645,7 @@ function limpiarFormularioInstruccion(){
 
 function actualizarVistaTipoCorte(){
   const personalizado = document.getElementById('ic-tipo-corte').value === 'personalizado';
-  document.getElementById('ic-cant-tiras-label').textContent = personalizado ? '¿Cuántas tiras distintas corta?' : '¿En cuántas tiras iguales divide este ancho?';
+  document.getElementById('ic-cant-tiras-label').textContent = '¿Cuántas piezas lleva el artículo?';
   document.getElementById('ic-largo-tira-wrap').style.display = personalizado ? 'none' : 'block';
 }
 
@@ -2670,21 +2674,23 @@ function cargarInstruccionActual(){
 
   const guardada = buscarInstruccionGuardada(articulo, ancho);
   if(guardada && guardada.piezas && guardada.piezas.length){
-    const esPersonalizado = guardada.tipo === 'personalizado';
-    document.getElementById('ic-tipo-corte').value = esPersonalizado ? 'personalizado' : 'igual';
+    // las instrucciones viejas de "tiras iguales" ya guardan ancho y largo por pieza: se abren como piezas
+    document.getElementById('ic-tipo-corte').value = 'personalizado';
     actualizarVistaTipoCorte();
     document.getElementById('ic-cant-tiras').value = guardada.piezas.length;
-    if(!esPersonalizado) document.getElementById('ic-largo-tira').value = guardada.piezas[0].largo;
     document.getElementById('ic-nota').value = guardada.nota || '';
     generarCamposTiras(guardada.piezas);
     document.getElementById('ic-btn-borrar').style.display = 'inline-block';
   } else if(PLANTILLAS_INSTRUCCIONES[articulo]){
     // primera vez con este articulo: precarga el ejemplo ya confirmado, listo para revisar y guardar
     const pl = PLANTILLAS_INSTRUCCIONES[articulo];
-    document.getElementById('ic-cant-tiras').value = pl.cantTiras;
-    document.getElementById('ic-largo-tira').value = pl.largoTira;
+    const anchoSel = parseFloat(ancho);
+    const piezasPl = pl.piezas
+      ? pl.piezas(anchoSel)
+      : pl.nombres.map(n => ({ nombre: n, ancho: Math.round(anchoSel / pl.cantTiras * 100) / 100, largo: pl.largoTira, fila: 1, cantidad: 1 }));
+    document.getElementById('ic-cant-tiras').value = piezasPl.length;
     document.getElementById('ic-nota').value = pl.nota;
-    generarCamposTiras(pl.nombres.map(n => ({nombre: n})));
+    generarCamposTiras(piezasPl);
   }
   previsualizarBosquejoCorte();
 }
@@ -2708,14 +2714,14 @@ function generarCamposTiras(piezasPrevias){
     if(personalizado){
       return `
         <div class="ic-fila-tira" style="border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;">
-          <div class="field"><label>Nombre de la tira ${i+1}</label><input type="text" class="ic-nombre-tira" value="${escapeAttr(p.nombre||'')}" placeholder="Ej: Faldón lateral" oninput="previsualizarBosquejoCorte()"></div>
-          <div class="field"><label>Ancho de esta tira (cm)</label><input type="number" step="0.1" class="ic-ancho-tira" value="${p.ancho||''}" oninput="previsualizarBosquejoCorte()"></div>
-          <div class="field"><label>Largo de esta tira (cm)</label><input type="number" step="0.1" class="ic-largo-tira-personal" value="${p.largo||''}" oninput="previsualizarBosquejoCorte()"></div>
+          <div class="field"><label>Pieza ${i+1} — nombre</label><input type="text" class="ic-nombre-tira" value="${escapeAttr(p.nombre||'')}" placeholder="Ej: Plana" oninput="previsualizarBosquejoCorte()"></div>
+          <div class="field"><label>Ancho de esta pieza (cm)</label><input type="number" step="0.1" class="ic-ancho-tira" value="${p.ancho||''}" oninput="previsualizarBosquejoCorte()"></div>
+          <div class="field"><label>Largo de esta pieza (cm)</label><input type="number" step="0.1" class="ic-largo-tira-personal" value="${p.largo||''}" oninput="previsualizarBosquejoCorte()"></div>
           <div class="field"><label>¿Dónde se corta?</label><select class="ic-fila-sel" onchange="previsualizarBosquejoCorte()">
             <option value="1" ${String(p.fila||1)==='1'?'selected':''}>Al lado de las otras (a lo ancho)</option>
             <option value="2" ${String(p.fila||1)==='2'?'selected':''}>Debajo, del largo de la tela</option>
           </select></div>
-          <div class="field"><label>Cantidad de piezas iguales</label><input type="number" min="1" step="1" class="ic-cant-pieza" value="${p.cantidad||1}" oninput="previsualizarBosquejoCorte()"></div>
+          <div class="field"><label>¿Cuántas de esta pieza lleva el artículo?</label><input type="number" min="1" step="1" class="ic-cant-pieza" value="${p.cantidad||1}" oninput="previsualizarBosquejoCorte()"></div>
         </div>`;
     }
     return `<div class="ic-fila-tira field"><label>Nombre de la tira ${i+1}</label><input type="text" class="ic-nombre-tira" value="${escapeAttr(p.nombre||'')}" placeholder="Ej: Ajustable" oninput="previsualizarBosquejoCorte()"></div>`;
@@ -2779,6 +2785,11 @@ function armarTextoInstruccion(piezas, nota){
     texto = personalizado
       ? `De ${ancho} cm de ancho se obtienen ${piezas.reduce((s,p)=>s+(p.cantidad||1),0)} tira(s) a medida: ${detalle}.`
       : `En ${ancho} cm de ancho por ${piezas[0].largo} cm de largo se obtienen ${piezas.length} tira(s): ${detalle}.`;
+  }
+  if(personalizado){
+    const articulo = document.getElementById('ic-articulo').value;
+    const total = piezas.reduce((s,p) => s + (p.cantidad||1), 0);
+    texto = `${articulo} lleva ${total} pieza(s): ${piezas.map(p => ((p.cantidad||1) > 1 ? p.cantidad + ' ' : '') + p.nombre).join(', ')}. ` + texto;
   }
   if(nota) texto += ' ' + nota;
   return texto;
@@ -2874,7 +2885,7 @@ async function guardarInstruccionCorte(){
   const piezas = leerPiezasFormularioInstruccion();
   if(!piezas){
     errorEl.textContent = document.getElementById('ic-tipo-corte').value === 'personalizado'
-      ? 'Complete el nombre, ancho y largo de cada tira.'
+      ? 'Complete el nombre, ancho y largo de cada pieza.'
       : 'Complete la cantidad de tiras, el largo, y el nombre de cada tira.';
     errorEl.style.display = 'block';
     return;
