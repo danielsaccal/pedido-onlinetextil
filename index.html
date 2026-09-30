@@ -506,12 +506,15 @@ a.grilla-celda{display:block;}
           <span>🏭 Talleres</span><span class="menu-cat-chev">▾</span>
         </div>
         <div class="menu-cat-body">
-          <span class="menu-item" onclick="abrirTablaConsumo()">📐 Tabla de consumo de tela</span>
+          <span class="menu-item" onclick="abrirArticulosCortes()">✂️ Artículos y cortes</span>
+          <span class="menu-item" onclick="abrirTrabajoMedida()">📏 Trabajo a medida</span>
           <span class="menu-item" onclick="abrirOrdenTrabajo()">📋 Generar orden de trabajo</span>
           <span class="menu-item" onclick="abrirHistorialOT()">📦 Historial de órdenes de trabajo</span>
-          <span class="menu-item" onclick="abrirTrabajoMedida()">📏 Trabajo a medida</span>
-          <span class="menu-item" onclick="abrirFichasArticulos()">🧩 Fichas de artículos (SKU)</span>
+          <details style="margin-top:4px;"><summary style="cursor:pointer;font-size:0.8rem;opacity:.7;padding:4px 0;">Pantallas anteriores</summary>
+          <span class="menu-item" onclick="abrirTablaConsumo()">📐 Tabla de consumo de tela</span>
           <span class="menu-item" onclick="abrirInstruccionesCorte()">✂️ Instrucciones de corte</span>
+          <span class="menu-item" onclick="abrirFichasArticulos()">🧩 Fichas de artículos (SKU)</span>
+          </details>
         </div>
       </div>
 
@@ -1459,7 +1462,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v20</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v21</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1522,6 +1525,53 @@ a.grilla-celda{display:block;}
         <p class="error" id="fa-error" style="display:none;"></p>
       </div>
 
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-articulos-cortes">
+    <div class="form-card" style="max-width:1100px;">
+      <h2>Artículos y cortes</h2>
+      <style>
+        .ac-grid{display:grid;grid-template-columns:1fr;gap:14px;}
+        @media (min-width:820px){.ac-grid{grid-template-columns:240px minmax(0,1fr);}}
+        .ac-grid input[type=text], .ac-grid input[type=number]{padding:7px 8px;font-size:0.88rem;min-width:0;width:100%;box-sizing:border-box;}
+      </style>
+      <div class="ac-grid">
+        <div style="border:1px solid var(--line);border-radius:12px;padding:10px;align-self:start;">
+          <input type="text" id="ac-buscar" placeholder="🔍 Buscar" oninput="renderListaAC()" style="margin-bottom:8px;">
+          <div id="ac-lista" style="max-height:60vh;overflow-y:auto;"></div>
+          <button type="button" class="btn-mini" style="width:100%;margin-top:8px;" onclick="nuevoArticuloAC()">+ Nuevo artículo</button>
+        </div>
+        <div style="border:1px solid var(--line);border-radius:12px;padding:12px;">
+          <p class="note" id="ac-vacio">Elija un artículo de la lista o cree uno nuevo.</p>
+          <div id="ac-editor" style="display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;">
+              <strong id="ac-titulo" style="font-size:1.05rem;"></strong>
+              <span style="display:flex;gap:6px;">
+                <button type="button" class="btn-mini" onclick="renombrarAC()" title="Renombrar">✏️</button>
+                <button type="button" class="btn-mini" onclick="borrarAC()" title="Borrar">🗑️</button>
+              </span>
+            </div>
+            <p class="note" id="ac-origen" style="margin:0 0 6px;"></p>
+            <div id="ac-variantes"></div>
+            <div style="display:grid;grid-template-columns:minmax(0,1.8fr) 62px 62px 46px 46px 34px 26px;gap:5px;font-size:0.72rem;color:#8A8072;margin-bottom:3px;">
+              <span>Pieza</span><span>Ancho</span><span>Largo</span><span>Cant.</span><span>Tapas</span><span title="Se puede girar si ahorra tela">Girar</span><span></span>
+            </div>
+            <div id="ac-piezas"></div>
+            <button type="button" class="btn-mini" onclick="agregarPiezaAC(); calcularAC();">+ Pieza</button>
+            <p class="note" style="margin:6px 0 12px;font-size:0.75rem;">Ancho y largo = lo que consume del ancho y del largo de la tela.</p>
+            <div id="ac-consumos" style="margin-bottom:8px;"></div>
+            <div id="ac-corte" style="margin-bottom:10px;"></div>
+            <input type="text" id="ac-nota" placeholder="Nota para el taller (opcional)" oninput="calcularAC()" style="margin-bottom:10px;">
+            <div class="actions">
+              <button class="btn btn-gold" onclick="guardarAC()">Guardar</button>
+              <button class="btn btn-ghost" onclick="ordenDesdeAC()">📋 Orden de trabajo</button>
+            </div>
+            <p class="error" id="ac-error" style="display:none;"></p>
+          </div>
+        </div>
+      </div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
@@ -3590,6 +3640,231 @@ async function llevarTrabajoMedidaAOrden(){
   r.querySelector('.ot-r-nota').value = texto;
 }
 
+// ===== Articulos y cortes (pantalla unificada) =====
+// Una sola pantalla para cargar las piezas de cada articulo una vez. El consumo en todos los anchos de
+// tela se ve al mismo tiempo. Guarda en el mismo lugar que "Instrucciones de corte", asi que las
+// ordenes de trabajo, la tabla y las piezas sueltas de los juegos siguen funcionando igual.
+let acArticulo = null;     // articulo abierto
+let acAnchoVista = null;   // ancho elegido para ver el corte
+
+async function abrirArticulosCortes(){
+  mostrarPaso('step-articulos-cortes');
+  if(tablaConsumo === null) await cargarTablaConsumo();
+  if(fichasArticulos === null) await cargarFichasArticulos();
+  tablaConsumo.articulos = tablaConsumo.articulos || {};
+  tablaConsumo.instrucciones = tablaConsumo.instrucciones || {};
+  await completarPiezasDeJuegosGuardados();
+  document.getElementById('ac-buscar').value = '';
+  acArticulo = null;
+  renderListaAC();
+  renderEditorAC();
+}
+
+function articulosAC(){
+  return [...new Set([...Object.keys(tablaConsumo.articulos || {}), ...Object.keys(tablaConsumo.instrucciones || {})])];
+}
+function origenAC(a){
+  const d = Object.values(tablaConsumo.instrucciones[a] || {}).find(x => x && x.auto && x.origen);
+  return d ? d.origen : '';
+}
+
+function renderListaAC(){
+  const q = document.getElementById('ac-buscar').value.trim().toLowerCase();
+  const todos = articulosAC();
+  const padres = todos.filter(a => !origenAC(a) || !todos.includes(origenAC(a))).sort((x,y) => x.localeCompare(y, 'es'));
+  const item = (a, hija) => `<div onclick="abrirArticuloAC('${escapeAttr(a)}')" style="padding:7px 10px;border-radius:8px;cursor:pointer;font-size:0.88rem;${hija ? 'padding-left:24px;color:#6B6258;' : ''}${a === acArticulo ? 'background:var(--purple);color:#fff;' : ''}">${hija ? '↳ ' : ''}${escaparHtml(a)}</div>`;
+  let html = '';
+  padres.forEach(p => {
+    const hijas = todos.filter(a => origenAC(a) === p).sort((x,y) => x.localeCompare(y, 'es'));
+    const coincide = !q || p.toLowerCase().includes(q) || hijas.some(h => h.toLowerCase().includes(q));
+    if(!coincide) return;
+    html += item(p, false);
+    hijas.forEach(h => html += item(h, true));
+  });
+  const fichas = hayFichas() ? Object.keys(fichasArticulos.fichas).sort().filter(s => !q || s.toLowerCase().includes(q) || (fichasArticulos.fichas[s].nombre||'').toLowerCase().includes(q)) : [];
+  if(fichas.length){
+    html += `<p style="font-size:0.75rem;color:#8A8072;margin:12px 0 4px;">Fichas por SKU</p>` +
+      fichas.map(s => `<div onclick="abrirFichasArticulos().then(() => abrirEditorFicha('${escapeAttr(s)}'))" style="padding:7px 10px;border-radius:8px;cursor:pointer;font-size:0.88rem;">${escaparHtml(nombreFicha(s))}</div>`).join('');
+  }
+  document.getElementById('ac-lista').innerHTML = html || '<p class="note">No hay artículos que coincidan.</p>';
+}
+
+// piezas cargadas del articulo: si hay distintas segun el ancho, se muestran para elegir
+function juegosDePiezasAC(a){
+  const grupos = [];
+  Object.entries(tablaConsumo.instrucciones[a] || {}).forEach(([ancho, g]) => {
+    if(!piezasValidas(g)) return;
+    const clave = JSON.stringify(g.piezas.map(p => [p.nombre, +p.ancho, +p.largo, +(p.cantidad||1), +(p.partes||1)]));
+    const ya = grupos.find(x => x.clave === clave);
+    if(ya) ya.anchos.push(+ancho); else grupos.push({ clave, piezas: g.piezas, anchos: [+ancho], guardado: g.guardado || 0, auto: !!g.auto });
+  });
+  return grupos.sort((x,y) => (y.guardado - x.guardado) || (y.piezas.length - x.piezas.length));
+}
+
+function abrirArticuloAC(a, piezasForzadas){
+  acArticulo = a;
+  acAnchoVista = null;
+  renderListaAC();
+  const grupos = juegosDePiezasAC(a);
+  const base = piezasForzadas || (grupos[0] ? grupos[0].piezas : []);
+  document.getElementById('ac-piezas').innerHTML = '';
+  (base.length ? base : [{}]).forEach(p => agregarPiezaAC(p));
+  const g0 = grupos.length ? (tablaConsumo.instrucciones[a] || {})[grupos[0].anchos[0]] : null;
+  document.getElementById('ac-nota').value = (g0 && g0.nota) || '';
+  renderEditorAC();
+  if(window.innerWidth < 820) document.getElementById('ac-editor').scrollIntoView({ behavior: 'smooth' });
+}
+
+function agregarPiezaAC(p){
+  p = p || {};
+  const fila = document.createElement('div');
+  fila.className = 'ac-pieza';
+  fila.style.cssText = 'display:grid;grid-template-columns:minmax(0,1.8fr) 62px 62px 46px 46px 34px 26px;gap:5px;margin-bottom:5px;align-items:center;';
+  fila.innerHTML = `
+    <input type="text" class="ac-p-nombre" value="${escapeAttr(p.nombre||'')}" placeholder="Plana" oninput="calcularAC()">
+    <input type="number" step="0.1" class="ac-p-ancho" value="${p.ancho||''}" placeholder="250" oninput="calcularAC()">
+    <input type="number" step="0.1" class="ac-p-largo" value="${p.largo||''}" placeholder="275" oninput="calcularAC()">
+    <input type="number" min="1" class="ac-p-cant" value="${p.cantidad||1}" oninput="calcularAC()">
+    <input type="number" min="1" class="ac-p-tapas" value="${p.partes||1}" oninput="calcularAC()">
+    <input type="checkbox" class="ac-p-girar" ${puedeGirar(p) ? 'checked' : ''} onchange="calcularAC()" title="Se puede girar si ahorra tela" style="width:18px;height:18px;justify-self:center;">
+    <button type="button" onclick="this.closest('.ac-pieza').remove(); calcularAC();" title="Quitar pieza" style="border:none;background:none;cursor:pointer;color:#8A8072;font-size:1rem;">✕</button>`;
+  document.getElementById('ac-piezas').appendChild(fila);
+}
+
+function leerPiezasAC(){
+  return [...document.querySelectorAll('.ac-pieza')].map(f => ({
+    nombre: f.querySelector('.ac-p-nombre').value.trim(),
+    ancho: parseFloat(f.querySelector('.ac-p-ancho').value),
+    largo: parseFloat(f.querySelector('.ac-p-largo').value),
+    cantidad: Math.max(1, parseInt(f.querySelector('.ac-p-cant').value, 10) || 1),
+    partes: Math.max(1, parseInt(f.querySelector('.ac-p-tapas').value, 10) || 1),
+    girar: f.querySelector('.ac-p-girar').checked,
+  })).filter(p => p.nombre || p.ancho || p.largo);
+}
+
+function renderEditorAC(){
+  const vacio = document.getElementById('ac-vacio'), ed = document.getElementById('ac-editor');
+  if(!acArticulo){ vacio.style.display = 'block'; ed.style.display = 'none'; return; }
+  vacio.style.display = 'none'; ed.style.display = 'block';
+  document.getElementById('ac-titulo').textContent = acArticulo;
+  const origen = origenAC(acArticulo);
+  document.getElementById('ac-origen').textContent = origen ? `Pieza del ${origen}: se actualiza sola cuando guarda el juego.` : '';
+  const grupos = juegosDePiezasAC(acArticulo);
+  document.getElementById('ac-variantes').innerHTML = grupos.length > 1
+    ? `<p class="note" style="margin:0 0 8px;">Este artículo tiene cortes distintos según el ancho. Está viendo el de ${grupos[0].anchos.join(', ')} cm. Ver el de: ` +
+      grupos.slice(1).map((g, i) => `<a href="#" onclick="event.preventDefault(); abrirArticuloAC(acArticulo, juegosDePiezasAC(acArticulo)[${i+1}].piezas)">${g.anchos.join(', ')} cm</a>`).join(' · ') +
+      `. Al guardar, queda uno solo para todos los anchos.</p>`
+    : '';
+  calcularAC();
+}
+
+function calcularAC(anchoElegido){
+  if(anchoElegido) acAnchoVista = anchoElegido;
+  const piezas = leerPiezasAC();
+  const cont = document.getElementById('ac-consumos'), corteEl = document.getElementById('ac-corte');
+  const completas = piezas.length && piezas.every(p => p.nombre && p.ancho > 0 && p.largo > 0);
+  if(!completas){
+    const manual = tablaConsumo.articulos[acArticulo] || {};
+    const ks = Object.keys(manual).filter(k => manual[k] !== null && manual[k] !== '' && manual[k] !== undefined);
+    cont.innerHTML = ks.length
+      ? `<p class="note" style="margin-bottom:6px;">Consumo cargado a mano (sin piezas):</p>` + ks.sort((a,b) => a-b).map(k => `<span style="display:inline-block;margin:0 6px 6px 0;padding:5px 10px;border:1px solid var(--line);border-radius:8px;font-size:0.85rem;">${k} · ${fmtMetros(Number(manual[k]))} m</span>`).join('')
+      : '<p class="note">Cargue las piezas para ver el consumo en cada ancho.</p>';
+    corteEl.innerHTML = '';
+    return;
+  }
+  const res = anchosConocidos().map(W => ({ W, c: calcularCorte(piezas, W) }));
+  const validas = res.filter(r => !r.c.avisos.length);
+  const mejor = validas.length ? validas.reduce((m, r) => r.c.metros < m.c.metros ? r : m) : null;
+  if(!acAnchoVista || !validas.some(r => r.W === acAnchoVista)) acAnchoVista = mejor ? mejor.W : null;
+  cont.innerHTML = res.map(r => {
+    if(r.c.avisos.length) return `<span style="display:inline-block;margin:0 6px 6px 0;padding:5px 10px;border:1px dashed var(--line);border-radius:8px;font-size:0.85rem;color:#B0A698;">${r.W} · no entra</span>`;
+    const sel = r.W === acAnchoVista;
+    return `<span onclick="calcularAC(${r.W})" style="display:inline-block;margin:0 6px 6px 0;padding:5px 10px;border-radius:8px;font-size:0.85rem;cursor:pointer;${sel ? 'background:var(--purple);color:#fff;border:1px solid var(--purple);' : 'border:1px solid var(--line);'}">${r.W} · ${fmtMetros(r.c.metros)} m${mejor && r.W === mejor.W ? ' ⭐' : ''}</span>`;
+  }).join('');
+  if(!acAnchoVista){ corteEl.innerHTML = '<p class="note" style="color:#A6432F;">Estas piezas no entran en ninguno de sus anchos de tela.</p>'; return; }
+  const img = dibujarBosquejoCorte(acAnchoVista, piezas);
+  corteEl.innerHTML = `
+    <div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px;align-items:start;">
+      <img src="${img}" onclick="verImagenGrandeAC(this.src)" title="Ver grande" style="width:110px;border:1px solid var(--line);border-radius:8px;cursor:zoom-in;background:#fff;">
+      <div style="font-size:0.82rem;color:#6B6258;white-space:pre-wrap;">${escaparHtml(textoCorte(acArticulo, piezas, acAnchoVista, document.getElementById('ac-nota').value.trim()))}</div>
+    </div>`;
+}
+
+function verImagenGrandeAC(src){
+  const o = document.createElement('div');
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px;';
+  o.innerHTML = `<img src="${src}" style="max-width:95vw;max-height:90vh;background:#fff;border-radius:8px;">`;
+  o.onclick = () => o.remove();
+  document.body.appendChild(o);
+}
+
+async function guardarAC(){
+  const errorEl = document.getElementById('ac-error');
+  errorEl.style.display = 'none';
+  const piezas = leerPiezasAC();
+  if(!piezas.length || piezas.some(p => !p.nombre || !(p.ancho > 0) || !(p.largo > 0))){
+    errorEl.textContent = 'Complete nombre, ancho y largo de cada pieza.'; errorEl.style.display = 'block'; return;
+  }
+  const a = acArticulo;
+  const W = acAnchoVista;
+  if(!W){ errorEl.textContent = 'Estas piezas no entran en ninguno de sus anchos de tela.'; errorEl.style.display = 'block'; return; }
+  const previas = Object.entries(tablaConsumo.instrucciones[a] || {}).filter(([k, g]) => g && !g.auto);
+  const distintas = previas.filter(([k, g]) => JSON.stringify((g.piezas||[]).map(p => [p.nombre, +p.ancho, +p.largo, +(p.cantidad||1), +(p.partes||1)])) !== JSON.stringify(piezas.map(p => [p.nombre, p.ancho, p.largo, p.cantidad, p.partes])));
+  if(distintas.length && !confirm(`Tenía cortes distintos cargados en ${distintas.map(d => d[0]).join(', ')} cm. Se reemplazan por este, que vale para todos los anchos. ¿Seguir?`)) return;
+  const nota = document.getElementById('ac-nota').value.trim();
+  const corte = calcularCorte(piezas, W);
+  // una sola instruccion para el articulo: los demas anchos se calculan solos a partir de esta
+  const nuevas = {};
+  Object.entries(tablaConsumo.instrucciones[a] || {}).forEach(([k, g]) => { if(g && g.auto) nuevas[k] = g; });
+  nuevas[W] = { texto: textoCorte(a, piezas, W, nota), bosquejoBase64: '', piezas, nota, tipo: 'personalizado', consumo: corte.metros, guardado: Date.now() };
+  tablaConsumo.instrucciones[a] = nuevas;
+  tablaConsumo.articulos[a] = tablaConsumo.articulos[a] || {};
+  const enTabla = tablaConsumo.articulos[a][W];
+  if(enTabla === undefined || enTabla === null || enTabla === '') tablaConsumo.articulos[a][W] = corte.metros;
+  const derivadas = cargarPiezasDelJuego(a, String(W), piezas);
+  try{
+    await guardarTablaYConsumo();
+    renderListaAC();
+    renderEditorAC();
+    alert('Guardado.' + (derivadas.length ? '\n\nPiezas sueltas actualizadas:\n• ' + derivadas.join('\n• ') : ''));
+  } catch(e){ errorEl.textContent = 'No se pudo guardar: ' + e.message; errorEl.style.display = 'block'; }
+}
+
+async function nuevoArticuloAC(){
+  const nombre = (prompt('Nombre del artículo nuevo (ej: Acolchado 2 1/2):') || '').trim();
+  if(!nombre) return;
+  if(articulosAC().includes(nombre)){ alert('Ya existe un artículo con ese nombre.'); return; }
+  tablaConsumo.articulos[nombre] = {};
+  try{ await guardarTablaYConsumo(); abrirArticuloAC(nombre); }
+  catch(e){ delete tablaConsumo.articulos[nombre]; alert('No se pudo crear: ' + e.message); }
+}
+async function renombrarAC(){
+  const sel = document.getElementById('ic-articulo');
+  sel.innerHTML = `<option value="${escapeAttr(acArticulo)}">x</option>`; sel.value = acArticulo;
+  const antes = articulosAC();
+  await renombrarArticuloInstruccion();
+  const nuevo = articulosAC().find(x => !antes.includes(x));
+  if(nuevo) abrirArticuloAC(nuevo);
+}
+async function borrarAC(){
+  const sel = document.getElementById('ic-articulo');
+  sel.innerHTML = `<option value="${escapeAttr(acArticulo)}">x</option>`; sel.value = acArticulo;
+  const antes = articulosAC().length;
+  await borrarArticuloInstruccion();
+  if(articulosAC().length < antes){ acArticulo = null; renderListaAC(); renderEditorAC(); }
+}
+async function ordenDesdeAC(){
+  if(!acArticulo || !acAnchoVista) return;
+  const a = acArticulo, W = acAnchoVista;
+  await abrirOrdenTrabajo();
+  const r = document.querySelector('.ot-renglon');
+  if(!r) return;
+  const sel = r.querySelector('.ot-r-articulo');
+  sel.value = a;
+  cambiarModoRenglonOT(sel);
+  r.querySelector('.ot-r-ancho').value = W;
+}
+
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -3690,7 +3965,7 @@ async function guardarInstruccionCorte(){
   const bosquejoBase64 = ''; // el bosquejo se dibuja en el momento a partir de las piezas
 
   tablaConsumo.instrucciones = tablaConsumo.instrucciones || {};
-  tablaConsumo.instrucciones[articulo] = { ...(tablaConsumo.instrucciones[articulo]||{}), [ancho]: { texto, bosquejoBase64, piezas, nota, tipo, consumo: corte.metros } };
+  tablaConsumo.instrucciones[articulo] = { ...(tablaConsumo.instrucciones[articulo]||{}), [ancho]: { texto, bosquejoBase64, piezas, nota, tipo, consumo: corte.metros, guardado: Date.now() } };
   tablaConsumo.articulos = tablaConsumo.articulos || {};
   tablaConsumo.articulos[articulo] = tablaConsumo.articulos[articulo] || {};
   const enTablaAhora = tablaConsumo.articulos[articulo][ancho];
@@ -10708,7 +10983,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-09-30-v20';
+const APP_VERSION = '2026-09-30-v21';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
