@@ -1470,7 +1470,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v24</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v25</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2679,10 +2679,27 @@ async function abrirTablaConsumo(){
 }
 
 // ---------- generar orden de trabajo (varios productos por orden, numerada) ----------
-function lineaRenglonTexto(r, i){
+// resumen del corte de un renglon: se recalcula con las piezas actuales si se puede (asi las ordenes
+// viejas tambien salen con el formato nuevo); si no, usa el que quedo guardado
+function corteCortoRenglon(r){
+  if(r.personalizado || !r.anchoUsado) return r.corteCorto || '';
+  try{
+    if(r.fichaSku){ const f = piezasDeFicha(r.fichaSku); if(f.piezas.length && !f.errores.length) return textoCorteCorto(f.piezas, r.anchoUsado); }
+    const c = piezasParaAncho(r.articulo, r.anchoUsado);
+    if(c) return textoCorteCorto(c.piezas, r.anchoUsado);
+  } catch(e){}
+  return r.corteCorto || '';
+}
+function anchoComunOT(renglones){
+  const s = [...new Set((renglones || []).filter(r => !r.personalizado && r.anchoUsado).map(r => +r.anchoUsado))];
+  return s.length === 1 ? s[0] : null;
+}
+function lineaRenglonTexto(r, i, anchoComun){
   const lineas = [`• ${r.cantidad} × ${r.articulo}${r.personalizado ? ' (a medida)' : ''}`];
-  lineas.push(`   ${r.anchoUsado ? 'Tela ' + r.anchoUsado + ' cm · ' : ''}${String(r.consumo).replace('.', ',')} m c/u · usa ${String(r.metrosConsumidos).replace('.', ',')} m${r.sku ? ' · SKU ' + r.sku : ''}`);
-  if(r.corteCorto) lineas.push(`   ✂️ ${r.corteCorto}`);
+  const tela = r.anchoUsado && !anchoComun ? 'Tela ' + r.anchoUsado + ' cm · ' : '';
+  lineas.push(`   ${tela}${String(r.consumo).replace('.', ',')} m c/u · usa ${String(r.metrosConsumidos).replace('.', ',')} m${r.sku ? ' · Código ' + r.sku : ''}`);
+  const corte = corteCortoRenglon(r);
+  if(corte) lineas.push(`   ✂️ ${corte}`);
   if(r.nota) lineas.push(`   📝 ${r.nota}`);
   return lineas.join('\n');
 }
@@ -3079,7 +3096,12 @@ function textoCorteCorto(piezas, ancho){
     const k = col.p.nombre + '|' + col.w + '|' + col.p.largo;
     const x = m.get(k) || { p: col.p, w: col.w, n: 0 }; x.n += n; m.set(k, x);
   }));
-  return [...m.values()].map(x => `${(x.p.partes||1) > 1 ? x.n + ' tapas ' + x.p.nombre : (x.n > 1 ? x.n + ' ' : '') + x.p.nombre} ${fmtCm(x.w)}×${fmtCm(x.p.largo)}`).join(' · ');
+  // las piezas de varias tapas (fundas) se cuentan por unidad: "2 Fundas", el detalle de tapas va en el bosquejo
+  const plural = t => t.replace(/^(\S+)/, w => /[aeiouáéó]$/i.test(w) ? w + 's' : w + 'es');
+  return [...m.values()].map(x => {
+    const n = (x.p.partes||1) > 1 ? Math.ceil(x.n / x.p.partes) : x.n;
+    return `${n > 1 ? n + ' ' + plural(x.p.nombre) : x.p.nombre} ${fmtCm(x.w)}×${fmtCm(x.p.largo)}`;
+  }).join(' · ');
 }
 
 function textoCorte(articulo, piezas, ancho, nota){
@@ -4426,9 +4448,10 @@ async function generarOrdenTrabajoCompleta(){
     `🧵 ORDEN DE TRABAJO ${numeroFormateado}`,
     `Taller: ${taller}`,
     `Tela: ${skuTela} · ${metrosTotales} m entregados`,
+    ...(anchoComunOT(renglones) ? [`Ancho de tela: ${anchoComunOT(renglones)} cm`] : []),
     ...(comprobante ? [`Comprobante: ${comprobante}`] : []),
     '',
-    ...renglones.map((r, i) => lineaRenglonTexto(r, i)),
+    ...renglones.map((r, i) => lineaRenglonTexto(r, i, anchoComunOT(renglones))),
     '',
     excede
       ? `⚠️ Se necesitan ≈ ${fmtMetros(metrosConsumidosTotal)} m y se entregan ${metrosTotales} m.`
@@ -4750,9 +4773,10 @@ function compartirTextoOrdenGuardada(docId, modo){
     `🧵 ORDEN DE TRABAJO ${orden.numero}`,
     `Taller: ${orden.taller}`,
     `Tela: ${orden.skuTela} · ${orden.metrosTotales} m entregados`,
+    ...(anchoComunOT(orden.renglones) ? [`Ancho de tela: ${anchoComunOT(orden.renglones)} cm`] : []),
     ...(orden.comprobante ? [`Comprobante: ${orden.comprobante}`] : []),
     '',
-    ...(orden.renglones||[]).map((r,i) => lineaRenglonTexto(r, i)),
+    ...(orden.renglones||[]).map((r,i) => lineaRenglonTexto(r, i, anchoComunOT(orden.renglones))),
   ];
   if(orden.notaGeneral) lineas.push('', orden.notaGeneral);
   const texto = lineas.join('\n');
@@ -11229,7 +11253,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-09-30-v24';
+const APP_VERSION = '2026-09-30-v25';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
