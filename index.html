@@ -1390,7 +1390,11 @@ a.grilla-celda{display:block;}
 
       <div class="field" style="margin-top:16px;"><label>Nota general (opcional)</label><input type="text" id="ot-nota-general" placeholder="Ej: entregar antes del viernes"></div>
 
-      <div class="actions" style="margin-top:14px;"><button class="btn btn-gold" onclick="generarOrdenTrabajoCompleta()">Generar orden de trabajo</button></div>
+      <div class="actions" style="margin-top:14px;">
+        <button class="btn btn-ghost" onclick="sugerirRemanenteOT()">♻️ ¿Qué hago con lo que sobra?</button>
+        <button class="btn btn-gold" onclick="generarOrdenTrabajoCompleta()">Generar orden de trabajo</button>
+      </div>
+      <div id="ot-remanente" style="margin-top:10px;"></div>
       <p class="error" id="ot-error" style="display:none;"></p>
       <div id="ot-resultado" style="margin-top:14px;"></div>
 
@@ -1462,7 +1466,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v21</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v22</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -3865,6 +3869,110 @@ async function ordenDesdeAC(){
   r.querySelector('.ot-r-ancho').value = W;
 }
 
+// ===== Remanente de una orden de trabajo =====
+// Si lo que se va a fabricar usa menos tela de la entregada, propone que hacer con lo que sobra para
+// desperdiciar lo menos posible: la mejor combinacion de articulos y las mejores opciones de uno solo.
+function consumoUnitarioOT(valor, ancho){
+  if(!valor || !(ancho > 0)) return null;
+  if(valor.startsWith('ficha:')){
+    const r = piezasDeFicha(valor.slice(6));
+    return r.errores.length || !r.piezas.length ? null : calcularCorte(r.piezas, ancho).metros;
+  }
+  const conPiezas = piezasParaAncho(valor, ancho);
+  if(conPiezas){ const c = calcularCorte(conPiezas.piezas, ancho); return c.avisos.length ? null : c.metros; }
+  const r = buscarConsumoMasCercano((tablaConsumo.articulos || {})[valor], ancho);
+  return r && r.exacto ? Number(r.consumo) : null;
+}
+
+function leerConsumoActualOT(){
+  let usados = 0, ancho = null;
+  document.querySelectorAll('.ot-renglon').forEach(el => {
+    const v = el.querySelector('.ot-r-articulo').value;
+    const cant = parseInt(el.querySelector('.ot-r-cantidad').value, 10) || 0;
+    if(v === '__personalizado__'){ usados += cant * (parseFloat(el.querySelector('.ot-r-consumo-personal').value) || 0); return; }
+    const w = parseFloat(el.querySelector('.ot-r-ancho').value);
+    if(w > 0 && !ancho) ancho = w;
+    const c = consumoUnitarioOT(v, w);
+    if(c) usados += cant * c;
+  });
+  return { usados: Math.round(usados * 100) / 100, ancho };
+}
+
+// candidatos: todo articulo o ficha con consumo calculable en ese ancho
+function candidatosRemanente(ancho){
+  const lista = [];
+  articulosAC().forEach(a => { const c = consumoUnitarioOT(a, ancho); if(c > 0) lista.push({ valor: a, nombre: a, c }); });
+  if(hayFichas()) Object.keys(fichasArticulos.fichas).forEach(s => { const c = consumoUnitarioOT('ficha:' + s, ancho); if(c > 0) lista.push({ valor: 'ficha:' + s, nombre: nombreFicha(s), c }); });
+  return lista;
+}
+
+// mejor combinacion (mochila sin limite): llena el remanente lo mas posible, con pocos articulos distintos
+function mejorCombinacion(cands, restoM){
+  const paso = restoM > 1000 ? 5 : 1; // en cm
+  const R = Math.floor(restoM * 100 / paso);
+  const pesos = cands.map(x => Math.max(1, Math.round(x.c * 100 / paso)));
+  const dp = new Int32Array(R + 1).fill(-1), dist = new Int32Array(R + 1).fill(1e9);
+  dp[0] = -2; dist[0] = 0;
+  const usados = Array.from({ length: R + 1 }, () => null);
+  usados[0] = new Set();
+  for(let x = 1; x <= R; x++){
+    for(let i = 0; i < cands.length; i++){
+      const y = x - pesos[i];
+      if(y < 0 || dp[y] === -1) continue;
+      const nd = usados[y].has(i) ? dist[y] : dist[y] + 1;
+      if(nd < dist[x]){ dist[x] = nd; dp[x] = i; usados[x] = new Set([...usados[y], i]); }
+    }
+  }
+  let x = R; while(x > 0 && dp[x] === -1) x--;
+  if(x <= 0) return null;
+  const cuenta = {};
+  let t = x; while(t > 0){ const i = dp[t]; cuenta[i] = (cuenta[i]||0) + 1; t -= pesos[i]; }
+  const items = Object.entries(cuenta).map(([i, n]) => ({ ...cands[i], n }));
+  const usa = items.reduce((s, it) => s + it.n * it.c, 0);
+  return { items, sobra: Math.round((restoM - usa) * 100) / 100 };
+}
+
+function sugerirRemanenteOT(){
+  const cont = document.getElementById('ot-remanente');
+  const total = parseFloat(document.getElementById('ot-metros-totales').value);
+  if(!(total > 0)){ cont.innerHTML = '<p class="note">Escriba primero los metros totales entregados.</p>'; return; }
+  const { usados, ancho } = leerConsumoActualOT();
+  if(!ancho){ cont.innerHTML = '<p class="note">Escriba el ancho de la tela en algún producto para poder calcular.</p>'; return; }
+  const resto = Math.round((total - usados) * 100) / 100;
+  if(resto <= 0){ cont.innerHTML = `<p class="note">No sobra tela: lo cargado usa ≈ ${fmtMetros(usados)} m de ${fmtMetros(total)} m.</p>`; return; }
+  const cands = candidatosRemanente(ancho).filter(x => x.c <= resto);
+  if(!cands.length){ cont.innerHTML = `<p class="note">Sobran ≈ ${fmtMetros(resto)} m, pero no hay ningún artículo que entre en ese remanente con tela de ${ancho} cm.</p>`; return; }
+  const combo = mejorCombinacion(cands, resto);
+  const solos = cands.map(x => { const n = Math.floor(resto / x.c + 1e-9); return { ...x, n, sobra: Math.round((resto - n * x.c) * 100) / 100 }; })
+    .sort((a,b) => a.sobra - b.sobra).slice(0, 6);
+  const btn = (items) => `<button type="button" class="btn-mini" onclick='agregarSugerenciaOT(${JSON.stringify(items.map(i => ({ v: i.valor, n: i.n })))}, ${ancho})'>+ Agregar</button>`;
+  cont.innerHTML = `
+    <div style="border:1px solid var(--line);border-radius:10px;padding:12px;">
+      <p style="margin:0 0 8px;"><b>Sobran ≈ ${fmtMetros(resto)} m</b> <span class="note">(tela de ${ancho} cm, lo cargado usa ≈ ${fmtMetros(usados)} m)</span></p>
+      ${combo ? `<p class="note" style="margin:0 0 4px;">Lo que menos desperdicia:</p>
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;background:var(--cream);border-radius:8px;padding:8px 10px;margin-bottom:10px;">
+          <span>${combo.items.map(i => `${i.n} × ${escaparHtml(i.nombre)}`).join(' + ')} <span class="note">→ sobran ${fmtMetros(combo.sobra)} m</span></span>${btn(combo.items)}
+        </div>` : ''}
+      <p class="note" style="margin:0 0 4px;">Con un solo artículo:</p>
+      ${solos.map(s => `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line);">
+        <span>${s.n} × ${escaparHtml(s.nombre)} <span class="note">(${fmtMetros(s.c)} m c/u) → sobran ${fmtMetros(s.sobra)} m</span></span>${btn([s])}</div>`).join('')}
+    </div>`;
+}
+
+function agregarSugerenciaOT(items, ancho){
+  items.forEach(it => {
+    agregarRenglonOrdenTrabajo();
+    const rs = document.querySelectorAll('.ot-renglon');
+    const r = rs[rs.length - 1];
+    const sel = r.querySelector('.ot-r-articulo');
+    sel.value = it.v;
+    cambiarModoRenglonOT(sel);
+    r.querySelector('.ot-r-ancho').value = ancho;
+    r.querySelector('.ot-r-cantidad').value = it.n;
+  });
+  sugerirRemanenteOT();
+}
+
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -4137,6 +4245,7 @@ async function abrirOrdenTrabajo(){
   document.getElementById('ot-nota-general').value = '';
   document.getElementById('ot-error').style.display = 'none';
   document.getElementById('ot-resultado').innerHTML = '';
+  document.getElementById('ot-remanente').innerHTML = '';
   document.getElementById('ot-renglones').innerHTML = '';
   renglonIdCounterOT = 0;
   if(hay) agregarRenglonOrdenTrabajo(); // arranca con un producto listo para completar
@@ -4318,6 +4427,7 @@ async function generarOrdenTrabajoCompleta(){
     </div>
   `;
   cont.dataset.texto = textoOrden;
+  if(!excede && metrosRemanentes > 0) cont.insertAdjacentHTML('beforeend', `<p class="note" style="margin-top:8px;">Sobran ≈ ${fmtMetros(metrosRemanentes)} m. Antes de mandarla puede tocar "♻️ ¿Qué hago con lo que sobra?" para ver qué fabricar con eso.</p>`);
 
   // registro de la orden ya generada y numerada (no bloquea si falla: el texto ya se armo bien igual)
   try{
@@ -10983,7 +11093,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-09-30-v21';
+const APP_VERSION = '2026-09-30-v22';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
