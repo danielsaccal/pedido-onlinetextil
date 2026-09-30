@@ -2527,7 +2527,7 @@ function agregarRenglonOrdenTrabajo(){
   div.innerHTML = `
     <div class="field"><label>Artículo</label><select class="ot-r-articulo"><option value="">Elija un artículo</option>${opcionesArticuloOT()}</select></div>
     <div class="field"><label>Ancho real de la tela (cm)</label><input type="number" step="0.1" class="ot-r-ancho" placeholder="Ej: 315"></div>
-    <div class="field"><label>Metros asignados a este producto</label><input type="number" step="0.01" class="ot-r-metros" placeholder="Ej: 400"></div>
+    <div class="field"><label>Cantidad de unidades a fabricar</label><input type="number" step="1" min="1" class="ot-r-cantidad" placeholder="Ej: 100"></div>
     <div class="field"><label>SKU del producto terminado</label><input type="text" class="ot-r-sku" placeholder="Ej: JQ315B"></div>
     <div class="field"><label>Nota de este producto (opcional)</label><input type="text" class="ot-r-nota"></div>
     <button type="button" class="btn-mini" onclick="eliminarRenglonOrdenTrabajo(${id})">🗑️ Quitar este producto</button>
@@ -2618,12 +2618,12 @@ async function generarOrdenTrabajoCompleta(){
   for(const el of renglonesEl){
     const articulo = el.querySelector('.ot-r-articulo').value;
     const ancho = parseFloat(el.querySelector('.ot-r-ancho').value);
-    const metros = parseFloat(el.querySelector('.ot-r-metros').value);
+    const cantidad = parseInt(el.querySelector('.ot-r-cantidad').value, 10);
     const sku = el.querySelector('.ot-r-sku').value.trim();
     const nota = el.querySelector('.ot-r-nota').value.trim();
 
-    if(!articulo || isNaN(ancho) || ancho <= 0 || isNaN(metros) || metros <= 0){
-      errorEl.textContent = 'Complete artículo, ancho y metros en todos los productos que agregó.';
+    if(!articulo || isNaN(ancho) || ancho <= 0 || isNaN(cantidad) || cantidad <= 0){
+      errorEl.textContent = 'Complete artículo, ancho y cantidad en todos los productos que agregó.';
       errorEl.style.display = 'block';
       return;
     }
@@ -2633,13 +2633,13 @@ async function generarOrdenTrabajoCompleta(){
       errorEl.style.display = 'block';
       return;
     }
-    const cantidad = Math.floor(metros / resultado.consumo);
-    renglones.push({ articulo, anchoIngresado: ancho, anchoUsado: resultado.anchoUsado, exacto: resultado.exacto, consumo: resultado.consumo, metros, cantidad, sku, nota, entregado: 0 });
+    const metrosConsumidos = Math.round(cantidad * resultado.consumo * 100) / 100;
+    renglones.push({ articulo, anchoIngresado: ancho, anchoUsado: resultado.anchoUsado, exacto: resultado.exacto, consumo: resultado.consumo, cantidad, metrosConsumidos, sku, nota, entregado: 0 });
   }
 
-  const metrosAsignados = Math.round(renglones.reduce((s,r) => s + r.metros, 0) * 100) / 100;
-  const metrosSobrantes = Math.round((metrosTotales - metrosAsignados) * 100) / 100;
-  const excede = metrosAsignados > metrosTotales + 0.005;
+  const metrosConsumidosTotal = Math.round(renglones.reduce((s,r) => s + r.metrosConsumidos, 0) * 100) / 100;
+  const metrosRemanentes = Math.round((metrosTotales - metrosConsumidosTotal) * 100) / 100;
+  const excede = metrosConsumidosTotal > metrosTotales + 0.005;
 
   const numero = await siguienteNumeroOrdenTrabajo();
   const numeroFormateado = 'OT-TALLER-' + String(numero).padStart(4, '0');
@@ -2654,19 +2654,19 @@ async function generarOrdenTrabajoCompleta(){
     ...(comprobante ? [`Comprobante de la tela: ${comprobante}`] : []),
     '',
     ...renglones.map((r, i) =>
-      `${i+1}) ${r.articulo} — ancho ${r.anchoUsado} cm, consumo ≈ ${r.consumo} m c/u — usa ${r.metros} m de tela → ${r.cantidad} unidades aprox.\n   SKU del producto terminado: ${r.sku || '(sin definir)'}` + (r.nota ? `\n   Nota: ${r.nota}` : '')
+      `${i+1}) ${r.articulo} — ${r.cantidad} unidades — ancho ${r.anchoUsado} cm, consumo ≈ ${r.consumo} m c/u → usa ≈ ${r.metrosConsumidos} m de tela\n   SKU del producto terminado: ${r.sku || '(sin definir)'}` + (r.nota ? `\n   Nota: ${r.nota}` : '')
     ),
     '',
     excede
-      ? `⚠️ La suma de metros asignados (${metrosAsignados} m) supera los metros entregados (${metrosTotales} m). Revise el reparto.`
-      : `Metros sobrantes: ≈ ${metrosSobrantes} m`,
+      ? `⚠️ Lo que pidió fabricar consume ≈ ${metrosConsumidosTotal} m, más de los ${metrosTotales} m entregados. Revíselo.`
+      : `Metros de tela consumidos: ≈ ${metrosConsumidosTotal} m — Metros remanentes: ≈ ${metrosRemanentes} m`,
   ];
   if(notaGeneral) lineas.push(notaGeneral);
   const textoOrden = lineas.join('\n');
 
   cont.innerHTML = `
     ${avisosAncho.map(a => `<p class="note" style="color:#A6432F;margin-bottom:6px;">${escaparHtml(a)}</p>`).join('')}
-    ${excede ? `<p class="note" style="color:#A6432F;font-weight:700;margin-bottom:8px;">⚠️ La suma de metros asignados supera lo entregado — revíselo antes de mandarlo.</p>` : ''}
+    ${excede ? `<p class="note" style="color:#A6432F;font-weight:700;margin-bottom:8px;">⚠️ Lo que pidió fabricar consume más tela de la entregada — revíselo antes de mandarlo.</p>` : ''}
     <div style="background:var(--cream);border-radius:10px;padding:14px;white-space:pre-wrap;font-size:0.88rem;margin-bottom:12px;">${escaparHtml(textoOrden)}</div>
     <div class="actions">
       <button class="btn btn-gold" onclick="compartirOrdenTrabajo('whatsapp')">📤 Compartir por WhatsApp</button>
@@ -2678,7 +2678,7 @@ async function generarOrdenTrabajoCompleta(){
   // registro de la orden ya generada y numerada (no bloquea si falla: el texto ya se armo bien igual)
   try{
     await db.collection('ordenes_trabajo').add({
-      numero: numeroFormateado, taller, fecha: new Date().toISOString(), skuTela, comprobante, metrosTotales, metrosAsignados, renglones, notaGeneral,
+      numero: numeroFormateado, taller, fecha: new Date().toISOString(), skuTela, comprobante, metrosTotales, metrosConsumidosTotal, renglones, notaGeneral,
     });
   } catch(e){
     console.error('No se pudo guardar el registro de la orden (el texto ya se generó bien):', e);
@@ -2842,7 +2842,7 @@ function compartirTextoOrdenGuardada(docId, modo){
     `Tela: ${orden.skuTela} — se entregan ${orden.metrosTotales} metros`,
     ...(orden.comprobante ? [`Comprobante de la tela: ${orden.comprobante}`] : []),
     '',
-    ...(orden.renglones||[]).map((r,i) => `${i+1}) ${r.articulo} — ancho ${r.anchoUsado} cm, consumo ≈ ${r.consumo} m c/u — usa ${r.metros} m de tela → ${r.cantidad} unidades aprox.\n   SKU del producto terminado: ${r.sku || '(sin definir)'}` + (r.nota ? `\n   Nota: ${r.nota}` : '')),
+    ...(orden.renglones||[]).map((r,i) => `${i+1}) ${r.articulo} — ${r.cantidad} unidades — ancho ${r.anchoUsado} cm, consumo ≈ ${r.consumo} m c/u → usa ≈ ${r.metrosConsumidos} m de tela\n   SKU del producto terminado: ${r.sku || '(sin definir)'}` + (r.nota ? `\n   Nota: ${r.nota}` : '')),
   ];
   if(orden.notaGeneral) lineas.push('', orden.notaGeneral);
   const texto = lineas.join('\n');
