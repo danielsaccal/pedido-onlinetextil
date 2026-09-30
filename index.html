@@ -2761,22 +2761,37 @@ function leerPiezasFormularioInstruccion(){
 
 // fila 1 = a lo ancho, fila 2 = debajo (del largo de la tela), fila 3 = de la lonja que sobra al costado
 function filasDeCorte(piezas, anchoTela){
-  const filas = {};
-  piezas.filter(p => (p.fila||1) !== 3).forEach(p => { const f = p.fila || 1; (filas[f] = filas[f] || []).push(p); });
-  return Object.keys(filas).map(Number).sort((a,b) => a-b).map(f => {
-    const pz = filas[f];
-    const anchoUsado = Math.round(pz.reduce((s,p) => s + p.ancho * (p.cantidad||1) * (p.partes||1), 0) * 100) / 100;
-    const largo = Math.max(...pz.map(p => p.largo));
-    // una sola pieza en la fila: todo el ancho que queda se corta igual y es sobrante
+  const filas = [];
+  const cerrar = (id, items) => {
+    if(!items.length) return;
+    const tipos = [...new Set(items.map(it => it.p))];
+    const anchoUsado = Math.round(items.reduce((s,it) => s + it.p.ancho * it.u, 0) * 100) / 100;
+    const largo = Math.max(...items.map(it => it.p.largo));
+    // un solo tipo de pieza en la fila: todo el ancho que queda se corta igual y es sobrante
     let extras = 0;
-    if(pz.length === 1 && anchoTela){
-      const entran = Math.floor((anchoTela + 0.01) / pz[0].ancho);
-      extras = Math.max(0, entran - (pz[0].cantidad||1) * (pz[0].partes||1));
+    if(tipos.length === 1 && anchoTela){
+      const entran = Math.floor((anchoTela + 0.01) / tipos[0].ancho);
+      extras = Math.max(0, entran - items.reduce((s,it) => s + it.u, 0));
     }
-    const ocupado = anchoUsado + (extras ? extras * pz[0].ancho : 0);
+    const ocupado = anchoUsado + (extras ? extras * tipos[0].ancho : 0);
     const lonja = anchoTela ? Math.max(0, Math.round((anchoTela - ocupado) * 100) / 100) : 0;
-    return { fila: f, piezas: pz, anchoUsado, largo, extras, ocupado, lonja };
+    filas.push({ fila: id, items, piezas: tipos, anchoUsado, largo, extras, ocupado, lonja });
+  };
+  // a lo ancho: todas juntas en la primera fila
+  cerrar('a1', piezas.filter(p => (p.fila||1) === 1).map(p => ({ p, u: (p.cantidad||1) * (p.partes||1), desde: 0 })));
+  // debajo: se acomodan una al lado de la otra mientras entren en el ancho; si no entran, van a una fila nueva mas abajo
+  let actual = [], usado = 0, n = 0;
+  piezas.filter(p => (p.fila||1) === 2).forEach(p => {
+    const total = (p.cantidad||1) * (p.partes||1);
+    for(let k = 0; k < total; k++){
+      if(actual.length && anchoTela && usado + p.ancho > anchoTela + 0.01){ cerrar('d' + (++n), actual); actual = []; usado = 0; }
+      const ult = actual[actual.length - 1];
+      if(ult && ult.p === p) ult.u++; else actual.push({ p, u: 1, desde: k });
+      usado += p.ancho;
+    }
   });
+  cerrar('d' + (++n), actual);
+  return filas;
 }
 
 // reparte las piezas "de la lonja" en el ancho que sobra al costado de cada fila, sin pasarse nunca
@@ -2819,14 +2834,17 @@ function consumoPorUnidad(piezas, anchoTela){
   const detalle = [];
   let cm = 0;
   filasDeCorte(piezas, anchoTela).forEach(f => {
+    // si la franja da piezas de mas (enteras), su largo se reparte entre los articulos que alcanza
     let alcanza = 1;
-    if(f.piezas.length === 1){
-      const p = f.piezas[0];
-      const porUnidad = (p.cantidad||1) * (p.partes||1);
-      alcanza = Math.max(1, Math.floor((f.extras + porUnidad) / porUnidad));
+    if(f.piezas.length === 1 && f.extras){
+      const p = f.piezas[0], partes = p.partes || 1;
+      const u = f.items.reduce((s,it) => s + it.u, 0);
+      const enteras = Math.floor((u + f.extras) / partes), usa = u / partes;
+      if(enteras > usa) alcanza = enteras / usa;
     }
     cm += f.largo / alcanza;
-    detalle.push(alcanza > 1 ? `${f.largo} cm ÷ ${alcanza}` : `${f.largo} cm`);
+    const alc = Math.round(alcanza * 100) / 100;
+    detalle.push(alcanza > 1 ? `${f.largo} cm ÷ ${String(alc).replace('.', ',')}` : `${f.largo} cm`);
   });
   return { metros: Math.round(cm) / 100, detalle: detalle.join(' + ') };
 }
@@ -2836,7 +2854,7 @@ function frasesSobrante(p, usadasUnid, extrasUnid, origen){
   const partes = p.partes || 1, total = usadasUnid + extrasUnid;
   if(partes > 1){
     const enteras = Math.floor(extrasUnid / partes), sueltas = extrasUnid % partes;
-    let t = ` ${origen} salen ${total} tapas = ${Math.floor(total/partes)} unidades de ${p.nombre}: ${Math.ceil(usadasUnid/partes)} para el artículo`;
+    let t = ` ${origen} salen ${total} tapas = ${Math.floor(total/partes)} ${Math.floor(total/partes) === 1 ? 'unidad' : 'unidades'} de ${p.nombre}: ${Math.ceil(usadasUnid/partes)} para el artículo`;
     if(enteras) t += `, sobran ${enteras}`;
     if(sueltas) t += `${enteras ? ' y ' : ', sobran '}${sueltas} tapa(s) suelta(s)`;
     return t + '.';
@@ -2845,8 +2863,12 @@ function frasesSobrante(p, usadasUnid, extrasUnid, origen){
 }
 function textoSobrante(f){
   if(!f.extras) return '';
-  const p = f.piezas[0];
-  return frasesSobrante(p, (p.cantidad||1) * (p.partes||1), f.extras, 'De esa franja');
+  return frasesSobrante(f.piezas[0], f.items.reduce((s,it) => s + it.u, 0), f.extras, 'De esa franja');
+}
+function textoItem(it){
+  const p = it.p, total = (p.cantidad||1) * (p.partes||1);
+  if(it.u === total) return textoPieza(p);
+  return `${it.u} ${(p.partes||1) > 1 ? 'tapa(s)' : 'pieza(s)'} de ${p.nombre} (${p.ancho} × ${p.largo} cm)`;
 }
 
 function armarTextoInstruccion(piezas, nota){
@@ -2857,7 +2879,7 @@ function armarTextoInstruccion(piezas, nota){
   if(personalizado){
     const L = lonjasDeCorte(piezas, parseFloat(ancho));
     const filas = L.filas;
-    const partes = filas.map((f, i) => (i === 0 ? 'a lo ancho: ' : 'debajo, del largo de la tela: ') + f.piezas.map(textoPieza).join(', '));
+    const partes = filas.map((f, i) => (f.fila === 'a1' ? 'a lo ancho: ' : 'debajo, del largo de la tela' + (filas.length > 2 ? ` (franja de ${f.largo} cm)` : '') + ': ') + f.items.map(textoItem).join(', '));
     const deLonja = piezas.filter(p => (p.fila||1) === 3);
     if(deLonja.length) partes.push('de la lonja que sobra al costado: ' + deLonja.map(textoPieza).join(', '));
     const largoTotal = Math.round(filas.reduce((s,f) => s + f.largo, 0) * 100) / 100;
@@ -2916,9 +2938,9 @@ function dibujarBosquejoCorte(anchoTela, piezas){
   let y = margen;
   filas.forEach(f => {
     let x = margen;
-    f.piezas.forEach(p => {
-      const partes = p.partes || 1;
-      for(let k = 0; k < (p.cantidad||1) * partes; k++){
+    f.items.forEach(it => {
+      const p = it.p, partes = p.partes || 1;
+      for(let k = it.desde; k < it.desde + it.u; k++){
         const w = p.ancho * escala, h = p.largo * escala;
         rect(x, y, w, h, p.nombre, partes > 1 ? `Tapa ${(k % partes) + 1} · ${p.ancho} × ${p.largo}` : `${p.ancho} × ${p.largo}`, false);
         x += w;
@@ -2982,7 +3004,7 @@ function previsualizarBosquejoCorte(){
   if(document.getElementById('ic-tipo-corte').value === 'personalizado'){
     const excedida = filasDeCorte(piezas, ancho).find(f => f.anchoUsado > ancho + 0.01);
     if(excedida){
-      const donde = excedida.fila === 1 ? 'a lo ancho' : 'debajo';
+      const donde = excedida.fila === 'a1' ? 'a lo ancho' : 'debajo';
       textoPreview = `⚠️ Las tiras ${donde} suman ${excedida.anchoUsado} cm, más que los ${ancho} cm de ancho de la tela. Revíselo.\n\n` + textoPreview;
     }
   }
@@ -3022,7 +3044,7 @@ async function guardarInstruccionCorte(){
   const excedida = document.getElementById('ic-tipo-corte').value === 'personalizado'
     ? filasDeCorte(piezas, parseFloat(ancho)).find(f => f.anchoUsado > parseFloat(ancho) + 0.01) : null;
   if(excedida){
-    if(!confirm('Las tiras ' + (excedida.fila === 1 ? 'a lo ancho' : 'de debajo') + ' suman ' + excedida.anchoUsado + ' cm, más que los ' + ancho + ' cm de ancho de la tela. ¿Guardar igual?')) return;
+    if(!confirm('Las tiras ' + (excedida.fila === 'a1' ? 'a lo ancho' : 'de debajo') + ' suman ' + excedida.anchoUsado + ' cm, más que los ' + ancho + ' cm de ancho de la tela. ¿Guardar igual?')) return;
   }
   const nota = document.getElementById('ic-nota').value.trim();
   const tipo = document.getElementById('ic-tipo-corte').value;
