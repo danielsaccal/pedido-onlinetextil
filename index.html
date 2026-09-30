@@ -1357,7 +1357,8 @@ a.grilla-celda{display:block;}
       <div id="tc-preview" style="margin-top:14px;"></div>
       <p class="note" id="tc-estado-actual" style="margin-top:16px;"></p>
       <button class="btn-mini" id="tc-btn-editar" onclick="iniciarEdicionTabla()" style="display:none;margin-top:6px;">✏️ Ver y corregir la tabla completa</button>
-      <div id="tc-editor" style="margin-top:14px;"></div>
+      <input type="text" id="tc-editor-buscar" placeholder="Buscar artículo..." style="display:none;width:100%;box-sizing:border-box;padding:9px 10px;margin-top:12px;border:1px solid var(--line);border-radius:8px;font-family:'Work Sans';" oninput="filtrarEditorTablaConsumo()">
+      <div id="tc-editor" style="margin-top:10px;"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
@@ -2321,7 +2322,22 @@ function iniciarEdicionTabla(){
     anchos: [...(base.anchos||[])].sort((a,b) => a-b),
     filas: Object.entries(base.articulos||{}).map(([nombre, consumos]) => ({nombre, consumos: {...consumos}})),
   };
+  const buscador = document.getElementById('tc-editor-buscar');
+  buscador.style.display = 'block';
+  buscador.value = '';
   renderEditorTablaConsumo();
+}
+
+function ordenarFilasEdicion(){
+  edicionTabla.filas.sort((a, b) => a.nombre.toLowerCase().localeCompare(b.nombre.toLowerCase(), 'es'));
+}
+
+function filtrarEditorTablaConsumo(){
+  const q = (document.getElementById('tc-editor-buscar').value || '').trim().toLowerCase();
+  document.querySelectorAll('#tc-editor-filas .tc-fila').forEach(fila => {
+    const nombre = fila.querySelector('.tc-nombre').value.toLowerCase();
+    fila.style.display = (!q || nombre.includes(q)) ? '' : 'none';
+  });
 }
 
 // lee lo que haya tipeado en la tabla editable y lo vuelca a edicionTabla, antes de agregar/borrar una fila o columna
@@ -2343,6 +2359,7 @@ function sincronizarEdicionDesdeDOM(){
 }
 
 function renderEditorTablaConsumo(){
+  ordenarFilasEdicion();
   const cont = document.getElementById('tc-editor');
   const anchos = edicionTabla.anchos;
   cont.innerHTML = `
@@ -2376,6 +2393,7 @@ function renderEditorTablaConsumo(){
       <button class="btn btn-gold" onclick="guardarEdicionTabla()">Guardar cambios</button>
     </div>
   `;
+  filtrarEditorTablaConsumo();
 }
 
 function agregarFilaEdicion(){
@@ -2450,6 +2468,8 @@ async function abrirTablaConsumo(){
   document.getElementById('tc-preview').innerHTML = '';
   document.getElementById('tc-error').style.display = 'none';
   document.getElementById('tc-editor').innerHTML = '';
+  document.getElementById('tc-editor-buscar').style.display = 'none';
+  document.getElementById('tc-editor-buscar').value = '';
   edicionTabla = null;
   if(tablaConsumo === null) await cargarTablaConsumo();
   mostrarEstadoTablaConsumo();
