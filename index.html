@@ -1470,7 +1470,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v27</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v28</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1562,6 +1562,7 @@ a.grilla-celda{display:block;}
               <strong id="ac-titulo" style="font-size:1.05rem;"></strong>
               <span style="display:flex;gap:6px;">
                 <button type="button" class="btn-mini" onclick="renombrarAC()" title="Renombrar">✏️</button>
+                <button type="button" class="btn-mini" onclick="unirArticuloAbiertoAC()" title="Unir con otro artículo">🔀</button>
                 <button type="button" class="btn-mini" onclick="borrarAC()" title="Borrar">🗑️</button>
               </span>
             </div>
@@ -4035,22 +4036,86 @@ function resumenArticuloAC(a){
   if(origenAC(a)) partes.push('pieza del ' + origenAC(a));
   return partes.join(' · ');
 }
-function verDuplicadosAC(){
+function gruposDuplicadosAC(){
+  const todos = articulosAC();
   const grupos = {};
-  articulosAC().forEach(a => { const k = claveDuplicado(a); (grupos[k] = grupos[k] || []).push(a); });
-  const dups = Object.values(grupos).filter(g => g.length > 1);
+  todos.forEach(a => { const k = claveDuplicado(a); (grupos[k] = grupos[k] || []).push(a); });
+  const iguales = Object.values(grupos).filter(g => g.length > 1);
+  // parecidos: todas las palabras de uno estan en el otro (ej: "Cortina" y "Cortina voile")
+  const yaAgrupados = new Set(iguales.flat());
+  const pal = a => claveDuplicado(a).split(' ').filter(Boolean);
+  const parecidos = [];
+  todos.forEach(x => {
+    if(yaAgrupados.has(x)) return;
+    const px = pal(x);
+    if(!px.length) return;
+    const otros = todos.filter(y => y !== x && !yaAgrupados.has(y) && origenAC(y) !== x && origenAC(x) !== y && (() => {
+      const py = pal(y);
+      return py.length > px.length && py.length - px.length <= 2 && px.every(w => py.includes(w));
+    })());
+    if(otros.length) parecidos.push([x, ...otros]);
+  });
+  return { iguales, parecidos };
+}
+function htmlGrupoDup(g){
+  return `<div style="border-top:1px solid var(--line);padding:6px 0;">${g.map(a => `
+    <div style="display:flex;justify-content:space-between;gap:6px;align-items:center;padding:3px 0;">
+      <span style="font-size:0.85rem;"><a href="#" onclick="event.preventDefault(); abrirArticuloAC('${escapeAttr(a)}')"><b>${escaparHtml(a)}</b></a><br><span class="note" style="font-size:0.75rem;">${escaparHtml(resumenArticuloAC(a))}</span></span>
+      <span style="display:flex;gap:4px;flex-shrink:0;">
+        <button type="button" class="btn-mini" title="Unir con otro de este grupo" onclick='unirDesdeGrupoAC(${JSON.stringify(a)}, ${JSON.stringify(g)})'>🔀</button>
+        <button type="button" class="btn-mini" title="Borrar" onclick="borrarDuplicadoAC('${escapeAttr(a)}')">🗑️</button>
+      </span>
+    </div>`).join('')}</div>`;
+}
+function verDuplicadosAC(){
+  const { iguales, parecidos } = gruposDuplicadosAC();
   const cont = document.getElementById('ac-duplicados');
-  if(!dups.length){ cont.innerHTML = '<p class="note" style="margin-top:8px;">No encontré artículos duplicados.</p>'; return; }
+  if(!iguales.length && !parecidos.length){ cont.innerHTML = '<p class="note" style="margin-top:8px;">No encontré artículos duplicados ni parecidos.</p>'; return; }
   cont.innerHTML = `<div style="border:1px solid var(--gold);border-radius:10px;padding:10px;margin-top:8px;">
-    <p style="margin:0 0 6px;font-weight:700;font-size:0.9rem;">${dups.length} grupo(s) con nombres repetidos</p>
-    <p class="note" style="margin:0 0 8px;">Borre el que sobra. Conviene quedarse con el que tiene piezas cargadas.</p>
-    ${dups.map(g => `<div style="border-top:1px solid var(--line);padding:6px 0;">${g.map(a => `
-      <div style="display:flex;justify-content:space-between;gap:6px;align-items:center;padding:3px 0;">
-        <span style="font-size:0.85rem;"><a href="#" onclick="event.preventDefault(); abrirArticuloAC('${escapeAttr(a)}')"><b>${escaparHtml(a)}</b></a><br><span class="note" style="font-size:0.75rem;">${escaparHtml(resumenArticuloAC(a))}</span></span>
-        <button type="button" class="btn-mini" onclick="borrarDuplicadoAC('${escapeAttr(a)}')">🗑️</button>
-      </div>`).join('')}</div>`).join('')}
+    <p class="note" style="margin:0 0 8px;">🔀 = unir: pasa lo que tiene ese artículo al otro y lo borra. 🗑️ = borrar.</p>
+    ${iguales.length ? `<p style="margin:0 0 4px;font-weight:700;font-size:0.88rem;">Mismo nombre escrito distinto</p>${iguales.map(htmlGrupoDup).join('')}` : ''}
+    ${parecidos.length ? `<p style="margin:10px 0 4px;font-weight:700;font-size:0.88rem;">Parecidos (revise si son lo mismo)</p>${parecidos.map(htmlGrupoDup).join('')}` : ''}
     <button type="button" class="btn-mini" style="margin-top:6px;" onclick="document.getElementById('ac-duplicados').innerHTML=''">Cerrar</button>
   </div>`;
+}
+function unirDesdeGrupoAC(origen, grupo){
+  const otros = grupo.filter(x => x !== origen);
+  const txt = otros.map((x, i) => `${i+1}) ${x}`).join('\n');
+  const r = otros.length === 1 ? (confirm(`¿Unir "${origen}" en "${otros[0]}"?\n\n"${origen}" se borra y lo que tenga pasa a "${otros[0]}".`) ? '1' : '') : prompt(`¿En cuál unir "${origen}"? Escriba el número:\n${txt}`);
+  const k = parseInt(r, 10);
+  if(!(k >= 1 && k <= otros.length)) return;
+  unirArticulosAC(origen, otros[k-1]);
+}
+// une "origen" en "destino": el destino conserva lo suyo y suma lo que le falta; el origen se borra
+async function unirArticulosAC(origen, destino){
+  const ta = tablaConsumo.articulos, ti = tablaConsumo.instrucciones;
+  ta[destino] = ta[destino] || {};
+  Object.entries(ta[origen] || {}).forEach(([k, v]) => { if(ta[destino][k] === undefined || ta[destino][k] === null || ta[destino][k] === '') ta[destino][k] = v; });
+  const instD = ti[destino] || {}, instO = ti[origen] || {};
+  const destinoTienePiezas = Object.values(instD).some(g => piezasValidas(g) && !g.auto);
+  if(!destinoTienePiezas){
+    Object.entries(instO).forEach(([k, g]) => { if(g && !instD[k]) instD[k] = { ...g, texto: g.texto ? g.texto.split(origen).join(destino) : g.texto }; });
+  }
+  if(Object.keys(instD).length) ti[destino] = instD;
+  // las piezas sueltas generadas desde el origen pasan a apuntar al destino
+  Object.values(ti).forEach(porAncho => Object.values(porAncho || {}).forEach(g => { if(g && g.origen === origen) g.origen = destino; }));
+  delete ta[origen]; delete ti[origen];
+  try{
+    await guardarTablaYConsumo();
+    if(acArticulo === origen) acArticulo = destino;
+    renderListaAC(); renderEditorAC();
+    if(acArticulo === destino) abrirArticuloAC(destino);
+    verDuplicadosAC();
+  } catch(e){ alert('No se pudo unir: ' + e.message); }
+}
+async function unirArticuloAbiertoAC(){
+  if(!acArticulo) return;
+  const nombre = (prompt(`¿Con qué artículo unir "${acArticulo}"? Escriba el nombre exacto del que queda:`) || '').trim();
+  if(!nombre) return;
+  const destino = articulosAC().find(x => x.toLowerCase() === nombre.toLowerCase());
+  if(!destino || destino === acArticulo){ alert('No encontré ese artículo. Escríbalo igual que en la lista.'); return; }
+  if(!confirm(`"${acArticulo}" se borra y lo que tenga pasa a "${destino}". ¿Seguir?`)) return;
+  unirArticulosAC(acArticulo, destino);
 }
 async function borrarDuplicadoAC(a){
   acArticulo = a;
@@ -11374,7 +11439,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-09-30-v27';
+const APP_VERSION = '2026-09-30-v28';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
