@@ -1415,7 +1415,7 @@ a.grilla-celda{display:block;}
   <div class="step" id="step-instrucciones-corte">
     <div class="form-card">
       <h2>Instrucciones de corte</h2>
-      <p class="note" style="margin-bottom:14px;">Cómo aprovechar el ancho de la tela para cada artículo — se suma sola al texto de la orden de trabajo cuando ese artículo y ese ancho estén incluidos.</p>
+      <p class="note" style="margin-bottom:14px;">Responda estas preguntas y arma solo el texto y el bosquejo para el taller — se suman a la orden de trabajo cuando ese artículo y ese ancho estén incluidos.</p>
       <p class="note" id="ic-sin-tabla" style="display:none;color:#A6432F;">Todavía no cargó la tabla de consumo — <a href="#" onclick="event.preventDefault(); abrirTablaConsumo();">cárguela acá</a> antes de seguir.</p>
 
       <div class="field">
@@ -1426,12 +1426,20 @@ a.grilla-celda{display:block;}
         <label>Ancho (cm)</label>
         <select id="ic-ancho" onchange="cargarInstruccionActual()"><option value="">Elija un ancho</option></select>
       </div>
-      <div class="field">
-        <label>Instrucciones de corte para este artículo a este ancho</label>
-        <textarea id="ic-texto" rows="8" placeholder="Ej: con 2,6 m se corta a la mitad, se saca la ajustable y la plana con los dos cortes de 260 x 157,5 cm..." style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:'Work Sans';box-sizing:border-box;"></textarea>
-      </div>
+
+      <div class="field"><label>¿En cuántas tiras iguales divide este ancho?</label><input type="number" id="ic-cant-tiras" min="1" max="12" placeholder="Ej: 2" oninput="generarCamposTiras()"></div>
+      <div class="field"><label>Largo de esa tira (cm)</label><input type="number" id="ic-largo-tira" min="0" step="0.1" placeholder="Ej: 260" oninput="previsualizarBosquejoCorte()"></div>
+
+      <div id="ic-campos-tiras"></div>
+
+      <div class="field"><label>Nota final (opcional — ej: "cada 2 tapas forman una funda")</label><input type="text" id="ic-nota" placeholder="Opcional" oninput="previsualizarBosquejoCorte()"></div>
+
+      <p class="note" style="margin:10px 0 4px;">Así queda el texto y el bosquejo:</p>
+      <div id="ic-preview-texto" style="background:var(--cream);border-radius:10px;padding:12px;white-space:pre-wrap;font-size:0.85rem;margin-bottom:10px;"></div>
+      <div id="ic-preview-bosquejo" style="text-align:center;margin-bottom:10px;"></div>
+
       <div class="actions">
-        <button class="btn btn-gold" onclick="guardarInstruccionCorte()">Guardar instrucción</button>
+        <button class="btn btn-gold" onclick="guardarInstruccionCorte()">Guardar instrucción y bosquejo</button>
         <button class="btn btn-ghost" id="ic-btn-borrar" style="display:none;" onclick="borrarInstruccionCorte()">Borrar esta instrucción</button>
       </div>
       <p class="error" id="ic-error" style="display:none;"></p>
@@ -2569,10 +2577,25 @@ function instruccionesDeArticulo(articulo){
   return (tablaConsumo && tablaConsumo.instrucciones && tablaConsumo.instrucciones[articulo]) || {};
 }
 
-function buscarInstruccionCorte(articulo, ancho){
-  const texto = instruccionesDeArticulo(articulo)[ancho];
-  return texto ? texto : '';
+// una instruccion guardada es {texto, bosquejoBase64, piezas:[{nombre,ancho,largo}], nota}
+function buscarInstruccionGuardada(articulo, ancho){
+  return instruccionesDeArticulo(articulo)[ancho] || null;
 }
+function buscarInstruccionCorte(articulo, ancho){
+  const g = buscarInstruccionGuardada(articulo, ancho);
+  return g ? g.texto : '';
+}
+function buscarBosquejoCorte(articulo, ancho){
+  const g = buscarInstruccionGuardada(articulo, ancho);
+  return g ? g.bosquejoBase64 : '';
+}
+
+// plantillas de ejemplo ya confirmadas con el dueño, para precargar el formulario la primera vez
+// que elija ese articulo (si todavia no tiene nada guardado para el ancho elegido)
+const PLANTILLAS_INSTRUCCIONES = {
+  'Juego 1 1/2': { cantTiras: 2, largoTira: 260, nombres: ['Ajustable', 'Plana'], nota: '' },
+  'Funda de almohada': { cantTiras: 6, largoTira: 85, nombres: ['Tapa 1','Tapa 2','Tapa 3','Tapa 4','Tapa 5','Tapa 6'], nota: 'Cada 2 tapas forman una funda de 50 x 80 cm terminada (deja margen de costura).' },
+};
 
 async function abrirInstruccionesCorte(){
   mostrarPaso('step-instrucciones-corte');
@@ -2585,17 +2608,25 @@ async function abrirInstruccionesCorte(){
   sel.innerHTML = '<option value="">Elija un artículo</option>' +
     (hay ? Object.keys(tablaConsumo.articulos).sort().map(n => `<option value="${escapeAttr(n)}">${n}</option>`).join('') : '');
   document.getElementById('ic-ancho').innerHTML = '<option value="">Elija un ancho</option>';
-  document.getElementById('ic-texto').value = '';
-  document.getElementById('ic-btn-borrar').style.display = 'none';
+  limpiarFormularioInstruccion();
   document.getElementById('ic-error').style.display = 'none';
   renderListaInstrucciones();
+}
+
+function limpiarFormularioInstruccion(){
+  document.getElementById('ic-cant-tiras').value = '';
+  document.getElementById('ic-largo-tira').value = '';
+  document.getElementById('ic-nota').value = '';
+  document.getElementById('ic-campos-tiras').innerHTML = '';
+  document.getElementById('ic-preview-texto').innerHTML = '';
+  document.getElementById('ic-preview-bosquejo').innerHTML = '';
+  document.getElementById('ic-btn-borrar').style.display = 'none';
 }
 
 function cambiarArticuloInstruccion(){
   const articulo = document.getElementById('ic-articulo').value;
   const selAncho = document.getElementById('ic-ancho');
-  document.getElementById('ic-texto').value = '';
-  document.getElementById('ic-btn-borrar').style.display = 'none';
+  limpiarFormularioInstruccion();
   if(!articulo || !tablaConsumo.articulos[articulo]){
     selAncho.innerHTML = '<option value="">Elija un ancho</option>';
     return;
@@ -2607,9 +2638,113 @@ function cambiarArticuloInstruccion(){
 function cargarInstruccionActual(){
   const articulo = document.getElementById('ic-articulo').value;
   const ancho = document.getElementById('ic-ancho').value;
-  const texto = (articulo && ancho) ? buscarInstruccionCorte(articulo, ancho) : '';
-  document.getElementById('ic-texto').value = texto;
-  document.getElementById('ic-btn-borrar').style.display = texto ? 'inline-block' : 'none';
+  limpiarFormularioInstruccion();
+  if(!articulo || !ancho) return;
+
+  const guardada = buscarInstruccionGuardada(articulo, ancho);
+  if(guardada && guardada.piezas && guardada.piezas.length){
+    document.getElementById('ic-cant-tiras').value = guardada.piezas.length;
+    document.getElementById('ic-largo-tira').value = guardada.piezas[0].largo;
+    document.getElementById('ic-nota').value = guardada.nota || '';
+    generarCamposTiras(guardada.piezas.map(p => p.nombre));
+    document.getElementById('ic-btn-borrar').style.display = 'inline-block';
+  } else if(PLANTILLAS_INSTRUCCIONES[articulo]){
+    // primera vez con este articulo: precarga el ejemplo ya confirmado, listo para revisar y guardar
+    const pl = PLANTILLAS_INSTRUCCIONES[articulo];
+    document.getElementById('ic-cant-tiras').value = pl.cantTiras;
+    document.getElementById('ic-largo-tira').value = pl.largoTira;
+    document.getElementById('ic-nota').value = pl.nota;
+    generarCamposTiras(pl.nombres);
+  }
+  previsualizarBosquejoCorte();
+}
+
+function generarCamposTiras(nombresPrevios){
+  const cant = parseInt(document.getElementById('ic-cant-tiras').value, 10);
+  const cont = document.getElementById('ic-campos-tiras');
+  if(isNaN(cant) || cant < 1){ cont.innerHTML = ''; previsualizarBosquejoCorte(); return; }
+  const previos = nombresPrevios || [...cont.querySelectorAll('.ic-nombre-tira')].map(i => i.value);
+  cont.innerHTML = Array.from({length: cant}, (_, i) => `
+    <div class="field"><label>Nombre de la tira ${i+1}</label><input type="text" class="ic-nombre-tira" value="${escapeAttr(previos[i]||'')}" placeholder="Ej: Ajustable" oninput="previsualizarBosquejoCorte()"></div>
+  `).join('');
+  previsualizarBosquejoCorte();
+}
+
+function leerPiezasFormularioInstruccion(){
+  const ancho = parseFloat(document.getElementById('ic-ancho').value);
+  const largoTira = parseFloat(document.getElementById('ic-largo-tira').value);
+  const nombres = [...document.querySelectorAll('.ic-nombre-tira')].map(i => i.value.trim());
+  if(isNaN(ancho) || ancho <= 0 || isNaN(largoTira) || largoTira <= 0 || nombres.length === 0 || nombres.some(n => !n)) return null;
+  const anchoTira = Math.round((ancho / nombres.length) * 100) / 100;
+  return nombres.map(nombre => ({ nombre, ancho: anchoTira, largo: largoTira }));
+}
+
+function armarTextoInstruccion(piezas, nota){
+  const ancho = document.getElementById('ic-ancho').value;
+  const largo = piezas[0].largo;
+  const detalle = piezas.map(p => `${p.nombre} (${p.ancho} × ${p.largo} cm)`).join(', ');
+  let texto = `En ${ancho} cm de ancho por ${largo} cm de largo se obtienen ${piezas.length} tira(s): ${detalle}.`;
+  if(nota) texto += ' ' + nota;
+  return texto;
+}
+
+// dibuja el bosquejo minimalista (lineas negras) en un canvas y devuelve la imagen en base64
+function dibujarBosquejoCorte(anchoTela, piezas){
+  const escala = Math.min(3.2, 900 / anchoTela);
+  const anchoPx = Math.round(anchoTela * escala);
+  const altoPx = Math.round(piezas[0].largo * escala);
+  const margen = 70;
+  const canvas = document.createElement('canvas');
+  canvas.width = anchoPx + margen*2;
+  canvas.height = altoPx + margen*2 + 30;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#000000'; ctx.fillStyle = '#000000'; ctx.lineWidth = 1.5;
+
+  // contorno de la tela
+  ctx.strokeRect(margen, margen, anchoPx, altoPx);
+
+  // lineas de division entre tiras + nombres
+  ctx.font = '13px Arial'; ctx.textAlign = 'center';
+  let x = margen;
+  piezas.forEach((p, i) => {
+    const anchoPzPx = p.ancho * escala;
+    if(i > 0){
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(x, margen); ctx.lineTo(x, margen + altoPx); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.font = 'bold 13px Arial';
+    ctx.fillText(p.nombre, x + anchoPzPx/2, margen + altoPx/2 - 6);
+    ctx.font = '11px Arial';
+    ctx.fillText(p.ancho + ' × ' + p.largo + ' cm', x + anchoPzPx/2, margen + altoPx/2 + 12);
+    x += anchoPzPx;
+  });
+
+  // cota de ancho arriba
+  ctx.font = '13px Arial';
+  const yFlecha = margen - 20;
+  ctx.beginPath(); ctx.moveTo(margen, yFlecha); ctx.lineTo(margen+anchoPx, yFlecha); ctx.stroke();
+  ctx.fillText(anchoTela + ' cm de ancho', margen + anchoPx/2, yFlecha - 8);
+
+  // cota de largo a la izquierda (sin rotar texto)
+  ctx.textAlign = 'left';
+  ctx.fillText(piezas[0].largo + ' cm', 8, margen + altoPx/2 + 5);
+
+  return canvas.toDataURL('image/png');
+}
+
+function previsualizarBosquejoCorte(){
+  const textoEl = document.getElementById('ic-preview-texto');
+  const bosquejoEl = document.getElementById('ic-preview-bosquejo');
+  const ancho = parseFloat(document.getElementById('ic-ancho').value);
+  const piezas = leerPiezasFormularioInstruccion();
+  if(!piezas || isNaN(ancho)){ textoEl.innerHTML = ''; bosquejoEl.innerHTML = ''; return; }
+  const nota = document.getElementById('ic-nota').value.trim();
+  textoEl.textContent = armarTextoInstruccion(piezas, nota);
+  const img = dibujarBosquejoCorte(ancho, piezas);
+  bosquejoEl.innerHTML = `<img src="${img}" style="max-width:100%;border:1px solid var(--line);border-radius:8px;">`;
+  bosquejoEl.dataset.img = img;
 }
 
 async function guardarInstruccionCorte(){
@@ -2617,26 +2752,29 @@ async function guardarInstruccionCorte(){
   errorEl.style.display = 'none';
   const articulo = document.getElementById('ic-articulo').value;
   const ancho = document.getElementById('ic-ancho').value;
-  const texto = document.getElementById('ic-texto').value.trim();
 
   if(!articulo || !ancho){
     errorEl.textContent = 'Elija el artículo y el ancho antes de guardar.';
     errorEl.style.display = 'block';
     return;
   }
-  if(!texto){
-    errorEl.textContent = 'Escriba la instrucción antes de guardar (para borrarla, use "Borrar esta instrucción").';
+  const piezas = leerPiezasFormularioInstruccion();
+  if(!piezas){
+    errorEl.textContent = 'Complete la cantidad de tiras, el largo, y el nombre de cada tira.';
     errorEl.style.display = 'block';
     return;
   }
+  const nota = document.getElementById('ic-nota').value.trim();
+  const texto = armarTextoInstruccion(piezas, nota);
+  const bosquejoBase64 = document.getElementById('ic-preview-bosquejo').dataset.img || dibujarBosquejoCorte(parseFloat(ancho), piezas);
 
   tablaConsumo.instrucciones = tablaConsumo.instrucciones || {};
-  tablaConsumo.instrucciones[articulo] = { ...(tablaConsumo.instrucciones[articulo]||{}), [ancho]: texto };
+  tablaConsumo.instrucciones[articulo] = { ...(tablaConsumo.instrucciones[articulo]||{}), [ancho]: { texto, bosquejoBase64, piezas, nota } };
   try{
     await db.collection('config').doc('tabla_consumo_telas').set(tablaConsumo);
     document.getElementById('ic-btn-borrar').style.display = 'inline-block';
     renderListaInstrucciones();
-    alert('Instrucción guardada.');
+    alert('Instrucción y bosquejo guardados.');
   } catch(e){
     errorEl.textContent = 'No se pudo guardar: ' + e.message;
     errorEl.style.display = 'block';
@@ -2654,8 +2792,7 @@ async function borrarInstruccionCorte(){
   tablaConsumo.instrucciones[articulo] = copia;
   try{
     await db.collection('config').doc('tabla_consumo_telas').set(tablaConsumo);
-    document.getElementById('ic-texto').value = '';
-    document.getElementById('ic-btn-borrar').style.display = 'none';
+    limpiarFormularioInstruccion();
     renderListaInstrucciones();
   } catch(e){
     alert('No se pudo borrar: ' + e.message);
@@ -2667,8 +2804,8 @@ function renderListaInstrucciones(){
   const instrucciones = (tablaConsumo && tablaConsumo.instrucciones) || {};
   const filas = [];
   Object.entries(instrucciones).forEach(([articulo, porAncho]) => {
-    Object.entries(porAncho).forEach(([ancho, texto]) => {
-      if(texto) filas.push({ articulo, ancho, texto });
+    Object.entries(porAncho).forEach(([ancho, datos]) => {
+      if(datos && datos.texto) filas.push({ articulo, ancho, texto: datos.texto });
     });
   });
 
@@ -2826,7 +2963,8 @@ async function generarOrdenTrabajoCompleta(){
     }
     const metrosConsumidos = Math.round(cantidad * resultado.consumo * 100) / 100;
     const instruccion = buscarInstruccionCorte(articulo, resultado.anchoUsado);
-    renglones.push({ articulo, anchoIngresado: ancho, anchoUsado: resultado.anchoUsado, exacto: resultado.exacto, consumo: resultado.consumo, cantidad, metrosConsumidos, sku, nota, instruccion, entregado: 0 });
+    const tieneBosquejo = !!buscarBosquejoCorte(articulo, resultado.anchoUsado);
+    renglones.push({ articulo, anchoIngresado: ancho, anchoUsado: resultado.anchoUsado, exacto: resultado.exacto, consumo: resultado.consumo, cantidad, metrosConsumidos, sku, nota, instruccion, tieneBosquejo, entregado: 0 });
   }
 
   const metrosConsumidosTotal = Math.round(renglones.reduce((s,r) => s + r.metrosConsumidos, 0) * 100) / 100;
@@ -2860,6 +2998,17 @@ async function generarOrdenTrabajoCompleta(){
     ${avisosAncho.map(a => `<p class="note" style="color:#A6432F;margin-bottom:6px;">${escaparHtml(a)}</p>`).join('')}
     ${excede ? `<p class="note" style="color:#A6432F;font-weight:700;margin-bottom:8px;">⚠️ Lo que pidió fabricar consume más tela de la entregada — revíselo antes de mandarlo.</p>` : ''}
     <div style="background:var(--cream);border-radius:10px;padding:14px;white-space:pre-wrap;font-size:0.88rem;margin-bottom:12px;">${escaparHtml(textoOrden)}</div>
+    ${renglones.some(r => r.tieneBosquejo) ? `
+      <p class="note" style="margin-bottom:8px;">Bosquejos de corte disponibles:</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+        ${renglones.filter(r => r.tieneBosquejo).map(r => `
+          <div style="text-align:center;">
+            <img src="${buscarBosquejoCorte(r.articulo, r.anchoUsado)}" style="width:130px;border:1px solid var(--line);border-radius:8px;cursor:pointer;" onclick="verBosquejoGrande('${escapeAttr(r.articulo)}', ${r.anchoUsado})">
+            <div style="font-size:0.75rem;color:#8A8072;">${escaparHtml(r.articulo)}</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
     <div class="actions">
       <button class="btn btn-gold" onclick="compartirOrdenTrabajo('whatsapp')">📤 Compartir por WhatsApp</button>
       <button class="btn btn-ghost" onclick="compartirOrdenTrabajo('copiar')">📋 Copiar texto</button>
@@ -2875,6 +3024,25 @@ async function generarOrdenTrabajoCompleta(){
   } catch(e){
     console.error('No se pudo guardar el registro de la orden (el texto ya se generó bien):', e);
   }
+}
+
+function verBosquejoGrande(articulo, ancho){
+  const img = buscarBosquejoCorte(articulo, ancho);
+  if(!img) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:200;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:20px;box-sizing:border-box;';
+  overlay.innerHTML = `
+    <img src="${img}" style="max-width:95vw;max-height:78vh;object-fit:contain;background:#fff;border-radius:8px;">
+    <p style="color:#fff;margin-top:12px;">${escaparHtml(articulo)} — ${ancho} cm</p>
+    <div style="display:flex;gap:14px;margin-top:10px;">
+      <button type="button" onclick="window.open('https://wa.me/?text=' + encodeURIComponent('Bosquejo de corte: ${escapeAttr(articulo)} a ${ancho} cm'))" style="background:var(--gold);border:none;border-radius:20px;padding:10px 18px;font-weight:700;cursor:pointer;">📤 Compartir nota por WhatsApp</button>
+      <button type="button" id="vb-cerrar" style="background:#fff;border:none;border-radius:20px;padding:10px 18px;font-weight:700;cursor:pointer;">Cerrar</button>
+    </div>
+    <p style="color:#bbb;font-size:0.78rem;margin-top:8px;max-width:400px;text-align:center;">Para mandar la imagen en sí, mantenga tocada la imagen y use "Compartir" o "Guardar imagen" de su navegador.</p>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#vb-cerrar').onclick = () => overlay.remove();
+  overlay.onclick = (e) => { if(e.target === overlay) overlay.remove(); };
 }
 
 function compartirOrdenTrabajo(modo){
