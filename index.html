@@ -1453,7 +1453,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v14</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v15</p>
       <div id="ic-lista" style="margin-top:8px;"></div>
 
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
@@ -2695,7 +2695,13 @@ async function abrirInstruccionesCorte(){
   document.getElementById('ic-ancho').innerHTML = '<option value="">Elija un ancho</option>';
   limpiarFormularioInstruccion();
   document.getElementById('ic-error').style.display = 'none';
+  const agregadas = await completarPiezasDeJuegosGuardados();
+  if(agregadas.length){
+    // refresca la lista de articulos para que aparezcan las piezas nuevas
+    sel.innerHTML = '<option value="">Elija un artículo</option>' + Object.keys(tablaConsumo.articulos).sort().map(n => `<option value="${escapeAttr(n)}">${n}</option>`).join('');
+  }
   renderListaInstrucciones();
+  if(agregadas.length) alert('Cargué las piezas sueltas de los juegos que ya tenía guardados:\n• ' + agregadas.join('\n• '));
 }
 
 function limpiarFormularioInstruccion(){
@@ -3345,6 +3351,32 @@ function cargarPiezasDelJuego(articulo, ancho, piezas){
   return hechos;
 }
 
+// juegos guardados antes de que existiera esto: se completan sus piezas sueltas una sola vez
+async function completarPiezasDeJuegosGuardados(){
+  if(!tablaConsumo || !tablaConsumo.instrucciones) return [];
+  tablaConsumo.articulos = tablaConsumo.articulos || {};
+  const agregadas = [];
+  Object.entries({ ...tablaConsumo.instrucciones }).forEach(([articulo, porAncho]) => {
+    const medida = medidaDelJuego(articulo);
+    if(!medida) return;
+    Object.entries(porAncho || {}).forEach(([ancho, g]) => {
+      const piezas = g && Array.isArray(g.piezas) ? g.piezas.filter(p => p && p.nombre && p.ancho > 0 && p.largo > 0) : [];
+      if(piezas.length < 2) return;
+      const faltan = piezas.some(p => {
+        const nombre = articuloDePieza(p.nombre.trim(), medida, articulo);
+        return !(tablaConsumo.instrucciones[nombre] || {})[ancho];
+      });
+      if(!faltan) return;
+      cargarPiezasDelJuego(articulo, ancho, piezas).filter(t => !t.includes('no la toqué')).forEach(t => agregadas.push(t));
+    });
+  });
+  if(agregadas.length){
+    try{ await db.collection('config').doc('tabla_consumo_telas').set(tablaConsumo); }
+    catch(e){ console.error('No se pudieron guardar las piezas sueltas:', e); return []; }
+  }
+  return agregadas;
+}
+
 async function guardarInstruccionCorte(){
   const errorEl = document.getElementById('ic-error');
   errorEl.style.display = 'none';
@@ -3410,7 +3442,7 @@ function renderListaInstrucciones(){
   const filas = [];
   Object.entries(instrucciones).forEach(([articulo, porAncho]) => {
     Object.entries(porAncho).forEach(([ancho, datos]) => {
-      if(datos && datos.texto) filas.push({ articulo, ancho, texto: datos.texto });
+      if(datos && datos.texto) filas.push({ articulo, ancho, texto: datos.texto, origen: datos.auto ? datos.origen : '' });
     });
   });
 
@@ -3421,7 +3453,7 @@ function renderListaInstrucciones(){
   filas.sort((a,b) => a.articulo.localeCompare(b.articulo, 'es') || (a.ancho - b.ancho));
   cont.innerHTML = filas.map(f => `
     <div onclick="irAInstruccion('${escapeAttr(f.articulo)}', ${f.ancho})" style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;cursor:pointer;font-size:0.82rem;">
-      <b>${escaparHtml(f.articulo)}</b> — ${f.ancho} cm<br>
+      <b>${escaparHtml(f.articulo)}</b> — ${f.ancho} cm${f.origen ? ` <span style="color:#8A8072;">(pieza del ${escaparHtml(f.origen)})</span>` : ''}<br>
       <span style="color:#8A8072;">${escaparHtml(f.texto.length > 90 ? f.texto.slice(0,90)+'…' : f.texto)}</span>
     </div>
   `).join('');
@@ -10346,7 +10378,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-09-30-v14';
+const APP_VERSION = '2026-09-30-v15';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
