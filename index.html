@@ -2564,15 +2564,24 @@ async function abrirOrdenTrabajo(){
 }
 
 // mismo contador externo que ya usan los pedidos (siguienteNumeroPedido), con su propio nombre de contador
-async function siguienteNumeroOrdenTrabajo(){
-  const COUNTER_URL = 'https://countapi.mileshilliard.com/api/v1/hit/onlinetextil_ordenes_trabajo_2026';
+// convierte el nombre del taller en una clave valida para el contador (sin espacios, acentos ni simbolos)
+function slugTaller(nombre){
+  return String(nombre||'').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // saca acentos
+    .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'taller';
+}
+
+async function siguienteNumeroOrdenTrabajo(taller){
+  const slug = slugTaller(taller);
+  const COUNTER_URL = 'https://countapi.mileshilliard.com/api/v1/hit/onlinetextil_ot_' + slug + '_2026';
   let n = 1;
   try{
     const resp = await fetch(COUNTER_URL);
     const data = await resp.json();
     n = parseInt(data.value, 10);
   } catch(e){
-    n = Math.floor(1000 + Math.random()*8999); // respaldo si el contador externo falla
+    // respaldo si el contador externo falla: numero al azar distinto por taller, para que no choquen entre si
+    n = Math.floor(1000 + Math.random()*8999);
   }
   return n;
 }
@@ -2641,8 +2650,8 @@ async function generarOrdenTrabajoCompleta(){
   const metrosRemanentes = Math.round((metrosTotales - metrosConsumidosTotal) * 100) / 100;
   const excede = metrosConsumidosTotal > metrosTotales + 0.005;
 
-  const numero = await siguienteNumeroOrdenTrabajo();
-  const numeroFormateado = 'OT-TALLER-' + String(numero).padStart(4, '0');
+  const numero = await siguienteNumeroOrdenTrabajo(taller);
+  const numeroFormateado = 'OT-' + slugTaller(taller).toUpperCase() + '-' + String(numero).padStart(4, '0');
 
   const avisosAncho = renglones.filter(r => !r.exacto)
     .map(r => `⚠️ "${r.articulo}": no había ancho ${r.anchoIngresado} cm exacto en la tabla — usé el más cercano (${r.anchoUsado} cm). Revíselo.`);
