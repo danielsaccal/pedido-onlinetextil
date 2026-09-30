@@ -509,6 +509,7 @@ a.grilla-celda{display:block;}
           <span class="menu-item" onclick="abrirTablaConsumo()">📐 Tabla de consumo de tela</span>
           <span class="menu-item" onclick="abrirOrdenTrabajo()">📋 Generar orden de trabajo</span>
           <span class="menu-item" onclick="abrirHistorialOT()">📦 Historial de órdenes de trabajo</span>
+          <span class="menu-item" onclick="abrirTrabajoMedida()">📏 Trabajo a medida</span>
           <span class="menu-item" onclick="abrirFichasArticulos()">🧩 Fichas de artículos (SKU)</span>
           <span class="menu-item" onclick="abrirInstruccionesCorte()">✂️ Instrucciones de corte</span>
         </div>
@@ -1458,7 +1459,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v19</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v20</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1521,6 +1522,35 @@ a.grilla-celda{display:block;}
         <p class="error" id="fa-error" style="display:none;"></p>
       </div>
 
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-medida">
+    <div class="form-card">
+      <h2>Trabajo a medida</h2>
+      <p class="note" style="margin-bottom:12px;">Escriba la medida del colchón y la app le muestra cuánta tela gasta en cada ancho.</p>
+      <div class="field"><label>¿Qué hay que hacer?</label>
+        <select id="tm-producto" onchange="calcularTrabajoMedida()">
+          <option value="juego">Juego de sábanas</option>
+          <option value="ajustable">Sábana ajustable</option>
+          <option value="plana">Sábana plana</option>
+          <option value="fundas">Fundas de almohada</option>
+        </select></div>
+      <div style="display:flex;gap:8px;">
+        <div class="field" style="flex:1;"><label>Ancho colchón</label><input type="number" id="tm-ancho" placeholder="160" oninput="calcularTrabajoMedida()"></div>
+        <div class="field" style="flex:1;"><label>Largo</label><input type="number" id="tm-largo" placeholder="200" oninput="calcularTrabajoMedida()"></div>
+        <div class="field" style="flex:1;"><label>Alto</label><input type="number" id="tm-alto" placeholder="30" oninput="calcularTrabajoMedida()"></div>
+        <div class="field" style="flex:1;"><label>Cantidad</label><input type="number" id="tm-cantidad" value="1" min="1" oninput="calcularTrabajoMedida()"></div>
+      </div>
+      <div class="field" id="tm-fundas-wrap" style="display:none;"><label>¿Cuántas fundas por unidad?</label><input type="number" id="tm-cant-fundas" value="2" min="1" oninput="calcularTrabajoMedida()"></div>
+      <div id="tm-resultado"></div>
+      <details style="margin-top:14px;">
+        <summary style="cursor:pointer;font-size:0.85rem;color:#8A8072;">Márgenes (cm que se suman al colchón)</summary>
+        <p class="note" style="margin:6px 0;">Ajustable = colchón + 2 × alto + margen. Plana: ancho = colchón + 2 × alto + margen; largo = colchón + alto + margen. Sacados del Juego Queen (160 × 200 × 30 → plana 240 × 250, ajustable 225 × 250).</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Ajustable: + ancho</label><input type="number" step="1" id="tm-m-ajAncho"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Ajustable: + largo</label><input type="number" step="1" id="tm-m-ajLargo"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Plana: + ancho</label><input type="number" step="1" id="tm-m-plAncho"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Plana: + largo</label><input type="number" step="1" id="tm-m-plLargo"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Funda: ancho</label><input type="number" step="1" id="tm-m-fundaAncho"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Funda: largo</label><input type="number" step="1" id="tm-m-fundaLargo"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>2 fundas desde colchón de</label><input type="number" step="1" id="tm-m-fundasDesde"></div></div>
+        <button type="button" class="btn-mini" onclick="guardarMargenesMedida()">Guardar márgenes</button>
+      </details>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
@@ -3452,6 +3482,112 @@ async function borrarArticuloInstruccion(){
   });
   try{ await guardarTablaYConsumo(); limpiarFormularioInstruccion(); refrescarArticulosInstruccion(''); document.getElementById('ic-ancho').innerHTML = '<option value="">Elija un ancho</option>'; }
   catch(e){ alert('No se pudo borrar: ' + e.message); }
+}
+
+// ===== Trabajo a medida =====
+// El cliente pide un juego para un colchon (ancho x largo x alto). Las medidas de cada pieza salen de
+// margenes fijos (tomados del Juego Queen: colchon 160 x 200 x 30 -> plana 240 x 250, ajustable
+// 225 x 250) y el motor de corte prueba todos los anchos de tela para ver cual gasta menos.
+const MARGENES_MEDIDA_DEF = { ajAncho: 5, ajLargo: -10, plAncho: 20, plLargo: 20, fundaAncho: 50, fundaLargo: 80, fundasDesde: 130 };
+let margenesMedida = null;
+
+async function abrirTrabajoMedida(){
+  mostrarPaso('step-medida');
+  if(tablaConsumo === null) await cargarTablaConsumo();
+  if(fichasArticulos === null) await cargarFichasArticulos();
+  if(margenesMedida === null){
+    try{ const d = await db.collection('config').doc('trabajo_medida').get(); margenesMedida = { ...MARGENES_MEDIDA_DEF, ...(d.exists ? d.data() : {}) }; }
+    catch(e){ margenesMedida = { ...MARGENES_MEDIDA_DEF }; }
+  }
+  Object.keys(MARGENES_MEDIDA_DEF).forEach(k => { const el = document.getElementById('tm-m-' + k); if(el) el.value = margenesMedida[k]; });
+  calcularTrabajoMedida();
+}
+
+function piezasTrabajoMedida(){
+  const A = parseFloat(document.getElementById('tm-ancho').value);
+  const L = parseFloat(document.getElementById('tm-largo').value);
+  const H = parseFloat(document.getElementById('tm-alto').value) || 0;
+  if(!(A > 0) || !(L > 0)) return null;
+  const m = margenesMedida;
+  const prod = document.getElementById('tm-producto').value;
+  const piezas = [];
+  const aj = { nombre: 'Ajustable', ancho: A + 2*H + m.ajAncho, largo: L + 2*H + m.ajLargo };
+  const pl = { nombre: 'Plana', ancho: A + 2*H + m.plAncho, largo: L + H + m.plLargo };
+  const fundas = A >= m.fundasDesde ? 2 : 1;
+  if(prod === 'juego' || prod === 'ajustable') piezas.push(aj);
+  if(prod === 'juego' || prod === 'plana') piezas.push(pl);
+  if(prod === 'juego' || prod === 'fundas') piezas.push({ nombre: 'Funda', ancho: m.fundaAncho, largo: m.fundaLargo, cantidad: prod === 'fundas' ? (parseInt(document.getElementById('tm-cant-fundas').value, 10) || 2) : fundas, partes: 2 });
+  return piezas;
+}
+
+let tmSeleccion = null;
+function calcularTrabajoMedida(anchoElegido){
+  const cont = document.getElementById('tm-resultado');
+  document.getElementById('tm-fundas-wrap').style.display = document.getElementById('tm-producto').value === 'fundas' ? 'block' : 'none';
+  const piezas = piezasTrabajoMedida();
+  if(!piezas){ cont.innerHTML = '<p class="note">Escriba el ancho, el largo y el alto del colchón.</p>'; return; }
+  const cant = Math.max(1, parseInt(document.getElementById('tm-cantidad').value, 10) || 1);
+  const anchos = anchosConocidos();
+  const filas = anchos.map(W => ({ W, c: calcularCorte(piezas, W) }));
+  const validas = filas.filter(f => !f.c.avisos.length).sort((a,b) => a.c.metros - b.c.metros || a.W - b.W);
+  const noEntran = filas.filter(f => f.c.avisos.length);
+  if(anchoElegido) tmSeleccion = anchoElegido;
+  if(!validas.some(f => f.W === tmSeleccion)) tmSeleccion = validas.length ? validas[0].W : null;
+  const medidas = piezas.map(p => `${p.nombre}${(p.cantidad||1) > 1 ? ' ×' + p.cantidad : ''} ${fmtCm(p.ancho)} × ${fmtCm(p.largo)}${(p.partes||1) > 1 ? ' (2 tapas)' : ''}`).join(' · ');
+  const nombre = nombreTrabajoMedida();
+  cont.innerHTML = `
+    <p class="note" style="margin:4px 0 8px;"><b>Medidas de corte:</b> ${escaparHtml(medidas)}</p>
+    <div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
+        <thead><tr style="background:var(--cream);"><th style="padding:8px;text-align:left;">Tela</th><th style="padding:8px;text-align:right;">Por unidad</th><th style="padding:8px;text-align:right;">Para ${cant}</th></tr></thead>
+        <tbody>
+          ${validas.map((f, i) => `<tr onclick="calcularTrabajoMedida(${f.W})" style="border-top:1px solid var(--line);cursor:pointer;${f.W === tmSeleccion ? 'background:var(--cream);font-weight:700;' : ''}">
+            <td style="padding:8px;">${f.W} cm${i === 0 ? ' ⭐' : ''}</td>
+            <td style="padding:8px;text-align:right;">${fmtMetros(f.c.metros)} m</td>
+            <td style="padding:8px;text-align:right;">${fmtMetros(Math.round(f.c.metros * cant * 100) / 100)} m</td></tr>`).join('')}
+          ${noEntran.map(f => `<tr style="border-top:1px solid var(--line);color:#B0A698;"><td style="padding:8px;">${f.W} cm</td><td colspan="2" style="padding:8px;text-align:right;">no entra</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${tmSeleccion ? `
+      <p class="note" style="margin-bottom:6px;">⭐ = la que menos tela gasta. Toque otra fila para ver su corte.</p>
+      <div style="background:var(--cream);border-radius:10px;padding:12px;white-space:pre-wrap;font-size:0.85rem;margin-bottom:10px;">${escaparHtml(textoCorte(nombre, piezas, tmSeleccion, ''))}</div>
+      <div style="text-align:center;margin-bottom:10px;"><img src="${dibujarBosquejoCorte(tmSeleccion, piezas)}" style="max-width:100%;border:1px solid var(--line);border-radius:8px;"></div>
+      <div class="actions">
+        <button class="btn btn-gold" onclick="llevarTrabajoMedidaAOrden()">📋 Usar en una orden de trabajo</button>
+      </div>` : '<p class="note" style="color:#A6432F;">En ninguno de sus anchos de tela entran estas piezas sin costura.</p>'}`;
+}
+
+function nombreTrabajoMedida(){
+  const prod = document.getElementById('tm-producto');
+  const A = document.getElementById('tm-ancho').value, L = document.getElementById('tm-largo').value, H = document.getElementById('tm-alto').value;
+  return `${prod.options[prod.selectedIndex].text} ${A} × ${L}${H ? ' × ' + H : ''}`;
+}
+
+async function guardarMargenesMedida(){
+  Object.keys(MARGENES_MEDIDA_DEF).forEach(k => { const v = parseFloat(document.getElementById('tm-m-' + k).value); if(!isNaN(v)) margenesMedida[k] = v; });
+  calcularTrabajoMedida();
+  try{ await db.collection('config').doc('trabajo_medida').set(margenesMedida); }
+  catch(e){ alert('No se pudieron guardar los márgenes: ' + e.message); }
+}
+
+async function llevarTrabajoMedidaAOrden(){
+  const piezas = piezasTrabajoMedida();
+  if(!piezas || !tmSeleccion) return;
+  const W = tmSeleccion, nombre = nombreTrabajoMedida();
+  const c = calcularCorte(piezas, W);
+  const cant = Math.max(1, parseInt(document.getElementById('tm-cantidad').value, 10) || 1);
+  const texto = textoCorte(nombre, piezas, W, '');
+  await abrirOrdenTrabajo();
+  const r = document.querySelector('.ot-renglon');
+  if(!r) return;
+  const sel = r.querySelector('.ot-r-articulo');
+  sel.value = '__personalizado__';
+  cambiarModoRenglonOT(sel);
+  r.querySelector('.ot-r-nombre-personal').value = `${nombre} (tela de ${W} cm)`;
+  r.querySelector('.ot-r-consumo-personal').value = c.metros;
+  r.querySelector('.ot-r-cantidad').value = cant;
+  r.querySelector('.ot-r-nota').value = texto;
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -10572,7 +10708,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-09-30-v19';
+const APP_VERSION = '2026-09-30-v20';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
