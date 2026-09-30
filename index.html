@@ -2780,6 +2780,25 @@ function textoPieza(p){
   if((p.partes||1) > 1) return `${c}${p.nombre} (${p.partes} tapas de ${p.ancho} × ${p.largo} cm)`;
   return `${c}${p.nombre} (${p.ancho} × ${p.largo} cm)`;
 }
+// consumo de tela por unidad del articulo: cada fila aporta su largo, dividido por cuantas
+// unidades del articulo salen de esa franja (ej: franja de 80 cm = 3 fundas = alcanza para 3 juegos)
+function consumoPorUnidad(piezas, anchoTela){
+  const detalle = [];
+  let cm = 0;
+  filasDeCorte(piezas, anchoTela).forEach(f => {
+    let alcanza = 1;
+    if(f.piezas.length === 1){
+      const p = f.piezas[0];
+      const porUnidad = (p.cantidad||1) * (p.partes||1);
+      alcanza = Math.max(1, Math.floor((f.extras + porUnidad) / porUnidad));
+    }
+    cm += f.largo / alcanza;
+    detalle.push(alcanza > 1 ? `${f.largo} cm ÷ ${alcanza}` : `${f.largo} cm`);
+  });
+  return { metros: Math.round(cm) / 100, detalle: detalle.join(' + ') };
+}
+function fmtMetros(m){ return m.toFixed(2).replace('.', ','); }
+
 function textoSobrante(f){
   if(!f.extras) return '';
   const p = f.piezas[0], partes = p.partes || 1;
@@ -2813,6 +2832,10 @@ function armarTextoInstruccion(piezas, nota){
     const articulo = document.getElementById('ic-articulo').value;
     const total = piezas.reduce((s,p) => s + (p.cantidad||1), 0);
     texto = `${articulo} lleva ${total} pieza(s): ${piezas.map(p => ((p.cantidad||1) > 1 ? p.cantidad + ' ' : '') + p.nombre).join(', ')}. ` + texto;
+  }
+  if(personalizado){
+    const cu = consumoPorUnidad(piezas, parseFloat(ancho));
+    texto += ` Consumo por unidad: ${fmtMetros(cu.metros)} m (${cu.detalle}).`;
   }
   if(nota) texto += ' ' + nota;
   return texto;
@@ -2896,6 +2919,14 @@ function previsualizarBosquejoCorte(){
     if(excedida){
       const donde = excedida.fila === 1 ? 'a lo ancho' : 'debajo';
       textoPreview = `⚠️ Las tiras ${donde} suman ${excedida.anchoUsado} cm, más que los ${ancho} cm de ancho de la tela. Revíselo.\n\n` + textoPreview;
+    }
+  }
+  if(document.getElementById('ic-tipo-corte').value === 'personalizado'){
+    const articulo = document.getElementById('ic-articulo').value;
+    const enTabla = tablaConsumo && tablaConsumo.articulos && tablaConsumo.articulos[articulo] ? tablaConsumo.articulos[articulo][String(ancho)] : undefined;
+    const cu = consumoPorUnidad(piezas, ancho);
+    if(enTabla !== undefined && Math.abs(Number(enTabla) - cu.metros) > 0.005){
+      textoPreview += `\n\nℹ️ En la tabla de consumo figura ${fmtMetros(Number(enTabla))} m para este artículo y ancho; según este corte son ${fmtMetros(cu.metros)} m.`;
     }
   }
   textoEl.textContent = textoPreview;
