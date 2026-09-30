@@ -509,6 +509,7 @@ a.grilla-celda{display:block;}
           <span class="menu-item" onclick="abrirTablaConsumo()">📐 Tabla de consumo de tela</span>
           <span class="menu-item" onclick="abrirOrdenTrabajo()">📋 Generar orden de trabajo</span>
           <span class="menu-item" onclick="abrirHistorialOT()">📦 Historial de órdenes de trabajo</span>
+          <span class="menu-item" onclick="abrirFichasArticulos()">🧩 Fichas de artículos (SKU)</span>
           <span class="menu-item" onclick="abrirInstruccionesCorte()">✂️ Instrucciones de corte</span>
         </div>
       </div>
@@ -1452,8 +1453,67 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v9 (automático)</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v10 (fichas)</p>
       <div id="ic-lista" style="margin-top:8px;"></div>
+
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-fichas">
+    <div class="form-card">
+      <h2>Fichas de artículos</h2>
+      <p class="note" style="margin-bottom:14px;">Cada SKU se carga una sola vez, con sus piezas y sin ancho. Los juegos se arman con otros SKU. El consumo y el bosquejo para cada ancho de tela los calcula el sistema.</p>
+
+      <div id="fa-lista-wrap">
+        <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;">
+          <div class="field" style="flex:1;margin:0;"><label>Anchos de tela que usa (cm)</label><input type="text" id="fa-anchos" placeholder="150, 160, 300, 315"></div>
+          <button type="button" class="btn-mini" style="margin-bottom:4px;" onclick="guardarAnchosFichas()">Guardar anchos</button>
+        </div>
+        <div class="actions" style="margin-bottom:10px;">
+          <button class="btn btn-gold" onclick="abrirEditorFicha()">+ Nueva ficha</button>
+        </div>
+        <div class="field"><input type="text" id="fa-buscar" placeholder="🔍 Buscar por SKU o nombre" oninput="renderListaFichas()"></div>
+        <div id="fa-lista"></div>
+      </div>
+
+      <div id="fa-editor" style="display:none;">
+        <p class="ni-seccion-tit" id="fa-titulo">Nueva ficha</p>
+        <div style="display:flex;gap:8px;">
+          <div class="field" style="flex:1;"><label>SKU</label><input type="text" id="fa-sku" placeholder="Ej: KA131" style="text-transform:uppercase;" oninput="calcularVistaFicha()"></div>
+          <div class="field" style="flex:2;"><label>Nombre</label><input type="text" id="fa-nombre" placeholder="Ej: Plana 1 1/2" oninput="calcularVistaFicha()"></div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <div class="field" style="flex:2;"><label>Tipo</label>
+            <select id="fa-tipo" onchange="cambiarTipoFicha()">
+              <option value="simple">Simple (se corta de la tela)</option>
+              <option value="compuesto">Juego (se arma con otros SKU)</option>
+            </select></div>
+          <div class="field" style="flex:1;"><label>Ancho habitual</label><select id="fa-habitual" onchange="calcularVistaFicha()"></select></div>
+        </div>
+
+        <div id="fa-bloque-piezas">
+          <p class="note" style="margin-bottom:6px;">Piezas que se cortan. El ancho es la medida mínima: si en la tela sobra un poco, el sistema lo reparte.</p>
+          <div id="fa-piezas"></div>
+          <button type="button" class="btn-mini" onclick="agregarPiezaFicha(); calcularVistaFicha();">+ Agregar pieza</button>
+        </div>
+
+        <div id="fa-bloque-componentes" style="display:none;">
+          <p class="note" style="margin-bottom:6px;">SKU que forman el juego. Si cambia la ficha de un componente, el juego se actualiza solo.</p>
+          <div id="fa-componentes"></div>
+          <datalist id="fa-skus"></datalist>
+          <button type="button" class="btn-mini" onclick="agregarComponenteFicha(); calcularVistaFicha();">+ Agregar componente</button>
+        </div>
+
+        <div id="fa-resultado" style="margin-top:14px;"></div>
+
+        <div class="actions" style="margin-top:12px;">
+          <button class="btn btn-gold" onclick="guardarFicha()">Guardar ficha</button>
+          <button class="btn btn-ghost" onclick="cerrarEditorFicha(); renderListaFichas();">Cancelar</button>
+          <button class="btn btn-ghost" id="fa-btn-borrar" style="display:none;" onclick="borrarFicha()">Borrar ficha</button>
+        </div>
+        <p class="error" id="fa-error" style="display:none;"></p>
+      </div>
 
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
@@ -2597,10 +2657,14 @@ function buscarInstruccionGuardada(articulo, ancho){
   return instruccionesDeArticulo(articulo)[ancho] || null;
 }
 function buscarInstruccionCorte(articulo, ancho){
+  const sku = fichaDesdeArticulo(articulo);
+  if(sku){ const r = piezasDeFicha(sku); return r.piezas.length ? textoCorte(nombreFicha(sku), r.piezas, parseFloat(ancho), '') : ''; }
   const g = buscarInstruccionGuardada(articulo, ancho);
   return g ? g.texto : '';
 }
 function buscarBosquejoCorte(articulo, ancho){
+  const sku = fichaDesdeArticulo(articulo);
+  if(sku){ const r = piezasDeFicha(sku); return r.piezas.length ? dibujarBosquejoCorte(parseFloat(ancho), r.piezas) : ''; }
   const g = buscarInstruccionGuardada(articulo, ancho);
   return g ? g.bosquejoBase64 : '';
 }
@@ -2765,6 +2829,10 @@ function leerPiezasFormularioInstruccion(){
 // 5. Una franja que tiene un solo tipo de pieza se llena entera: lo que el articulo no usa sirve
 //    para el articulo siguiente, y el consumo cuenta solo la parte que usa este articulo.
 //    Lo que queda libre al costado de franjas mezcladas es sobrante y no se cuenta.
+// 6. El ancho de cada pieza es su medida minima. Si en una franja sobra ancho y no entra otra pieza,
+//    ese sobrante se reparte entre las piezas mas anchas de la franja (ej: 2 planas de 150 en 315
+//    quedan de 157,5). Tope: cada pieza crece como mucho un 10 %; si el sobrante es mayor, queda libre.
+const TOPE_ENSANCHE = 0.10;
 function calcularCorte(piezas, W){
   const EPS = 0.01;
   const tipos = piezas.map((p, i) => ({ p, orden: i, n: (p.cantidad||1) * (p.partes||1) }));
@@ -2772,7 +2840,8 @@ function calcularCorte(piezas, W){
   const franjas = [];
   const avisos = [];
   const nuevaFranja = largo => { const f = { largo, cols: [], usado: 0 }; franjas.push(f); return f; };
-  const colocar = (f, col, p, k, sobrante) => { col.items.push({ p, k, sobrante, y: col.alto }); col.alto += p.largo; };
+  const colocar = (col, p, sobrante) => { col.items.push({ p, sobrante, y: col.alto }); col.alto += p.largo; };
+  const nuevaCol = (f, p) => { const col = { p, x: f.usado, w: p.ancho, alto: 0, items: [] }; f.cols.push(col); f.usado += p.ancho; return col; };
 
   porTamano.forEach(t => {
     const p = t.p;
@@ -2782,46 +2851,48 @@ function calcularCorte(piezas, W){
       // 1) arriba de otra igual, en una columna que todavia tiene largo libre
       for(const f of franjas){
         const col = f.cols.find(c => c.p === p && c.alto + p.largo <= f.largo + EPS);
-        if(col){ colocar(f, col, p, k, false); ok = true; break; }
+        if(col){ colocar(col, p, false); ok = true; break; }
       }
       // 2) al costado, en el ancho libre de una franja que ya existe
       if(!ok) for(const f of franjas){
-        if(W - f.usado >= p.ancho - EPS && p.largo <= f.largo + EPS){
-          const col = { p, x: f.usado, w: p.ancho, alto: 0, items: [] };
-          f.cols.push(col); f.usado += p.ancho; colocar(f, col, p, k, false); ok = true; break;
-        }
+        if(W - f.usado >= p.ancho - EPS && p.largo <= f.largo + EPS){ colocar(nuevaCol(f, p), p, false); ok = true; break; }
       }
       // 3) franja nueva mas abajo
-      if(!ok){
-        const f = nuevaFranja(p.largo);
-        const col = { p, x: 0, w: p.ancho, alto: 0, items: [] };
-        f.cols.push(col); f.usado += p.ancho; colocar(f, col, p, k, false);
-      }
+      if(!ok) colocar(nuevaCol(nuevaFranja(p.largo), p), p, false);
     }
   });
 
-  // llenar lo que queda libre en cada franja
   const chicas = [...tipos].sort((a,b) => (a.p.ancho*a.p.largo) - (b.p.ancho*b.p.largo));
   let y = 0;
   franjas.forEach(f => {
     f.y = y; y += f.largo;
     const tiposEnFranja = [...new Set(f.cols.map(c => c.p))];
     f.unTipo = tiposEnFranja.length === 1;
-    f.cols.forEach(c => { while(c.alto + c.p.largo <= f.largo + EPS) colocar(f, c, c.p, c.items.length, true); });
-    // columnas nuevas en el ancho libre: con la misma pieza si la franja es de un solo tipo, si no con la mas chica que entre
+    // llenar lo libre: columnas a medio llenar, y despues columnas nuevas en el ancho libre
+    f.cols.forEach(c => { while(c.alto + c.p.largo <= f.largo + EPS) colocar(c, c.p, true); });
     for(;;){
       const libre = W - f.usado;
       const t = f.unTipo ? (tiposEnFranja[0].ancho <= libre + EPS ? { p: tiposEnFranja[0] } : null)
                          : chicas.find(t => t.p.ancho <= libre + EPS && t.p.largo <= f.largo + EPS);
       if(!t) break;
-      const col = { p: t.p, x: f.usado, w: t.p.ancho, alto: 0, items: [] };
-      f.cols.push(col); f.usado += t.p.ancho;
-      while(col.alto + t.p.largo <= f.largo + EPS) colocar(f, col, t.p, col.items.length, true);
+      const col = nuevaCol(f, t.p);
+      while(col.alto + t.p.largo <= f.largo + EPS) colocar(col, t.p, true);
+    }
+    // regla 6: repartir el ancho que sobra entre las piezas mas anchas de la franja
+    const libre = Math.round((W - f.usado) * 100) / 100;
+    if(libre > EPS && f.cols.length){
+      const maxW = Math.max(...f.cols.map(c => c.w));
+      const anchas = f.cols.filter(c => Math.abs(c.w - maxW) < EPS);
+      const suma = Math.round(libre / anchas.length * 100) / 100;
+      if(suma <= maxW * TOPE_ENSANCHE + EPS){
+        anchas.forEach(c => c.w = Math.round((c.w + suma) * 100) / 100);
+        let x = 0; f.cols.forEach(c => { c.x = x; x += c.w; });
+        f.usado = x;
+      }
     }
     const usadas = f.cols.reduce((s,c) => s + c.items.filter(i => !i.sobrante).length, 0);
     const total = f.cols.reduce((s,c) => s + c.items.length, 0);
     f.factor = f.unTipo && total > usadas ? usadas / total : 1;
-    f.lonja = Math.max(0, Math.round((W - f.cols.filter(c => c.items.some(i => !i.sobrante)).reduce((s,c) => s + c.w, 0)) * 100) / 100);
   });
 
   const cm = franjas.reduce((s,f) => s + f.largo * f.factor, 0);
@@ -2829,32 +2900,36 @@ function calcularCorte(piezas, W){
   return { franjas, avisos, largoTotal: y, metros: Math.round(cm) / 100, detalle };
 }
 
+function fmtCm(n){ return String(Math.round(n*100)/100).replace('.', ','); }
 function textoPieza(p){
   const c = (p.cantidad||1) > 1 ? `${p.cantidad} × ` : '';
-  if((p.partes||1) > 1) return `${c}${p.nombre} (${p.partes} tapas de ${p.ancho} × ${p.largo} cm)`;
-  return `${c}${p.nombre} (${p.ancho} × ${p.largo} cm)`;
+  if((p.partes||1) > 1) return `${c}${p.nombre} (${p.partes} tapas de ${fmtCm(p.ancho)} × ${fmtCm(p.largo)} cm)`;
+  return `${c}${p.nombre} (${fmtCm(p.ancho)} × ${fmtCm(p.largo)} cm)`;
 }
 function fmtMetros(m){ return m.toFixed(2).replace('.', ','); }
 function consumoPorUnidad(piezas, anchoTela){ const c = calcularCorte(piezas, anchoTela); return { metros: c.metros, detalle: c.detalle }; }
 function nombreUnidad(p, n){ return (p.partes||1) > 1 ? `${n} tapa${n===1?'':'s'} de ${p.nombre}` : `${n} ${p.nombre}`; }
 
-function armarTextoInstruccion(piezas, nota){
-  const ancho = parseFloat(document.getElementById('ic-ancho').value);
-  const articulo = document.getElementById('ic-articulo').value;
+// texto para el taller (no depende de la pantalla: sirve para instrucciones, fichas y ordenes)
+function textoCorte(articulo, piezas, ancho, nota){
   const c = calcularCorte(piezas, ancho);
   const total = piezas.reduce((s,p) => s + (p.cantidad||1), 0);
-  let texto = `${articulo} lleva ${total} pieza(s): ${piezas.map(textoPieza).join(', ')}. Corte en ${ancho} cm de ancho (las piezas no se giran).`;
+  let texto = `${articulo} lleva ${total} pieza(s): ${piezas.map(textoPieza).join(', ')}. Corte en ${fmtCm(ancho)} cm de ancho (las piezas no se giran).`;
   const sobrantes = new Map();
   c.franjas.forEach((f, i) => {
-    const usadasPorTipo = new Map();
+    const usadas = new Map(); // clave: pieza + ancho real de corte
     f.cols.forEach(col => {
       const us = col.items.filter(it => !it.sobrante).length;
-      if(us) usadasPorTipo.set(col.p, (usadasPorTipo.get(col.p)||0) + us);
+      if(us){
+        const k = col.p.nombre + '|' + col.w;
+        const prev = usadas.get(k) || { p: col.p, w: col.w, n: 0 };
+        prev.n += us; usadas.set(k, prev);
+      }
       const so = col.items.length - us;
       if(so && !f.unTipo) sobrantes.set(col.p, (sobrantes.get(col.p)||0) + so);
     });
-    const lista = [...usadasPorTipo].map(([p, n]) => `${nombreUnidad(p, n)} (${p.ancho} × ${p.largo})`);
-    texto += ` Franja ${i+1} (${f.largo} cm de largo): ${lista.join(' + ')}.`;
+    const lista = [...usadas.values()].map(u => `${nombreUnidad(u.p, u.n)} (${fmtCm(u.w)} × ${fmtCm(u.p.largo)})`);
+    texto += ` Franja ${i+1} (${fmtCm(f.largo)} cm de largo): ${lista.join(' + ')}.`;
     if(f.unTipo && f.factor < 1){
       const p = f.cols[0].p, tot = f.cols.reduce((s,col) => s + col.items.length, 0);
       const us = f.cols.reduce((s,col) => s + col.items.filter(it => !it.sobrante).length, 0);
@@ -2867,10 +2942,13 @@ function armarTextoInstruccion(piezas, nota){
       ? ` Sobran ${n} tapa(s) de ${p.nombre}` + (Math.floor(n/partes) ? ` = ${Math.floor(n/partes)} ${p.nombre} de más` : '') + '.'
       : ` Sobran ${n} ${p.nombre}.`;
   });
-  texto += ` Largo total de tela: ${c.largoTotal} cm. Consumo por unidad: ${fmtMetros(c.metros)} m (${c.detalle}); lo que sobra no se cuenta en el artículo.`;
+  texto += ` Largo total de tela: ${fmtCm(c.largoTotal)} cm. Consumo por unidad: ${fmtMetros(c.metros)} m (${c.detalle}); lo que sobra no se cuenta en el artículo.`;
   c.avisos.forEach(a => texto += ' ⚠️ ' + a);
   if(nota) texto += ' ' + nota;
   return texto;
+}
+function armarTextoInstruccion(piezas, nota){
+  return textoCorte(document.getElementById('ic-articulo').value, piezas, parseFloat(document.getElementById('ic-ancho').value), nota);
 }
 
 // bosquejo: el limite es siempre el ancho de la tela
@@ -2895,7 +2973,7 @@ function dibujarBosquejoCorte(anchoTela, piezas){
     f.cols.forEach(col => {
       col.items.forEach(it => {
         const x = margen + col.x * escala, y = margen + (f.y + it.y) * escala;
-        const w = it.p.ancho * escala, h = it.p.largo * escala;
+        const w = col.w * escala, h = it.p.largo * escala;
         const partes = it.p.partes || 1;
         const nro = numTapa.get(it.p) || 0; numTapa.set(it.p, nro + 1);
         const tapa = partes > 1 ? `Tapa ${(nro % partes) + 1}` : '';
@@ -2907,24 +2985,293 @@ function dibujarBosquejoCorte(anchoTela, piezas){
         ctx.fillText(it.p.nombre, x + w/2, y + h/2 - 6, w - 4);
         ctx.font = (chico ? '9px' : '11px') + ' Arial';
         const extra = f.unTipo ? 'Siguiente artículo' : 'Sobrante';
-        ctx.fillText(it.sobrante ? (tapa ? tapa + ' · ' : '') + extra : (tapa ? tapa + ' · ' : '') + `${it.p.ancho} × ${it.p.largo}`, x + w/2, y + h/2 + 10, w - 4);
+        ctx.fillText(it.sobrante ? (tapa ? tapa + ' · ' : '') + extra : (tapa ? tapa + ' · ' : '') + `${fmtCm(col.w)} × ${fmtCm(it.p.largo)}`, x + w/2, y + h/2 + 10, w - 4);
       });
     });
-    // linea que separa franjas
     ctx.beginPath(); ctx.moveTo(margen, margen + f.y*escala); ctx.lineTo(margen + anchoPx, margen + f.y*escala); ctx.stroke();
   });
   ctx.restore();
 
   ctx.setLineDash([6,4]); ctx.strokeRect(margen, margen, anchoPx, altoPx); ctx.setLineDash([]);
   ctx.font = '12px Arial'; ctx.textAlign = 'left';
-  c.franjas.forEach(f => ctx.fillText(f.largo + ' cm', 8, margen + (f.y + f.largo/2)*escala + 5));
+  c.franjas.forEach(f => ctx.fillText(fmtCm(f.largo) + ' cm', 8, margen + (f.y + f.largo/2)*escala + 5));
   ctx.textAlign = 'center';
   ctx.font = '13px Arial';
   const yFlecha = margen - 20;
   ctx.beginPath(); ctx.moveTo(margen, yFlecha); ctx.lineTo(margen+anchoPx, yFlecha); ctx.stroke();
-  ctx.fillText(anchoTela + ' cm de ancho', margen + anchoPx/2, yFlecha - 8);
-  if(c.franjas.length > 1) ctx.fillText('Largo total: ' + c.largoTotal + ' cm', margen + anchoPx/2, margen + altoPx + 24);
+  ctx.fillText(fmtCm(anchoTela) + ' cm de ancho', margen + anchoPx/2, yFlecha - 8);
+  if(c.franjas.length > 1) ctx.fillText('Largo total: ' + fmtCm(c.largoTotal) + ' cm', margen + anchoPx/2, margen + altoPx + 24);
   return canvas.toDataURL('image/png');
+}
+
+// ===== Fichas de articulos por SKU =====
+// Cada SKU se carga una sola vez, sin ancho. Un articulo "simple" tiene sus piezas; un "compuesto"
+// (ej: juego KA131J) se arma con otros SKU y toma las piezas de cada uno. El consumo y el bosquejo
+// para cualquier ancho los calcula el motor de corte, asi que no se carga nada por ancho.
+// Vive en su propio documento: config/fichas_articulos = { anchos: [...], fichas: { SKU: {...} } }
+let fichasArticulos = null;
+let fichaEditando = null; // SKU original de la ficha abierta (null = nueva)
+
+async function cargarFichasArticulos(){
+  try{
+    const doc = await db.collection('config').doc('fichas_articulos').get();
+    fichasArticulos = doc.exists ? doc.data() : {};
+  } catch(e){
+    console.error('Error cargando fichas:', e);
+    fichasArticulos = fichasArticulos || {};
+  }
+  fichasArticulos.anchos = Array.isArray(fichasArticulos.anchos) && fichasArticulos.anchos.length ? fichasArticulos.anchos : [150, 160, 300, 315];
+  fichasArticulos.fichas = fichasArticulos.fichas || {};
+}
+function normalizarSku(s){ return String(s||'').trim().toUpperCase(); }
+function hayFichas(){ return !!(fichasArticulos && fichasArticulos.fichas && Object.keys(fichasArticulos.fichas).length); }
+
+// arma la lista de piezas de un SKU (si es compuesto, junta las de sus componentes)
+function piezasDeFicha(sku, fichas, mult, camino){
+  fichas = fichas || fichasArticulos.fichas; mult = mult || 1; camino = camino || [];
+  const f = fichas[sku];
+  if(!f) return { piezas: [], errores: [`El SKU ${sku} no tiene ficha cargada.`] };
+  if(camino.includes(sku)) return { piezas: [], errores: [`${sku} se incluye a sí mismo (${[...camino, sku].join(' → ')}).`] };
+  if(f.tipo === 'compuesto'){
+    const r = { piezas: [], errores: [] };
+    (f.componentes || []).forEach(c => {
+      const sub = piezasDeFicha(normalizarSku(c.sku), fichas, mult * (parseInt(c.cantidad, 10) || 1), [...camino, sku]);
+      r.piezas.push(...sub.piezas); r.errores.push(...sub.errores);
+    });
+    return r;
+  }
+  return { piezas: (f.piezas || []).map(p => ({ nombre: p.nombre, ancho: parseFloat(p.ancho), largo: parseFloat(p.largo), partes: parseInt(p.partes, 10) || 1, cantidad: mult })), errores: [] };
+}
+function nombreFicha(sku){ const f = fichasArticulos && fichasArticulos.fichas[sku]; return f ? `${sku} — ${f.nombre}` : sku; }
+// en ordenes guardadas el articulo queda como "SKU — nombre": de ahi se recupera la ficha
+function fichaDesdeArticulo(articulo){
+  if(!fichasArticulos || !fichasArticulos.fichas) return null;
+  const sku = normalizarSku(String(articulo||'').split(' — ')[0]);
+  return fichasArticulos.fichas[sku] ? sku : null;
+}
+
+// ---------- pantalla ----------
+async function abrirFichasArticulos(){
+  mostrarPaso('step-fichas');
+  if(fichasArticulos === null) await cargarFichasArticulos();
+  document.getElementById('fa-anchos').value = fichasArticulos.anchos.join(', ');
+  document.getElementById('fa-buscar').value = '';
+  cerrarEditorFicha();
+  renderListaFichas();
+}
+
+async function guardarAnchosFichas(){
+  const anchos = [...new Set(document.getElementById('fa-anchos').value.split(/[,;\s]+/).map(x => parseFloat(x.replace(',', '.'))).filter(x => x > 0))].sort((a,b) => a-b);
+  if(!anchos.length){ alert('Escriba al menos un ancho, ej: 150, 160, 300, 315'); return; }
+  fichasArticulos.anchos = anchos;
+  try{
+    await db.collection('config').doc('fichas_articulos').set(fichasArticulos);
+    document.getElementById('fa-anchos').value = anchos.join(', ');
+    renderListaFichas();
+    if(document.getElementById('fa-editor').style.display !== 'none') calcularVistaFicha();
+    alert('Anchos guardados.');
+  } catch(e){ alert('No se pudieron guardar los anchos: ' + e.message); }
+}
+
+function renderListaFichas(){
+  const cont = document.getElementById('fa-lista');
+  const q = document.getElementById('fa-buscar').value.trim().toLowerCase();
+  const skus = Object.keys(fichasArticulos.fichas).sort()
+    .filter(s => !q || s.toLowerCase().includes(q) || (fichasArticulos.fichas[s].nombre||'').toLowerCase().includes(q));
+  if(!skus.length){ cont.innerHTML = `<p class="note">${hayFichas() ? 'No hay fichas que coincidan.' : 'Todavía no hay fichas. Empiece por los artículos simples (plana, ajustable, funda) y después arme los juegos.'}</p>`; return; }
+  cont.innerHTML = skus.map(s => {
+    const f = fichasArticulos.fichas[s];
+    const ah = parseFloat(f.anchoHabitual) || fichasArticulos.anchos[0];
+    const r = piezasDeFicha(s);
+    const consumo = r.errores.length || !r.piezas.length ? '⚠️ revisar' : fmtMetros(calcularCorte(r.piezas, ah).metros) + ' m';
+    const detalle = f.tipo === 'compuesto'
+      ? (f.componentes||[]).map(c => `${(parseInt(c.cantidad,10)||1) > 1 ? c.cantidad + ' × ' : ''}${normalizarSku(c.sku)}`).join(' + ')
+      : (f.piezas||[]).map(p => p.nombre).join(', ');
+    return `<div onclick="abrirEditorFicha('${escapeAttr(s)}')" style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;">
+      <div style="display:flex;justify-content:space-between;gap:8px;"><strong>${escaparHtml(s)}</strong><span style="font-size:0.85rem;">${consumo} <span style="color:#8A8072;">en ${ah} cm</span></span></div>
+      <div style="font-size:0.85rem;">${escaparHtml(f.nombre||'')}${f.tipo === 'compuesto' ? ' <span style="color:#8A8072;">(juego)</span>' : ''}</div>
+      <div style="font-size:0.78rem;color:#8A8072;">${escaparHtml(detalle)}</div>
+    </div>`;
+  }).join('');
+}
+
+function cerrarEditorFicha(){
+  document.getElementById('fa-editor').style.display = 'none';
+  document.getElementById('fa-lista-wrap').style.display = 'block';
+  fichaEditando = null;
+}
+
+function opcionesAnchoHabitual(sel){
+  return fichasArticulos.anchos.map(a => `<option value="${a}" ${String(a) === String(sel) ? 'selected' : ''}>${a} cm</option>`).join('');
+}
+
+function abrirEditorFicha(sku){
+  fichaEditando = sku || null;
+  const f = sku ? fichasArticulos.fichas[sku] : { tipo: 'simple', piezas: [{ nombre: '', ancho: '', largo: '', partes: 1 }], componentes: [], anchoHabitual: fichasArticulos.anchos[0] };
+  document.getElementById('fa-lista-wrap').style.display = 'none';
+  document.getElementById('fa-editor').style.display = 'block';
+  document.getElementById('fa-titulo').textContent = sku ? 'Editar ' + sku : 'Nueva ficha';
+  document.getElementById('fa-sku').value = sku || '';
+  document.getElementById('fa-nombre').value = f.nombre || '';
+  document.getElementById('fa-tipo').value = f.tipo || 'simple';
+  document.getElementById('fa-habitual').innerHTML = opcionesAnchoHabitual(f.anchoHabitual);
+  document.getElementById('fa-piezas').innerHTML = '';
+  (f.piezas && f.piezas.length ? f.piezas : [{ nombre: '', ancho: '', largo: '', partes: 1 }]).forEach(p => agregarPiezaFicha(p));
+  document.getElementById('fa-componentes').innerHTML = '';
+  (f.componentes && f.componentes.length ? f.componentes : [{ sku: '', cantidad: 1 }]).forEach(c => agregarComponenteFicha(c));
+  document.getElementById('fa-btn-borrar').style.display = sku ? 'inline-block' : 'none';
+  document.getElementById('fa-error').style.display = 'none';
+  document.getElementById('fa-skus').innerHTML = Object.keys(fichasArticulos.fichas).sort().map(s => `<option value="${escapeAttr(s)}">${escaparHtml(fichasArticulos.fichas[s].nombre||'')}</option>`).join('');
+  cambiarTipoFicha();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cambiarTipoFicha(){
+  const comp = document.getElementById('fa-tipo').value === 'compuesto';
+  document.getElementById('fa-bloque-piezas').style.display = comp ? 'none' : 'block';
+  document.getElementById('fa-bloque-componentes').style.display = comp ? 'block' : 'none';
+  calcularVistaFicha();
+}
+
+function agregarPiezaFicha(p){
+  p = p || { nombre: '', ancho: '', largo: '', partes: 1 };
+  const div = document.createElement('div');
+  div.className = 'fa-pieza';
+  div.style.cssText = 'border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;';
+  div.innerHTML = `
+    <div class="field"><label>Nombre de la pieza</label><input type="text" class="fa-p-nombre" value="${escapeAttr(p.nombre||'')}" placeholder="Ej: Plana" oninput="calcularVistaFicha()"></div>
+    <div style="display:flex;gap:8px;">
+      <div class="field" style="flex:1;"><label>Ancho mínimo (cm)</label><input type="number" step="0.1" class="fa-p-ancho" value="${p.ancho||''}" placeholder="150" oninput="calcularVistaFicha()"></div>
+      <div class="field" style="flex:1;"><label>Largo (cm)</label><input type="number" step="0.1" class="fa-p-largo" value="${p.largo||''}" placeholder="260" oninput="calcularVistaFicha()"></div>
+      <div class="field" style="flex:1;"><label>Cuántas (tapas)</label><input type="number" min="1" step="1" class="fa-p-partes" value="${p.partes||1}" oninput="calcularVistaFicha()"></div>
+    </div>
+    <button type="button" class="btn-mini" onclick="this.closest('.fa-pieza').remove(); calcularVistaFicha();">🗑️ Quitar pieza</button>`;
+  document.getElementById('fa-piezas').appendChild(div);
+}
+
+function agregarComponenteFicha(c){
+  c = c || { sku: '', cantidad: 1 };
+  const div = document.createElement('div');
+  div.className = 'fa-comp';
+  div.style.cssText = 'display:flex;gap:8px;align-items:flex-end;margin-bottom:8px;';
+  div.innerHTML = `
+    <div class="field" style="flex:3;margin:0;"><label>SKU del componente</label><input type="text" list="fa-skus" class="fa-c-sku" value="${escapeAttr(c.sku||'')}" placeholder="Ej: KA131" oninput="calcularVistaFicha()"></div>
+    <div class="field" style="flex:1;margin:0;"><label>Cantidad</label><input type="number" min="1" step="1" class="fa-c-cant" value="${c.cantidad||1}" oninput="calcularVistaFicha()"></div>
+    <button type="button" class="btn-mini" style="margin-bottom:4px;" onclick="this.closest('.fa-comp').remove(); calcularVistaFicha();">🗑️</button>`;
+  document.getElementById('fa-componentes').appendChild(div);
+}
+
+function leerFichaFormulario(){
+  const tipo = document.getElementById('fa-tipo').value;
+  const f = {
+    nombre: document.getElementById('fa-nombre').value.trim(),
+    tipo,
+    anchoHabitual: parseFloat(document.getElementById('fa-habitual').value) || fichasArticulos.anchos[0],
+  };
+  if(tipo === 'compuesto'){
+    f.componentes = [...document.querySelectorAll('.fa-comp')].map(el => ({ sku: normalizarSku(el.querySelector('.fa-c-sku').value), cantidad: Math.max(1, parseInt(el.querySelector('.fa-c-cant').value, 10) || 1) })).filter(c => c.sku);
+  } else {
+    f.piezas = [...document.querySelectorAll('.fa-pieza')].map(el => ({
+      nombre: el.querySelector('.fa-p-nombre').value.trim(),
+      ancho: parseFloat(el.querySelector('.fa-p-ancho').value),
+      largo: parseFloat(el.querySelector('.fa-p-largo').value),
+      partes: Math.max(1, parseInt(el.querySelector('.fa-p-partes').value, 10) || 1),
+    })).filter(p => p.nombre || p.ancho || p.largo);
+  }
+  return f;
+}
+
+function problemasFicha(sku, f){
+  const errores = [];
+  if(!sku) errores.push('Falta el SKU.');
+  if(!f.nombre) errores.push('Falta el nombre.');
+  if(f.tipo === 'compuesto'){
+    if(!f.componentes.length) errores.push('Agregue al menos un componente.');
+  } else {
+    if(!f.piezas.length) errores.push('Agregue al menos una pieza.');
+    if(f.piezas.some(p => !p.nombre || !(p.ancho > 0) || !(p.largo > 0))) errores.push('Complete nombre, ancho y largo de cada pieza.');
+  }
+  return errores;
+}
+
+let fichaVistaAncho = null;
+function calcularVistaFicha(anchoElegido){
+  if(anchoElegido) fichaVistaAncho = anchoElegido;
+  const cont = document.getElementById('fa-resultado');
+  const sku = normalizarSku(document.getElementById('fa-sku').value) || 'NUEVO';
+  const f = leerFichaFormulario();
+  const prueba = { ...fichasArticulos.fichas, [sku]: f };
+  const r = piezasDeFicha(sku, prueba);
+  const incompleto = problemasFicha(sku, f).filter(e => !e.startsWith('Falta el'));
+  if(r.errores.length || incompleto.length || !r.piezas.length || r.piezas.some(p => !(p.ancho > 0) || !(p.largo > 0))){
+    cont.innerHTML = `<p class="note">${escaparHtml([...r.errores, ...incompleto].join(' ') || 'Complete las piezas para ver el consumo.')}</p>`;
+    return;
+  }
+  const habitual = parseFloat(document.getElementById('fa-habitual').value);
+  const anchos = [...new Set([...fichasArticulos.anchos, ...(fichaVistaAncho ? [fichaVistaAncho] : [])])].sort((a,b) => a-b);
+  if(!fichaVistaAncho || !anchos.includes(fichaVistaAncho)) fichaVistaAncho = habitual || anchos[0];
+  const filas = anchos.map(a => {
+    const c = calcularCorte(r.piezas, a);
+    const sel = a === fichaVistaAncho;
+    return `<tr onclick="calcularVistaFicha(${a})" style="cursor:pointer;${sel ? 'background:var(--cream);font-weight:700;' : ''}">
+      <td style="padding:6px 8px;">${a} cm${a === habitual ? ' ⭐' : ''}</td>
+      <td style="padding:6px 8px;text-align:right;">${fmtMetros(c.metros)} m${c.avisos.length ? ' ⚠️' : ''}</td>
+      <td style="padding:6px 8px;text-align:right;color:#8A8072;">${sel ? 'viendo' : 'ver'}</td></tr>`;
+  }).join('');
+  const nombre = f.nombre ? `${sku} — ${f.nombre}` : sku;
+  cont.innerHTML = `
+    <p class="note" style="margin-bottom:6px;">Consumo por unidad según el ancho de la tela (⭐ = habitual). Toque un ancho para ver el corte.</p>
+    <table style="width:100%;border-collapse:collapse;font-size:0.9rem;margin-bottom:8px;">${filas}</table>
+    <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:10px;">
+      <div class="field" style="flex:1;margin:0;"><label>Probar otro ancho (cm)</label><input type="number" step="0.1" id="fa-otro-ancho" placeholder="Ej: 280"></div>
+      <button type="button" class="btn-mini" style="margin-bottom:4px;" onclick="const v=parseFloat(document.getElementById('fa-otro-ancho').value); if(v>0) calcularVistaFicha(v);">Ver</button>
+    </div>
+    <div style="background:var(--cream);border-radius:10px;padding:12px;white-space:pre-wrap;font-size:0.85rem;margin-bottom:10px;">${escaparHtml(textoCorte(nombre, r.piezas, fichaVistaAncho, ''))}</div>
+    <div style="text-align:center;"><img src="${dibujarBosquejoCorte(fichaVistaAncho, r.piezas)}" style="max-width:100%;border:1px solid var(--line);border-radius:8px;"></div>`;
+}
+
+async function guardarFicha(){
+  const errorEl = document.getElementById('fa-error');
+  errorEl.style.display = 'none';
+  const sku = normalizarSku(document.getElementById('fa-sku').value);
+  const f = leerFichaFormulario();
+  const errores = problemasFicha(sku, f);
+  if(!errores.length){
+    const r = piezasDeFicha(sku, { ...fichasArticulos.fichas, [sku]: f });
+    errores.push(...r.errores);
+  }
+  if(sku !== fichaEditando && fichasArticulos.fichas[sku]) errores.push(`Ya existe una ficha con el SKU ${sku}.`);
+  if(errores.length){ errorEl.textContent = errores.join(' '); errorEl.style.display = 'block'; return; }
+  const nuevas = { ...fichasArticulos.fichas };
+  if(fichaEditando && fichaEditando !== sku){
+    // cambio de SKU: los juegos que usaban el SKU viejo pasan a usar el nuevo
+    delete nuevas[fichaEditando];
+    Object.values(nuevas).forEach(x => (x.componentes||[]).forEach(c => { if(normalizarSku(c.sku) === fichaEditando) c.sku = sku; }));
+  }
+  nuevas[sku] = f;
+  try{
+    await db.collection('config').doc('fichas_articulos').set({ ...fichasArticulos, fichas: nuevas });
+    fichasArticulos.fichas = nuevas;
+    cerrarEditorFicha();
+    renderListaFichas();
+    alert('Ficha ' + sku + ' guardada.');
+  } catch(e){ errorEl.textContent = 'No se pudo guardar: ' + e.message; errorEl.style.display = 'block'; }
+}
+
+async function borrarFicha(){
+  const sku = fichaEditando;
+  if(!sku) return;
+  const usan = Object.keys(fichasArticulos.fichas).filter(s => (fichasArticulos.fichas[s].componentes||[]).some(c => normalizarSku(c.sku) === sku));
+  if(usan.length){ alert(`No se puede borrar ${sku}: lo usan estos juegos: ${usan.join(', ')}. Quítelo de ahí primero.`); return; }
+  if(!confirm('¿Borrar la ficha ' + sku + '?')) return;
+  const nuevas = { ...fichasArticulos.fichas };
+  delete nuevas[sku];
+  try{
+    await db.collection('config').doc('fichas_articulos').set({ ...fichasArticulos, fichas: nuevas });
+    fichasArticulos.fichas = nuevas;
+    cerrarEditorFicha();
+    renderListaFichas();
+  } catch(e){ alert('No se pudo borrar: ' + e.message); }
 }
 
 function previsualizarBosquejoCorte(){
@@ -3039,8 +3386,13 @@ function irAInstruccion(articulo, ancho){
 let renglonIdCounterOT = 0;
 
 function opcionesArticuloOT(){
-  if(!tablaConsumo || !tablaConsumo.articulos) return '';
-  return Object.keys(tablaConsumo.articulos).sort().map(n => `<option value="${escapeAttr(n)}">${n}</option>`).join('');
+  const deFichas = hayFichas()
+    ? `<optgroup label="Fichas por SKU (consumo calculado)">` + Object.keys(fichasArticulos.fichas).sort().map(s => `<option value="ficha:${escapeAttr(s)}">${escaparHtml(nombreFicha(s))}</option>`).join('') + `</optgroup>`
+    : '';
+  const deTabla = (tablaConsumo && tablaConsumo.articulos && Object.keys(tablaConsumo.articulos).length)
+    ? `<optgroup label="Tabla de consumo">` + Object.keys(tablaConsumo.articulos).sort().map(n => `<option value="${escapeAttr(n)}">${n}</option>`).join('') + `</optgroup>`
+    : '';
+  return deFichas + deTabla;
 }
 
 function agregarRenglonOrdenTrabajo(){
@@ -3069,6 +3421,13 @@ function agregarRenglonOrdenTrabajo(){
 
 function cambiarModoRenglonOT(selectEl){
   const renglon = selectEl.closest('.ot-renglon');
+  if(selectEl.value.startsWith('ficha:')){
+    // ficha: completa el SKU y el ancho habitual si estan vacios
+    const sku = selectEl.value.slice(6), f = fichasArticulos.fichas[sku];
+    const skuEl = renglon.querySelector('.ot-r-sku'), anchoEl = renglon.querySelector('.ot-r-ancho');
+    if(!skuEl.value.trim()) skuEl.value = sku;
+    if(!anchoEl.value && f && f.anchoHabitual) anchoEl.value = f.anchoHabitual;
+  }
   const personalizado = selectEl.value === '__personalizado__';
   renglon.querySelector('.ot-r-normal').style.display = personalizado ? 'none' : 'block';
   renglon.querySelector('.ot-r-personalizado').style.display = personalizado ? 'block' : 'none';
@@ -3082,10 +3441,11 @@ function eliminarRenglonOrdenTrabajo(id){
 async function abrirOrdenTrabajo(){
   mostrarPaso('step-orden-trabajo');
   if(tablaConsumo === null) await cargarTablaConsumo();
+  if(fichasArticulos === null) await cargarFichasArticulos();
   if(talleresLista === null) await cargarTalleres();
   poblarSelectTalleres();
 
-  const hay = tablaConsumo && tablaConsumo.articulos && Object.keys(tablaConsumo.articulos).length > 0;
+  const hay = (tablaConsumo && tablaConsumo.articulos && Object.keys(tablaConsumo.articulos).length > 0) || hayFichas();
   document.getElementById('ot-sin-tabla').style.display = hay ? 'none' : 'block';
 
   document.getElementById('ot-taller').value = '';
@@ -3194,6 +3554,21 @@ async function generarOrdenTrabajoCompleta(){
       errorEl.textContent = 'Complete el ancho en todos los productos que agregó.';
       errorEl.style.display = 'block';
       return;
+    }
+    if(articuloSel.startsWith('ficha:')){
+      // ficha por SKU: el consumo se calcula exacto para el ancho real de la tela
+      const skuFicha = articuloSel.slice(6);
+      const r = piezasDeFicha(skuFicha);
+      if(r.errores.length || !r.piezas.length){
+        errorEl.textContent = `La ficha ${skuFicha} tiene problemas: ${r.errores.join(' ') || 'no tiene piezas.'}`;
+        errorEl.style.display = 'block';
+        return;
+      }
+      const nombre = nombreFicha(skuFicha);
+      const consumo = calcularCorte(r.piezas, ancho).metros;
+      const metrosConsumidos = Math.round(cantidad * consumo * 100) / 100;
+      renglones.push({ articulo: nombre, fichaSku: skuFicha, anchoIngresado: ancho, anchoUsado: ancho, exacto: true, consumo, cantidad, metrosConsumidos, sku, nota, instruccion: textoCorte(nombre, r.piezas, ancho, ''), tieneBosquejo: true, entregado: 0 });
+      continue;
     }
     const resultado = buscarConsumoMasCercano(tablaConsumo.articulos[articulo], ancho);
     if(!resultado){
@@ -3332,6 +3707,7 @@ async function abrirHistorialOT(){
   mostrarPaso('step-historial-ot');
   document.getElementById('hot-buscador').value = '';
   document.getElementById('hot-lista').innerHTML = '<p class="empty-msg">Cargando órdenes...</p>';
+  if(fichasArticulos === null) await cargarFichasArticulos();
   await cargarHistorialOT();
   renderHistorialOT('');
 }
