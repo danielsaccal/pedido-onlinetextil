@@ -1366,15 +1366,17 @@ a.grilla-celda{display:block;}
       <h2>Orden de trabajo para taller</h2>
       <p class="note" id="ot-sin-tabla" style="display:none;margin-bottom:14px;color:#A6432F;">Todavía no cargó la tabla de consumo — <a href="#" onclick="event.preventDefault(); abrirTablaConsumo();">cárguela acá</a> antes de seguir.</p>
       <div class="field"><label>SKU de la tela entregada</label><input type="text" id="ot-sku-tela" placeholder="Ej: MAC315B"></div>
-      <div class="field"><label>Metros entregados</label><input type="number" id="ot-metros" min="0" step="0.01" placeholder="Ej: 600" oninput="calcularOrdenTrabajo()"></div>
-      <div class="field">
-        <label>Artículo a fabricar</label>
-        <select id="ot-articulo" onchange="calcularOrdenTrabajo()"><option value="">Elija un artículo</option></select>
-      </div>
-      <div class="field"><label>Ancho real de esta tela (cm)</label><input type="number" id="ot-ancho" min="0" step="0.1" placeholder="Ej: 315" oninput="calcularOrdenTrabajo()"></div>
-      <div class="field"><label>SKU del producto terminado</label><input type="text" id="ot-sku-producto" placeholder="Ej: JQ315B"></div>
-      <div class="field"><label>Nota adicional (opcional)</label><input type="text" id="ot-nota" placeholder="Ej: entregar antes del viernes"></div>
+      <div class="field"><label>Metros totales entregados</label><input type="number" id="ot-metros-totales" min="0" step="0.01" placeholder="Ej: 600"></div>
 
+      <p class="ni-seccion-tit" style="margin-top:18px;">Productos a fabricar con esta tela</p>
+      <p class="note" style="margin-bottom:10px;">Si con la misma partida hace más de un producto (ej: juegos de sábanas y fundas sueltas), agregue uno por cada uno — reparta entre ellos los metros que use cada uno.</p>
+      <div id="ot-renglones"></div>
+      <button type="button" class="btn-mini" onclick="agregarRenglonOrdenTrabajo()">+ Agregar producto</button>
+
+      <div class="field" style="margin-top:16px;"><label>Nota general (opcional)</label><input type="text" id="ot-nota-general" placeholder="Ej: entregar antes del viernes"></div>
+
+      <div class="actions" style="margin-top:14px;"><button class="btn btn-gold" onclick="generarOrdenTrabajoCompleta()">Generar orden de trabajo</button></div>
+      <p class="error" id="ot-error" style="display:none;"></p>
       <div id="ot-resultado" style="margin-top:14px;"></div>
 
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
@@ -2427,7 +2429,7 @@ async function abrirTablaConsumo(){
   mostrarEstadoTablaConsumo();
 }
 
-// ---------- generar orden de trabajo ----------
+// ---------- generar orden de trabajo (varios productos por orden, numerada) ----------
 function buscarConsumoMasCercano(articuloData, anchoBuscado){
   if(!articuloData) return null;
   const entradas = Object.entries(articuloData)
@@ -2439,6 +2441,36 @@ function buscarConsumoMasCercano(articuloData, anchoBuscado){
   return { consumo: mejor.consumo, anchoUsado: mejor.ancho, exacto: Math.abs(mejor.ancho - anchoBuscado) < 0.01 };
 }
 
+let renglonIdCounterOT = 0;
+
+function opcionesArticuloOT(){
+  if(!tablaConsumo || !tablaConsumo.articulos) return '';
+  return Object.keys(tablaConsumo.articulos).sort().map(n => `<option value="${escapeAttr(n)}">${n}</option>`).join('');
+}
+
+function agregarRenglonOrdenTrabajo(){
+  const id = renglonIdCounterOT++;
+  const cont = document.getElementById('ot-renglones');
+  const div = document.createElement('div');
+  div.className = 'ot-renglon';
+  div.dataset.id = id;
+  div.style.cssText = 'border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;';
+  div.innerHTML = `
+    <div class="field"><label>Artículo</label><select class="ot-r-articulo"><option value="">Elija un artículo</option>${opcionesArticuloOT()}</select></div>
+    <div class="field"><label>Ancho real de la tela (cm)</label><input type="number" step="0.1" class="ot-r-ancho" placeholder="Ej: 315"></div>
+    <div class="field"><label>Metros asignados a este producto</label><input type="number" step="0.01" class="ot-r-metros" placeholder="Ej: 400"></div>
+    <div class="field"><label>SKU del producto terminado</label><input type="text" class="ot-r-sku" placeholder="Ej: JQ315B"></div>
+    <div class="field"><label>Nota de este producto (opcional)</label><input type="text" class="ot-r-nota"></div>
+    <button type="button" class="btn-mini" onclick="eliminarRenglonOrdenTrabajo(${id})">🗑️ Quitar este producto</button>
+  `;
+  cont.appendChild(div);
+}
+
+function eliminarRenglonOrdenTrabajo(id){
+  const el = document.querySelector(`.ot-renglon[data-id="${id}"]`);
+  if(el) el.remove();
+}
+
 async function abrirOrdenTrabajo(){
   mostrarPaso('step-orden-trabajo');
   if(tablaConsumo === null) await cargarTablaConsumo();
@@ -2447,62 +2479,103 @@ async function abrirOrdenTrabajo(){
   document.getElementById('ot-sin-tabla').style.display = hay ? 'none' : 'block';
 
   document.getElementById('ot-sku-tela').value = '';
-  document.getElementById('ot-metros').value = '';
-  document.getElementById('ot-ancho').value = '';
-  document.getElementById('ot-sku-producto').value = '';
-  document.getElementById('ot-nota').value = '';
+  document.getElementById('ot-metros-totales').value = '';
+  document.getElementById('ot-nota-general').value = '';
+  document.getElementById('ot-error').style.display = 'none';
   document.getElementById('ot-resultado').innerHTML = '';
-
-  const sel = document.getElementById('ot-articulo');
-  sel.innerHTML = '<option value="">Elija un artículo</option>';
-  if(hay){
-    Object.keys(tablaConsumo.articulos).sort().forEach(nom => {
-      const opt = document.createElement('option');
-      opt.value = nom; opt.textContent = nom;
-      sel.appendChild(opt);
-    });
-  }
+  document.getElementById('ot-renglones').innerHTML = '';
+  renglonIdCounterOT = 0;
+  if(hay) agregarRenglonOrdenTrabajo(); // arranca con un producto listo para completar
 }
 
-function calcularOrdenTrabajo(){
+// mismo contador externo que ya usan los pedidos (siguienteNumeroPedido), con su propio nombre de contador
+async function siguienteNumeroOrdenTrabajo(){
+  const COUNTER_URL = 'https://countapi.mileshilliard.com/api/v1/hit/onlinetextil_ordenes_trabajo_2026';
+  let n = 1;
+  try{
+    const resp = await fetch(COUNTER_URL);
+    const data = await resp.json();
+    n = parseInt(data.value, 10);
+  } catch(e){
+    n = Math.floor(1000 + Math.random()*8999); // respaldo si el contador externo falla
+  }
+  return n;
+}
+
+async function generarOrdenTrabajoCompleta(){
+  const errorEl = document.getElementById('ot-error');
   const cont = document.getElementById('ot-resultado');
+  errorEl.style.display = 'none';
+  cont.innerHTML = '';
+
   const skuTela = document.getElementById('ot-sku-tela').value.trim();
-  const metros = parseFloat(document.getElementById('ot-metros').value);
-  const articuloNombre = document.getElementById('ot-articulo').value;
-  const anchoIngresado = parseFloat(document.getElementById('ot-ancho').value);
-  const skuProducto = document.getElementById('ot-sku-producto').value.trim();
-  const nota = document.getElementById('ot-nota').value.trim();
+  const metrosTotales = parseFloat(document.getElementById('ot-metros-totales').value);
+  const notaGeneral = document.getElementById('ot-nota-general').value.trim();
 
-  if(!articuloNombre || isNaN(metros) || metros <= 0 || isNaN(anchoIngresado) || anchoIngresado <= 0){
-    cont.innerHTML = '';
+  if(!skuTela || isNaN(metrosTotales) || metrosTotales <= 0){
+    errorEl.textContent = 'Complete el SKU de la tela y los metros totales entregados.';
+    errorEl.style.display = 'block';
     return;
   }
 
-  const datosArticulo = tablaConsumo.articulos[articuloNombre];
-  const resultado = buscarConsumoMasCercano(datosArticulo, anchoIngresado);
-  if(!resultado){
-    cont.innerHTML = '<p class="error" style="display:block;">Este artículo no tiene ningún ancho cargado en la tabla.</p>';
+  const renglonesEl = [...document.querySelectorAll('.ot-renglon')];
+  if(renglonesEl.length === 0){
+    errorEl.textContent = 'Agregue al menos un producto a fabricar con "+ Agregar producto".';
+    errorEl.style.display = 'block';
     return;
   }
 
-  const cantidad = Math.floor(metros / resultado.consumo);
-  const sobrante = Math.round((metros - cantidad*resultado.consumo) * 100) / 100;
+  const renglones = [];
+  for(const el of renglonesEl){
+    const articulo = el.querySelector('.ot-r-articulo').value;
+    const ancho = parseFloat(el.querySelector('.ot-r-ancho').value);
+    const metros = parseFloat(el.querySelector('.ot-r-metros').value);
+    const sku = el.querySelector('.ot-r-sku').value.trim();
+    const nota = el.querySelector('.ot-r-nota').value.trim();
 
-  const avisoAncho = resultado.exacto ? '' :
-    `⚠️ La tabla no tiene el ancho ${anchoIngresado} cm exacto para "${articuloNombre}" — usé el más cercano (${resultado.anchoUsado} cm). Revíselo antes de mandarlo.`;
+    if(!articulo || isNaN(ancho) || ancho <= 0 || isNaN(metros) || metros <= 0){
+      errorEl.textContent = 'Complete artículo, ancho y metros en todos los productos que agregó.';
+      errorEl.style.display = 'block';
+      return;
+    }
+    const resultado = buscarConsumoMasCercano(tablaConsumo.articulos[articulo], ancho);
+    if(!resultado){
+      errorEl.textContent = `"${articulo}" no tiene ningún ancho cargado en la tabla.`;
+      errorEl.style.display = 'block';
+      return;
+    }
+    const cantidad = Math.floor(metros / resultado.consumo);
+    renglones.push({ articulo, anchoIngresado: ancho, anchoUsado: resultado.anchoUsado, exacto: resultado.exacto, consumo: resultado.consumo, metros, cantidad, sku, nota });
+  }
 
-  const lineasTexto = [
-    'ORDEN DE TRABAJO',
-    `Tela: ${skuTela || '(sin SKU)'} — se entregan ${metros} metros`,
-    `Fabricar: ${articuloNombre} (ancho ${resultado.anchoUsado} cm, consumo ≈ ${resultado.consumo} m c/u)`,
-    `Cantidad aproximada: ${cantidad} unidades` + (sobrante > 0 ? ` (sobran ≈ ${sobrante} m)` : ''),
-    `SKU del producto terminado: ${skuProducto || '(sin definir)'}`,
+  const metrosAsignados = Math.round(renglones.reduce((s,r) => s + r.metros, 0) * 100) / 100;
+  const metrosSobrantes = Math.round((metrosTotales - metrosAsignados) * 100) / 100;
+  const excede = metrosAsignados > metrosTotales + 0.005;
+
+  const numero = await siguienteNumeroOrdenTrabajo();
+  const numeroFormateado = 'OT-TALLER-' + String(numero).padStart(4, '0');
+
+  const avisosAncho = renglones.filter(r => !r.exacto)
+    .map(r => `⚠️ "${r.articulo}": no había ancho ${r.anchoIngresado} cm exacto en la tabla — usé el más cercano (${r.anchoUsado} cm). Revíselo.`);
+
+  const lineas = [
+    `ORDEN DE TRABAJO ${numeroFormateado}`,
+    `Tela: ${skuTela} — se entregan ${metrosTotales} metros`,
+    '',
+    ...renglones.map((r, i) =>
+      `${i+1}) ${r.articulo} — ancho ${r.anchoUsado} cm, consumo ≈ ${r.consumo} m c/u — usa ${r.metros} m de tela → ${r.cantidad} unidades aprox.\n   SKU del producto terminado: ${r.sku || '(sin definir)'}` + (r.nota ? `\n   Nota: ${r.nota}` : '')
+    ),
+    '',
+    excede
+      ? `⚠️ La suma de metros asignados (${metrosAsignados} m) supera los metros entregados (${metrosTotales} m). Revise el reparto.`
+      : `Metros sobrantes: ≈ ${metrosSobrantes} m`,
   ];
-  if(nota) lineasTexto.push(nota);
-  const textoOrden = lineasTexto.join('\n');
+  if(notaGeneral) lineas.push(notaGeneral);
+  const textoOrden = lineas.join('\n');
 
   cont.innerHTML = `
-    ${avisoAncho ? `<p class="note" style="color:#A6432F;margin-bottom:10px;">${avisoAncho}</p>` : ''}
+    ${avisosAncho.map(a => `<p class="note" style="color:#A6432F;margin-bottom:6px;">${escaparHtml(a)}</p>`).join('')}
+    ${excede ? `<p class="note" style="color:#A6432F;font-weight:700;margin-bottom:8px;">⚠️ La suma de metros asignados supera lo entregado — revíselo antes de mandarlo.</p>` : ''}
     <div style="background:var(--cream);border-radius:10px;padding:14px;white-space:pre-wrap;font-size:0.88rem;margin-bottom:12px;">${escaparHtml(textoOrden)}</div>
     <div class="actions">
       <button class="btn btn-gold" onclick="compartirOrdenTrabajo('whatsapp')">📤 Compartir por WhatsApp</button>
@@ -2510,6 +2583,15 @@ function calcularOrdenTrabajo(){
     </div>
   `;
   cont.dataset.texto = textoOrden;
+
+  // registro de la orden ya generada y numerada (no bloquea si falla: el texto ya se armo bien igual)
+  try{
+    await db.collection('ordenes_trabajo').add({
+      numero: numeroFormateado, fecha: new Date().toISOString(), skuTela, metrosTotales, metrosAsignados, renglones, notaGeneral,
+    });
+  } catch(e){
+    console.error('No se pudo guardar el registro de la orden (el texto ya se generó bien):', e);
+  }
 }
 
 function compartirOrdenTrabajo(modo){
