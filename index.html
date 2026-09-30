@@ -1453,7 +1453,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v12</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v13</p>
       <div id="ic-lista" style="margin-top:8px;"></div>
 
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
@@ -10290,6 +10290,30 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 }).then(() => {
   renderCatalogo(document.getElementById('buscador').value);
 });
+</script>
+<script>
+// ===== Aviso de version nueva =====
+// El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
+// pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
+const APP_VERSION = '2026-09-30-v13';
+async function revisarVersionNueva(){
+  try{
+    const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
+    const t = await r.text();
+    const m = t.match(/const APP_VERSION = '([^']+)'/);
+    if(m && m[1] !== APP_VERSION && !document.getElementById('aviso-version')){
+      const d = document.createElement('div');
+      d.id = 'aviso-version';
+      d.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:500;background:#3D2150;color:#fff;padding:12px 16px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.3);display:flex;gap:12px;align-items:center;font-size:14px;max-width:92vw;';
+      d.innerHTML = '<span>Hay una versión nueva de la app.</span><button type="button" style="background:#F2D16B;border:none;border-radius:16px;padding:8px 14px;font-weight:700;cursor:pointer;">Actualizar</button>';
+      d.querySelector('button').onclick = () => { location.replace(location.pathname + '?v=' + Date.now() + location.hash); };
+      document.body.appendChild(d);
+    }
+  } catch(e){ /* sin conexion: se vuelve a intentar despues */ }
+}
+setInterval(revisarVersionNueva, 3 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') revisarVersionNueva(); });
+window.addEventListener('load', () => setTimeout(revisarVersionNueva, 5000));
 </script>
 </body>
 </html>
