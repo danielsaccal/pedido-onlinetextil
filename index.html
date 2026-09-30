@@ -1470,7 +1470,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v26</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v27</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1549,7 +1549,11 @@ a.grilla-celda{display:block;}
         <div style="border:1px solid var(--line);border-radius:12px;padding:10px;align-self:start;">
           <input type="text" id="ac-buscar" placeholder="🔍 Buscar" oninput="renderListaAC()" style="margin-bottom:8px;">
           <div id="ac-lista" style="max-height:60vh;overflow-y:auto;"></div>
-          <button type="button" class="btn-mini" style="width:100%;margin-top:8px;" onclick="nuevoArticuloAC()">+ Nuevo artículo</button>
+          <div style="display:flex;gap:6px;margin-top:8px;">
+            <button type="button" class="btn-mini" style="flex:1;" onclick="nuevoArticuloAC()">+ Nuevo artículo</button>
+            <button type="button" class="btn-mini" style="flex:1;" onclick="verDuplicadosAC()">🧹 Duplicados</button>
+          </div>
+          <div id="ac-duplicados"></div>
         </div>
         <div style="border:1px solid var(--line);border-radius:12px;padding:12px;">
           <p class="note" id="ac-vacio">Elija un artículo de la lista o cree uno nuevo.</p>
@@ -3716,7 +3720,8 @@ function renderListaAC(){
   const q = document.getElementById('ac-buscar').value.trim().toLowerCase();
   const todos = articulosAC();
   const padres = todos.filter(a => !origenAC(a) || !todos.includes(origenAC(a))).sort((x,y) => x.localeCompare(y, 'es'));
-  const item = (a, hija) => `<div onclick="abrirArticuloAC('${escapeAttr(a)}')" style="padding:7px 10px;border-radius:8px;cursor:pointer;font-size:0.88rem;${hija ? 'padding-left:24px;color:#6B6258;' : ''}${a === acArticulo ? 'background:var(--purple);color:#fff;' : ''}">${hija ? '↳ ' : ''}${escaparHtml(a)}</div>`;
+  const tienePiezas = a => Object.values(tablaConsumo.instrucciones[a] || {}).some(g => piezasValidas(g));
+  const item = (a, hija) => `<div onclick="abrirArticuloAC('${escapeAttr(a)}')" title="${tienePiezas(a) ? 'Tiene piezas cargadas' : 'Sin piezas cargadas'}" style="display:flex;justify-content:space-between;gap:6px;padding:7px 10px;border-radius:8px;cursor:pointer;font-size:0.88rem;${hija ? 'padding-left:24px;color:#6B6258;' : ''}${a === acArticulo ? 'background:var(--purple);color:#fff;' : ''}"><span>${hija ? '↳ ' : ''}${escaparHtml(a)}</span>${tienePiezas(a) ? '<span style="opacity:.6;">✂️</span>' : ''}</div>`;
   let html = '';
   padres.forEach(p => {
     const hijas = todos.filter(a => origenAC(a) === p).sort((x,y) => x.localeCompare(y, 'es'));
@@ -4011,6 +4016,46 @@ function agregarSugerenciaOT(items, ancho){
     r.querySelector('.ot-r-cantidad').value = it.n;
   });
   sugerirRemanenteOT();
+}
+
+// ===== Articulos duplicados =====
+// Agrupa los que tienen el mismo nombre escrito distinto (mayusculas, tildes, plurales, "de", orden de
+// las palabras). Muestra que tiene cada uno para decidir cual borrar.
+function claveDuplicado(n){
+  return palabrasNombre(n).map(w => w.length > 3 ? w.replace(/s$/, '') : w).sort().join(' ');
+}
+function resumenArticuloAC(a){
+  const inst = tablaConsumo.instrucciones[a] || {};
+  const conPiezas = Object.entries(inst).filter(([k, g]) => piezasValidas(g));
+  const tabla = Object.entries(tablaConsumo.articulos[a] || {}).filter(([k, v]) => v !== null && v !== '' && v !== undefined);
+  const partes = [];
+  if(conPiezas.length) partes.push(`piezas cargadas (${conPiezas.map(x => x[0]).join(', ')} cm)`);
+  else partes.push('sin piezas');
+  if(tabla.length) partes.push(`consumo a mano en ${tabla.map(x => x[0]).join(', ')} cm`);
+  if(origenAC(a)) partes.push('pieza del ' + origenAC(a));
+  return partes.join(' · ');
+}
+function verDuplicadosAC(){
+  const grupos = {};
+  articulosAC().forEach(a => { const k = claveDuplicado(a); (grupos[k] = grupos[k] || []).push(a); });
+  const dups = Object.values(grupos).filter(g => g.length > 1);
+  const cont = document.getElementById('ac-duplicados');
+  if(!dups.length){ cont.innerHTML = '<p class="note" style="margin-top:8px;">No encontré artículos duplicados.</p>'; return; }
+  cont.innerHTML = `<div style="border:1px solid var(--gold);border-radius:10px;padding:10px;margin-top:8px;">
+    <p style="margin:0 0 6px;font-weight:700;font-size:0.9rem;">${dups.length} grupo(s) con nombres repetidos</p>
+    <p class="note" style="margin:0 0 8px;">Borre el que sobra. Conviene quedarse con el que tiene piezas cargadas.</p>
+    ${dups.map(g => `<div style="border-top:1px solid var(--line);padding:6px 0;">${g.map(a => `
+      <div style="display:flex;justify-content:space-between;gap:6px;align-items:center;padding:3px 0;">
+        <span style="font-size:0.85rem;"><a href="#" onclick="event.preventDefault(); abrirArticuloAC('${escapeAttr(a)}')"><b>${escaparHtml(a)}</b></a><br><span class="note" style="font-size:0.75rem;">${escaparHtml(resumenArticuloAC(a))}</span></span>
+        <button type="button" class="btn-mini" onclick="borrarDuplicadoAC('${escapeAttr(a)}')">🗑️</button>
+      </div>`).join('')}</div>`).join('')}
+    <button type="button" class="btn-mini" style="margin-top:6px;" onclick="document.getElementById('ac-duplicados').innerHTML=''">Cerrar</button>
+  </div>`;
+}
+async function borrarDuplicadoAC(a){
+  acArticulo = a;
+  await borrarAC();
+  verDuplicadosAC();
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -11329,7 +11374,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-09-30-v26';
+const APP_VERSION = '2026-09-30-v27';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
