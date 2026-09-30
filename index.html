@@ -1466,7 +1466,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v22</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v23</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2676,10 +2676,11 @@ async function abrirTablaConsumo(){
 
 // ---------- generar orden de trabajo (varios productos por orden, numerada) ----------
 function lineaRenglonTexto(r, i){
-  const base = r.personalizado
-    ? `${i+1}) ${r.articulo} (a medida) — ${r.cantidad} unidades — consumo ≈ ${r.consumo} m c/u → usa ≈ ${r.metrosConsumidos} m de tela`
-    : `${i+1}) ${r.articulo} — ${r.cantidad} unidades — ancho ${r.anchoUsado} cm, consumo ≈ ${r.consumo} m c/u → usa ≈ ${r.metrosConsumidos} m de tela`;
-  return base + `\n   SKU del producto terminado: ${r.sku || '(sin definir)'}` + (r.instruccion ? `\n   Corte: ${r.instruccion}` : '') + (r.nota ? `\n   Nota: ${r.nota}` : '');
+  const lineas = [`• ${r.cantidad} × ${r.articulo}${r.personalizado ? ' (a medida)' : ''}`];
+  lineas.push(`   ${r.anchoUsado ? 'Tela ' + r.anchoUsado + ' cm · ' : ''}${String(r.consumo).replace('.', ',')} m c/u · usa ${String(r.metrosConsumidos).replace('.', ',')} m${r.sku ? ' · SKU ' + r.sku : ''}`);
+  if(r.corteCorto) lineas.push(`   ✂️ ${r.corteCorto}`);
+  if(r.nota) lineas.push(`   📝 ${r.nota}`);
+  return lineas.join('\n');
 }
 
 function buscarConsumoMasCercano(articuloData, anchoBuscado){
@@ -3064,6 +3065,19 @@ function consumoPorUnidad(piezas, anchoTela){ const c = calcularCorte(piezas, an
 function nombreUnidad(p, n){ return (p.partes||1) > 1 ? `${n} tapa${n===1?'':'s'} de ${p.nombre}` : `${n} ${p.nombre}`; }
 
 // texto para el taller (no depende de la pantalla: sirve para instrucciones, fichas y ordenes)
+// resumen de una linea para la orden: que piezas se cortan y de que medida
+function textoCorteCorto(piezas, ancho){
+  const c = calcularCorte(piezas, ancho);
+  const m = new Map();
+  c.franjas.forEach(f => f.cols.forEach(col => {
+    const n = col.items.filter(it => !it.sobrante).length;
+    if(!n) return;
+    const k = col.p.nombre + '|' + col.w + '|' + col.p.largo;
+    const x = m.get(k) || { p: col.p, w: col.w, n: 0 }; x.n += n; m.set(k, x);
+  }));
+  return [...m.values()].map(x => `${(x.p.partes||1) > 1 ? x.n + ' tapas ' + x.p.nombre : (x.n > 1 ? x.n + ' ' : '') + x.p.nombre} ${fmtCm(x.w)}×${fmtCm(x.p.largo)}`).join(' · ');
+}
+
 function textoCorte(articulo, piezas, ancho, nota){
   const c = calcularCorte(piezas, ancho);
   const total = piezas.reduce((s,p) => s + (p.cantidad||1), 0);
@@ -3641,7 +3655,7 @@ async function llevarTrabajoMedidaAOrden(){
   r.querySelector('.ot-r-nombre-personal').value = `${nombre} (tela de ${W} cm)`;
   r.querySelector('.ot-r-consumo-personal').value = c.metros;
   r.querySelector('.ot-r-cantidad').value = cant;
-  r.querySelector('.ot-r-nota').value = texto;
+  r.querySelector('.ot-r-nota').value = '✂️ ' + textoCorteCorto(piezas, W);
 }
 
 // ===== Articulos y cortes (pantalla unificada) =====
@@ -4356,7 +4370,7 @@ async function generarOrdenTrabajoCompleta(){
       const nombre = nombreFicha(skuFicha);
       const consumo = calcularCorte(r.piezas, ancho).metros;
       const metrosConsumidos = Math.round(cantidad * consumo * 100) / 100;
-      renglones.push({ articulo: nombre, fichaSku: skuFicha, anchoIngresado: ancho, anchoUsado: ancho, exacto: true, consumo, cantidad, metrosConsumidos, sku, nota, instruccion: textoCorte(nombre, r.piezas, ancho, ''), tieneBosquejo: true, entregado: 0 });
+      renglones.push({ articulo: nombre, fichaSku: skuFicha, anchoIngresado: ancho, anchoUsado: ancho, exacto: true, consumo, cantidad, metrosConsumidos, sku, nota, instruccion: textoCorte(nombre, r.piezas, ancho, ''), corteCorto: textoCorteCorto(r.piezas, ancho), tieneBosquejo: true, entregado: 0 });
       continue;
     }
     const conPiezas = piezasParaAncho(articulo, ancho);
@@ -4364,7 +4378,7 @@ async function generarOrdenTrabajoCompleta(){
       // tiene instruccion de corte: consumo exacto para el ancho real de la tela
       const consumo = calcularCorte(conPiezas.piezas, ancho).metros;
       const metrosConsumidos = Math.round(cantidad * consumo * 100) / 100;
-      renglones.push({ articulo, anchoIngresado: ancho, anchoUsado: ancho, exacto: true, consumo, cantidad, metrosConsumidos, sku, nota, instruccion: textoCorte(articulo, conPiezas.piezas, ancho, ''), tieneBosquejo: true, entregado: 0 });
+      renglones.push({ articulo, anchoIngresado: ancho, anchoUsado: ancho, exacto: true, consumo, cantidad, metrosConsumidos, sku, nota, instruccion: textoCorte(articulo, conPiezas.piezas, ancho, ''), corteCorto: textoCorteCorto(conPiezas.piezas, ancho), tieneBosquejo: true, entregado: 0 });
       continue;
     }
     const resultado = buscarConsumoMasCercano(tablaConsumo.articulos[articulo], ancho);
@@ -4390,18 +4404,17 @@ async function generarOrdenTrabajoCompleta(){
     .map(r => `⚠️ "${r.articulo}": no había ancho ${r.anchoIngresado} cm exacto en la tabla — usé el más cercano (${r.anchoUsado} cm). Revíselo.`);
 
   const lineas = [
-    `ORDEN DE TRABAJO ${numeroFormateado}`,
+    `🧵 ORDEN DE TRABAJO ${numeroFormateado}`,
     `Taller: ${taller}`,
-    `Tela: ${skuTela} — se entregan ${metrosTotales} metros`,
-    ...(comprobante ? [`Comprobante de la tela: ${comprobante}`] : []),
+    `Tela: ${skuTela} · ${metrosTotales} m entregados`,
+    ...(comprobante ? [`Comprobante: ${comprobante}`] : []),
     '',
-    ...renglones.map((r, i) =>
-      lineaRenglonTexto(r, i)
-    ),
+    ...renglones.map((r, i) => lineaRenglonTexto(r, i)),
     '',
     excede
-      ? `⚠️ Lo que pidió fabricar consume ≈ ${metrosConsumidosTotal} m, más de los ${metrosTotales} m entregados. Revíselo.`
-      : `Metros de tela consumidos: ≈ ${metrosConsumidosTotal} m — Metros remanentes: ≈ ${metrosRemanentes} m`,
+      ? `⚠️ Se necesitan ≈ ${fmtMetros(metrosConsumidosTotal)} m y se entregan ${metrosTotales} m.`
+      : `Total a usar ≈ ${fmtMetros(metrosConsumidosTotal)} m · Sobran ≈ ${fmtMetros(metrosRemanentes)} m`,
+    ...(renglones.some(r => r.tieneBosquejo) ? ['Bosquejos de corte adjuntos.'] : []),
   ];
   if(notaGeneral) lineas.push(notaGeneral);
   const textoOrden = lineas.join('\n');
@@ -4427,6 +4440,7 @@ async function generarOrdenTrabajoCompleta(){
     </div>
   `;
   cont.dataset.texto = textoOrden;
+  window.ultimaOTRenglones = renglones;
   if(!excede && metrosRemanentes > 0) cont.insertAdjacentHTML('beforeend', `<p class="note" style="margin-top:8px;">Sobran ≈ ${fmtMetros(metrosRemanentes)} m. Antes de mandarla puede tocar "♻️ ¿Qué hago con lo que sobra?" para ver qué fabricar con eso.</p>`);
 
   // registro de la orden ya generada y numerada (no bloquea si falla: el texto ya se armo bien igual)
@@ -4470,7 +4484,46 @@ function compartirOrdenTrabajo(modo){
     }
     return;
   }
+  compartirConBosquejos(texto, window.ultimaOTRenglones || []);
+}
+
+// ===== Compartir la orden con los bosquejos =====
+// Arma una imagen por producto (con su nombre arriba) y las comparte junto con el texto. En el celular
+// y en Chrome de la PC se abre el menu de compartir (se elige WhatsApp). Si el navegador no permite
+// mandar imagenes, abre WhatsApp con el texto y descarga los bosquejos para adjuntarlos.
+async function imagenesBosquejosOT(renglones){
+  const archivos = [];
+  for(let i = 0; i < renglones.length; i++){
+    const r = renglones[i];
+    if(!r.tieneBosquejo || !r.anchoUsado) continue;
+    const src = buscarBosquejoCorte(r.articulo, r.anchoUsado);
+    if(!src) continue;
+    const img = await new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
+    if(!img) continue;
+    const cv = document.createElement('canvas');
+    cv.width = img.width; cv.height = img.height + 50;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = '#000'; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'left';
+    ctx.fillText(`${r.cantidad} × ${r.articulo} — tela ${r.anchoUsado} cm`, 20, 34, cv.width - 40);
+    ctx.drawImage(img, 0, 50);
+    const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+    if(blob) archivos.push(new File([blob], `bosquejo-${i+1}.png`, { type: 'image/png' }));
+  }
+  return archivos;
+}
+async function compartirConBosquejos(texto, renglones){
+  let archivos = [];
+  try{ archivos = await imagenesBosquejosOT(renglones); } catch(e){ archivos = []; }
+  if(archivos.length && navigator.canShare && navigator.canShare({ files: archivos })){
+    try{ await navigator.share({ text: texto, files: archivos }); return; }
+    catch(e){ if(e && e.name === 'AbortError') return; }
+  }
   window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+  if(archivos.length){
+    archivos.forEach(f => { const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); });
+    alert(`Se descargaron ${archivos.length} bosquejo(s). Adjúntelos en el chat de WhatsApp que se abrió.`);
+  }
 }
 
 // ---------- historial de ordenes de trabajo (seguimiento de entregas parciales) ----------
@@ -4611,10 +4664,10 @@ function compartirTextoOrdenGuardada(docId, modo){
   const orden = historialOT.find(o => o._docId === docId);
   if(!orden) return;
   const lineas = [
-    `ORDEN DE TRABAJO ${orden.numero}`,
+    `🧵 ORDEN DE TRABAJO ${orden.numero}`,
     `Taller: ${orden.taller}`,
-    `Tela: ${orden.skuTela} — se entregan ${orden.metrosTotales} metros`,
-    ...(orden.comprobante ? [`Comprobante de la tela: ${orden.comprobante}`] : []),
+    `Tela: ${orden.skuTela} · ${orden.metrosTotales} m entregados`,
+    ...(orden.comprobante ? [`Comprobante: ${orden.comprobante}`] : []),
     '',
     ...(orden.renglones||[]).map((r,i) => lineaRenglonTexto(r, i)),
   ];
@@ -4625,7 +4678,7 @@ function compartirTextoOrdenGuardada(docId, modo){
     else window.prompt('Copie el texto:', texto);
     return;
   }
-  window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+  compartirConBosquejos(texto, orden.renglones || []);
 }
 
 async function abrirDatosBancarios(){
@@ -11093,7 +11146,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-09-30-v22';
+const APP_VERSION = '2026-09-30-v23';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
