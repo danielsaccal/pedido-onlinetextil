@@ -1373,6 +1373,7 @@ a.grilla-celda{display:block;}
       </div>
       <div class="field" id="ot-taller-nuevo-wrap" style="display:none;"><label>Nombre del taller nuevo</label><input type="text" id="ot-taller-nuevo" placeholder="Ej: Mendez"></div>
       <div class="field"><label>SKU de la tela entregada</label><input type="text" id="ot-sku-tela" placeholder="Ej: MAC315B"></div>
+      <div class="field"><label>Comprobante de referencia (con qué le entregó la tela el proveedor)</label><input type="text" id="ot-comprobante" placeholder="Ej: Remito 0001-00023456"></div>
       <div class="field"><label>Metros totales entregados</label><input type="number" id="ot-metros-totales" min="0" step="0.01" placeholder="Ej: 600"></div>
 
       <p class="ni-seccion-tit" style="margin-top:18px;">Productos a fabricar con esta tela</p>
@@ -2550,6 +2551,7 @@ async function abrirOrdenTrabajo(){
 
   document.getElementById('ot-taller').value = '';
   document.getElementById('ot-taller-nuevo-wrap').style.display = 'none';
+  document.getElementById('ot-comprobante').value = '';
   document.getElementById('ot-taller-nuevo').value = '';
   document.getElementById('ot-sku-tela').value = '';
   document.getElementById('ot-metros-totales').value = '';
@@ -2582,6 +2584,7 @@ async function generarOrdenTrabajoCompleta(){
   cont.innerHTML = '';
 
   const skuTela = document.getElementById('ot-sku-tela').value.trim();
+  const comprobante = document.getElementById('ot-comprobante').value.trim();
   const metrosTotales = parseFloat(document.getElementById('ot-metros-totales').value);
   const notaGeneral = document.getElementById('ot-nota-general').value.trim();
 
@@ -2648,6 +2651,7 @@ async function generarOrdenTrabajoCompleta(){
     `ORDEN DE TRABAJO ${numeroFormateado}`,
     `Taller: ${taller}`,
     `Tela: ${skuTela} — se entregan ${metrosTotales} metros`,
+    ...(comprobante ? [`Comprobante de la tela: ${comprobante}`] : []),
     '',
     ...renglones.map((r, i) =>
       `${i+1}) ${r.articulo} — ancho ${r.anchoUsado} cm, consumo ≈ ${r.consumo} m c/u — usa ${r.metros} m de tela → ${r.cantidad} unidades aprox.\n   SKU del producto terminado: ${r.sku || '(sin definir)'}` + (r.nota ? `\n   Nota: ${r.nota}` : '')
@@ -2674,7 +2678,7 @@ async function generarOrdenTrabajoCompleta(){
   // registro de la orden ya generada y numerada (no bloquea si falla: el texto ya se armo bien igual)
   try{
     await db.collection('ordenes_trabajo').add({
-      numero: numeroFormateado, taller, fecha: new Date().toISOString(), skuTela, metrosTotales, metrosAsignados, renglones, notaGeneral,
+      numero: numeroFormateado, taller, fecha: new Date().toISOString(), skuTela, comprobante, metrosTotales, metrosAsignados, renglones, notaGeneral,
     });
   } catch(e){
     console.error('No se pudo guardar el registro de la orden (el texto ya se generó bien):', e);
@@ -2789,6 +2793,7 @@ function renderHistorialOT(filtro){
         <div class="hist-body">
           <div style="margin-bottom:8px;line-height:1.5;">
             <b>Tela:</b> ${escaparHtml(o.skuTela||'')} — ${o.metrosTotales||0} m entregados
+            ${o.comprobante ? `<br><b>Comprobante:</b> ${escaparHtml(o.comprobante)}` : ''}
             ${o.notaGeneral ? `<br><b>Nota:</b> ${escaparHtml(o.notaGeneral)}` : ''}
           </div>
           <table>
@@ -2835,6 +2840,7 @@ function compartirTextoOrdenGuardada(docId, modo){
     `ORDEN DE TRABAJO ${orden.numero}`,
     `Taller: ${orden.taller}`,
     `Tela: ${orden.skuTela} — se entregan ${orden.metrosTotales} metros`,
+    ...(orden.comprobante ? [`Comprobante de la tela: ${orden.comprobante}`] : []),
     '',
     ...(orden.renglones||[]).map((r,i) => `${i+1}) ${r.articulo} — ancho ${r.anchoUsado} cm, consumo ≈ ${r.consumo} m c/u — usa ${r.metros} m de tela → ${r.cantidad} unidades aprox.\n   SKU del producto terminado: ${r.sku || '(sin definir)'}` + (r.nota ? `\n   Nota: ${r.nota}` : '')),
   ];
