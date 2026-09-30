@@ -1470,7 +1470,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v25</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v26</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -4479,10 +4479,12 @@ async function generarOrdenTrabajoCompleta(){
     <div class="actions">
       <button class="btn btn-gold" onclick="compartirOrdenTrabajo('whatsapp')">📤 Compartir por WhatsApp</button>
       <button class="btn btn-ghost" onclick="compartirOrdenTrabajo('copiar')">📋 Copiar texto</button>
+      <button class="btn btn-ghost" onclick="pdfOrdenActual()">📄 PDF</button>
     </div>
   `;
   cont.dataset.texto = textoOrden;
   window.ultimaOTRenglones = renglones;
+  window.ultimaOTDatos = { numero: numeroFormateado, taller, fecha: new Date().toISOString(), skuTela, comprobante, metrosTotales, metrosConsumidosTotal, renglones, notaGeneral };
   if(!excede && metrosRemanentes > 0) cont.insertAdjacentHTML('beforeend', `<p class="note" style="margin-top:8px;">Sobran ≈ ${fmtMetros(metrosRemanentes)} m. Antes de mandarla puede tocar "♻️ ¿Qué hago con lo que sobra?" para ver qué fabricar con eso.</p>`);
 
   // registro de la orden ya generada y numerada (no bloquea si falla: el texto ya se armo bien igual)
@@ -4539,6 +4541,79 @@ function compartirOrdenTrabajo(modo){
   }
   compartirConBosquejos(texto, window.ultimaOTRenglones || []);
 }
+
+// ===== PDF de la orden de trabajo (texto + bosquejos) =====
+function limpiarPDF(t){ return String(t == null ? '' : t).replace(/≈/g, '~').replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu, '').replace(/\s+/g, ' ').trim(); }
+function numPDF(n){ return String(Math.round((+n || 0) * 100) / 100).replace('.', ','); }
+async function generarPDFOrden(o){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const W = 210, M = 14;
+  const renglones = o.renglones || [];
+  const ancho = anchoComunOT(renglones);
+  doc.setFillColor(61, 43, 78); doc.rect(0, 0, W, 22, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+  doc.text('ORDEN DE TRABAJO ' + limpiarPDF(o.numero), M, 14);
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+  doc.text(o.fecha ? new Date(o.fecha).toLocaleDateString('es-AR') : new Date().toLocaleDateString('es-AR'), W - M, 14, { align: 'right' });
+  doc.setTextColor(0, 0, 0); doc.setFontSize(10.5);
+  let y = 31;
+  const dato = (k, v) => { if(!v && v !== 0) return; doc.setFont('helvetica', 'bold'); doc.text(k, M, y); doc.setFont('helvetica', 'normal'); doc.text(limpiarPDF(v), M + 34, y); y += 6; };
+  dato('Taller:', o.taller);
+  dato('Tela:', `${o.skuTela || ''} · ${numPDF(o.metrosTotales)} m entregados`);
+  if(ancho) dato('Ancho de tela:', ancho + ' cm');
+  dato('Comprobante:', o.comprobante);
+  y += 2;
+  doc.autoTable({
+    startY: y, margin: { left: M, right: M },
+    head: [['Cant.', 'Producto', 'Código', 'm c/u', 'Usa (m)', 'Corte']],
+    body: renglones.map(r => [
+      r.cantidad,
+      limpiarPDF(r.articulo + (r.personalizado ? ' (a medida)' : '') + (!ancho && r.anchoUsado ? ` — tela ${r.anchoUsado} cm` : '') + (r.nota ? ` — ${r.nota}` : '')),
+      limpiarPDF(r.sku || ''),
+      numPDF(r.consumo), numPDF(r.metrosConsumidos),
+      limpiarPDF(corteCortoRenglon(r)),
+    ]),
+    styles: { fontSize: 8.5, cellPadding: 2, valign: 'top' },
+    headStyles: { fillColor: [245, 212, 112], textColor: [42, 29, 54], fontStyle: 'bold' },
+    columnStyles: { 0: { cellWidth: 13, halign: 'right' }, 2: { cellWidth: 20 }, 3: { cellWidth: 14, halign: 'right' }, 4: { cellWidth: 17, halign: 'right' } },
+  });
+  y = doc.lastAutoTable.finalY + 8;
+  const usa = o.metrosConsumidosTotal != null ? o.metrosConsumidosTotal : renglones.reduce((s, r) => s + (+r.metrosConsumidos || 0), 0);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
+  doc.text(`Total a usar ~ ${numPDF(usa)} m · Sobran ~ ${numPDF((+o.metrosTotales || 0) - usa)} m`, M, y); y += 7;
+  if(o.notaGeneral){ doc.setFont('helvetica', 'normal'); const l = doc.splitTextToSize('Nota: ' + limpiarPDF(o.notaGeneral), W - 2*M); doc.text(l, M, y); y += l.length * 5; }
+  // bosquejos: uno por pagina, lo mas grande posible
+  for(const r of renglones){
+    if(!r.tieneBosquejo || !r.anchoUsado) continue;
+    const src = buscarBosquejoCorte(r.articulo, r.anchoUsado);
+    if(!src) continue;
+    const dim = await new Promise(res => { const im = new Image(); im.onload = () => res({ w: im.width, h: im.height }); im.onerror = () => res(null); im.src = src; });
+    if(!dim) continue;
+    doc.addPage();
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+    doc.text(limpiarPDF(`${r.cantidad} × ${r.articulo}`), M, 18);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+    doc.text(limpiarPDF(`Tela de ${r.anchoUsado} cm · ${numPDF(r.consumo)} m por unidad · ${corteCortoRenglon(r)}`), M, 24, { maxWidth: W - 2*M });
+    const maxW = W - 2*M, maxH = 297 - 34 - 12;
+    const k = Math.min(maxW / dim.w, maxH / dim.h);
+    doc.addImage(src, 'PNG', M + (maxW - dim.w * k) / 2, 32, dim.w * k, dim.h * k);
+  }
+  return doc;
+}
+async function pdfOrden(o){
+  try{
+    const doc = await generarPDFOrden(o);
+    const nombre = (limpiarPDF(o.numero) || 'orden-de-trabajo') + '.pdf';
+    const file = new File([doc.output('blob')], nombre, { type: 'application/pdf' });
+    if(navigator.canShare && navigator.canShare({ files: [file] }) && /Android|iPhone|iPad/i.test(navigator.userAgent)){
+      try{ await navigator.share({ files: [file], title: nombre }); return; } catch(e){ if(e && e.name === 'AbortError') return; }
+    }
+    doc.save(nombre);
+  } catch(e){ alert('No se pudo armar el PDF: ' + e.message); }
+}
+function pdfOrdenActual(){ if(window.ultimaOTDatos) pdfOrden(window.ultimaOTDatos); }
+function pdfOrdenGuardada(docId){ const o = (historialOT || []).find(x => x._docId === docId); if(o) pdfOrden(o); }
 
 // ===== Compartir la orden con los bosquejos =====
 // Arma una imagen por producto (con su nombre arriba) y las comparte junto con el texto. En el celular
@@ -4733,6 +4808,7 @@ function renderHistorialOT(filtro){
           </table>
           <div class="hist-acciones">
             <button class="btn-mini" onclick="event.stopPropagation(); compartirTextoOrdenGuardada('${o._docId}', 'whatsapp')">📤 Reenviar por WhatsApp</button>
+            <button class="btn-mini" onclick="event.stopPropagation(); pdfOrdenGuardada('${o._docId}')">📄 PDF</button>
             <button class="btn-mini" onclick="event.stopPropagation(); modificarOrdenOT('${o._docId}')">✏️ Modificar</button>
             <button class="btn-mini" onclick="event.stopPropagation(); borrarOrdenOT('${o._docId}')">🗑️ Borrar</button>
           </div>
@@ -11253,7 +11329,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-09-30-v25';
+const APP_VERSION = '2026-09-30-v26';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
