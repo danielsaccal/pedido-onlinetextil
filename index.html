@@ -1217,6 +1217,9 @@ a.grilla-celda{display:block;}
         <label class="ni-chip" style="display:inline-flex;"><input type="checkbox" id="f-incluir-bancarios"><span>🏦 Incluir mis datos bancarios en el comprobante y en el mail al cliente</span></label>
         <p class="note" id="f-bancarios-nota" style="display:none;margin-top:6px;">Todavía no cargó sus datos bancarios. Cárguelos en Herramientas → Configuración → Datos bancarios.</p>
       </div>
+      <div class="field">
+        <label class="ni-chip" style="display:inline-flex;"><input type="checkbox" id="f-incluir-fotos-pdf"><span>🖼️ Incluir fotos de producto en el PDF (gasta bastante más toner al imprimir)</span></label>
+      </div>
       <p class="error" id="form-error">Completá todos los campos para continuar.</p>
       <div class="actions">
         <button class="btn btn-gold" onclick="confirmarPedido()">Confirmar pedido</button>
@@ -1261,6 +1264,7 @@ a.grilla-celda{display:block;}
       <label class="ni-chip"><input type="radio" name="hist-filtro-estado" value="cancelado" onchange="renderHistorial(document.getElementById('hist-buscador').value)"><span>Cancelados</span></label>
     </div>
     <label class="ni-chip" style="display:inline-flex;margin-bottom:12px;"><input type="checkbox" id="hist-incluir-bancarios"><span>🏦 Incluir datos bancarios al compartir, reenviar o imprimir</span></label>
+    <label class="ni-chip" style="display:inline-flex;margin-bottom:12px;"><input type="checkbox" id="hist-incluir-fotos-pdf"><span>🖼️ Incluir fotos de producto al generar el PDF (gasta más toner)</span></label>
     <div id="hist-lista"><p class="empty-msg">Cargando pedidos...</p></div>
     <div style="display:flex;gap:10px;margin-top:10px;">
       <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
@@ -1735,6 +1739,7 @@ function irADatos(){
   actualizarResumenDatos();
   precargarClientesParaAutocompletar();
   actualizarCasillasBancarios();
+  try{ document.getElementById('f-incluir-fotos-pdf').checked = localStorage.getItem('ot_incluir_fotos_pdf') === '1'; } catch(e){}
   mostrarPaso('step-datos');
 }
 
@@ -1789,6 +1794,8 @@ async function confirmarPedido(){
   if(hayDatosBancarios()){
     try{ localStorage.setItem('ot_incluir_bancarios', incluirDatosBancarios ? '1' : '0'); } catch(e){}
   }
+  const incluirFotosPDF = !!document.getElementById('f-incluir-fotos-pdf').checked;
+  try{ localStorage.setItem('ot_incluir_fotos_pdf', incluirFotosPDF ? '1' : '0'); } catch(e){}
 
   const numero = await siguienteNumeroPedido();
   const numeroFormateado = 'OT-' + String(numero).padStart(5, '0');
@@ -1802,6 +1809,7 @@ async function confirmarPedido(){
     observaciones,
     bultos,
     incluirDatosBancarios,
+    incluirFotosPDF,
   };
 
   renderConfirmacion(ordenActual);
@@ -1859,12 +1867,14 @@ async function imagenABase64(url){
 async function construirDocPDF(orden){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
+  const conFotos = !!orden.incluirFotosPDF;
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.setTextColor(61,43,78);
+  doc.setTextColor(0,0,0);
   doc.text('OnLineTextil — Comprobante de pedido', 14, 18);
   doc.setFontSize(11);
-  doc.setTextColor(40,40,40);
+  doc.setTextColor(30,30,30);
   doc.setFont('helvetica','normal');
   doc.text('Pedido: ' + orden.numero, 14, 27);
   doc.text('Fecha: ' + orden.fecha.toLocaleString('es-AR'), 14, 33);
@@ -1874,26 +1884,41 @@ async function construirDocPDF(orden){
   doc.text('Teléfono: ' + orden.cliente.telefono + '   Email: ' + orden.cliente.email, 14, 54);
   doc.text('Transporte: ' + orden.cliente.transporte, 14, 60);
 
-  const imagenesB64 = await Promise.all(orden.items.map(i => i.imagen ? imagenABase64(i.imagen) : Promise.resolve(null)));
+  // las fotos son lo que más toner gasta al imprimir: solo se piden/dibujan si el usuario tildó la casilla
+  const imagenesB64 = conFotos
+    ? await Promise.all(orden.items.map(i => i.imagen ? imagenABase64(i.imagen) : Promise.resolve(null)))
+    : [];
 
-  const body = orden.items.map(i => [
-    '',
-    i.cantidad,
-    i.sku,
-    i.nombreProducto + ' — ' + i.desc + (i.nota ? '\nNota: ' + i.nota : '') + (i.descuentoItemPct > 0 ? '\nDesc. ítem: ' + i.descuentoItemPct + '%' : ''),
-    formatPrice(i.precio),
-    formatPrice(precioLineaItem(i))
-  ]);
+  const head = conFotos
+    ? [['Foto', 'Cant.', 'SKU', 'Descripción', 'Precio unit.', 'Subtotal']]
+    : [['Cant.', 'SKU', 'Descripción', 'Precio unit.', 'Subtotal']];
+
+  const body = orden.items.map(i => {
+    const fila = [
+      i.cantidad,
+      i.sku,
+      i.nombreProducto + ' — ' + i.desc + (i.nota ? '\nNota: ' + i.nota : '') + (i.descuentoItemPct > 0 ? '\nDesc. ítem: ' + i.descuentoItemPct + '%' : ''),
+      formatPrice(i.precio),
+      formatPrice(precioLineaItem(i))
+    ];
+    if(conFotos) fila.unshift('');
+    return fila;
+  });
+
+  const columnStyles = conFotos
+    ? {0:{cellWidth:16}, 1:{cellWidth:12}, 2:{cellWidth:20}, 4:{cellWidth:24, halign:'right'}, 5:{cellWidth:24, halign:'right'}}
+    : {0:{cellWidth:12}, 1:{cellWidth:20}, 3:{cellWidth:24, halign:'right'}, 4:{cellWidth:24, halign:'right'}};
 
   doc.autoTable({
     startY: 68,
-    head: [['Foto', 'Cant.', 'SKU', 'Descripción', 'Precio unit.', 'Subtotal']],
+    head: head,
     body: body,
-    styles: {font:'helvetica', fontSize:9, minCellHeight:16, valign:'middle'},
-    headStyles: {fillColor:[61,43,78], textColor:[245,243,239]},
-    columnStyles: {0:{cellWidth:16}, 1:{cellWidth:12}, 2:{cellWidth:20}, 4:{cellWidth:24, halign:'right'}, 5:{cellWidth:24, halign:'right'}},
+    styles: {font:'helvetica', fontSize:9, minCellHeight:conFotos?16:9, valign:'middle', lineWidth:0.2, lineColor:[140,140,140]},
+    headStyles: {fillColor:[255,255,255], textColor:[0,0,0], fontStyle:'bold', lineWidth:0.4, lineColor:[0,0,0]},
+    alternateRowStyles: {fillColor:[255,255,255]},
+    columnStyles: columnStyles,
     didDrawCell: function(data){
-      if(data.section === 'body' && data.column.index === 0){
+      if(conFotos && data.section === 'body' && data.column.index === 0){
         const b64 = imagenesB64[data.row.index];
         if(b64){
           try{ doc.addImage(b64, 'JPEG', data.cell.x + 2, data.cell.y + 2, 12, 12); } catch(e){ /* ignora si falla */ }
@@ -1935,11 +1960,11 @@ async function construirDocPDF(orden){
     const lineasB = lineasDatosBancarios().flatMap(l => doc.splitTextToSize(l, 168));
     const altoBloque = 13 + lineasB.length * 5.6;
     if(y + altoBloque > 275){ doc.addPage(); y = 20; }
-    doc.setDrawColor(61,43,78);
+    doc.setDrawColor(0,0,0);
     doc.setLineWidth(0.4);
     doc.roundedRect(14, y, 182, altoBloque, 2, 2);
     doc.setFont('helvetica','bold');
-    doc.setTextColor(61,43,78);
+    doc.setTextColor(0,0,0);
     doc.text('DATOS PARA TRANSFERENCIA', 19, y + 8);
     doc.setFont('helvetica','normal');
     doc.setTextColor(40,40,40);
@@ -1953,13 +1978,13 @@ async function construirDocPDF(orden){
 
   // ---------- pagina 2: etiqueta de envio ----------
   doc.addPage();
-  doc.setDrawColor(61,43,78);
-  doc.setLineWidth(1.2);
+  doc.setDrawColor(0,0,0);
+  doc.setLineWidth(0.6);
   doc.rect(15, 15, 180, 130);
 
   doc.setFont('helvetica','bold');
   doc.setFontSize(14);
-  doc.setTextColor(61,43,78);
+  doc.setTextColor(0,0,0);
   doc.text('ETIQUETA DE ENVÍO', 105, 30, {align:'center'});
   doc.setLineWidth(0.3);
   doc.line(25, 36, 185, 36);
@@ -1997,7 +2022,7 @@ async function construirDocPDF(orden){
   doc.text('CANTIDAD DE BULTOS', 120, 100);
   doc.setFont('helvetica','bold');
   doc.setFontSize(28);
-  doc.setTextColor(61,43,78);
+  doc.setTextColor(0,0,0);
   doc.text(String(orden.bultos || 1), 120, 118);
 
   doc.setFont('helvetica','normal');
@@ -2597,6 +2622,7 @@ function ordenDesdeHistorial(numero){
     observaciones: p.observaciones || '',
     bultos: p.bultos || 1,
     incluirDatosBancarios: !!(document.getElementById('hist-incluir-bancarios') && document.getElementById('hist-incluir-bancarios').checked) && hayDatosBancarios(),
+    incluirFotosPDF: !!(document.getElementById('hist-incluir-fotos-pdf') && document.getElementById('hist-incluir-fotos-pdf').checked),
   };
 }
 
