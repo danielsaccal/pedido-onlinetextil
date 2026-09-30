@@ -2721,6 +2721,7 @@ function generarCamposTiras(piezasPrevias){
           <div class="field"><label>¿Dónde se corta?</label><select class="ic-fila-sel" onchange="previsualizarBosquejoCorte()">
             <option value="1" ${String(p.fila||1)==='1'?'selected':''}>Al lado de las otras (a lo ancho)</option>
             <option value="2" ${String(p.fila||1)==='2'?'selected':''}>Debajo, del largo de la tela</option>
+            <option value="3" ${String(p.fila||1)==='3'?'selected':''}>De la lonja que sobra al costado</option>
           </select></div>
           <div class="field"><label>¿Cuántas de esta pieza lleva el artículo?</label><input type="number" min="1" step="1" class="ic-cant-pieza" value="${p.cantidad||1}" oninput="previsualizarBosquejoCorte()"></div>
           <div class="field"><label>¿De cuántas tapas se forma esta pieza? (ej: funda = 2)</label><input type="number" min="1" step="1" class="ic-partes-pieza" value="${p.partes||1}" oninput="previsualizarBosquejoCorte()"></div>
@@ -2758,10 +2759,10 @@ function leerPiezasFormularioInstruccion(){
   return nombres.map(nombre => ({ nombre, ancho: anchoTira, largo: largoTira }));
 }
 
-// agrupa las piezas por fila (1 = arriba, a lo ancho; 2 = debajo, del largo de la tela)
+// fila 1 = a lo ancho, fila 2 = debajo (del largo de la tela), fila 3 = de la lonja que sobra al costado
 function filasDeCorte(piezas, anchoTela){
   const filas = {};
-  piezas.forEach(p => { const f = p.fila || 1; (filas[f] = filas[f] || []).push(p); });
+  piezas.filter(p => (p.fila||1) !== 3).forEach(p => { const f = p.fila || 1; (filas[f] = filas[f] || []).push(p); });
   return Object.keys(filas).map(Number).sort((a,b) => a-b).map(f => {
     const pz = filas[f];
     const anchoUsado = Math.round(pz.reduce((s,p) => s + p.ancho * (p.cantidad||1) * (p.partes||1), 0) * 100) / 100;
@@ -2772,16 +2773,48 @@ function filasDeCorte(piezas, anchoTela){
       const entran = Math.floor((anchoTela + 0.01) / pz[0].ancho);
       extras = Math.max(0, entran - (pz[0].cantidad||1) * (pz[0].partes||1));
     }
-    return { fila: f, piezas: pz, anchoUsado, largo, extras };
+    const ocupado = anchoUsado + (extras ? extras * pz[0].ancho : 0);
+    const lonja = anchoTela ? Math.max(0, Math.round((anchoTela - ocupado) * 100) / 100) : 0;
+    return { fila: f, piezas: pz, anchoUsado, largo, extras, ocupado, lonja };
   });
 }
+
+// reparte las piezas "de la lonja" en el ancho que sobra al costado de cada fila, sin pasarse nunca
+// del ancho de la tela. Prueba la pieza derecha y girada y usa la que mas entra. Llena la lonja entera:
+// primero lo que lleva el articulo, el resto se marca como sobrante.
+function lonjasDeCorte(piezas, anchoTela){
+  const filas = filasDeCorte(piezas, anchoTela);
+  const tipos = piezas.filter(p => (p.fila||1) === 3).map(p => ({ p, faltan: (p.cantidad||1) * (p.partes||1), usadas: 0, sobran: 0 }));
+  const bloques = [];
+  if(!tipos.length) return { bloques, tipos, filas };
+  let y = 0, ultimo = tipos[0];
+  filas.forEach(f => {
+    const pendiente = tipos.find(t => t.faltan > 0);
+    const t = pendiente || ultimo;
+    ultimo = t;
+    const p = t.p;
+    const derecha = { w: p.ancho, l: p.largo, cols: Math.floor((f.lonja + 0.01) / p.ancho), rows: Math.floor((f.largo + 0.01) / p.largo) };
+    const girada  = { w: p.largo, l: p.ancho, cols: Math.floor((f.lonja + 0.01) / p.largo), rows: Math.floor((f.largo + 0.01) / p.ancho) };
+    const o = (girada.cols * girada.rows > derecha.cols * derecha.rows) ? girada : derecha;
+    const entran = o.cols * o.rows;
+    if(entran > 0){
+      const necesarias = Math.min(t.faltan, entran);
+      t.faltan -= necesarias; t.usadas += necesarias; t.sobran += entran - necesarias;
+      bloques.push({ fila: f.fila, x: f.ocupado, y, p, w: o.w, l: o.l, cols: o.cols, rows: o.rows, necesarias, entran, girada: o === girada });
+    }
+    y += f.largo;
+  });
+  return { bloques, tipos, filas };
+}
+
 function textoPieza(p){
   const c = (p.cantidad||1) > 1 ? `${p.cantidad} × ` : '';
   if((p.partes||1) > 1) return `${c}${p.nombre} (${p.partes} tapas de ${p.ancho} × ${p.largo} cm)`;
   return `${c}${p.nombre} (${p.ancho} × ${p.largo} cm)`;
 }
 // consumo de tela por unidad del articulo: cada fila aporta su largo, dividido por cuantas
-// unidades del articulo salen de esa franja (ej: franja de 80 cm = 3 fundas = alcanza para 3 juegos)
+// unidades del articulo salen de esa franja (ej: franja de 80 cm = 3 fundas = alcanza para 3 juegos).
+// Lo que sale de la lonja del costado no suma consumo: esa tela ya esta contada en la fila.
 function consumoPorUnidad(piezas, anchoTela){
   const detalle = [];
   let cm = 0;
@@ -2799,18 +2832,21 @@ function consumoPorUnidad(piezas, anchoTela){
 }
 function fmtMetros(m){ return m.toFixed(2).replace('.', ','); }
 
-function textoSobrante(f){
-  if(!f.extras) return '';
-  const p = f.piezas[0], partes = p.partes || 1;
-  const usadas = (p.cantidad||1) * partes, total = usadas + f.extras;
+function frasesSobrante(p, usadasUnid, extrasUnid, origen){
+  const partes = p.partes || 1, total = usadasUnid + extrasUnid;
   if(partes > 1){
-    const enteras = Math.floor(f.extras / partes), sueltas = f.extras % partes;
-    let t = ` De esa franja salen ${total} tapas = ${Math.floor(total/partes)} unidades de ${p.nombre}: ${p.cantidad||1} para el artículo`;
+    const enteras = Math.floor(extrasUnid / partes), sueltas = extrasUnid % partes;
+    let t = ` ${origen} salen ${total} tapas = ${Math.floor(total/partes)} unidades de ${p.nombre}: ${Math.ceil(usadasUnid/partes)} para el artículo`;
     if(enteras) t += `, sobran ${enteras}`;
     if(sueltas) t += `${enteras ? ' y ' : ', sobran '}${sueltas} tapa(s) suelta(s)`;
     return t + '.';
   }
-  return ` De esa franja salen ${total} piezas: ${usadas} para el artículo, sobran ${f.extras}.`;
+  return ` ${origen} salen ${total} piezas de ${p.nombre}: ${usadasUnid} para el artículo` + (extrasUnid ? `, sobran ${extrasUnid}.` : '.');
+}
+function textoSobrante(f){
+  if(!f.extras) return '';
+  const p = f.piezas[0];
+  return frasesSobrante(p, (p.cantidad||1) * (p.partes||1), f.extras, 'De esa franja');
 }
 
 function armarTextoInstruccion(piezas, nota){
@@ -2818,36 +2854,40 @@ function armarTextoInstruccion(piezas, nota){
   const personalizado = document.getElementById('ic-tipo-corte').value === 'personalizado';
   const detalle = piezas.map(textoPieza).join(', ');
   let texto;
-  const filas = personalizado ? filasDeCorte(piezas, parseFloat(ancho)) : [];
-  if(personalizado && filas.length > 1){
-    const partes = filas.map((f, i) => (i === 0 ? 'a lo ancho: ' : 'debajo, del largo de la tela: ') + f.piezas.map(textoPieza).join(', '));
-    const largoTotal = Math.round(filas.reduce((s,f) => s + f.largo, 0) * 100) / 100;
-    texto = `De ${ancho} cm de ancho se corta ${partes.join('; ')}.${filas.map(textoSobrante).join('')} Largo total de tela: ${largoTotal} cm.`;
-  } else {
-    texto = personalizado
-      ? `De ${ancho} cm de ancho se obtienen: ${detalle}.${filas.map(textoSobrante).join('')}`
-      : `En ${ancho} cm de ancho por ${piezas[0].largo} cm de largo se obtienen ${piezas.length} tira(s): ${detalle}.`;
-  }
   if(personalizado){
+    const L = lonjasDeCorte(piezas, parseFloat(ancho));
+    const filas = L.filas;
+    const partes = filas.map((f, i) => (i === 0 ? 'a lo ancho: ' : 'debajo, del largo de la tela: ') + f.piezas.map(textoPieza).join(', '));
+    const deLonja = piezas.filter(p => (p.fila||1) === 3);
+    if(deLonja.length) partes.push('de la lonja que sobra al costado: ' + deLonja.map(textoPieza).join(', '));
+    const largoTotal = Math.round(filas.reduce((s,f) => s + f.largo, 0) * 100) / 100;
+    texto = `De ${ancho} cm de ancho se corta ${partes.join('; ')}.${filas.map(textoSobrante).join('')}`;
+    L.tipos.forEach(t => {
+      const lonjas = [...new Set(L.bloques.filter(b => b.p === t.p).map(b => filas.find(f => f.fila === b.fila).lonja))];
+      texto += frasesSobrante(t.p, t.usadas, t.sobran, `De la lonja del costado (${lonjas.join(' / ')} cm de ancho)`);
+      if(t.faltan > 0) texto += ` ⚠️ No entran todas: faltan ${t.faltan} ${(t.p.partes||1) > 1 ? 'tapa(s)' : 'pieza(s)'} de ${t.p.nombre}.`;
+    });
+    if(filas.length) texto += ` Largo total de tela: ${largoTotal} cm.`;
     const articulo = document.getElementById('ic-articulo').value;
     const total = piezas.reduce((s,p) => s + (p.cantidad||1), 0);
     texto = `${articulo} lleva ${total} pieza(s): ${piezas.map(p => ((p.cantidad||1) > 1 ? p.cantidad + ' ' : '') + p.nombre).join(', ')}. ` + texto;
-  }
-  if(personalizado){
     const cu = consumoPorUnidad(piezas, parseFloat(ancho));
-    texto += ` Consumo por unidad: ${fmtMetros(cu.metros)} m (${cu.detalle}).`;
+    texto += ` Consumo por unidad: ${fmtMetros(cu.metros)} m (${cu.detalle})` + (L.tipos.some(t => t.sobran) || filas.some(f => f.extras) ? '; lo que sobra no se cuenta en el artículo.' : '.');
+  } else {
+    texto = `En ${ancho} cm de ancho por ${piezas[0].largo} cm de largo se obtienen ${piezas.length} tira(s): ${detalle}.`;
   }
   if(nota) texto += ' ' + nota;
   return texto;
 }
 
-// dibuja el bosquejo minimalista (lineas negras) en un canvas y devuelve la imagen en base64
-// cada pieza se dibuja con su propio ancho y largo (sirve tanto para tiras iguales como a medida)
+// dibuja el bosquejo minimalista (lineas negras) en un canvas y devuelve la imagen en base64.
+// El limite del dibujo es siempre el ancho de la tela: nada se dibuja por fuera.
 function dibujarBosquejoCorte(anchoTela, piezas){
-  const filas = filasDeCorte(piezas, anchoTela);
+  const L = lonjasDeCorte(piezas, anchoTela);
+  const filas = L.filas;
   const escala = Math.min(3.2, 900 / anchoTela);
   const anchoPx = Math.round(anchoTela * escala);
-  const largoTotal = filas.reduce((s,f) => s + f.largo, 0);
+  const largoTotal = filas.reduce((s,f) => s + f.largo, 0) || 1;
   const altoPx = Math.round(largoTotal * escala);
   const margen = 70;
   const canvas = document.createElement('canvas');
@@ -2858,40 +2898,66 @@ function dibujarBosquejoCorte(anchoTela, piezas){
   ctx.strokeStyle = '#000000'; ctx.fillStyle = '#000000'; ctx.lineWidth = 1.5;
   ctx.textAlign = 'center';
 
-  // contorno de la tela (ancho completo x largo total)
-  ctx.setLineDash([6,4]); ctx.strokeRect(margen, margen, anchoPx, altoPx); ctx.setLineDash([]);
+  const rect = (x, y, w, h, etiqueta, linea2, sobrante) => {
+    if(sobrante) ctx.setLineDash([4,3]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
+    const chico = w < 90;
+    ctx.font = (chico ? 'bold 10px' : 'bold 13px') + ' Arial';
+    ctx.fillText(etiqueta, x + w/2, y + h/2 - 6, w - 4);
+    ctx.font = (chico ? '9px' : '11px') + ' Arial';
+    ctx.fillText(linea2, x + w/2, y + h/2 + 10, w - 4);
+  };
+
+  // todo lo que va adentro de la tela queda recortado a su ancho
+  ctx.save();
+  ctx.beginPath(); ctx.rect(margen, margen, anchoPx, altoPx); ctx.clip();
 
   let y = margen;
   filas.forEach(f => {
     let x = margen;
-    const dibujar = (p, etiqueta, sobrante, linea2) => {
-      const w = p.ancho * escala, h = p.largo * escala;
-      if(sobrante) ctx.setLineDash([4,3]);
-      ctx.strokeRect(x, y, w, h);
-      ctx.setLineDash([]);
-      const chico = w < 90;
-      ctx.font = (chico ? 'bold 10px' : 'bold 13px') + ' Arial';
-      ctx.fillText(etiqueta, x + w/2, y + h/2 - 6, w - 4);
-      ctx.font = (chico ? '9px' : '11px') + ' Arial';
-      ctx.fillText(linea2 || (sobrante ? 'Sobrante' : (p.ancho + ' × ' + p.largo)), x + w/2, y + h/2 + 10, w - 4);
-      x += w;
-    };
     f.piezas.forEach(p => {
       const partes = p.partes || 1;
       for(let k = 0; k < (p.cantidad||1) * partes; k++){
-        dibujar(p, p.nombre, false, partes > 1 ? `Tapa ${(k % partes) + 1} · ${p.ancho} × ${p.largo}` : '');
+        const w = p.ancho * escala, h = p.largo * escala;
+        rect(x, y, w, h, p.nombre, partes > 1 ? `Tapa ${(k % partes) + 1} · ${p.ancho} × ${p.largo}` : `${p.ancho} × ${p.largo}`, false);
+        x += w;
       }
     });
     for(let k = 0; k < f.extras; k++){
       const p = f.piezas[0], partes = p.partes || 1;
-      dibujar(p, partes > 1 ? `Tapa ${(k % partes) + 1}` : p.nombre, true);
+      const w = p.ancho * escala, h = p.largo * escala;
+      rect(x, y, w, h, partes > 1 ? `Tapa ${(k % partes) + 1}` : p.nombre, 'Sobrante', true);
+      x += w;
     }
-    // cota de largo de cada fila a la izquierda
-    ctx.font = '12px Arial'; ctx.textAlign = 'left';
-    ctx.fillText(f.largo + ' cm', 8, y + (f.largo*escala)/2 + 5);
-    ctx.textAlign = 'center';
     y += f.largo * escala;
   });
+
+  // piezas sacadas de la lonja del costado
+  L.bloques.forEach(b => {
+    const partes = b.p.partes || 1;
+    let n = 0;
+    for(let r = 0; r < b.rows; r++){
+      for(let c = 0; c < b.cols; c++){
+        const x = margen + (b.x + c * b.w) * escala, yy = margen + (b.y + r * b.l) * escala;
+        const w = b.w * escala, h = b.l * escala;
+        const sobrante = n >= b.necesarias;
+        const tapa = partes > 1 ? `Tapa ${(n % partes) + 1}` : b.p.nombre;
+        rect(x, yy, w, h, sobrante ? tapa : b.p.nombre, sobrante ? 'Sobrante' : (partes > 1 ? `${tapa} · ${b.p.ancho} × ${b.p.largo}` : `${b.p.ancho} × ${b.p.largo}`), sobrante);
+        n++;
+      }
+    }
+  });
+  ctx.restore();
+
+  // contorno de la tela (ancho completo x largo total)
+  ctx.setLineDash([6,4]); ctx.strokeRect(margen, margen, anchoPx, altoPx); ctx.setLineDash([]);
+
+  // cotas de largo por fila
+  let yc = margen;
+  ctx.font = '12px Arial'; ctx.textAlign = 'left';
+  filas.forEach(f => { ctx.fillText(f.largo + ' cm', 8, yc + (f.largo*escala)/2 + 5); yc += f.largo * escala; });
+  ctx.textAlign = 'center';
 
   // cota de ancho arriba
   ctx.font = '13px Arial';
@@ -2899,7 +2965,6 @@ function dibujarBosquejoCorte(anchoTela, piezas){
   ctx.beginPath(); ctx.moveTo(margen, yFlecha); ctx.lineTo(margen+anchoPx, yFlecha); ctx.stroke();
   ctx.fillText(anchoTela + ' cm de ancho', margen + anchoPx/2, yFlecha - 8);
 
-  // largo total abajo si hay mas de una fila
   if(filas.length > 1){
     ctx.fillText('Largo total: ' + (Math.round(largoTotal*100)/100) + ' cm', margen + anchoPx/2, margen + altoPx + 24);
   }
