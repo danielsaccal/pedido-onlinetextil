@@ -1373,6 +1373,10 @@ a.grilla-celda{display:block;}
   <div class="step" id="step-orden-trabajo">
     <div class="form-card">
       <h2>Orden de trabajo para taller</h2>
+      <div id="ot-editando" style="display:none;background:var(--gold);border-radius:10px;padding:10px 12px;margin-bottom:12px;display:none;">
+        <b id="ot-editando-num"></b> — está modificando esta orden. Al tocar "Guardar cambios" se actualiza, sin usar un número nuevo.
+        <a href="#" onclick="event.preventDefault(); otEditando = null; abrirOrdenTrabajo();" style="margin-left:6px;">Cancelar</a>
+      </div>
       <p class="note" id="ot-sin-tabla" style="display:none;margin-bottom:14px;color:#A6432F;">Todavía no cargó la tabla de consumo — <a href="#" onclick="event.preventDefault(); abrirTablaConsumo();">cárguela acá</a> antes de seguir.</p>
       <div class="field">
         <label>Taller</label>
@@ -1392,7 +1396,7 @@ a.grilla-celda{display:block;}
 
       <div class="actions" style="margin-top:14px;">
         <button class="btn btn-ghost" onclick="sugerirRemanenteOT()">♻️ ¿Qué hago con lo que sobra?</button>
-        <button class="btn btn-gold" onclick="generarOrdenTrabajoCompleta()">Generar orden de trabajo</button>
+        <button class="btn btn-gold" id="ot-btn-generar" onclick="generarOrdenTrabajoCompleta()">Generar orden de trabajo</button>
       </div>
       <div id="ot-remanente" style="margin-top:10px;"></div>
       <p class="error" id="ot-error" style="display:none;"></p>
@@ -1466,7 +1470,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v23</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v24</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -4240,8 +4244,14 @@ function eliminarRenglonOrdenTrabajo(id){
   if(el) el.remove();
 }
 
-async function abrirOrdenTrabajo(){
+let otEditando = null; // { docId, numero, fecha, renglones } cuando se modifica una orden ya generada
+async function abrirOrdenTrabajo(modoEdicion){
   mostrarPaso('step-orden-trabajo');
+  if(!modoEdicion){
+    otEditando = null;
+    document.getElementById('ot-editando').style.display = 'none';
+    document.getElementById('ot-btn-generar').textContent = 'Generar orden de trabajo';
+  }
   if(tablaConsumo === null) await cargarTablaConsumo();
   if(fichasArticulos === null) await cargarFichasArticulos();
   if(talleresLista === null) await cargarTalleres();
@@ -4397,8 +4407,17 @@ async function generarOrdenTrabajoCompleta(){
   const metrosRemanentes = Math.round((metrosTotales - metrosConsumidosTotal) * 100) / 100;
   const excede = metrosConsumidosTotal > metrosTotales + 0.005;
 
-  const numero = await siguienteNumeroOrdenTrabajo(taller);
-  const numeroFormateado = 'OT-' + slugTaller(taller).toUpperCase() + '-' + String(numero).padStart(4, '0');
+  const editando = otEditando;
+  const numeroFormateado = editando ? editando.numero
+    : 'OT-' + slugTaller(taller).toUpperCase() + '-' + String(await siguienteNumeroOrdenTrabajo(taller)).padStart(4, '0');
+  if(editando){
+    // conserva lo que el taller ya entrego, producto por producto
+    const previos = [...(editando.renglones || [])];
+    renglones.forEach(r => {
+      const k = previos.findIndex(p => p.articulo === r.articulo && (p.sku||'') === (r.sku||''));
+      if(k >= 0){ r.entregado = Math.min(r.cantidad, previos[k].entregado || 0); previos.splice(k, 1); }
+    });
+  }
 
   const avisosAncho = renglones.filter(r => !r.exacto)
     .map(r => `⚠️ "${r.articulo}": no había ancho ${r.anchoIngresado} cm exacto en la tabla — usé el más cercano (${r.anchoUsado} cm). Revíselo.`);
@@ -4445,9 +4464,20 @@ async function generarOrdenTrabajoCompleta(){
 
   // registro de la orden ya generada y numerada (no bloquea si falla: el texto ya se armo bien igual)
   try{
-    await db.collection('ordenes_trabajo').add({
-      numero: numeroFormateado, taller, fecha: new Date().toISOString(), skuTela, comprobante, metrosTotales, metrosConsumidosTotal, renglones, notaGeneral,
-    });
+    if(editando){
+      await db.collection('ordenes_trabajo').doc(editando.docId).set({
+        numero: numeroFormateado, taller, fecha: editando.fecha || new Date().toISOString(), modificada: new Date().toISOString(), skuTela, comprobante, metrosTotales, metrosConsumidosTotal, renglones, notaGeneral,
+      });
+      otEditando = null;
+      historialOT = null;
+      document.getElementById('ot-editando').style.display = 'none';
+      document.getElementById('ot-btn-generar').textContent = 'Generar orden de trabajo';
+      cont.insertAdjacentHTML('afterbegin', `<p class="note" style="color:#3D7A3D;font-weight:700;margin-bottom:8px;">✓ Cambios guardados en ${escaparHtml(numeroFormateado)}.</p>`);
+    } else {
+      await db.collection('ordenes_trabajo').add({
+        numero: numeroFormateado, taller, fecha: new Date().toISOString(), skuTela, comprobante, metrosTotales, metrosConsumidosTotal, renglones, notaGeneral,
+      });
+    }
   } catch(e){
     console.error('No se pudo guardar el registro de la orden (el texto ya se generó bien):', e);
   }
@@ -4554,6 +4584,57 @@ function estadoOrdenTrabajo(orden){
   return 'parcial';
 }
 
+async function borrarOrdenOT(docId){
+  const o = (historialOT || []).find(x => x._docId === docId);
+  if(!o) return;
+  const entregas = (o.renglones || []).some(r => (r.entregado || 0) > 0);
+  if(!confirm(`¿Borrar la orden ${o.numero}?` + (entregas ? '\n\nOjo: ya tiene entregas registradas.' : '') + '\n\nNo se puede deshacer.')) return;
+  try{
+    await db.collection('ordenes_trabajo').doc(docId).delete();
+    historialOT = historialOT.filter(x => x._docId !== docId);
+    renderHistorialOT(document.getElementById('hot-buscador').value);
+  } catch(e){ alert('No se pudo borrar: ' + e.message); }
+}
+
+async function modificarOrdenOT(docId){
+  const o = (historialOT || []).find(x => x._docId === docId);
+  if(!o) return;
+  otEditando = { docId, numero: o.numero, fecha: o.fecha, renglones: o.renglones || [] };
+  await abrirOrdenTrabajo(true);
+  document.getElementById('ot-editando-num').textContent = o.numero;
+  document.getElementById('ot-editando').style.display = 'block';
+  document.getElementById('ot-btn-generar').textContent = 'Guardar cambios';
+  const selT = document.getElementById('ot-taller');
+  if(o.taller && ![...selT.options].some(op => op.value === o.taller)) selT.insertAdjacentHTML('afterbegin', `<option value="${escapeAttr(o.taller)}">${escaparHtml(o.taller)}</option>`);
+  selT.value = o.taller || '';
+  document.getElementById('ot-sku-tela').value = o.skuTela || '';
+  document.getElementById('ot-comprobante').value = o.comprobante || '';
+  document.getElementById('ot-metros-totales').value = o.metrosTotales || '';
+  document.getElementById('ot-nota-general').value = o.notaGeneral || '';
+  document.getElementById('ot-renglones').innerHTML = '';
+  (o.renglones || []).forEach(r => {
+    agregarRenglonOrdenTrabajo();
+    const els = document.querySelectorAll('.ot-renglon'), el = els[els.length - 1];
+    const sel = el.querySelector('.ot-r-articulo');
+    const valor = r.fichaSku ? 'ficha:' + r.fichaSku : r.articulo;
+    if(!r.personalizado && [...sel.options].some(op => op.value === valor)){
+      sel.value = valor;
+      cambiarModoRenglonOT(sel);
+      el.querySelector('.ot-r-ancho').value = r.anchoIngresado || r.anchoUsado || '';
+    } else {
+      // articulo a medida, o que ya no existe en la lista: se carga como personalizado con su consumo
+      sel.value = '__personalizado__';
+      cambiarModoRenglonOT(sel);
+      el.querySelector('.ot-r-nombre-personal').value = r.articulo;
+      el.querySelector('.ot-r-consumo-personal').value = r.consumo;
+    }
+    el.querySelector('.ot-r-cantidad').value = r.cantidad;
+    el.querySelector('.ot-r-sku').value = r.sku || '';
+    el.querySelector('.ot-r-nota').value = r.nota || '';
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 async function abrirHistorialOT(){
   mostrarPaso('step-historial-ot');
   document.getElementById('hot-buscador').value = '';
@@ -4629,6 +4710,8 @@ function renderHistorialOT(filtro){
           </table>
           <div class="hist-acciones">
             <button class="btn-mini" onclick="event.stopPropagation(); compartirTextoOrdenGuardada('${o._docId}', 'whatsapp')">📤 Reenviar por WhatsApp</button>
+            <button class="btn-mini" onclick="event.stopPropagation(); modificarOrdenOT('${o._docId}')">✏️ Modificar</button>
+            <button class="btn-mini" onclick="event.stopPropagation(); borrarOrdenOT('${o._docId}')">🗑️ Borrar</button>
           </div>
         </div>
       </div>`;
@@ -11146,7 +11229,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-09-30-v23';
+const APP_VERSION = '2026-09-30-v24';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
