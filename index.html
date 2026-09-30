@@ -2610,7 +2610,7 @@ const PLANTILLAS_INSTRUCCIONES = {
   'Juego 1 1/2': { nota: '', piezas: (a) => [
     { nombre: 'Plana', ancho: Math.round(a/2*100)/100, largo: 260, fila: 1, cantidad: 1 },
     { nombre: 'Ajustable', ancho: Math.round(a/2*100)/100, largo: 260, fila: 1, cantidad: 1 },
-    { nombre: 'Funda de almohada', ancho: 50, largo: 80, fila: 2, cantidad: 1 },
+    { nombre: 'Funda de almohada', ancho: 50, largo: 80, fila: 2, cantidad: 1, partes: 2 },
   ] },
   'Funda de almohada': { cantTiras: 6, largoTira: 85, nombres: ['Tapa 1','Tapa 2','Tapa 3','Tapa 4','Tapa 5','Tapa 6'], nota: 'Cada 2 tapas forman una funda de 50 x 80 cm terminada (deja margen de costura).' },
 };
@@ -2707,6 +2707,7 @@ function generarCamposTiras(piezasPrevias){
     largo: f.querySelector('.ic-largo-tira-personal') ? f.querySelector('.ic-largo-tira-personal').value : '',
     fila: f.querySelector('.ic-fila-sel') ? f.querySelector('.ic-fila-sel').value : 1,
     cantidad: f.querySelector('.ic-cant-pieza') ? f.querySelector('.ic-cant-pieza').value : 1,
+    partes: f.querySelector('.ic-partes-pieza') ? f.querySelector('.ic-partes-pieza').value : 1,
   }));
 
   cont.innerHTML = Array.from({length: cant}, (_, i) => {
@@ -2722,6 +2723,7 @@ function generarCamposTiras(piezasPrevias){
             <option value="2" ${String(p.fila||1)==='2'?'selected':''}>Debajo, del largo de la tela</option>
           </select></div>
           <div class="field"><label>¿Cuántas de esta pieza lleva el artículo?</label><input type="number" min="1" step="1" class="ic-cant-pieza" value="${p.cantidad||1}" oninput="previsualizarBosquejoCorte()"></div>
+          <div class="field"><label>¿De cuántas tapas se forma esta pieza? (ej: funda = 2)</label><input type="number" min="1" step="1" class="ic-partes-pieza" value="${p.partes||1}" oninput="previsualizarBosquejoCorte()"></div>
         </div>`;
     }
     return `<div class="ic-fila-tira field"><label>Nombre de la tira ${i+1}</label><input type="text" class="ic-nombre-tira" value="${escapeAttr(p.nombre||'')}" placeholder="Ej: Ajustable" oninput="previsualizarBosquejoCorte()"></div>`;
@@ -2743,6 +2745,7 @@ function leerPiezasFormularioInstruccion(){
       largo: parseFloat(f.querySelector('.ic-largo-tira-personal').value),
       fila: parseInt(f.querySelector('.ic-fila-sel').value, 10) || 1,
       cantidad: Math.max(1, parseInt(f.querySelector('.ic-cant-pieza').value, 10) || 1),
+      partes: Math.max(1, parseInt(f.querySelector('.ic-partes-pieza').value, 10) || 1),
     }));
     if(piezas.some(p => !p.nombre || isNaN(p.ancho) || p.ancho <= 0 || isNaN(p.largo) || p.largo <= 0)) return null;
     return piezas;
@@ -2756,19 +2759,39 @@ function leerPiezasFormularioInstruccion(){
 }
 
 // agrupa las piezas por fila (1 = arriba, a lo ancho; 2 = debajo, del largo de la tela)
-function filasDeCorte(piezas){
+function filasDeCorte(piezas, anchoTela){
   const filas = {};
   piezas.forEach(p => { const f = p.fila || 1; (filas[f] = filas[f] || []).push(p); });
   return Object.keys(filas).map(Number).sort((a,b) => a-b).map(f => {
     const pz = filas[f];
-    const anchoUsado = Math.round(pz.reduce((s,p) => s + p.ancho * (p.cantidad||1), 0) * 100) / 100;
+    const anchoUsado = Math.round(pz.reduce((s,p) => s + p.ancho * (p.cantidad||1) * (p.partes||1), 0) * 100) / 100;
     const largo = Math.max(...pz.map(p => p.largo));
-    return { fila: f, piezas: pz, anchoUsado, largo };
+    // una sola pieza en la fila: todo el ancho que queda se corta igual y es sobrante
+    let extras = 0;
+    if(pz.length === 1 && anchoTela){
+      const entran = Math.floor((anchoTela + 0.01) / pz[0].ancho);
+      extras = Math.max(0, entran - (pz[0].cantidad||1) * (pz[0].partes||1));
+    }
+    return { fila: f, piezas: pz, anchoUsado, largo, extras };
   });
 }
 function textoPieza(p){
   const c = (p.cantidad||1) > 1 ? `${p.cantidad} × ` : '';
+  if((p.partes||1) > 1) return `${c}${p.nombre} (${p.partes} tapas de ${p.ancho} × ${p.largo} cm)`;
   return `${c}${p.nombre} (${p.ancho} × ${p.largo} cm)`;
+}
+function textoSobrante(f){
+  if(!f.extras) return '';
+  const p = f.piezas[0], partes = p.partes || 1;
+  const usadas = (p.cantidad||1) * partes, total = usadas + f.extras;
+  if(partes > 1){
+    const enteras = Math.floor(f.extras / partes), sueltas = f.extras % partes;
+    let t = ` De esa franja salen ${total} tapas = ${Math.floor(total/partes)} unidades de ${p.nombre}: ${p.cantidad||1} para el artículo`;
+    if(enteras) t += `, sobran ${enteras}`;
+    if(sueltas) t += `${enteras ? ' y ' : ', sobran '}${sueltas} tapa(s) suelta(s)`;
+    return t + '.';
+  }
+  return ` De esa franja salen ${total} piezas: ${usadas} para el artículo, sobran ${f.extras}.`;
 }
 
 function armarTextoInstruccion(piezas, nota){
@@ -2776,14 +2799,14 @@ function armarTextoInstruccion(piezas, nota){
   const personalizado = document.getElementById('ic-tipo-corte').value === 'personalizado';
   const detalle = piezas.map(textoPieza).join(', ');
   let texto;
-  const filas = personalizado ? filasDeCorte(piezas) : [];
+  const filas = personalizado ? filasDeCorte(piezas, parseFloat(ancho)) : [];
   if(personalizado && filas.length > 1){
     const partes = filas.map((f, i) => (i === 0 ? 'a lo ancho: ' : 'debajo, del largo de la tela: ') + f.piezas.map(textoPieza).join(', '));
     const largoTotal = Math.round(filas.reduce((s,f) => s + f.largo, 0) * 100) / 100;
-    texto = `De ${ancho} cm de ancho se corta ${partes.join('; ')}. Largo total de tela: ${largoTotal} cm.`;
+    texto = `De ${ancho} cm de ancho se corta ${partes.join('; ')}.${filas.map(textoSobrante).join('')} Largo total de tela: ${largoTotal} cm.`;
   } else {
     texto = personalizado
-      ? `De ${ancho} cm de ancho se obtienen ${piezas.reduce((s,p)=>s+(p.cantidad||1),0)} tira(s) a medida: ${detalle}.`
+      ? `De ${ancho} cm de ancho se obtienen: ${detalle}.${filas.map(textoSobrante).join('')}`
       : `En ${ancho} cm de ancho por ${piezas[0].largo} cm de largo se obtienen ${piezas.length} tira(s): ${detalle}.`;
   }
   if(personalizado){
@@ -2798,7 +2821,7 @@ function armarTextoInstruccion(piezas, nota){
 // dibuja el bosquejo minimalista (lineas negras) en un canvas y devuelve la imagen en base64
 // cada pieza se dibuja con su propio ancho y largo (sirve tanto para tiras iguales como a medida)
 function dibujarBosquejoCorte(anchoTela, piezas){
-  const filas = filasDeCorte(piezas);
+  const filas = filasDeCorte(piezas, anchoTela);
   const escala = Math.min(3.2, 900 / anchoTela);
   const anchoPx = Math.round(anchoTela * escala);
   const largoTotal = filas.reduce((s,f) => s + f.largo, 0);
@@ -2818,18 +2841,28 @@ function dibujarBosquejoCorte(anchoTela, piezas){
   let y = margen;
   filas.forEach(f => {
     let x = margen;
+    const dibujar = (p, etiqueta, sobrante, linea2) => {
+      const w = p.ancho * escala, h = p.largo * escala;
+      if(sobrante) ctx.setLineDash([4,3]);
+      ctx.strokeRect(x, y, w, h);
+      ctx.setLineDash([]);
+      const chico = w < 90;
+      ctx.font = (chico ? 'bold 10px' : 'bold 13px') + ' Arial';
+      ctx.fillText(etiqueta, x + w/2, y + h/2 - 6, w - 4);
+      ctx.font = (chico ? '9px' : '11px') + ' Arial';
+      ctx.fillText(linea2 || (sobrante ? 'Sobrante' : (p.ancho + ' × ' + p.largo)), x + w/2, y + h/2 + 10, w - 4);
+      x += w;
+    };
     f.piezas.forEach(p => {
-      for(let k = 0; k < (p.cantidad||1); k++){
-        const w = p.ancho * escala, h = p.largo * escala;
-        ctx.strokeRect(x, y, w, h);
-        const chico = w < 90;
-        ctx.font = (chico ? 'bold 10px' : 'bold 13px') + ' Arial';
-        ctx.fillText(p.nombre, x + w/2, y + h/2 - 6, w - 4);
-        ctx.font = (chico ? '9px' : '11px') + ' Arial';
-        ctx.fillText(p.ancho + ' × ' + p.largo, x + w/2, y + h/2 + 10, w - 4);
-        x += w;
+      const partes = p.partes || 1;
+      for(let k = 0; k < (p.cantidad||1) * partes; k++){
+        dibujar(p, p.nombre, false, partes > 1 ? `Tapa ${(k % partes) + 1} · ${p.ancho} × ${p.largo}` : '');
       }
     });
+    for(let k = 0; k < f.extras; k++){
+      const p = f.piezas[0], partes = p.partes || 1;
+      dibujar(p, partes > 1 ? `Tapa ${(k % partes) + 1}` : p.nombre, true);
+    }
     // cota de largo de cada fila a la izquierda
     ctx.font = '12px Arial'; ctx.textAlign = 'left';
     ctx.fillText(f.largo + ' cm', 8, y + (f.largo*escala)/2 + 5);
@@ -2859,7 +2892,7 @@ function previsualizarBosquejoCorte(){
   const nota = document.getElementById('ic-nota').value.trim();
   let textoPreview = armarTextoInstruccion(piezas, nota);
   if(document.getElementById('ic-tipo-corte').value === 'personalizado'){
-    const excedida = filasDeCorte(piezas).find(f => f.anchoUsado > ancho + 0.01);
+    const excedida = filasDeCorte(piezas, ancho).find(f => f.anchoUsado > ancho + 0.01);
     if(excedida){
       const donde = excedida.fila === 1 ? 'a lo ancho' : 'debajo';
       textoPreview = `⚠️ Las tiras ${donde} suman ${excedida.anchoUsado} cm, más que los ${ancho} cm de ancho de la tela. Revíselo.\n\n` + textoPreview;
@@ -2891,7 +2924,7 @@ async function guardarInstruccionCorte(){
     return;
   }
   const excedida = document.getElementById('ic-tipo-corte').value === 'personalizado'
-    ? filasDeCorte(piezas).find(f => f.anchoUsado > parseFloat(ancho) + 0.01) : null;
+    ? filasDeCorte(piezas, parseFloat(ancho)).find(f => f.anchoUsado > parseFloat(ancho) + 0.01) : null;
   if(excedida){
     if(!confirm('Las tiras ' + (excedida.fila === 1 ? 'a lo ancho' : 'de debajo') + ' suman ' + excedida.anchoUsado + ' cm, más que los ' + ancho + ' cm de ancho de la tela. ¿Guardar igual?')) return;
   }
