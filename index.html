@@ -1354,6 +1354,8 @@ a.grilla-celda{display:block;}
       <p class="error" id="tc-error" style="display:none;"></p>
       <div id="tc-preview" style="margin-top:14px;"></div>
       <p class="note" id="tc-estado-actual" style="margin-top:16px;"></p>
+      <button class="btn-mini" id="tc-btn-editar" onclick="iniciarEdicionTabla()" style="display:none;margin-top:6px;">✏️ Ver y corregir la tabla completa</button>
+      <div id="tc-editor" style="margin-top:14px;"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
@@ -2278,6 +2280,140 @@ function mostrarEstadoTablaConsumo(){
   el.textContent = hay
     ? `Tabla actual cargada: ${Object.keys(tablaConsumo.articulos).length} artículo(s).`
     : 'Todavía no hay ninguna tabla guardada.';
+  const btnEditar = document.getElementById('tc-btn-editar');
+  if(btnEditar) btnEditar.style.display = hay ? 'inline-block' : 'none';
+}
+
+// ---------- editor de la tabla de consumo (agregar/corregir articulos, anchos y consumos) ----------
+let edicionTabla = null;
+
+function iniciarEdicionTabla(){
+  const base = (tablaConsumo && tablaConsumo.articulos) ? tablaConsumo : {anchos:[], articulos:{}};
+  edicionTabla = {
+    anchos: [...(base.anchos||[])].sort((a,b) => a-b),
+    filas: Object.entries(base.articulos||{}).map(([nombre, consumos]) => ({nombre, consumos: {...consumos}})),
+  };
+  renderEditorTablaConsumo();
+}
+
+// lee lo que haya tipeado en la tabla editable y lo vuelca a edicionTabla, antes de agregar/borrar una fila o columna
+// (para no perder lo que ya escribió al re-armar la tabla)
+function sincronizarEdicionDesdeDOM(){
+  if(!edicionTabla) return;
+  document.querySelectorAll('#tc-editor-filas .tc-fila').forEach((filaEl) => {
+    const idx = parseInt(filaEl.dataset.idx, 10);
+    const fila = edicionTabla.filas[idx];
+    if(!fila) return;
+    fila.nombre = filaEl.querySelector('.tc-nombre').value;
+    edicionTabla.anchos.forEach(ancho => {
+      const inp = filaEl.querySelector(`[data-ancho="${ancho}"]`);
+      const val = inp ? parsearNumeroArgentino(inp.value) : null;
+      if(val === null) delete fila.consumos[ancho];
+      else fila.consumos[ancho] = val;
+    });
+  });
+}
+
+function renderEditorTablaConsumo(){
+  const cont = document.getElementById('tc-editor');
+  const anchos = edicionTabla.anchos;
+  cont.innerHTML = `
+    <div style="overflow-x:auto;max-height:420px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;">
+      <table style="border-collapse:collapse;width:100%;font-size:0.78rem;">
+        <thead style="position:sticky;top:0;background:var(--cream);">
+          <tr>
+            <th style="padding:6px;text-align:left;min-width:170px;">Artículo</th>
+            ${anchos.map(a => `<th style="padding:6px;min-width:74px;white-space:nowrap;">${a}cm <span onclick="eliminarAnchoEdicion(${a})" style="cursor:pointer;color:#B5453A;" title="Borrar esta columna">×</span></th>`).join('')}
+            <th style="min-width:34px;"></th>
+          </tr>
+        </thead>
+        <tbody id="tc-editor-filas">
+          ${edicionTabla.filas.map((f, i) => `
+            <tr class="tc-fila" data-idx="${i}">
+              <td style="padding:4px;"><input class="tc-nombre" value="${escapeAttr(f.nombre)}" placeholder="Nombre del artículo" style="width:100%;border:1px solid var(--line);border-radius:4px;padding:4px;box-sizing:border-box;"></td>
+              ${anchos.map(a => `<td style="padding:4px;"><input type="number" step="0.01" data-ancho="${a}" value="${f.consumos[a] !== undefined ? f.consumos[a] : ''}" style="width:64px;border:1px solid var(--line);border-radius:4px;padding:4px;"></td>`).join('')}
+              <td style="text-align:center;"><span onclick="eliminarFilaEdicion(${i})" style="cursor:pointer;" title="Borrar este artículo">🗑️</span></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;align-items:center;">
+      <button class="btn-mini" onclick="agregarFilaEdicion()">+ Artículo</button>
+      <input type="number" id="tc-nuevo-ancho" placeholder="Ancho nuevo (cm)" style="width:130px;padding:6px;border:1px solid var(--line);border-radius:6px;">
+      <button class="btn-mini" onclick="agregarAnchoEdicion()">+ Ancho</button>
+    </div>
+    <p class="error" id="tc-editor-error" style="display:none;margin-top:8px;"></p>
+    <div class="actions" style="margin-top:14px;">
+      <button class="btn btn-gold" onclick="guardarEdicionTabla()">Guardar cambios</button>
+    </div>
+  `;
+}
+
+function agregarFilaEdicion(){
+  sincronizarEdicionDesdeDOM();
+  edicionTabla.filas.push({nombre:'', consumos:{}});
+  renderEditorTablaConsumo();
+}
+
+function eliminarFilaEdicion(idx){
+  const nombre = edicionTabla.filas[idx].nombre || '(sin nombre)';
+  if(!confirm('¿Borrar "' + nombre + '" de la tabla?')) return;
+  sincronizarEdicionDesdeDOM();
+  edicionTabla.filas.splice(idx, 1);
+  renderEditorTablaConsumo();
+}
+
+function agregarAnchoEdicion(){
+  sincronizarEdicionDesdeDOM();
+  const val = parsearNumeroArgentino(document.getElementById('tc-nuevo-ancho').value);
+  if(val === null){ alert('Escriba un ancho válido.'); return; }
+  if(edicionTabla.anchos.includes(val)){ alert('Ese ancho ya existe en la tabla.'); return; }
+  edicionTabla.anchos.push(val);
+  edicionTabla.anchos.sort((a,b) => a-b);
+  renderEditorTablaConsumo();
+}
+
+function eliminarAnchoEdicion(ancho){
+  if(!confirm('¿Borrar la columna de ' + ancho + ' cm? Se pierde el consumo cargado ahí para todos los artículos.')) return;
+  sincronizarEdicionDesdeDOM();
+  edicionTabla.anchos = edicionTabla.anchos.filter(a => a !== ancho);
+  edicionTabla.filas.forEach(f => delete f.consumos[ancho]);
+  renderEditorTablaConsumo();
+}
+
+async function guardarEdicionTabla(){
+  sincronizarEdicionDesdeDOM();
+  const errorEl = document.getElementById('tc-editor-error');
+  errorEl.style.display = 'none';
+
+  const nombres = edicionTabla.filas.map(f => f.nombre.trim());
+  if(nombres.some(n => !n)){
+    errorEl.textContent = 'Hay artículos sin nombre — complételos o bórrelos con 🗑️ antes de guardar.';
+    errorEl.style.display = 'block';
+    return;
+  }
+  const vistos = new Set();
+  const repetidos = [];
+  nombres.forEach(n => { const clave = n.toLowerCase(); if(vistos.has(clave) && !repetidos.includes(n)) repetidos.push(n); vistos.add(clave); });
+  if(repetidos.length){
+    errorEl.textContent = 'Hay artículos con el mismo nombre: ' + repetidos.join(', ') + '. Use nombres distintos, o bórrelos si están de más.';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  const articulos = {};
+  edicionTabla.filas.forEach(f => { articulos[f.nombre.trim()] = f.consumos; });
+  const datos = { anchos: edicionTabla.anchos, articulos, totalArticulos: edicionTabla.filas.length };
+  try{
+    await db.collection('config').doc('tabla_consumo_telas').set(datos);
+    tablaConsumo = datos;
+    alert('Tabla actualizada: ' + edicionTabla.filas.length + ' artículo(s).');
+    mostrarEstadoTablaConsumo();
+  } catch(e){
+    errorEl.textContent = 'No se pudo guardar: ' + e.message;
+    errorEl.style.display = 'block';
+  }
 }
 
 async function abrirTablaConsumo(){
@@ -2285,6 +2421,8 @@ async function abrirTablaConsumo(){
   document.getElementById('tc-pegado').value = '';
   document.getElementById('tc-preview').innerHTML = '';
   document.getElementById('tc-error').style.display = 'none';
+  document.getElementById('tc-editor').innerHTML = '';
+  edicionTabla = null;
   if(tablaConsumo === null) await cargarTablaConsumo();
   mostrarEstadoTablaConsumo();
 }
