@@ -1452,6 +1452,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v8</p>
       <div id="ic-lista" style="margin-top:8px;"></div>
 
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
@@ -2834,13 +2835,12 @@ function consumoPorUnidad(piezas, anchoTela){
   const detalle = [];
   let cm = 0;
   filasDeCorte(piezas, anchoTela).forEach(f => {
-    // si la franja da piezas de mas (enteras), su largo se reparte entre los articulos que alcanza
+    // si la franja da piezas de mas, su largo se reparte segun lo que usa el articulo
+    // (las tapas sueltas se juntan con las del articulo siguiente: 3 tapas por franja = 1,5 fundas)
     let alcanza = 1;
     if(f.piezas.length === 1 && f.extras){
-      const p = f.piezas[0], partes = p.partes || 1;
       const u = f.items.reduce((s,it) => s + it.u, 0);
-      const enteras = Math.floor((u + f.extras) / partes), usa = u / partes;
-      if(enteras > usa) alcanza = enteras / usa;
+      alcanza = (u + f.extras) / u;
     }
     cm += f.largo / alcanza;
     const alc = Math.round(alcanza * 100) / 100;
@@ -2856,7 +2856,7 @@ function frasesSobrante(p, usadasUnid, extrasUnid, origen){
     const enteras = Math.floor(extrasUnid / partes), sueltas = extrasUnid % partes;
     let t = ` ${origen} salen ${total} tapas = ${Math.floor(total/partes)} ${Math.floor(total/partes) === 1 ? 'unidad' : 'unidades'} de ${p.nombre}: ${Math.ceil(usadasUnid/partes)} para el artículo`;
     if(enteras) t += `, sobran ${enteras}`;
-    if(sueltas) t += `${enteras ? ' y ' : ', sobran '}${sueltas} tapa(s) suelta(s)`;
+    if(sueltas) t += `${enteras ? ' y ' : ', sobran '}${sueltas} tapa(s) suelta(s), que se junta(n) con la(s) del artículo siguiente`;
     return t + '.';
   }
   return ` ${origen} salen ${total} piezas de ${p.nombre}: ${usadasUnid} para el artículo` + (extrasUnid ? `, sobran ${extrasUnid}.` : '.');
