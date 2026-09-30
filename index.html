@@ -1453,7 +1453,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v13</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v14</p>
       <div id="ic-lista" style="margin-top:8px;"></div>
 
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
@@ -2666,7 +2666,9 @@ function buscarBosquejoCorte(articulo, ancho){
   const sku = fichaDesdeArticulo(articulo);
   if(sku){ const r = piezasDeFicha(sku); return r.piezas.length ? dibujarBosquejoCorte(parseFloat(ancho), r.piezas) : ''; }
   const g = buscarInstruccionGuardada(articulo, ancho);
-  return g ? g.bosquejoBase64 : '';
+  if(!g) return '';
+  if(g.bosquejoBase64) return g.bosquejoBase64;
+  return Array.isArray(g.piezas) && g.piezas.length ? dibujarBosquejoCorte(parseFloat(ancho), g.piezas) : '';
 }
 
 // plantillas de ejemplo ya confirmadas con el dueño, para precargar el formulario la primera vez
@@ -3296,6 +3298,53 @@ function previsualizarBosquejoCorte(){
   bosquejoEl.dataset.img = img;
 }
 
+// ===== Piezas de un juego → instrucciones propias =====
+// Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
+// tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
+// interpreta como la plana King. Si en la tabla ya existe un articulo que la nombra (ej: "Sabana
+// Plana King"), se usa ese; si no, se crea "Plana King".
+const PALABRAS_VACIAS = ['de','del','la','el','los','las','para','con','y'];
+function palabrasNombre(t){
+  return String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .split(/\s+/).filter(w => w && !PALABRAS_VACIAS.includes(w));
+}
+function medidaDelJuego(articulo){
+  const m = String(articulo||'').match(/^\s*juego(\s+de\s+s[aá]banas?)?\s+(.+)$/i);
+  return m ? m[2].trim() : null;
+}
+function articuloDePieza(nombrePieza, medida, excluir){
+  const buscadas = [...palabrasNombre(nombrePieza), ...palabrasNombre(medida)];
+  const candidatos = Object.keys((tablaConsumo && tablaConsumo.articulos) || {})
+    .filter(n => n !== excluir)
+    .filter(n => { const w = palabrasNombre(n); return buscadas.every(b => w.includes(b)); })
+    .sort((a,b) => palabrasNombre(a).length - palabrasNombre(b).length || a.length - b.length);
+  return candidatos[0] || `${nombrePieza} ${medida}`;
+}
+// devuelve un resumen de lo que cargo, para mostrarlo al guardar
+function cargarPiezasDelJuego(articulo, ancho, piezas){
+  const medida = medidaDelJuego(articulo);
+  if(!medida || piezas.length < 2) return [];
+  const hechos = [];
+  const vistos = new Set();
+  piezas.forEach(p => {
+    const clave = p.nombre.trim().toLowerCase();
+    if(!p.nombre.trim() || vistos.has(clave)) return;
+    vistos.add(clave);
+    const nombre = articuloDePieza(p.nombre.trim(), medida, articulo);
+    const suelta = [{ nombre: p.nombre.trim(), ancho: p.ancho, largo: p.largo, cantidad: 1, partes: p.partes || 1 }];
+    const previa = (tablaConsumo.instrucciones[nombre] || {})[ancho];
+    if(previa && !previa.auto){ hechos.push(`${nombre}: ya tenía una instrucción cargada a mano en ${ancho} cm, no la toqué.`); return; }
+    const corte = calcularCorte(suelta, parseFloat(ancho));
+    tablaConsumo.instrucciones[nombre] = { ...(tablaConsumo.instrucciones[nombre]||{}),
+      [ancho]: { texto: textoCorte(nombre, suelta, parseFloat(ancho), ''), bosquejoBase64: '', piezas: suelta, nota: '', tipo: 'personalizado', consumo: corte.metros, auto: true, origen: articulo } };
+    tablaConsumo.articulos[nombre] = tablaConsumo.articulos[nombre] || {};
+    const enTabla = tablaConsumo.articulos[nombre][ancho];
+    if(enTabla === undefined || enTabla === null || enTabla === '') tablaConsumo.articulos[nombre][ancho] = corte.metros;
+    hechos.push(`${nombre} en ${ancho} cm: ${fmtMetros(corte.metros)} m` + (enTabla !== undefined && enTabla !== null && enTabla !== '' && Math.abs(Number(enTabla) - corte.metros) > 0.005 ? ` (en la tabla figura ${fmtMetros(Number(enTabla))} m, lo dejé como estaba)` : ''));
+  });
+  return hechos;
+}
+
 async function guardarInstruccionCorte(){
   const errorEl = document.getElementById('ic-error');
   errorEl.style.display = 'none';
@@ -3320,15 +3369,17 @@ async function guardarInstruccionCorte(){
   const nota = document.getElementById('ic-nota').value.trim();
   const tipo = document.getElementById('ic-tipo-corte').value;
   const texto = armarTextoInstruccion(piezas, nota);
-  const bosquejoBase64 = document.getElementById('ic-preview-bosquejo').dataset.img || dibujarBosquejoCorte(parseFloat(ancho), piezas);
+  const bosquejoBase64 = ''; // el bosquejo se dibuja en el momento a partir de las piezas
 
   tablaConsumo.instrucciones = tablaConsumo.instrucciones || {};
   tablaConsumo.instrucciones[articulo] = { ...(tablaConsumo.instrucciones[articulo]||{}), [ancho]: { texto, bosquejoBase64, piezas, nota, tipo, consumo: corte.metros } };
+  tablaConsumo.articulos = tablaConsumo.articulos || {};
+  const derivadas = cargarPiezasDelJuego(articulo, ancho, piezas);
   try{
     await db.collection('config').doc('tabla_consumo_telas').set(tablaConsumo);
     document.getElementById('ic-btn-borrar').style.display = 'inline-block';
     renderListaInstrucciones();
-    alert('Instrucción y bosquejo guardados.');
+    alert('Instrucción y bosquejo guardados.' + (derivadas.length ? '\n\nTambién quedaron cargadas las piezas sueltas:\n• ' + derivadas.join('\n• ') : ''));
   } catch(e){
     errorEl.textContent = 'No se pudo guardar: ' + e.message;
     errorEl.style.display = 'block';
@@ -10295,7 +10346,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-09-30-v13';
+const APP_VERSION = '2026-09-30-v14';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
