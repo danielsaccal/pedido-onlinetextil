@@ -1422,6 +1422,11 @@ a.grilla-celda{display:block;}
       <div class="field">
         <label>Artículo</label>
         <select id="ic-articulo" onchange="cambiarArticuloInstruccion()"><option value="">Elija un artículo</option></select>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+          <button type="button" class="btn-mini" onclick="nuevoArticuloInstruccion()">+ Nuevo</button>
+          <button type="button" class="btn-mini" onclick="renombrarArticuloInstruccion()">✏️ Renombrar</button>
+          <button type="button" class="btn-mini" onclick="borrarArticuloInstruccion()">🗑️ Borrar</button>
+        </div>
       </div>
       <div class="field">
         <label>Ancho (cm)</label>
@@ -1453,7 +1458,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v16</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v17</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2661,13 +2666,15 @@ function buscarInstruccionCorte(articulo, ancho){
   const sku = fichaDesdeArticulo(articulo);
   if(sku){ const r = piezasDeFicha(sku); return r.piezas.length ? textoCorte(nombreFicha(sku), r.piezas, parseFloat(ancho), '') : ''; }
   const g = buscarInstruccionGuardada(articulo, ancho);
-  return g ? g.texto : '';
+  if(g) return g.texto;
+  const c = instruccionCalculada(articulo, ancho);
+  return c ? textoCorte(articulo, c.piezas, parseFloat(ancho), '') : '';
 }
 function buscarBosquejoCorte(articulo, ancho){
   const sku = fichaDesdeArticulo(articulo);
   if(sku){ const r = piezasDeFicha(sku); return r.piezas.length ? dibujarBosquejoCorte(parseFloat(ancho), r.piezas) : ''; }
   const g = buscarInstruccionGuardada(articulo, ancho);
-  if(!g) return '';
+  if(!g){ const c = instruccionCalculada(articulo, ancho); return c ? dibujarBosquejoCorte(parseFloat(ancho), c.piezas) : ''; }
   if(g.bosquejoBase64) return g.bosquejoBase64;
   return Array.isArray(g.piezas) && g.piezas.length ? dibujarBosquejoCorte(parseFloat(ancho), g.piezas) : '';
 }
@@ -2706,6 +2713,7 @@ async function abrirInstruccionesCorte(){
 }
 
 function limpiarFormularioInstruccion(){
+  delete document.getElementById('ic-preview-texto').dataset.aviso;
   document.getElementById('ic-tipo-corte').value = 'personalizado';
   document.getElementById('ic-cant-tiras').value = '';
   document.getElementById('ic-largo-tira').value = '';
@@ -2736,8 +2744,9 @@ function cambiarArticuloInstruccion(){
     selAncho.innerHTML = '<option value="">Elija un ancho</option>';
     return;
   }
-  const anchosDelArticulo = Object.keys(tablaConsumo.articulos[articulo]).map(Number).sort((a,b) => a-b);
-  selAncho.innerHTML = '<option value="">Elija un ancho</option>' + anchosDelArticulo.map(a => `<option value="${a}">${a} cm</option>`).join('');
+  const anchosDelArticulo = [...new Set([...Object.keys(tablaConsumo.articulos[articulo]).map(Number), ...anchosConocidos()])].filter(a => a > 0).sort((a,b) => a-b);
+  const inst = instruccionesDeArticulo(articulo);
+  selAncho.innerHTML = '<option value="">Elija un ancho</option>' + anchosDelArticulo.map(a => `<option value="${a}">${a} cm${inst[a] ? ' ✓' : (instruccionCalculada(articulo, a) ? ' (calculada)' : '')}</option>`).join('');
 }
 
 function cargarInstruccionActual(){
@@ -2755,6 +2764,12 @@ function cargarInstruccionActual(){
     document.getElementById('ic-nota').value = guardada.nota || '';
     generarCamposTiras(guardada.piezas);
     document.getElementById('ic-btn-borrar').style.display = 'inline-block';
+  } else if(instruccionCalculada(articulo, ancho)){
+    // no esta cargada en este ancho: se precarga la calculada a partir de otro ancho, lista para guardar
+    const c = instruccionCalculada(articulo, ancho);
+    document.getElementById('ic-cant-tiras').value = c.piezas.length;
+    generarCamposTiras(c.piezas.map(p => ({ ...p })));
+    document.getElementById('ic-preview-texto').dataset.aviso = `ℹ️ Calculada a partir de la instrucción de ${c.desde} cm. Si está bien, guárdela; si no, corríjala.`;
   } else if(PLANTILLAS_INSTRUCCIONES[articulo]){
     // primera vez con este articulo: precarga el ejemplo ya confirmado, listo para revisar y guardar
     const pl = PLANTILLAS_INSTRUCCIONES[articulo];
@@ -2782,6 +2797,7 @@ function generarCamposTiras(piezasPrevias){
     fila: f.querySelector('.ic-fila-sel') ? f.querySelector('.ic-fila-sel').value : 1,
     cantidad: f.querySelector('.ic-cant-pieza') ? f.querySelector('.ic-cant-pieza').value : 1,
     partes: f.querySelector('.ic-partes-pieza') ? f.querySelector('.ic-partes-pieza').value : 1,
+    girar: f.querySelector('.ic-girar') ? f.querySelector('.ic-girar').value : undefined,
   }));
 
   cont.innerHTML = Array.from({length: cant}, (_, i) => {
@@ -2794,6 +2810,10 @@ function generarCamposTiras(piezasPrevias){
           <div class="field"><label>¿Cuánto consume del largo de la tela? (cm)</label><input type="number" step="0.1" class="ic-largo-tira-personal" value="${p.largo||''}" oninput="previsualizarBosquejoCorte()"></div>
           <div class="field"><label>¿Cuántas de esta pieza lleva el artículo?</label><input type="number" min="1" step="1" class="ic-cant-pieza" value="${p.cantidad||1}" oninput="previsualizarBosquejoCorte()"></div>
           <div class="field"><label>¿De cuántas tapas se forma esta pieza? (ej: funda = 2)</label><input type="number" min="1" step="1" class="ic-partes-pieza" value="${p.partes||1}" oninput="previsualizarBosquejoCorte()"></div>
+          <div class="field"><label>¿Se puede cortar girada según la tela?</label><select class="ic-girar" onchange="previsualizarBosquejoCorte()">
+            <option value="si" ${puedeGirar(p) ? 'selected' : ''}>Sí, el sistema elige el sentido que menos tela gasta</option>
+            <option value="no" ${puedeGirar(p) ? '' : 'selected'}>No, siempre en este sentido</option>
+          </select></div>
         </div>`;
     }
     return `<div class="ic-fila-tira field"><label>Nombre de la tira ${i+1}</label><input type="text" class="ic-nombre-tira" value="${escapeAttr(p.nombre||'')}" placeholder="Ej: Ajustable" oninput="previsualizarBosquejoCorte()"></div>`;
@@ -2815,6 +2835,7 @@ function leerPiezasFormularioInstruccion(){
       largo: parseFloat(f.querySelector('.ic-largo-tira-personal').value),
       cantidad: Math.max(1, parseInt(f.querySelector('.ic-cant-pieza').value, 10) || 1),
       partes: Math.max(1, parseInt(f.querySelector('.ic-partes-pieza').value, 10) || 1),
+      girar: f.querySelector('.ic-girar') ? f.querySelector('.ic-girar').value === 'si' : undefined,
     }));
     if(piezas.some(p => !p.nombre || isNaN(p.ancho) || p.ancho <= 0 || isNaN(p.largo) || p.largo <= 0)) return null;
     return piezas;
@@ -2842,7 +2863,32 @@ function leerPiezasFormularioInstruccion(){
 //    ese sobrante se reparte entre las piezas mas anchas de la franja (ej: 2 planas de 150 en 315
 //    quedan de 157,5). Tope: cada pieza crece como mucho un 10 %; si el sobrante es mayor, queda libre.
 const TOPE_ENSANCHE = 0.10;
+// 7. Cada pieza se puede cortar derecha o girada (lo que consume del ancho pasa a ser lo que consume
+//    del largo) y el sistema elige la forma que gasta menos tela en ese ancho. Ej: una tapa de
+//    150 x 250 en tela de 250 va con los 250 a lo ancho; en tela de 150 va girada. Las piezas marcadas
+//    "no se gira" (por defecto las fundas) mantienen siempre su sentido.
+function puedeGirar(p){
+  if(p.girar === true || p.girar === 'si') return true;
+  if(p.girar === false || p.girar === 'no') return false;
+  return !/funda/i.test(p.nombre || '');
+}
 function calcularCorte(piezas, W){
+  const girables = piezas.map((p, i) => i).filter(i => puedeGirar(piezas[i]) && Math.abs(piezas[i].ancho - piezas[i].largo) > 0.01);
+  if(!girables.length || girables.length > 6) return calcularCorteFijo(piezas, W);
+  let mejor = null;
+  for(let m = 0; m < (1 << girables.length); m++){
+    const variante = piezas.map((p, i) => {
+      const k = girables.indexOf(i);
+      return k >= 0 && (m >> k) & 1 ? { ...p, ancho: p.largo, largo: p.ancho, girada: true } : p;
+    });
+    const c = calcularCorteFijo(variante, W);
+    // gana la que no tiene avisos, despues la que menos consume, despues la de menos largo total
+    if(!mejor || c.avisos.length < mejor.avisos.length ||
+       (c.avisos.length === mejor.avisos.length && (c.metros < mejor.metros - 0.001 || (Math.abs(c.metros - mejor.metros) <= 0.001 && c.largoTotal < mejor.largoTotal)))) mejor = c;
+  }
+  return mejor;
+}
+function calcularCorteFijo(piezas, W){
   const EPS = 0.01;
   const tipos = piezas.map((p, i) => ({ p, orden: i, n: (p.cantidad||1) * (p.partes||1) }));
   const porTamano = [...tipos].sort((a,b) => (b.p.ancho*b.p.largo) - (a.p.ancho*a.p.largo) || a.orden - b.orden);
@@ -2923,7 +2969,7 @@ function nombreUnidad(p, n){ return (p.partes||1) > 1 ? `${n} tapa${n===1?'':'s'
 function textoCorte(articulo, piezas, ancho, nota){
   const c = calcularCorte(piezas, ancho);
   const total = piezas.reduce((s,p) => s + (p.cantidad||1), 0);
-  let texto = `${articulo} lleva ${total} pieza(s): ${piezas.map(textoPieza).join(', ')}. Corte en ${fmtCm(ancho)} cm de ancho (las piezas no se giran).`;
+  let texto = `${articulo} lleva ${total} pieza(s): ${piezas.map(textoPieza).join(', ')}. Corte en ${fmtCm(ancho)} cm de ancho (medidas: lo que consume del ancho × lo que consume del largo de la tela).`;
   const sobrantes = new Map();
   c.franjas.forEach((f, i) => {
     const usadas = new Map(); // clave: pieza + ancho real de corte
@@ -2937,7 +2983,7 @@ function textoCorte(articulo, piezas, ancho, nota){
       const so = col.items.length - us;
       if(so && !f.unTipo) sobrantes.set(col.p, (sobrantes.get(col.p)||0) + so);
     });
-    const lista = [...usadas.values()].map(u => `${nombreUnidad(u.p, u.n)} (${fmtCm(u.w)} × ${fmtCm(u.p.largo)})`);
+    const lista = [...usadas.values()].map(u => `${nombreUnidad(u.p, u.n)} (${fmtCm(u.w)} × ${fmtCm(u.p.largo)}${u.p.girada ? ', girada' : ''})`);
     texto += ` Franja ${i+1} (${fmtCm(f.largo)} cm de largo): ${lista.join(' + ')}.`;
     if(f.unTipo && f.factor < 1){
       const p = f.cols[0].p, tot = f.cols.reduce((s,col) => s + col.items.length, 0);
@@ -3049,7 +3095,7 @@ function piezasDeFicha(sku, fichas, mult, camino){
     });
     return r;
   }
-  return { piezas: (f.piezas || []).map(p => ({ nombre: p.nombre, ancho: parseFloat(p.ancho), largo: parseFloat(p.largo), partes: parseInt(p.partes, 10) || 1, cantidad: mult })), errores: [] };
+  return { piezas: (f.piezas || []).map(p => ({ nombre: p.nombre, ancho: parseFloat(p.ancho), largo: parseFloat(p.largo), partes: parseInt(p.partes, 10) || 1, cantidad: mult, girar: p.girar })), errores: [] };
 }
 function nombreFicha(sku){ const f = fichasArticulos && fichasArticulos.fichas[sku]; return f ? `${sku} — ${f.nombre}` : sku; }
 // en ordenes guardadas el articulo queda como "SKU — nombre": de ahi se recupera la ficha
@@ -3154,6 +3200,9 @@ function agregarPiezaFicha(p){
       <div class="field" style="flex:1;"><label>Largo (cm)</label><input type="number" step="0.1" class="fa-p-largo" value="${p.largo||''}" placeholder="260" oninput="calcularVistaFicha()"></div>
       <div class="field" style="flex:1;"><label>Cuántas (tapas)</label><input type="number" min="1" step="1" class="fa-p-partes" value="${p.partes||1}" oninput="calcularVistaFicha()"></div>
     </div>
+    <div class="field"><label>¿Se puede cortar girada?</label><select class="fa-p-girar" onchange="calcularVistaFicha()">
+      <option value="si" ${puedeGirar(p) ? 'selected' : ''}>Sí, según la tela</option>
+      <option value="no" ${puedeGirar(p) ? '' : 'selected'}>No, siempre en este sentido</option></select></div>
     <button type="button" class="btn-mini" onclick="this.closest('.fa-pieza').remove(); calcularVistaFicha();">🗑️ Quitar pieza</button>`;
   document.getElementById('fa-piezas').appendChild(div);
 }
@@ -3185,6 +3234,7 @@ function leerFichaFormulario(){
       ancho: parseFloat(el.querySelector('.fa-p-ancho').value),
       largo: parseFloat(el.querySelector('.fa-p-largo').value),
       partes: Math.max(1, parseInt(el.querySelector('.fa-p-partes').value, 10) || 1),
+      girar: el.querySelector('.fa-p-girar').value === 'si',
     })).filter(p => p.nombre || p.ancho || p.largo);
   }
   return f;
@@ -3299,10 +3349,92 @@ function previsualizarBosquejoCorte(){
       textoPreview += `\n\nℹ️ En la tabla de consumo figura ${fmtMetros(Number(enTabla))} m para este artículo y ancho; según este corte son ${fmtMetros(cu.metros)} m.`;
     }
   }
+  if(textoEl.dataset.aviso) textoPreview = textoEl.dataset.aviso + '\n\n' + textoPreview;
   textoEl.textContent = textoPreview;
   const img = dibujarBosquejoCorte(ancho, piezas);
   bosquejoEl.innerHTML = `<img src="${img}" style="max-width:100%;border:1px solid var(--line);border-radius:8px;">`;
   bosquejoEl.dataset.img = img;
+}
+
+// ===== Instrucciones calculadas para cualquier ancho =====
+// Con una sola instruccion cargada (ej: Acolchado 1 1/2 en 250), el sistema calcula el corte y el
+// consumo en cualquier otro ancho de tela, usando las mismas piezas. Si hay varias cargadas, usa la
+// que da menos consumo sin pasarse del ancho. Lo cargado a mano en un ancho siempre tiene prioridad.
+function anchosConocidos(){
+  const s = new Set();
+  Object.values((tablaConsumo && tablaConsumo.articulos) || {}).forEach(x => Object.keys(x || {}).forEach(k => s.add(parseFloat(k))));
+  Object.values((tablaConsumo && tablaConsumo.instrucciones) || {}).forEach(x => Object.keys(x || {}).forEach(k => s.add(parseFloat(k))));
+  ((fichasArticulos && fichasArticulos.anchos) || []).forEach(a => s.add(parseFloat(a)));
+  return [...s].filter(a => a > 0).sort((a,b) => a-b);
+}
+function piezasValidas(g){ return g && Array.isArray(g.piezas) && g.piezas.length && g.piezas.every(p => p && p.ancho > 0 && p.largo > 0); }
+function instruccionCalculada(articulo, ancho){
+  const W = parseFloat(ancho);
+  let mejor = null;
+  Object.entries(instruccionesDeArticulo(articulo)).forEach(([a, g]) => {
+    if(!piezasValidas(g)) return;
+    const corte = calcularCorte(g.piezas, W);
+    if(corte.avisos.length) return;
+    if(!mejor || corte.metros < mejor.corte.metros - 0.001) mejor = { piezas: g.piezas, corte, desde: a };
+  });
+  return mejor;
+}
+// piezas para un articulo y ancho: la instruccion de ese ancho si esta cargada, si no la calculada
+function piezasParaAncho(articulo, ancho){
+  const g = buscarInstruccionGuardada(articulo, ancho);
+  if(piezasValidas(g)) return { piezas: g.piezas, calculada: false };
+  const c = instruccionCalculada(articulo, ancho);
+  return c ? { piezas: c.piezas, calculada: true, desde: c.desde } : null;
+}
+
+// ===== Administrar articulos (crear, renombrar, borrar) =====
+function refrescarArticulosInstruccion(seleccionar){
+  const sel = document.getElementById('ic-articulo');
+  sel.innerHTML = '<option value="">Elija un artículo</option>' + Object.keys(tablaConsumo.articulos || {}).sort((a,b) => a.localeCompare(b, 'es')).map(n => `<option value="${escapeAttr(n)}">${escaparHtml(n)}</option>`).join('');
+  if(seleccionar){ sel.value = seleccionar; cambiarArticuloInstruccion(); }
+  renderListaInstrucciones();
+}
+async function guardarTablaYConsumo(){
+  await db.collection('config').doc('tabla_consumo_telas').set(tablaConsumo);
+}
+async function nuevoArticuloInstruccion(){
+  const nombre = (prompt('Nombre del artículo nuevo (ej: Acolchado 2 1/2):') || '').trim();
+  if(!nombre) return;
+  tablaConsumo.articulos = tablaConsumo.articulos || {};
+  if(tablaConsumo.articulos[nombre]){ alert('Ya existe un artículo con ese nombre.'); return; }
+  tablaConsumo.articulos[nombre] = {};
+  try{ await guardarTablaYConsumo(); refrescarArticulosInstruccion(nombre); }
+  catch(e){ delete tablaConsumo.articulos[nombre]; alert('No se pudo crear: ' + e.message); }
+}
+async function renombrarArticuloInstruccion(){
+  const viejo = document.getElementById('ic-articulo').value;
+  if(!viejo){ alert('Elija primero el artículo que quiere renombrar.'); return; }
+  const nuevo = (prompt('Nuevo nombre para "' + viejo + '":', viejo) || '').trim();
+  if(!nuevo || nuevo === viejo) return;
+  if(tablaConsumo.articulos[nuevo]){ alert('Ya existe un artículo con ese nombre.'); return; }
+  tablaConsumo.articulos[nuevo] = tablaConsumo.articulos[viejo]; delete tablaConsumo.articulos[viejo];
+  tablaConsumo.instrucciones = tablaConsumo.instrucciones || {};
+  if(tablaConsumo.instrucciones[viejo]){ tablaConsumo.instrucciones[nuevo] = tablaConsumo.instrucciones[viejo]; delete tablaConsumo.instrucciones[viejo]; }
+  // las piezas sueltas que salieron de este juego pasan a apuntar al nombre nuevo
+  Object.values(tablaConsumo.instrucciones).forEach(porAncho => Object.values(porAncho || {}).forEach(g => { if(g && g.origen === viejo) g.origen = nuevo; }));
+  try{ await guardarTablaYConsumo(); refrescarArticulosInstruccion(nuevo); }
+  catch(e){ alert('No se pudo renombrar: ' + e.message); }
+}
+async function borrarArticuloInstruccion(){
+  const art = document.getElementById('ic-articulo').value;
+  if(!art){ alert('Elija primero el artículo que quiere borrar.'); return; }
+  const hijas = Object.keys(tablaConsumo.instrucciones || {}).filter(a => Object.values(tablaConsumo.instrucciones[a] || {}).some(g => g && g.auto && g.origen === art));
+  const msg = `¿Borrar "${art}" con todas sus instrucciones y su consumo en la tabla?` + (hijas.length ? `\n\nTambién se borran sus piezas sueltas generadas: ${hijas.join(', ')}.` : '');
+  if(!confirm(msg)) return;
+  delete tablaConsumo.articulos[art];
+  if(tablaConsumo.instrucciones) delete tablaConsumo.instrucciones[art];
+  hijas.forEach(a => {
+    const porAncho = tablaConsumo.instrucciones[a];
+    Object.keys(porAncho).forEach(k => { if(porAncho[k] && porAncho[k].auto && porAncho[k].origen === art) delete porAncho[k]; });
+    if(!Object.keys(porAncho).length){ delete tablaConsumo.instrucciones[a]; delete tablaConsumo.articulos[a]; }
+  });
+  try{ await guardarTablaYConsumo(); limpiarFormularioInstruccion(); refrescarArticulosInstruccion(''); document.getElementById('ic-ancho').innerHTML = '<option value="">Elija un ancho</option>'; }
+  catch(e){ alert('No se pudo borrar: ' + e.message); }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -3338,7 +3470,7 @@ function cargarPiezasDelJuego(articulo, ancho, piezas){
     if(!p.nombre.trim() || vistos.has(clave)) return;
     vistos.add(clave);
     const nombre = articuloDePieza(p.nombre.trim(), medida, articulo);
-    const suelta = [{ nombre: p.nombre.trim(), ancho: p.ancho, largo: p.largo, cantidad: 1, partes: p.partes || 1 }];
+    const suelta = [{ nombre: p.nombre.trim(), ancho: p.ancho, largo: p.largo, cantidad: 1, partes: p.partes || 1, girar: p.girar }];
     const previa = (tablaConsumo.instrucciones[nombre] || {})[ancho];
     if(previa && !previa.auto){ hechos.push(`${nombre}: ya tenía una instrucción cargada a mano en ${ancho} cm, no la toqué.`); return; }
     const corte = calcularCorte(suelta, parseFloat(ancho));
@@ -3407,6 +3539,9 @@ async function guardarInstruccionCorte(){
   tablaConsumo.instrucciones = tablaConsumo.instrucciones || {};
   tablaConsumo.instrucciones[articulo] = { ...(tablaConsumo.instrucciones[articulo]||{}), [ancho]: { texto, bosquejoBase64, piezas, nota, tipo, consumo: corte.metros } };
   tablaConsumo.articulos = tablaConsumo.articulos || {};
+  tablaConsumo.articulos[articulo] = tablaConsumo.articulos[articulo] || {};
+  const enTablaAhora = tablaConsumo.articulos[articulo][ancho];
+  if(enTablaAhora === undefined || enTablaAhora === null || enTablaAhora === '') tablaConsumo.articulos[articulo][ancho] = corte.metros;
   const derivadas = cargarPiezasDelJuego(articulo, ancho, piezas);
   try{
     await db.collection('config').doc('tabla_consumo_telas').set(tablaConsumo);
@@ -3451,7 +3586,7 @@ function renderListaInstrucciones(){
   const articulos = Object.keys(instrucciones).filter(a => Object.values(instrucciones[a]||{}).some(d => d && d.texto));
   if(!articulos.length){ cont.innerHTML = '<p class="empty-msg">Todavía no cargó ninguna.</p>'; return; }
 
-  const anchos = [...new Set(articulos.flatMap(a => Object.keys(instrucciones[a]).filter(k => instrucciones[a][k] && instrucciones[a][k].texto)))].map(Number).sort((x,y) => x-y);
+  const anchos = anchosConocidos();
   const origenDe = a => { const d = Object.values(instrucciones[a]).find(x => x && x.auto && x.origen); return d ? d.origen : ''; };
   const juegos = articulos.filter(a => !origenDe(a)).sort((x,y) => x.localeCompare(y, 'es'));
   const filas = [];
@@ -3464,13 +3599,18 @@ function renderListaInstrucciones(){
 
   const celda = (a, ancho) => {
     const g = (instrucciones[a]||{})[ancho];
-    if(!g || !g.texto) return '<td style="padding:7px 8px;text-align:center;color:#D6CFC4;">·</td>';
+    if(!g || !g.texto){
+      const c = instruccionCalculada(a, ancho);
+      if(!c) return '<td style="padding:7px 8px;text-align:center;color:#D6CFC4;">·</td>';
+      return `<td onclick="irAInstruccion('${escapeAttr(a)}', ${ancho})" title="Calculada: toque para revisarla y guardarla" style="padding:7px 8px;text-align:center;cursor:pointer;white-space:nowrap;">
+        <span style="display:inline-block;border:1px dashed #C9BFB2;border-radius:8px;padding:2px 7px;color:#8A8072;">≈ ${fmtMetros(c.corte.metros)} m</span></td>`;
+    }
     const m = consumoDeInstruccion(ancho, g);
     return `<td onclick="irAInstruccion('${escapeAttr(a)}', ${ancho})" title="Ver instrucción" style="padding:7px 8px;text-align:center;cursor:pointer;white-space:nowrap;">
       <span style="display:inline-block;background:var(--cream);border-radius:8px;padding:3px 8px;font-weight:600;">${m !== null ? fmtMetros(m) + ' m' : '✓'}</span></td>`;
   };
   cont.innerHTML = `
-    <p class="note" style="margin-bottom:6px;">Consumo por unidad según el ancho de la tela. Toque un valor para abrir la instrucción.</p>
+    <p class="note" style="margin-bottom:6px;">Consumo por unidad según el ancho de la tela. Los valores con ≈ los calculó el sistema a partir de otro ancho; se usan igual en las órdenes. Toque un valor para abrirlo.</p>
     <div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;">
       <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
         <thead><tr style="background:var(--cream);">
@@ -3680,6 +3820,14 @@ async function generarOrdenTrabajoCompleta(){
       const consumo = calcularCorte(r.piezas, ancho).metros;
       const metrosConsumidos = Math.round(cantidad * consumo * 100) / 100;
       renglones.push({ articulo: nombre, fichaSku: skuFicha, anchoIngresado: ancho, anchoUsado: ancho, exacto: true, consumo, cantidad, metrosConsumidos, sku, nota, instruccion: textoCorte(nombre, r.piezas, ancho, ''), tieneBosquejo: true, entregado: 0 });
+      continue;
+    }
+    const conPiezas = piezasParaAncho(articulo, ancho);
+    if(conPiezas){
+      // tiene instruccion de corte: consumo exacto para el ancho real de la tela
+      const consumo = calcularCorte(conPiezas.piezas, ancho).metros;
+      const metrosConsumidos = Math.round(cantidad * consumo * 100) / 100;
+      renglones.push({ articulo, anchoIngresado: ancho, anchoUsado: ancho, exacto: true, consumo, cantidad, metrosConsumidos, sku, nota, instruccion: textoCorte(articulo, conPiezas.piezas, ancho, ''), tieneBosquejo: true, entregado: 0 });
       continue;
     }
     const resultado = buscarConsumoMasCercano(tablaConsumo.articulos[articulo], ancho);
@@ -10407,7 +10555,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-09-30-v16';
+const APP_VERSION = '2026-09-30-v17';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
