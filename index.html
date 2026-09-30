@@ -509,6 +509,7 @@ a.grilla-celda{display:block;}
           <span class="menu-item" onclick="abrirTablaConsumo()">📐 Tabla de consumo de tela</span>
           <span class="menu-item" onclick="abrirOrdenTrabajo()">📋 Generar orden de trabajo</span>
           <span class="menu-item" onclick="abrirHistorialOT()">📦 Historial de órdenes de trabajo</span>
+          <span class="menu-item" onclick="abrirInstruccionesCorte()">✂️ Instrucciones de corte</span>
         </div>
       </div>
 
@@ -1406,6 +1407,38 @@ a.grilla-celda{display:block;}
         <label class="ni-chip"><input type="radio" name="hot-filtro-estado" value="entregado" onchange="renderHistorialOT(document.getElementById('hot-buscador').value)"><span>Entregadas</span></label>
       </div>
       <div id="hot-lista"><p class="empty-msg">Cargando órdenes...</p></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    </div>
+  </div>
+
+  <!-- STEP: INSTRUCCIONES DE CORTE -->
+  <div class="step" id="step-instrucciones-corte">
+    <div class="form-card">
+      <h2>Instrucciones de corte</h2>
+      <p class="note" style="margin-bottom:14px;">Cómo aprovechar el ancho de la tela para cada artículo — se suma sola al texto de la orden de trabajo cuando ese artículo y ese ancho estén incluidos.</p>
+      <p class="note" id="ic-sin-tabla" style="display:none;color:#A6432F;">Todavía no cargó la tabla de consumo — <a href="#" onclick="event.preventDefault(); abrirTablaConsumo();">cárguela acá</a> antes de seguir.</p>
+
+      <div class="field">
+        <label>Artículo</label>
+        <select id="ic-articulo" onchange="cambiarArticuloInstruccion()"><option value="">Elija un artículo</option></select>
+      </div>
+      <div class="field">
+        <label>Ancho (cm)</label>
+        <select id="ic-ancho" onchange="cargarInstruccionActual()"><option value="">Elija un ancho</option></select>
+      </div>
+      <div class="field">
+        <label>Instrucciones de corte para este artículo a este ancho</label>
+        <textarea id="ic-texto" rows="8" placeholder="Ej: con 2,6 m se corta a la mitad, se saca la ajustable y la plana con los dos cortes de 260 x 157,5 cm..." style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:'Work Sans';box-sizing:border-box;"></textarea>
+      </div>
+      <div class="actions">
+        <button class="btn btn-gold" onclick="guardarInstruccionCorte()">Guardar instrucción</button>
+        <button class="btn btn-ghost" id="ic-btn-borrar" style="display:none;" onclick="borrarInstruccionCorte()">Borrar esta instrucción</button>
+      </div>
+      <p class="error" id="ic-error" style="display:none;"></p>
+
+      <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
+      <div id="ic-lista" style="margin-top:8px;"></div>
+
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
   </div>
@@ -2530,6 +2563,135 @@ async function resolverTallerParaGuardar(){
   return nombreNuevo;
 }
 
+// ---------- instrucciones de corte (por articulo + ancho, se suman solas al texto de la orden) ----------
+// viven dentro del mismo doc que la tabla de consumo: tablaConsumo.instrucciones = { articulo: { ancho: texto } }
+function instruccionesDeArticulo(articulo){
+  return (tablaConsumo && tablaConsumo.instrucciones && tablaConsumo.instrucciones[articulo]) || {};
+}
+
+function buscarInstruccionCorte(articulo, ancho){
+  const texto = instruccionesDeArticulo(articulo)[ancho];
+  return texto ? texto : '';
+}
+
+async function abrirInstruccionesCorte(){
+  mostrarPaso('step-instrucciones-corte');
+  if(tablaConsumo === null) await cargarTablaConsumo();
+
+  const hay = tablaConsumo && tablaConsumo.articulos && Object.keys(tablaConsumo.articulos).length > 0;
+  document.getElementById('ic-sin-tabla').style.display = hay ? 'none' : 'block';
+
+  const sel = document.getElementById('ic-articulo');
+  sel.innerHTML = '<option value="">Elija un artículo</option>' +
+    (hay ? Object.keys(tablaConsumo.articulos).sort().map(n => `<option value="${escapeAttr(n)}">${n}</option>`).join('') : '');
+  document.getElementById('ic-ancho').innerHTML = '<option value="">Elija un ancho</option>';
+  document.getElementById('ic-texto').value = '';
+  document.getElementById('ic-btn-borrar').style.display = 'none';
+  document.getElementById('ic-error').style.display = 'none';
+  renderListaInstrucciones();
+}
+
+function cambiarArticuloInstruccion(){
+  const articulo = document.getElementById('ic-articulo').value;
+  const selAncho = document.getElementById('ic-ancho');
+  document.getElementById('ic-texto').value = '';
+  document.getElementById('ic-btn-borrar').style.display = 'none';
+  if(!articulo || !tablaConsumo.articulos[articulo]){
+    selAncho.innerHTML = '<option value="">Elija un ancho</option>';
+    return;
+  }
+  const anchosDelArticulo = Object.keys(tablaConsumo.articulos[articulo]).map(Number).sort((a,b) => a-b);
+  selAncho.innerHTML = '<option value="">Elija un ancho</option>' + anchosDelArticulo.map(a => `<option value="${a}">${a} cm</option>`).join('');
+}
+
+function cargarInstruccionActual(){
+  const articulo = document.getElementById('ic-articulo').value;
+  const ancho = document.getElementById('ic-ancho').value;
+  const texto = (articulo && ancho) ? buscarInstruccionCorte(articulo, ancho) : '';
+  document.getElementById('ic-texto').value = texto;
+  document.getElementById('ic-btn-borrar').style.display = texto ? 'inline-block' : 'none';
+}
+
+async function guardarInstruccionCorte(){
+  const errorEl = document.getElementById('ic-error');
+  errorEl.style.display = 'none';
+  const articulo = document.getElementById('ic-articulo').value;
+  const ancho = document.getElementById('ic-ancho').value;
+  const texto = document.getElementById('ic-texto').value.trim();
+
+  if(!articulo || !ancho){
+    errorEl.textContent = 'Elija el artículo y el ancho antes de guardar.';
+    errorEl.style.display = 'block';
+    return;
+  }
+  if(!texto){
+    errorEl.textContent = 'Escriba la instrucción antes de guardar (para borrarla, use "Borrar esta instrucción").';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  tablaConsumo.instrucciones = tablaConsumo.instrucciones || {};
+  tablaConsumo.instrucciones[articulo] = { ...(tablaConsumo.instrucciones[articulo]||{}), [ancho]: texto };
+  try{
+    await db.collection('config').doc('tabla_consumo_telas').set(tablaConsumo);
+    document.getElementById('ic-btn-borrar').style.display = 'inline-block';
+    renderListaInstrucciones();
+    alert('Instrucción guardada.');
+  } catch(e){
+    errorEl.textContent = 'No se pudo guardar: ' + e.message;
+    errorEl.style.display = 'block';
+  }
+}
+
+async function borrarInstruccionCorte(){
+  const articulo = document.getElementById('ic-articulo').value;
+  const ancho = document.getElementById('ic-ancho').value;
+  if(!articulo || !ancho) return;
+  if(!confirm('¿Borrar la instrucción de "' + articulo + '" a ' + ancho + ' cm?')) return;
+
+  const copia = { ...(tablaConsumo.instrucciones[articulo]||{}) };
+  delete copia[ancho];
+  tablaConsumo.instrucciones[articulo] = copia;
+  try{
+    await db.collection('config').doc('tabla_consumo_telas').set(tablaConsumo);
+    document.getElementById('ic-texto').value = '';
+    document.getElementById('ic-btn-borrar').style.display = 'none';
+    renderListaInstrucciones();
+  } catch(e){
+    alert('No se pudo borrar: ' + e.message);
+  }
+}
+
+function renderListaInstrucciones(){
+  const cont = document.getElementById('ic-lista');
+  const instrucciones = (tablaConsumo && tablaConsumo.instrucciones) || {};
+  const filas = [];
+  Object.entries(instrucciones).forEach(([articulo, porAncho]) => {
+    Object.entries(porAncho).forEach(([ancho, texto]) => {
+      if(texto) filas.push({ articulo, ancho, texto });
+    });
+  });
+
+  if(filas.length === 0){
+    cont.innerHTML = '<p class="empty-msg">Todavía no cargó ninguna.</p>';
+    return;
+  }
+  filas.sort((a,b) => a.articulo.localeCompare(b.articulo, 'es') || (a.ancho - b.ancho));
+  cont.innerHTML = filas.map(f => `
+    <div onclick="irAInstruccion('${escapeAttr(f.articulo)}', ${f.ancho})" style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;cursor:pointer;font-size:0.82rem;">
+      <b>${escaparHtml(f.articulo)}</b> — ${f.ancho} cm<br>
+      <span style="color:#8A8072;">${escaparHtml(f.texto.length > 90 ? f.texto.slice(0,90)+'…' : f.texto)}</span>
+    </div>
+  `).join('');
+}
+
+function irAInstruccion(articulo, ancho){
+  document.getElementById('ic-articulo').value = articulo;
+  cambiarArticuloInstruccion();
+  document.getElementById('ic-ancho').value = ancho;
+  cargarInstruccionActual();
+}
+
 let renglonIdCounterOT = 0;
 
 function opcionesArticuloOT(){
@@ -2663,7 +2825,8 @@ async function generarOrdenTrabajoCompleta(){
       return;
     }
     const metrosConsumidos = Math.round(cantidad * resultado.consumo * 100) / 100;
-    renglones.push({ articulo, anchoIngresado: ancho, anchoUsado: resultado.anchoUsado, exacto: resultado.exacto, consumo: resultado.consumo, cantidad, metrosConsumidos, sku, nota, entregado: 0 });
+    const instruccion = buscarInstruccionCorte(articulo, resultado.anchoUsado);
+    renglones.push({ articulo, anchoIngresado: ancho, anchoUsado: resultado.anchoUsado, exacto: resultado.exacto, consumo: resultado.consumo, cantidad, metrosConsumidos, sku, nota, instruccion, entregado: 0 });
   }
 
   const metrosConsumidosTotal = Math.round(renglones.reduce((s,r) => s + r.metrosConsumidos, 0) * 100) / 100;
@@ -2683,7 +2846,7 @@ async function generarOrdenTrabajoCompleta(){
     ...(comprobante ? [`Comprobante de la tela: ${comprobante}`] : []),
     '',
     ...renglones.map((r, i) =>
-      `${i+1}) ${r.articulo} — ${r.cantidad} unidades — ancho ${r.anchoUsado} cm, consumo ≈ ${r.consumo} m c/u → usa ≈ ${r.metrosConsumidos} m de tela\n   SKU del producto terminado: ${r.sku || '(sin definir)'}` + (r.nota ? `\n   Nota: ${r.nota}` : '')
+      `${i+1}) ${r.articulo} — ${r.cantidad} unidades — ancho ${r.anchoUsado} cm, consumo ≈ ${r.consumo} m c/u → usa ≈ ${r.metrosConsumidos} m de tela\n   SKU del producto terminado: ${r.sku || '(sin definir)'}` + (r.instruccion ? `\n   Corte: ${r.instruccion}` : '') + (r.nota ? `\n   Nota: ${r.nota}` : '')
     ),
     '',
     excede
@@ -2871,7 +3034,7 @@ function compartirTextoOrdenGuardada(docId, modo){
     `Tela: ${orden.skuTela} — se entregan ${orden.metrosTotales} metros`,
     ...(orden.comprobante ? [`Comprobante de la tela: ${orden.comprobante}`] : []),
     '',
-    ...(orden.renglones||[]).map((r,i) => `${i+1}) ${r.articulo} — ${r.cantidad} unidades — ancho ${r.anchoUsado} cm, consumo ≈ ${r.consumo} m c/u → usa ≈ ${r.metrosConsumidos} m de tela\n   SKU del producto terminado: ${r.sku || '(sin definir)'}` + (r.nota ? `\n   Nota: ${r.nota}` : '')),
+    ...(orden.renglones||[]).map((r,i) => `${i+1}) ${r.articulo} — ${r.cantidad} unidades — ancho ${r.anchoUsado} cm, consumo ≈ ${r.consumo} m c/u → usa ≈ ${r.metrosConsumidos} m de tela\n   SKU del producto terminado: ${r.sku || '(sin definir)'}` + (r.instruccion ? `\n   Corte: ${r.instruccion}` : '') + (r.nota ? `\n   Nota: ${r.nota}` : '')),
   ];
   if(orden.notaGeneral) lineas.push('', orden.notaGeneral);
   const texto = lineas.join('\n');
