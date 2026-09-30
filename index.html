@@ -1453,8 +1453,9 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v15</p>
-      <div id="ic-lista" style="margin-top:8px;"></div>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v16</p>
+      <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
+      <div id="ic-lista" style="margin-top:4px;"></div>
 
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
     </div>
@@ -3436,30 +3437,58 @@ async function borrarInstruccionCorte(){
   }
 }
 
+// lista de "Ya cargadas" como tabla: una fila por articulo, una columna por ancho, y en cada celda el
+// consumo por unidad. Las piezas que salen de un juego van debajo de su juego, con sangria.
+function consumoDeInstruccion(ancho, g){
+  if(g && typeof g.consumo === 'number') return g.consumo;
+  if(g && Array.isArray(g.piezas) && g.piezas.length && g.piezas.every(p => p.ancho > 0 && p.largo > 0)) return calcularCorte(g.piezas, parseFloat(ancho)).metros;
+  return null;
+}
 function renderListaInstrucciones(){
   const cont = document.getElementById('ic-lista');
   const instrucciones = (tablaConsumo && tablaConsumo.instrucciones) || {};
-  const filas = [];
-  Object.entries(instrucciones).forEach(([articulo, porAncho]) => {
-    Object.entries(porAncho).forEach(([ancho, datos]) => {
-      if(datos && datos.texto) filas.push({ articulo, ancho, texto: datos.texto, origen: datos.auto ? datos.origen : '' });
-    });
-  });
+  const q = (document.getElementById('ic-lista-buscar') ? document.getElementById('ic-lista-buscar').value : '').trim().toLowerCase();
+  const articulos = Object.keys(instrucciones).filter(a => Object.values(instrucciones[a]||{}).some(d => d && d.texto));
+  if(!articulos.length){ cont.innerHTML = '<p class="empty-msg">Todavía no cargó ninguna.</p>'; return; }
 
-  if(filas.length === 0){
-    cont.innerHTML = '<p class="empty-msg">Todavía no cargó ninguna.</p>';
-    return;
-  }
-  filas.sort((a,b) => a.articulo.localeCompare(b.articulo, 'es') || (a.ancho - b.ancho));
-  cont.innerHTML = filas.map(f => `
-    <div onclick="irAInstruccion('${escapeAttr(f.articulo)}', ${f.ancho})" style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;cursor:pointer;font-size:0.82rem;">
-      <b>${escaparHtml(f.articulo)}</b> — ${f.ancho} cm${f.origen ? ` <span style="color:#8A8072;">(pieza del ${escaparHtml(f.origen)})</span>` : ''}<br>
-      <span style="color:#8A8072;">${escaparHtml(f.texto.length > 90 ? f.texto.slice(0,90)+'…' : f.texto)}</span>
-    </div>
-  `).join('');
+  const anchos = [...new Set(articulos.flatMap(a => Object.keys(instrucciones[a]).filter(k => instrucciones[a][k] && instrucciones[a][k].texto)))].map(Number).sort((x,y) => x-y);
+  const origenDe = a => { const d = Object.values(instrucciones[a]).find(x => x && x.auto && x.origen); return d ? d.origen : ''; };
+  const juegos = articulos.filter(a => !origenDe(a)).sort((x,y) => x.localeCompare(y, 'es'));
+  const filas = [];
+  juegos.forEach(j => {
+    filas.push({ a: j, hija: false });
+    articulos.filter(a => origenDe(a) === j).sort((x,y) => x.localeCompare(y, 'es')).forEach(a => filas.push({ a, hija: true }));
+  });
+  articulos.filter(a => origenDe(a) && !juegos.includes(origenDe(a))).forEach(a => filas.push({ a, hija: false }));
+  const visibles = q ? filas.filter(f => f.a.toLowerCase().includes(q) || (f.hija && origenDe(f.a).toLowerCase().includes(q))) : filas;
+
+  const celda = (a, ancho) => {
+    const g = (instrucciones[a]||{})[ancho];
+    if(!g || !g.texto) return '<td style="padding:7px 8px;text-align:center;color:#D6CFC4;">·</td>';
+    const m = consumoDeInstruccion(ancho, g);
+    return `<td onclick="irAInstruccion('${escapeAttr(a)}', ${ancho})" title="Ver instrucción" style="padding:7px 8px;text-align:center;cursor:pointer;white-space:nowrap;">
+      <span style="display:inline-block;background:var(--cream);border-radius:8px;padding:3px 8px;font-weight:600;">${m !== null ? fmtMetros(m) + ' m' : '✓'}</span></td>`;
+  };
+  cont.innerHTML = `
+    <p class="note" style="margin-bottom:6px;">Consumo por unidad según el ancho de la tela. Toque un valor para abrir la instrucción.</p>
+    <div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+        <thead><tr style="background:var(--cream);">
+          <th style="padding:8px 10px;text-align:left;position:sticky;left:0;background:var(--cream);">Artículo</th>
+          ${anchos.map(x => `<th style="padding:8px;text-align:center;white-space:nowrap;">${x} cm</th>`).join('')}
+        </tr></thead>
+        <tbody>
+          ${visibles.map(f => `<tr style="border-top:1px solid var(--line);">
+            <td style="padding:7px 10px;position:sticky;left:0;background:#fff;${f.hija ? 'padding-left:24px;color:#6B6258;' : 'font-weight:700;'}">${f.hija ? '↳ ' : ''}${escaparHtml(f.a)}</td>
+            ${anchos.map(x => celda(f.a, x)).join('')}
+          </tr>`).join('') || `<tr><td colspan="${anchos.length + 1}" style="padding:10px;color:#8A8072;">No hay artículos que coincidan.</td></tr>`}
+        </tbody>
+      </table>
+    </div>`;
 }
 
 function irAInstruccion(articulo, ancho){
+  window.scrollTo({ top: 0, behavior: 'smooth' });
   document.getElementById('ic-articulo').value = articulo;
   cambiarArticuloInstruccion();
   document.getElementById('ic-ancho').value = ancho;
@@ -10378,7 +10407,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-09-30-v15';
+const APP_VERSION = '2026-09-30-v16';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
