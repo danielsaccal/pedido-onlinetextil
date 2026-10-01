@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v61</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v62</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1592,6 +1592,7 @@ a.grilla-celda{display:block;}
 
         <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(0,1.2fr);gap:6px;margin-top:12px;">
           <div class="field" style="margin:0;"><label>Bolsa</label><select id="fa-bolsa"></select></div>
+          <div class="field" style="margin:0;"><label>Unidades por bolsa</label><input type="number" min="1" id="fa-por-bolsa" placeholder="1"></div>
           <div class="field" style="margin:0;"><label>Etiqueta: descripción</label><input type="text" id="fa-et-desc" placeholder="FUNDA DE ALMOHADA"></div>
           <div class="field" style="margin:0;"><label>Etiqueta: medida</label><input type="text" id="fa-et-medida" placeholder="50 X 85 CM (APROX)"></div>
         </div>
@@ -1660,7 +1661,8 @@ a.grilla-celda{display:block;}
                 <a href="#" onclick="event.preventDefault(); editarBolsasDisponibles()" style="font-size:0.75rem;">medidas de bolsa</a>
               </div>
               <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;">
-                <div><select id="ac-bolsa" onchange="cambioEmpaqueAC()"></select><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Bolsa</div></div>
+                <div><select id="ac-bolsa" onchange="cambioEmpaqueAC()" style="width:100%;padding:9px 8px;box-sizing:border-box;"></select><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Bolsa</div></div>
+                <div><input type="number" id="ac-por-bolsa" min="1" step="1" placeholder="1" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Unidades por bolsa</div></div>
                 <div><input type="text" id="ac-et-desc" placeholder="Descripción" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Nombre del artículo (etiqueta)</div></div>
                 <div><input type="text" id="ac-et-medida" placeholder="50 X 85 CM (APROX)" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Medida (etiqueta)</div></div>
                 <div><input type="text" id="ac-sku" placeholder="Ej: KA181F" oninput="cambioEmpaqueAC()" style="text-transform:uppercase;"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">SKU (se completa solo en la orden)</div></div>
@@ -2864,7 +2866,7 @@ function anchoComunOT(renglones){
 function lineaRenglonTexto(r, i, anchoComun){
   const lineas = [`• ${r.cantidad} × ${r.articulo}${r.personalizado ? ' (a medida)' : ''}`];
   const tela = r.anchoUsado && !anchoComun ? 'Tela ' + r.anchoUsado + ' cm · ' : '';
-  lineas.push(`   ${tela}${String(r.consumo).replace('.', ',')} m c/u · usa ${String(r.metrosConsumidos).replace('.', ',')} m${r.sku ? ' · Código ' + r.sku : ''}${r.bolsa ? ' · Bolsa ' + r.bolsa : ''}`);
+  lineas.push(`   ${tela}${String(r.consumo).replace('.', ',')} m c/u · usa ${String(r.metrosConsumidos).replace('.', ',')} m${r.sku ? ' · Código ' + r.sku : ''}${r.bolsa ? ' · Bolsa ' + r.bolsa + ((r.porBolsa || 1) > 1 ? ` x${r.porBolsa} (${Math.ceil(r.cantidad / r.porBolsa)} bolsas)` : '') : ''}`);
   const corte = corteCortoRenglon(r);
   if(corte) lineas.push(`   ✂️ ${corte}`);
   if(r.deSobras > 0) lineas.push(`   ♻️ ${r.deSobras} salen de lo que sobra de los otros cortes${r.deSobras < r.cantidad ? `, ${r.cantidad - r.deSobras} de tela nueva` : ' (no usan tela nueva)'}`);
@@ -3631,6 +3633,7 @@ function abrirEditorFicha(sku){
   document.getElementById('fa-bolsa').innerHTML = opcionesBolsa(f.bolsa || '');
   document.getElementById('fa-et-desc').value = f.etDesc || '';
   document.getElementById('fa-et-medida').value = f.etMedida || '';
+  document.getElementById('fa-por-bolsa').value = f.porBolsa > 1 ? f.porBolsa : '';
   document.getElementById('fa-piezas').innerHTML = '';
   (f.piezas && f.piezas.length ? f.piezas : [{ nombre: '', ancho: '', largo: '', partes: 1 }]).forEach(p => agregarPiezaFicha(p));
   document.getElementById('fa-componentes').innerHTML = '';
@@ -3689,6 +3692,7 @@ function leerFichaFormulario(){
     bolsa: document.getElementById('fa-bolsa').value,
     etDesc: document.getElementById('fa-et-desc').value.trim(),
     etMedida: document.getElementById('fa-et-medida').value.trim(),
+    porBolsa: Math.max(1, parseInt(document.getElementById('fa-por-bolsa').value, 10) || 1),
   };
   if(tipo === 'compuesto'){
     f.componentes = [...document.querySelectorAll('.fa-comp')].map(el => ({ sku: normalizarSku(el.querySelector('.fa-c-sku').value), cantidad: Math.max(1, parseInt(el.querySelector('.fa-c-cant').value, 10) || 1) })).filter(c => c.sku);
@@ -4705,9 +4709,9 @@ function aprovecharSobrasOrden(renglones){
 const BOLSAS_DEF = ['25 × 42', '30 × 45'];
 function bolsasDisponibles(){ return (tablaConsumo && Array.isArray(tablaConsumo.bolsas) && tablaConsumo.bolsas.length) ? tablaConsumo.bolsas : BOLSAS_DEF; }
 function datosEmpaque(articulo, fichaSku){
-  if(fichaSku && fichasArticulos && fichasArticulos.fichas[fichaSku]){ const f = fichasArticulos.fichas[fichaSku]; return { bolsa: f.bolsa || '', etDesc: f.etDesc || '', etMedida: f.etMedida || '' }; }
+  if(fichaSku && fichasArticulos && fichasArticulos.fichas[fichaSku]){ const f = fichasArticulos.fichas[fichaSku]; return { bolsa: f.bolsa || '', etDesc: f.etDesc || '', etMedida: f.etMedida || '', porBolsa: f.porBolsa || 1 }; }
   const d = (tablaConsumo && tablaConsumo.empaque && tablaConsumo.empaque[articulo]) || {};
-  return { bolsa: d.bolsa || '', etDesc: d.etDesc || '', etMedida: d.etMedida || '', sku: d.sku || '' };
+  return { bolsa: d.bolsa || '', etDesc: d.etDesc || '', etMedida: d.etMedida || '', sku: d.sku || '', porBolsa: d.porBolsa || 1 };
 }
 function opcionesBolsa(sel){
   return `<option value="">Sin bolsa</option>` + bolsasDisponibles().map(b => `<option value="${escapeAttr(b)}" ${b === sel ? 'selected' : ''}>Bolsa ${escaparHtml(b)}</option>`).join('');
@@ -4720,6 +4724,7 @@ function cargarEmpaqueAC(){
   document.getElementById('ac-et-desc').value = d.etDesc;
   document.getElementById('ac-et-medida').value = d.etMedida;
   document.getElementById('ac-sku').value = d.sku || '';
+  document.getElementById('ac-por-bolsa').value = d.porBolsa > 1 ? d.porBolsa : '';
   document.getElementById('ac-et-desc').placeholder = String(acArticulo || '').toUpperCase();
 }
 function cambioEmpaqueAC(){
@@ -4730,6 +4735,7 @@ function cambioEmpaqueAC(){
     etDesc: document.getElementById('ac-et-desc').value.trim(),
     etMedida: document.getElementById('ac-et-medida').value.trim(),
     sku: document.getElementById('ac-sku').value.trim().toUpperCase(),
+    porBolsa: Math.max(1, parseInt(document.getElementById('ac-por-bolsa').value, 10) || 1),
   };
   clearTimeout(empaqueTimer);
   empaqueTimer = setTimeout(async () => {
@@ -4748,7 +4754,7 @@ async function editarBolsasDisponibles(){
 // resumen de bolsas y etiquetas de una orden
 function resumenBolsas(renglones){
   const porBolsa = new Map(); let etiquetas = 0;
-  (renglones || []).forEach(r => { if(!r.bolsa) return; porBolsa.set(r.bolsa, (porBolsa.get(r.bolsa) || 0) + (+r.cantidad || 0)); etiquetas += +r.cantidad || 0; });
+  (renglones || []).forEach(r => { if(!r.bolsa) return; const n = Math.ceil((+r.cantidad || 0) / (r.porBolsa || 1)); porBolsa.set(r.bolsa, (porBolsa.get(r.bolsa) || 0) + n); etiquetas += n; });
   if(!etiquetas) return '';
   return `🛍️ Bolsas: ${[...porBolsa].map(([b, n]) => `${b} → ${n}`).join(' · ')} · Etiquetas: ${etiquetas}`;
 }
@@ -4756,7 +4762,7 @@ function resumenBolsas(renglones){
 async function etiquetasOrden(o){
   const rs = (o.renglones || []).filter(r => r.bolsa && (+r.cantidad || 0) > 0);
   if(!rs.length){ alert('Ningún producto de esta orden lleva bolsa con etiqueta.'); return; }
-  const total = rs.reduce((s, r) => s + (+r.cantidad || 0), 0);
+  const total = rs.reduce((s, r) => s + Math.ceil((+r.cantidad || 0) / (r.porBolsa || 1)), 0);
   if(total > 300 && !confirm(`Son ${total} etiquetas. ¿Armar el PDF con todas?`)) return;
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: [50, 25], orientation: 'landscape' });
@@ -4765,7 +4771,9 @@ async function etiquetasOrden(o){
     const desc = limpiarPDF(r.etDesc || r.articulo).toUpperCase();
     const medida = limpiarPDF(r.etMedida || '').toUpperCase();
     const sku = limpiarPDF(r.sku || r.fichaSku || '');
-    for(let i = 0; i < r.cantidad; i++){
+    const pack = r.porBolsa || 1;
+    const bolsas = Math.ceil((+r.cantidad || 0) / pack);
+    for(let i = 0; i < bolsas; i++){
       if(!primera) doc.addPage([50, 25], 'landscape');
       primera = false;
       doc.setFont('helvetica', 'bold');
@@ -4776,7 +4784,8 @@ async function etiquetasOrden(o){
       lineas.forEach(l => { doc.text(l, 25, y, { align: 'center' }); y += fs * 0.42; });
       doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
       if(medida) doc.text(medida, 25, 16, { align: 'center', maxWidth: 46 });
-      if(sku){ doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.text('SKU ' + sku, 25, 21.5, { align: 'center' }); }
+      const pie = [pack > 1 ? `${pack} UNIDADES` : '', sku ? 'SKU ' + sku : ''].filter(Boolean).join(' · ');
+      if(pie){ doc.setFont('helvetica', 'bold'); doc.setFontSize(pack > 1 ? 8 : 9); doc.text(pie, 25, 21.5, { align: 'center', maxWidth: 47 }); }
     }
   });
   const nombre = 'etiquetas-' + (limpiarPDF(o.numero) || 'orden') + '.pdf';
@@ -5913,7 +5922,7 @@ async function generarOrdenTrabajoCompleta(){
     renglones.push({ articulo, anchoIngresado: ancho, anchoUsado: resultado.anchoUsado, exacto: resultado.exacto, consumo: resultado.consumo, cantidad, metrosConsumidos, sku, nota, instruccion, tieneBosquejo, entregado: 0 });
   }
 
-  renglones.forEach(r => { if(r.personalizado) return; const d = datosEmpaque(r.articulo, r.fichaSku); if(d.bolsa){ r.bolsa = d.bolsa; r.etDesc = d.etDesc; r.etMedida = d.etMedida; } });
+  renglones.forEach(r => { if(r.personalizado) return; const d = datosEmpaque(r.articulo, r.fichaSku); if(d.bolsa){ r.bolsa = d.bolsa; r.etDesc = d.etDesc; r.etMedida = d.etMedida; r.porBolsa = d.porBolsa || 1; } });
   let quedanSobras = [];
   try{ quedanSobras = aprovecharSobrasOrden(renglones); } catch(e){ console.error('aprovechar sobras', e); }
   const metrosConsumidosTotal = Math.round(renglones.reduce((s,r) => s + r.metrosConsumidos, 0) * 100) / 100;
@@ -12869,7 +12878,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v61';
+const APP_VERSION = '2026-10-01-v62';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
