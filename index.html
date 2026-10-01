@@ -1431,7 +1431,7 @@ a.grilla-celda{display:block;}
         <select id="ot-taller" onchange="manejarCambioTallerOT()"></select>
       </div>
       <div class="field" id="ot-taller-nuevo-wrap" style="display:none;"><label>Nombre del taller nuevo</label><input type="text" id="ot-taller-nuevo" placeholder="Ej: Mendez"></div>
-      <div class="field"><label>SKU de la tela entregada</label><input type="text" id="ot-sku-tela" placeholder="Ej: MAC315B"></div>
+      <div class="field"><label>SKU de la tela entregada</label><input type="text" id="ot-sku-tela" placeholder="Ej: MAC315B" list="lista-telas" oninput="aplicarTelaEnOrden()" style="text-transform:uppercase;"><div id="ot-tela-info" class="note" style="margin-top:3px;text-align:left;"></div></div>
       <div class="field"><label>Comprobante de referencia (con qué le entregó la tela el proveedor)</label><input type="text" id="ot-comprobante" placeholder="Ej: Remito 0001-00023456"></div>
       <div class="field"><label>Metros totales entregados</label><input type="number" id="ot-metros-totales" min="0" step="0.01" placeholder="Ej: 600" oninput="calcularReparto()"></div>
 
@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v65</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v66</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1716,7 +1716,7 @@ a.grilla-celda{display:block;}
         <p style="margin:0 0 8px;font-weight:700;">🚚 Registrar envío de tela</p>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;">
           <div class="field" style="margin:0;"><label>Taller</label><select id="et-taller"></select></div>
-          <div class="field" style="margin:0;"><label>Código de tela</label><input type="text" id="et-sku" placeholder="HON315B"></div>
+          <div class="field" style="margin:0;"><label>Código de tela</label><input type="text" id="et-sku" placeholder="HON315B" list="lista-telas" style="text-transform:uppercase;"></div>
           <div class="field" style="margin:0;"><label>Metros</label><input type="number" id="et-metros" min="0" step="0.01" placeholder="640"></div>
           <div class="field" style="margin:0;"><label>Comprobante</label><input type="text" id="et-comprobante" placeholder="R-7343"></div>
           <div class="field" style="margin:0;"><label>Fecha</label><input type="date" id="et-fecha"></div>
@@ -1767,6 +1767,22 @@ a.grilla-celda{display:block;}
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
+
+  <div class="step" id="step-telas">
+    <div class="form-card" style="max-width:1100px;">
+      <h2>Telas</h2>
+      <p class="note" style="margin-bottom:10px;">Cada tela una sola vez: ancho, calidad, rendimiento y para qué se usa.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+        <input type="text" id="tl-buscar" placeholder="🔍 Buscar por código o nombre" oninput="renderTelas()" style="flex:1;min-width:200px;">
+        <button class="btn btn-gold" style="width:auto;padding:10px 16px;" onclick="editarTela()">+ Nueva tela</button>
+      </div>
+      <div id="tl-usos-filtro" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
+      <div id="tl-editor" style="display:none;"></div>
+      <div id="tl-lista"><p class="empty-msg">Cargando...</p></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
+    </div>
+  </div>
+  <datalist id="lista-telas"></datalist>
 
   <div class="step" id="step-datos-bancarios">
     <div class="form-card">
@@ -4965,7 +4981,7 @@ const GRUPOS_INICIO = {
   e: { lado: 'int', titulo: 'Clientes', items: [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
   f: { lado: 'int', titulo: 'Productos y precios', items: [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📷 Actualizar foto', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
   g: { lado: 'int', titulo: 'Producción', columnas: [
-    [['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🚚 Ingreso a los talleres', 'abrirEnviosTela()']],
+    [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🚚 Ingreso a los talleres', 'abrirEnviosTela()']],
     [['🏭 Productos en producción', 'abrirEnProduccion()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📦 Historial de órdenes', 'abrirHistorialOT()']],
     [['📥 Entregas del taller', 'abrirIngresoTaller()']],
   ] },
@@ -5017,6 +5033,7 @@ let etFiltro = 'pendientes';
 const DIAS_ALERTA_ENVIO = 15;
 async function abrirEnviosTela(){
   mostrarPaso('step-envios-tela');
+  if(telasDatos === null) cargarTelas();
   if(talleresLista === null) await cargarTalleres();
   document.getElementById('et-taller').innerHTML = '<option value="">Elija un taller</option>' + talleresLista.map(t => `<option value="${escapeAttr(t)}">${escaparHtml(t)}</option>`).join('');
   document.getElementById('et-fecha').value = new Date().toISOString().slice(0, 10);
@@ -5116,6 +5133,7 @@ async function armarOrdenDesdeEnvio(id){
   selT.value = e.taller;
   document.getElementById('ot-sku-tela').value = e.skuTela;
   document.getElementById('ot-comprobante').value = e.comprobante || '';
+  try{ aplicarTelaEnOrden(); } catch(err){}
   document.getElementById('ot-metros-totales').value = resto;
   const banner = document.getElementById('ot-envio-banner');
   banner.innerHTML = `<b>🚚 Orden para el envío ${escaparHtml(e.skuTela)} (${escaparHtml(e.taller)})</b> — quedan ${fmtCm(resto)} m sin asignar. Puede usar menos y armar otra orden después con el resto.`;
@@ -5512,6 +5530,141 @@ function renderEnProduccion(){
     <p class="note" style="margin-top:6px;">"En producción" = pedido menos lo ya entregado (buenas y falladas). Días desde que se armó la orden: verde hasta 7, amarillo hasta ${DIAS_ALERTA_ENVIO}, rojo más.</p>`;
 }
 
+// ===== Telas =====
+// Registro de telas: codigo, nombre, ancho, calidad (hilos), rendimiento (metros por kilo) y usos.
+// El gramaje (g/m2) se calcula solo: 1000 / (metros por kilo x ancho en metros).
+// Vive en config/telas = { telas: { CODIGO: {...} }, usos: [...] }
+const USOS_TELA_DEF = ['Sábanas', 'Toallas', 'Manteles', 'Cortinas', 'Acolchados', 'Batas'];
+let telasDatos = null, tlFiltroUso = '', tlEditando = null;
+async function cargarTelas(){
+  try{ const d = await db.collection('config').doc('telas').get(); telasDatos = d.exists ? d.data() : {}; }
+  catch(e){ console.error('telas', e); telasDatos = telasDatos || {}; }
+  telasDatos.telas = telasDatos.telas || {};
+  telasDatos.usos = Array.isArray(telasDatos.usos) && telasDatos.usos.length ? telasDatos.usos : [...USOS_TELA_DEF];
+  const dl = document.getElementById('lista-telas');
+  if(dl) dl.innerHTML = Object.entries(telasDatos.telas).map(([c, t]) => `<option value="${escapeAttr(c)}">${escaparHtml((t.nombre || '') + (t.ancho ? ' · ' + t.ancho + ' cm' : ''))}</option>`).join('');
+}
+function datosTela(codigo){ return telasDatos && telasDatos.telas ? telasDatos.telas[String(codigo || '').trim().toUpperCase()] || null : null; }
+function gramaje(t){ return t && t.mPorKg > 0 && t.ancho > 0 ? Math.round(1000 / (t.mPorKg * t.ancho / 100)) : null; }
+async function abrirTelas(){
+  mostrarPaso('step-telas');
+  await cargarTelas();
+  document.getElementById('tl-editor').style.display = 'none';
+  renderTelas();
+}
+function renderTelas(){
+  const usos = telasDatos.usos;
+  const chip = (v, t) => `<span onclick="tlFiltroUso='${escapeAttr(v)}'; renderTelas();" style="cursor:pointer;font-size:0.82rem;padding:5px 12px;border-radius:14px;border:1px solid var(--line);${tlFiltroUso === v ? 'background:var(--purple);color:#fff;border-color:var(--purple);' : ''}">${escaparHtml(t)}</span>`;
+  document.getElementById('tl-usos-filtro').innerHTML = chip('', 'Todos los usos') + usos.map(u => chip(u, u)).join('');
+  const q = normBusqueda(document.getElementById('tl-buscar').value);
+  const lista = Object.entries(telasDatos.telas)
+    .filter(([c, t]) => (!tlFiltroUso || (t.usos || []).includes(tlFiltroUso)) && (!q || normBusqueda(c + ' ' + (t.nombre || '')).includes(q)))
+    .sort((a, b) => a[0].localeCompare(b[0]));
+  const cont = document.getElementById('tl-lista');
+  if(!lista.length){ cont.innerHTML = `<p class="empty-msg">${Object.keys(telasDatos.telas).length ? 'No hay telas que coincidan.' : 'Todavía no hay telas cargadas. Toque "+ Nueva tela".'}</p>`; return; }
+  const th = (x, al) => `<th style="padding:7px 8px;text-align:${al || 'left'};white-space:nowrap;">${x}</th>`;
+  cont.innerHTML = `<div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;"><table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+    <thead><tr style="background:var(--cream);">${th('Código')}${th('Nombre')}${th('Ancho', 'right')}${th('Calidad', 'right')}${th('Rendimiento', 'right')}${th('Gramaje', 'right')}${th('Usos')}</tr></thead><tbody>
+    ${lista.map(([c, t]) => `<tr onclick="editarTela('${escapeAttr(c)}')" style="border-top:1px solid var(--line);cursor:pointer;" title="Toque para editar">
+      <td style="padding:7px 8px;"><b>${escaparHtml(c)}</b></td>
+      <td style="padding:7px 8px;">${escaparHtml(t.nombre || '')}</td>
+      <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${t.ancho ? t.ancho + ' cm' : '—'}</td>
+      <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${t.hilos ? t.hilos + ' hilos' : '—'}</td>
+      <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${t.mPorKg ? fmtCm(t.mPorKg) + ' m/kg' : '—'}</td>
+      <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${gramaje(t) ? gramaje(t) + ' g/m²' : '—'}</td>
+      <td style="padding:7px 8px;">${(t.usos || []).map(u => `<span style="display:inline-block;background:var(--cream);border-radius:8px;padding:1px 7px;margin:1px;font-size:0.75rem;">${escaparHtml(u)}</span>`).join('')}</td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+function editarTela(codigo){
+  tlEditando = codigo || null;
+  const t = codigo ? telasDatos.telas[codigo] : { usos: [] };
+  const ed = document.getElementById('tl-editor');
+  const f = (id, lab, val, extra) => `<div class="field" style="margin:0;"><label>${lab}</label><input id="${id}" value="${escapeAttr(val == null ? '' : val)}" ${extra || ''}></div>`;
+  ed.innerHTML = `<div style="border:2px solid var(--purple);border-radius:12px;padding:12px;margin-bottom:12px;">
+    <p style="margin:0 0 8px;font-weight:700;">${codigo ? 'Editar ' + escaparHtml(codigo) : 'Nueva tela'}</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
+      ${f('tl-codigo', 'Código', codigo || '', 'placeholder="HON315B" style="text-transform:uppercase;"')}
+      ${f('tl-nombre', 'Nombre', t.nombre, 'placeholder="Percal 180 blanco"')}
+      ${f('tl-ancho', 'Ancho (cm)', t.ancho, 'type="number" step="0.1" placeholder="315" oninput="calcGramajeTela()"')}
+      ${f('tl-hilos', 'Calidad (hilos)', t.hilos, 'type="number" placeholder="180"')}
+      ${f('tl-mkg', 'Rendimiento (metros por kilo)', t.mPorKg, 'type="text" inputmode="decimal" placeholder="2,8" oninput="calcGramajeTela()"')}
+      <div class="field" style="margin:0;"><label>Gramaje (calculado)</label><div id="tl-gramaje" style="padding:10px 0;font-weight:700;"></div></div>
+    </div>
+    <div class="field" style="margin:10px 0 0;"><label>Usos (puede marcar varios)</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">${telasDatos.usos.map(u => `<label class="ni-chip"><input type="checkbox" class="tl-uso" value="${escapeAttr(u)}" ${(t.usos || []).includes(u) ? 'checked' : ''}><span>${escaparHtml(u)}</span></label>`).join('')}
+        <a href="#" onclick="event.preventDefault(); agregarUsoTela()" style="align-self:center;font-size:0.82rem;">+ otro uso</a></div></div>
+    ${f('tl-notas', 'Notas (opcional)', t.notas, 'placeholder="Color, composición, proveedor…"')}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+      <button class="btn btn-gold" style="width:auto;padding:10px 18px;" onclick="guardarTela()">Guardar</button>
+      <button class="btn btn-ghost" style="width:auto;padding:10px 18px;" onclick="document.getElementById('tl-editor').style.display='none'">Cancelar</button>
+      ${codigo ? `<button class="btn btn-ghost" style="width:auto;padding:10px 18px;color:#A6432F;" onclick="borrarTela('${escapeAttr(codigo)}')">🗑️ Borrar</button>` : ''}
+    </div>
+    <p class="error" id="tl-error" style="display:none;"></p>
+  </div>`;
+  ed.style.display = 'block';
+  calcGramajeTela();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function calcGramajeTela(){
+  const g = gramaje({ ancho: parseFloat(document.getElementById('tl-ancho').value), mPorKg: parseFloat(String(document.getElementById('tl-mkg').value).replace(',', '.')) });
+  document.getElementById('tl-gramaje').textContent = g ? `${g} g/m²` : '—';
+}
+async function agregarUsoTela(){
+  const u = (prompt('Nombre del nuevo uso (ej: Almohadones):') || '').trim();
+  if(!u || telasDatos.usos.includes(u)) return;
+  const marcados = [...document.querySelectorAll('.tl-uso:checked')].map(x => x.value);
+  telasDatos.usos.push(u);
+  const cod = tlEditando;
+  editarTela(cod);
+  document.querySelectorAll('.tl-uso').forEach(x => { if(marcados.includes(x.value) || x.value === u) x.checked = true; });
+}
+async function guardarTela(){
+  const err = document.getElementById('tl-error'); err.style.display = 'none';
+  const codigo = document.getElementById('tl-codigo').value.trim().toUpperCase();
+  const t = {
+    nombre: document.getElementById('tl-nombre').value.trim(),
+    ancho: parseFloat(document.getElementById('tl-ancho').value) || null,
+    hilos: parseInt(document.getElementById('tl-hilos').value, 10) || null,
+    mPorKg: parseFloat(String(document.getElementById('tl-mkg').value).replace(',', '.')) || null,
+    usos: [...document.querySelectorAll('.tl-uso:checked')].map(x => x.value),
+    notas: document.getElementById('tl-notas').value.trim(),
+  };
+  if(!codigo){ err.textContent = 'Falta el código de la tela.'; err.style.display = 'block'; return; }
+  if(!t.ancho){ err.textContent = 'Falta el ancho.'; err.style.display = 'block'; return; }
+  if(codigo !== tlEditando && telasDatos.telas[codigo]){ err.textContent = 'Ya existe una tela con ese código.'; err.style.display = 'block'; return; }
+  const nuevas = { ...telasDatos.telas };
+  if(tlEditando && tlEditando !== codigo) delete nuevas[tlEditando];
+  nuevas[codigo] = t;
+  try{
+    await db.collection('config').doc('telas').set({ ...telasDatos, telas: nuevas });
+    telasDatos.telas = nuevas;
+    // si el ancho no estaba en la lista de anchos de tela, se suma
+    if(tablaConsumo && Array.isArray(tablaConsumo.anchosTela) && !tablaConsumo.anchosTela.includes(t.ancho)){
+      tablaConsumo.anchosTela = [...tablaConsumo.anchosTela, t.ancho].sort((a, b) => a - b);
+      guardarTablaYConsumo().catch(() => {});
+    }
+    await cargarTelas();
+    document.getElementById('tl-editor').style.display = 'none';
+    renderTelas();
+  } catch(e){ err.textContent = 'No se pudo guardar: ' + e.message; err.style.display = 'block'; }
+}
+async function borrarTela(codigo){
+  if(!confirm(`¿Borrar la tela ${codigo}?`)) return;
+  const nuevas = { ...telasDatos.telas }; delete nuevas[codigo];
+  try{ await db.collection('config').doc('telas').set({ ...telasDatos, telas: nuevas }); telasDatos.telas = nuevas; await cargarTelas(); document.getElementById('tl-editor').style.display = 'none'; renderTelas(); }
+  catch(e){ alert('No se pudo borrar: ' + e.message); }
+}
+// al poner el codigo de una tela conocida en la orden de trabajo, se completa el ancho
+function aplicarTelaEnOrden(){
+  const t = datosTela(document.getElementById('ot-sku-tela').value);
+  const info = document.getElementById('ot-tela-info');
+  if(!t){ if(info) info.textContent = ''; return; }
+  if(info) info.textContent = `${t.nombre || ''} · ${t.ancho} cm${t.hilos ? ' · ' + t.hilos + ' hilos' : ''}${gramaje(t) ? ' · ' + gramaje(t) + ' g/m²' : ''}`;
+  const rp = document.getElementById('rp-ancho'); if(rp && !rp.value) rp.value = t.ancho;
+  document.querySelectorAll('.ot-renglon').forEach(r => { const a = r.querySelector('.ot-r-ancho'); if(a && !a.value){ a.value = t.ancho; resumenRenglonOT(a); } });
+  try{ calcularReparto(); } catch(e){}
+}
+
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -5803,6 +5956,7 @@ async function abrirOrdenTrabajo(modoEdicion){
   if(tablaConsumo === null) await cargarTablaConsumo();
   if(fichasArticulos === null) await cargarFichasArticulos();
   if(talleresLista === null) await cargarTalleres();
+  if(telasDatos === null) await cargarTelas();
   poblarSelectTalleres();
   try{ prepararReparto(); } catch(e){ console.error(e); }
 
@@ -12923,7 +13077,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v65';
+const APP_VERSION = '2026-10-01-v66';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
