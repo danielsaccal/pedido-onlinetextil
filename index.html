@@ -1541,7 +1541,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v78</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v79</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5988,8 +5988,15 @@ function composicionTexto(t){
   if(pct) return pct[0].replace(/\s*[-/,]\s*/g, ' ').replace(/\s+/g, ' ').toLowerCase().replace(/algodon/g, 'algodón').replace(/poliester/g, 'poliéster');
   return t.composicion === 'Algodón' ? '100% algodón' : t.composicion === 'Poliéster' ? '100% poliéster' : t.composicion === 'Mezcla' ? 'algodón/poliéster' : '';
 }
-function claveCalidad(t){ return [normBusqueda(t.nombre || '').replace(/\s+/g, ' ').trim(), t.hilos || '', normBusqueda(composicionTexto(t))].join('|'); }
-function etiquetaCalidad(t){ const c = composicionTexto(t); return `${String(t.nombre || '').toUpperCase()}${t.hilos ? ' · ' + t.hilos + ' hilos' : ''}${c ? ' · ' + c : ''}`; }
+// la composicion se compara por sus numeros y fibras ("70% algodón - 30% poliéster" = "70 % algodon y 30% poliester")
+function claveComposicion(t){
+  const n = normBusqueda(String(t.notas || ''));
+  const pares = [...n.matchAll(/(\d+)\s*%\s*(algodon|poliester|polyester|lino|viscosa|rayon|elastano|lycra|acrilico|microfibra|nylon|seda|lana)/g)].map(m => m[1] + (m[2] === 'polyester' ? 'poliester' : m[2]));
+  if(pares.length) return pares.sort().join('+');
+  return normBusqueda(t.composicion || '');
+}
+function claveCalidad(t){ return [normBusqueda(t.nombre || '').replace(/\s+/g, ' ').trim(), parseInt(t.hilos, 10) || '', claveComposicion(t)].join('|'); }
+function etiquetaCalidad(t){ const c = composicionTexto(t); return `${String(t.nombre || '').trim().replace(/\s+/g, ' ').toUpperCase()}${t.hilos ? ' · ' + parseInt(t.hilos, 10) + ' hilos' : ''}${c ? ' · ' + c : ''}`; }
 function calidadesTela(){
   const m = new Map();
   Object.entries((telasDatos && telasDatos.telas) || {}).forEach(([c, t]) => { const k = claveCalidad(t); const x = m.get(k) || { clave: k, etiqueta: etiquetaCalidad(t), codigos: [] }; x.codigos.push(c); m.set(k, x); });
@@ -6008,7 +6015,7 @@ function calidadDeSku(sku){
   return null;
 }
 function opcionesCalidad(sel){
-  return '<option value="">— sin calidad —</option>' + calidadesTela().map(q => `<option value="${escapeAttr(q.clave)}" ${q.clave === sel ? 'selected' : ''}>${escaparHtml(q.etiqueta)}</option>`).join('');
+  return '<option value="">— sin calidad —</option>' + calidadesTela().map(q => `<option value="${escapeAttr(q.clave)}" ${q.clave === sel ? 'selected' : ''}>${escaparHtml(q.etiqueta)} (${escaparHtml(q.codigos.join(', '))})</option>`).join('');
 }
 // en la orden: con el articulo y la tela entregada, el SKU que corresponde
 function skuPorArticuloYTela(articuloValor, codTela){
@@ -13526,7 +13533,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v78';
+const APP_VERSION = '2026-10-01-v79';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
