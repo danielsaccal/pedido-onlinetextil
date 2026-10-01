@@ -1521,7 +1521,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v48</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v49</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2802,6 +2802,7 @@ async function abrirTablaConsumo(){
 // resumen del corte de un renglon: se recalcula con las piezas actuales si se puede (asi las ordenes
 // viejas tambien salen con el formato nuevo); si no, usa el que quedo guardado
 function corteCortoRenglon(r){
+  if(r.piezasGen && r.anchoUsado) return textoCorteCorto(r.piezasGen, +r.anchoUsado);
   if(r.personalizado || !r.anchoUsado) return r.corteCorto || '';
   try{
     if(r.fichaSku){ const f = piezasDeFicha(r.fichaSku); if(f.piezas.length && !f.errores.length) return textoCorteCorto(f.piezas, r.anchoUsado); }
@@ -4248,6 +4249,11 @@ function leerConsumoActualOT(){
     const v = el.querySelector('.ot-r-articulo').value;
     const cant = parseInt(el.querySelector('.ot-r-cantidad').value, 10) || 0;
     if(v === '__personalizado__'){ personal += cant * (parseFloat(el.querySelector('.ot-r-consumo-personal').value) || 0); return; }
+    if(v === '__generico__'){
+      const pz = piezasGenericoDe(el), wg = parseFloat(el.querySelector('.ot-r-ancho').value);
+      if(pz && wg > 0){ if(!ancho) ancho = wg; const cg = calcularCorte(pz, wg); if(!cg.avisos.length) rs.push({ articulo: el.querySelector('.ot-r-g-nombre').value.trim() || 'Genérico', piezasGen: pz, anchoUsado: wg, cantidad: cant, consumo: cg.metros, metrosConsumidos: cant * cg.metros }); }
+      return;
+    }
     const w = parseFloat(el.querySelector('.ot-r-ancho').value);
     if(w > 0 && !ancho) ancho = w;
     const c = consumoUnitarioOT(v, w);
@@ -4501,6 +4507,7 @@ function hacerSelectBuscable(sel){
 // largo de todo el corte. Se calcula cuantas unidades de un articulo chico (ej: fundas) salen de esas
 // tiras, sumando las piezas que ya quedaron de mas. Es aproximado.
 function piezasDeRenglon(r){
+  if(r.piezasGen) return r.piezasGen;
   if(r.personalizado || !r.anchoUsado) return null;
   if(r.fichaSku){ const f = piezasDeFicha(r.fichaSku); return f.piezas.length && !f.errores.length ? f.piezas : null; }
   const c = piezasParaAncho(r.articulo, r.anchoUsado);
@@ -5178,6 +5185,33 @@ function renderDeudaTela(){
   }).join('') + `<p class="note">"Sin asignar" = tela del envío que todavía no tiene productos asignados en una orden (incluye lo que sobra de cada orden). "En trabajo" = tela de productos asignados que el taller todavía no entregó.</p>`;
 }
 
+// ===== Producto generico en la orden =====
+// Para trabajos que no son ningun articulo cargado (ej: paños de 150 x 175): se indica la medida de la
+// pieza y cuantas lleva cada unidad, y el motor de corte calcula consumo, bosquejo y sobrante.
+function piezasGenericoDe(renglon){
+  const a = parseFloat(renglon.querySelector('.ot-r-g-ancho').value), l = parseFloat(renglon.querySelector('.ot-r-g-largo').value);
+  if(!(a > 0) || !(l > 0)) return null;
+  return [{ nombre: renglon.querySelector('.ot-r-g-nombre').value.trim() || 'Pieza', ancho: a, largo: l, cantidad: 1,
+    partes: Math.max(1, parseInt(renglon.querySelector('.ot-r-g-piezas').value, 10) || 1), girar: renglon.querySelector('.ot-r-g-girar').value === 'si' }];
+}
+function calcularGenericoOT(el){
+  const renglon = el.closest('.ot-renglon');
+  if(!renglon || renglon.querySelector('.ot-r-articulo').value !== '__generico__') return;
+  const res = renglon.querySelector('.ot-r-g-res');
+  const piezas = piezasGenericoDe(renglon), W = parseFloat(renglon.querySelector('.ot-r-ancho').value);
+  if(!piezas || !(W > 0)){ res.innerHTML = '<p class="note">Escriba el ancho de la tela y la medida de la pieza.</p>'; return; }
+  const c = calcularCorte(piezas, W);
+  if(c.avisos.length){ res.innerHTML = `<p class="note" style="color:#A6432F;">${escaparHtml(c.avisos.join(' '))}</p>`; return; }
+  const sobra = Math.round((1 - aprovechamientoCorte(c, W)) * 100);
+  res.innerHTML = `<div style="display:grid;grid-template-columns:90px minmax(0,1fr);gap:10px;align-items:center;background:var(--cream);border-radius:10px;padding:8px;">
+    <img src="${dibujarBosquejoCorte(W, piezas)}" onclick="verImagenGrandeAC(this.src)" style="width:90px;border:1px solid var(--line);border-radius:6px;cursor:zoom-in;background:#fff;">
+    <div style="font-size:0.88rem;"><b>${fmtMetros(c.metros)} m por unidad</b> · ${sobra <= 3 ? '<span style="color:#2F7A47;">✓ sin desperdicio</span>' : `<span style="color:${sobra <= 15 ? '#8A6417' : '#A6432F'};">sobra ${sobra} %</span>`}<br><span class="note">${escaparHtml(textoCorteCorto(piezas, W))}</span></div></div>`;
+}
+function bosquejoDeRenglon(r){
+  if(r.piezasGen && r.anchoUsado) return dibujarBosquejoCorte(+r.anchoUsado, r.piezasGen);
+  return buscarBosquejoCorte(r.articulo, r.anchoUsado);
+}
+
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -5396,9 +5430,19 @@ function agregarRenglonOrdenTrabajo(){
   div.dataset.id = id;
   div.style.cssText = 'border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;';
   div.innerHTML = `
-    <div class="field"><label>Artículo</label><select class="ot-r-articulo" onchange="cambiarModoRenglonOT(this)"><option value="">Elija un artículo</option>${opcionesArticuloOT()}<option value="__personalizado__">✏️ Personalizado (a medida)</option></select></div>
+    <div class="field"><label>Artículo</label><select class="ot-r-articulo" onchange="cambiarModoRenglonOT(this)"><option value="">Elija un artículo</option>${opcionesArticuloOT()}<option value="__generico__">🧩 Genérico (por medida de pieza)</option><option value="__personalizado__">✏️ Personalizado (a medida, consumo a mano)</option></select></div>
     <div class="ot-r-normal">
-      <div class="field"><label>Ancho real de la tela (cm)</label><input type="number" step="0.1" class="ot-r-ancho" placeholder="Ej: 315"></div>
+      <div class="field"><label>Ancho real de la tela (cm)</label><input type="number" step="0.1" class="ot-r-ancho" placeholder="Ej: 315" oninput="calcularGenericoOT(this)"></div>
+    </div>
+    <div class="ot-r-generico" style="display:none;">
+      <div class="field"><label>Nombre</label><input type="text" class="ot-r-g-nombre" placeholder="Ej: Paño 150 × 175" oninput="calcularGenericoOT(this)"></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;">
+        <div class="field" style="margin:0;"><label>Pieza: ancho (cm)</label><input type="number" step="0.1" class="ot-r-g-ancho" placeholder="150" oninput="calcularGenericoOT(this)"></div>
+        <div class="field" style="margin:0;"><label>Pieza: largo (cm)</label><input type="number" step="0.1" class="ot-r-g-largo" placeholder="175" oninput="calcularGenericoOT(this)"></div>
+        <div class="field" style="margin:0;"><label>Piezas por unidad</label><input type="number" min="1" step="1" class="ot-r-g-piezas" value="1" oninput="calcularGenericoOT(this)"></div>
+        <div class="field" style="margin:0;"><label>¿Se puede girar?</label><select class="ot-r-g-girar" onchange="calcularGenericoOT(this)"><option value="si">Sí, si ahorra tela</option><option value="no">No</option></select></div>
+      </div>
+      <div class="ot-r-g-res" style="margin-top:8px;"></div>
     </div>
     <div class="ot-r-personalizado" style="display:none;">
       <div class="field"><label>Nombre del producto (a medida)</label><input type="text" class="ot-r-nombre-personal" placeholder="Ej: Cubrepava a medida"></div>
@@ -5424,8 +5468,11 @@ function cambiarModoRenglonOT(selectEl){
     if(!anchoEl.value && f && f.anchoHabitual) anchoEl.value = f.anchoHabitual;
   }
   const personalizado = selectEl.value === '__personalizado__';
+  const generico = selectEl.value === '__generico__';
   renglon.querySelector('.ot-r-normal').style.display = personalizado ? 'none' : 'block';
   renglon.querySelector('.ot-r-personalizado').style.display = personalizado ? 'block' : 'none';
+  renglon.querySelector('.ot-r-generico').style.display = generico ? 'block' : 'none';
+  if(generico) calcularGenericoOT(selectEl);
 }
 
 function eliminarRenglonOrdenTrabajo(id){
@@ -5464,7 +5511,7 @@ async function abrirOrdenTrabajo(modoEdicion){
   document.getElementById('ot-remanente').innerHTML = '';
   document.getElementById('ot-renglones').innerHTML = '';
   renglonIdCounterOT = 0;
-  if(hay) agregarRenglonOrdenTrabajo(); // arranca con un producto listo para completar
+  agregarRenglonOrdenTrabajo(); // arranca con un producto listo para completar (los genericos no necesitan tabla)
 }
 
 // mismo contador externo que ya usan los pedidos (siguienteNumeroPedido), con su propio nombre de contador
@@ -5538,6 +5585,21 @@ async function generarOrdenTrabajoCompleta(){
       errorEl.textContent = 'Complete artículo y cantidad en todos los productos que agregó.';
       errorEl.style.display = 'block';
       return;
+    }
+
+    if(articuloSel === '__generico__'){
+      const piezas = piezasGenericoDe(el), W = parseFloat(el.querySelector('.ot-r-ancho').value);
+      const nombre = el.querySelector('.ot-r-g-nombre').value.trim();
+      if(!nombre || !piezas || !(W > 0)){
+        errorEl.textContent = 'En los productos genéricos, complete nombre, ancho de tela y medida de la pieza.';
+        errorEl.style.display = 'block';
+        return;
+      }
+      const c = calcularCorte(piezas, W);
+      if(c.avisos.length){ errorEl.textContent = nombre + ': ' + c.avisos.join(' '); errorEl.style.display = 'block'; return; }
+      const metrosConsumidos = Math.round(cantidad * c.metros * 100) / 100;
+      renglones.push({ articulo: nombre, generico: true, piezasGen: piezas, anchoIngresado: W, anchoUsado: W, exacto: true, consumo: c.metros, cantidad, metrosConsumidos, sku, nota, instruccion: textoCorte(nombre, piezas, W, ''), corteCorto: textoCorteCorto(piezas, W), tieneBosquejo: true, entregado: 0 });
+      continue;
     }
 
     if(articuloSel === '__personalizado__'){
@@ -5645,7 +5707,7 @@ async function generarOrdenTrabajoCompleta(){
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
         ${renglones.filter(r => r.tieneBosquejo).map(r => `
           <div style="text-align:center;">
-            <img src="${buscarBosquejoCorte(r.articulo, r.anchoUsado)}" style="width:130px;border:1px solid var(--line);border-radius:8px;cursor:pointer;" onclick="verBosquejoGrande('${escapeAttr(r.articulo)}', ${r.anchoUsado})">
+            <img src="${bosquejoDeRenglon(r)}" style="width:130px;border:1px solid var(--line);border-radius:8px;cursor:pointer;" onclick="verImagenGrandeAC(this.src)">
             <div style="font-size:0.75rem;color:#8A8072;">${escaparHtml(r.articulo)}</div>
           </div>
         `).join('')}
@@ -5767,7 +5829,7 @@ async function generarPDFOrden(o){
   // bosquejos: uno por pagina, lo mas grande posible
   for(const r of renglones){
     if(!r.tieneBosquejo || !r.anchoUsado) continue;
-    const src = buscarBosquejoCorte(r.articulo, r.anchoUsado);
+    const src = bosquejoDeRenglon(r);
     if(!src) continue;
     const dim = await new Promise(res => { const im = new Image(); im.onload = () => res({ w: im.width, h: im.height }); im.onerror = () => res(null); im.src = src; });
     if(!dim) continue;
@@ -5805,7 +5867,7 @@ async function imagenesBosquejosOT(renglones){
   for(let i = 0; i < renglones.length; i++){
     const r = renglones[i];
     if(!r.tieneBosquejo || !r.anchoUsado) continue;
-    const src = buscarBosquejoCorte(r.articulo, r.anchoUsado);
+    const src = bosquejoDeRenglon(r);
     if(!src) continue;
     const img = await new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
     if(!img) continue;
@@ -5916,7 +5978,16 @@ async function modificarOrdenOT(docId){
     const els = document.querySelectorAll('.ot-renglon'), el = els[els.length - 1];
     const sel = el.querySelector('.ot-r-articulo');
     const valor = r.fichaSku ? 'ficha:' + r.fichaSku : r.articulo;
-    if(!r.personalizado && [...sel.options].some(op => op.value === valor)){
+    if(r.generico && r.piezasGen){
+      sel.value = '__generico__';
+      el.querySelector('.ot-r-g-nombre').value = r.articulo;
+      el.querySelector('.ot-r-g-ancho').value = r.piezasGen[0].ancho;
+      el.querySelector('.ot-r-g-largo').value = r.piezasGen[0].largo;
+      el.querySelector('.ot-r-g-piezas').value = r.piezasGen[0].partes || 1;
+      el.querySelector('.ot-r-g-girar').value = r.piezasGen[0].girar === false ? 'no' : 'si';
+      el.querySelector('.ot-r-ancho').value = r.anchoUsado || '';
+      cambiarModoRenglonOT(sel);
+    } else if(!r.personalizado && [...sel.options].some(op => op.value === valor)){
       sel.value = valor;
       cambiarModoRenglonOT(sel);
       el.querySelector('.ot-r-ancho').value = r.anchoIngresado || r.anchoUsado || '';
@@ -12535,7 +12606,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v48';
+const APP_VERSION = '2026-10-01-v49';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
