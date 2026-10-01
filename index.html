@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v69</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v70</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5563,7 +5563,9 @@ function renderTelas(){
   const q = normBusqueda(document.getElementById('tl-buscar').value);
   const lista = Object.entries(telasDatos.telas)
     .filter(([c, t]) => (!tlFiltroUso || (t.usos || []).includes(tlFiltroUso)) && (!q || normBusqueda(c + ' ' + (t.nombre || '') + ' ' + (t.proveedor || '')).includes(q)))
-    .sort((a, b) => a[0].localeCompare(b[0]));
+    .sort((a, b) => familiaTela(a[1]).localeCompare(familiaTela(b[1])) || (a[1].ancho || 0) - (b[1].ancho || 0) || a[0].localeCompare(b[0]));
+  const cuantos = {}; lista.forEach(([c, t]) => { const f = familiaTela(t); cuantos[f] = (cuantos[f] || 0) + 1; });
+  let famPrevia = null;
   window.__tlVisibles = lista.map(([c]) => c);
   renderAccionesTelas();
   const cont = document.getElementById('tl-lista');
@@ -5571,16 +5573,24 @@ function renderTelas(){
   const th = (x, al) => `<th style="padding:7px 8px;text-align:${al || 'left'};white-space:nowrap;">${x}</th>`;
   cont.innerHTML = `<div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;"><table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
     <thead><tr style="background:var(--cream);"><th style="padding:7px 8px;width:30px;"><input type="checkbox" title="Seleccionar todas las de la lista" onchange="seleccionarTodasTelas(this.checked)" ${lista.length && lista.every(([c]) => tlSeleccion.has(c)) ? 'checked' : ''}></th>${th('Código')}${th('Nombre')}${th('Proveedor')}${th('Ancho', 'right')}${th('Calidad', 'right')}${th('Rendimiento', 'right')}${th('Gramaje', 'right')}${th('Usos')}</tr></thead><tbody>
-    ${lista.map(([c, t]) => `<tr onclick="editarTela('${escapeAttr(c)}')" style="border-top:1px solid var(--line);cursor:pointer;${tlSeleccion.has(c) ? 'background:#F3EEF7;' : ''}" title="Toque para editar">
+    ${lista.map(([c, t]) => {
+      const fam = familiaTela(t), r = rendimientoTela(c), g = r ? gramaje({ ancho: t.ancho, mPorKg: r.mPorKg }) : null;
+      let cab = '';
+      if(fam !== famPrevia){
+        famPrevia = fam;
+        if(cuantos[fam] > 1) cab = `<tr style="background:#FAF8F4;border-top:1px solid var(--line);"><td></td><td colspan="8" style="padding:6px 8px;font-size:0.8rem;color:#6B6258;">🧵 <b>${escaparHtml(t.nombre || '')}</b> · ${t.hilos ? t.hilos + ' hilos · ' : ''}${escaparHtml(t.proveedor || '')} — misma tela en ${cuantos[fam]} anchos</td></tr>`;
+      }
+      return cab + `<tr onclick="editarTela('${escapeAttr(c)}')" style="border-top:1px solid var(--line);cursor:pointer;${tlSeleccion.has(c) ? 'background:#F3EEF7;' : ''}" title="Toque para editar">
       <td style="padding:7px 8px;" onclick="event.stopPropagation();"><input type="checkbox" ${tlSeleccion.has(c) ? 'checked' : ''} onchange="toggleSeleccionTela('${escapeAttr(c)}', this.checked)"></td>
       <td style="padding:7px 8px;"><b>${escaparHtml(c)}</b></td>
       <td style="padding:7px 8px;">${escaparHtml(t.nombre || '')}</td>
       <td style="padding:7px 8px;">${escaparHtml(t.proveedor || '—')}</td>
       <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${t.ancho ? t.ancho + ' cm' : '—'}</td>
       <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${t.hilos ? t.hilos + ' hilos' : '—'}</td>
-      <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${t.mPorKg ? fmtCm(t.mPorKg) + ' m/kg' : '—'}</td>
-      <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${gramaje(t) ? gramaje(t) + ' g/m²' : '—'}</td>
-      <td style="padding:7px 8px;">${(t.usos || []).map(u => `<span style="display:inline-block;background:var(--cream);border-radius:8px;padding:1px 7px;margin:1px;font-size:0.75rem;">${escaparHtml(u)}</span>`).join('')}</td></tr>`).join('')}
+      <td style="padding:7px 8px;text-align:right;white-space:nowrap;${r && r.calculado ? 'color:#8A8072;font-style:italic;' : ''}" title="${r && r.calculado ? 'Calculado a partir del otro ancho de la misma tela' : ''}">${r ? (r.calculado ? '≈ ' : '') + fmtCm(r.mPorKg) + ' m/kg' : '—'}</td>
+      <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${g ? g + ' g/m²' : '—'}</td>
+      <td style="padding:7px 8px;">${(t.usos || []).map(u => `<span style="display:inline-block;background:var(--cream);border-radius:8px;padding:1px 7px;margin:1px;font-size:0.75rem;">${escaparHtml(u)}</span>`).join('')}</td></tr>`;
+    }).join('')}
     </tbody></table></div>`;
 }
 function editarTela(codigo){
@@ -5599,6 +5609,7 @@ function editarTela(codigo){
       ${f('tl-mkg', 'Rendimiento (metros por kilo)', t.mPorKg, 'type="text" inputmode="decimal" placeholder="2,8" oninput="calcGramajeTela()"')}
       <div class="field" style="margin:0;"><label>Gramaje (calculado)</label><div id="tl-gramaje" style="padding:10px 0;font-weight:700;"></div></div>
     </div>
+    ${codigo && hermanasTela(codigo).length ? `<p class="note" style="margin:6px 0 0;text-align:left;">🧵 Misma tela en otros anchos: ${hermanasTela(codigo).map(c => `<b>${escaparHtml(c)}</b> (${telasDatos.telas[c].ancho || '?'} cm)`).join(', ')}${!t.mPorKg && rendimientoTela(codigo) ? ` · rendimiento calculado ≈ ${fmtCm(rendimientoTela(codigo).mPorKg)} m/kg` : ''}</p>` : ''}
     <div class="field" style="margin:10px 0 0;"><label>Usos (puede marcar varios)</label>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">${telasDatos.usos.map(u => `<label class="ni-chip"><input type="checkbox" class="tl-uso" value="${escapeAttr(u)}" ${(t.usos || []).includes(u) ? 'checked' : ''}><span>${escaparHtml(u)}</span></label>`).join('')}
         <a href="#" onclick="event.preventDefault(); agregarUsoTela()" style="align-self:center;font-size:0.82rem;">+ otro uso</a></div></div>
@@ -5615,7 +5626,9 @@ function editarTela(codigo){
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 function calcGramajeTela(){
-  const g = gramaje({ ancho: parseFloat(document.getElementById('tl-ancho').value), mPorKg: parseFloat(String(document.getElementById('tl-mkg').value).replace(',', '.')) });
+  let mkg = parseFloat(String(document.getElementById('tl-mkg').value).replace(',', '.'));
+  if(!(mkg > 0) && tlEditando){ const r = rendimientoTela(tlEditando); if(r) mkg = r.mPorKg; }
+  const g = gramaje({ ancho: parseFloat(document.getElementById('tl-ancho').value), mPorKg: mkg });
   document.getElementById('tl-gramaje').textContent = g ? `${g} g/m²` : '—';
 }
 function agregarUsoTela(){
@@ -5654,6 +5667,13 @@ async function guardarTela(){
   const nuevas = { ...telasDatos.telas };
   if(tlEditando && tlEditando !== codigo) delete nuevas[tlEditando];
   nuevas[codigo] = t;
+  // misma tela en otros anchos: ofrecer copiar los usos
+  const fam = familiaTela(t);
+  const otros = Object.keys(nuevas).filter(c => c !== codigo && familiaTela(nuevas[c]) === fam && t.nombre);
+  const distintos = otros.filter(c => JSON.stringify([...(nuevas[c].usos || [])].sort()) !== JSON.stringify([...t.usos].sort()));
+  if(distintos.length && confirm(`Esta tela también está en otros anchos: ${distintos.map(c => c + ' (' + (nuevas[c].ancho || '?') + ' cm)').join(', ')}.\n\n¿Aplicarles los mismos usos?`)){
+    distintos.forEach(c => nuevas[c] = { ...nuevas[c], usos: [...t.usos] });
+  }
   try{
     await db.collection('config').doc('telas').set({ ...telasDatos, telas: nuevas });
     telasDatos.telas = nuevas;
@@ -5682,6 +5702,26 @@ function aplicarTelaEnOrden(){
   const rp = document.getElementById('rp-ancho'); if(rp && !rp.value) rp.value = t.ancho;
   document.querySelectorAll('.ot-renglon').forEach(r => { const a = r.querySelector('.ot-r-ancho'); if(a && !a.value){ a.value = t.ancho; resumenRenglonOT(a); } });
   try{ calcularReparto(); } catch(e){}
+}
+
+// ----- misma tela en distintos anchos -----
+// Se agrupan solas las telas con mismo nombre, proveedor y calidad. El gramaje es de la tela (no del
+// ancho): con el rendimiento de un ancho se calcula el de los demas.
+function familiaTela(t){ return [normBusqueda(t.nombre || '').replace(/\s+/g, ' ').trim(), normBusqueda(t.proveedor || '').replace(/\s+/g, ' ').trim(), t.hilos || ''].join('|'); }
+function hermanasTela(codigo){
+  const t = telasDatos.telas[codigo]; if(!t || !t.nombre) return [];
+  const f = familiaTela(t);
+  return Object.keys(telasDatos.telas).filter(c => c !== codigo && familiaTela(telasDatos.telas[c]) === f);
+}
+// rendimiento propio, o calculado a partir de otro ancho de la misma tela
+function rendimientoTela(codigo){
+  const t = telasDatos.telas[codigo];
+  if(!t) return null;
+  if(t.mPorKg > 0) return { mPorKg: t.mPorKg, calculado: false };
+  const h = hermanasTela(codigo).map(c => telasDatos.telas[c]).find(x => x.mPorKg > 0 && x.ancho > 0);
+  if(!h || !(t.ancho > 0)) return null;
+  const g = 1000 / (h.mPorKg * h.ancho / 100);
+  return { mPorKg: Math.round(1000 / (g * t.ancho / 100) * 100) / 100, calculado: true, desde: h };
 }
 
 // ----- cambiar usos de varias telas a la vez -----
@@ -13137,7 +13177,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v69';
+const APP_VERSION = '2026-10-01-v70';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
