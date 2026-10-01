@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v53</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v54</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1745,6 +1745,21 @@ a.grilla-celda{display:block;}
       <p class="note" style="margin-bottom:10px;">Lo que cada taller todavía debe, partida por partida, y cuánto tarda en entregar. Toque una tela para ver sus opciones.</p>
       <div id="dt-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"></div>
       <div id="dt-lista"><p class="empty-msg">Cargando...</p></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-en-produccion">
+    <div class="form-card" style="max-width:1100px;">
+      <h2>Productos en producción</h2>
+      <p class="note" style="margin-bottom:10px;">Todo lo que está en los talleres y todavía no se entregó.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+        <input type="text" id="ep-buscar" placeholder="🔍 Buscar producto, SKU u orden" oninput="renderEnProduccion()" style="flex:1;min-width:200px;">
+        <select id="ep-taller" onchange="renderEnProduccion()" style="width:auto;"></select>
+        <label class="ni-chip"><input type="checkbox" id="ep-agrupar" onchange="renderEnProduccion()"><span>Agrupar por producto</span></label>
+      </div>
+      <div id="ep-resumen" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;"></div>
+      <div id="ep-lista"><p class="empty-msg">Cargando...</p></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
@@ -4868,7 +4883,7 @@ const GRUPOS_INICIO = {
   f: { lado: 'int', titulo: 'Productos y precios', items: [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📷 Actualizar foto', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
   g: { lado: 'int', titulo: 'Producción', columnas: [
     [['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['⏳ Tela pendiente de entrega', 'abrirDeudaTela()']],
-    [['🚚 Tela en talleres', 'abrirEnviosTela()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📦 Historial de órdenes', 'abrirHistorialOT()']],
+    [['🏭 Productos en producción', 'abrirEnProduccion()'], ['🚚 Tela en talleres', 'abrirEnviosTela()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📦 Historial de órdenes', 'abrirHistorialOT()']],
     [['📥 Ingreso del taller', 'abrirIngresoTaller()']],
   ] },
   h: { lado: 'int', titulo: 'Finanzas', items: [['💰 Ventas Mercado Libre', 'abrirVentasML()'], ['🧮 Calculadora de costos', 'abrirCalculadoraCostos()']] },
@@ -5360,6 +5375,58 @@ function resumenRenglonOT(el){
   const sobra = Math.round((1 - aprovechamientoCorte(c, W)) * 100);
   const desp = sobra <= 3 ? '<span style="color:#2F7A47;">✓ sin desperdicio</span>' : `<span style="color:${sobra <= 15 ? '#8A6417' : '#A6432F'};">sobra ${sobra} %</span>`;
   res.innerHTML = `<img src="${dibujarBosquejoCorte(W, piezas)}" onclick="verImagenGrandeAC(this.src)" title="Ver bosquejo"><span><b>${fmtMetros(c.metros)} m c/u</b>${cant ? ` × ${cant} = <b>${fmtMetros(c.metros * cant)} m</b>` : ''} · ${desp}<br><span class="note" style="font-size:0.78rem;">✂️ ${escaparHtml(textoCorteCorto(piezas, W))}</span></span>`;
+}
+
+// ===== Productos en produccion =====
+async function abrirEnProduccion(){
+  mostrarPaso('step-en-produccion');
+  document.getElementById('ep-lista').innerHTML = '<p class="empty-msg">Cargando...</p>';
+  await cargarHistorialOT();
+  const talleres = [...new Set((historialOT || []).filter(o => !o.cerrada).map(o => o.taller))].sort();
+  const sel = document.getElementById('ep-taller'), actual = sel.value;
+  sel.innerHTML = '<option value="">Todos los talleres</option>' + talleres.map(t => `<option value="${escapeAttr(t)}">${escaparHtml(t)}</option>`).join('');
+  if(talleres.includes(actual)) sel.value = actual;
+  renderEnProduccion();
+}
+function filasEnProduccion(){
+  const filas = [];
+  (historialOT || []).filter(o => !o.cerrada).forEach(o => {
+    const dias = Math.max(0, Math.floor((Date.now() - new Date(o.fecha).getTime()) / 86400000));
+    (o.renglones || []).forEach(r => {
+      const pend = pendienteRenglon(r);
+      if(pend <= 0) return;
+      filas.push({ articulo: r.articulo, sku: r.sku || '', taller: o.taller, orden: o.numero, tela: o.skuTela || '', ancho: r.anchoUsado || '', pedido: +r.cantidad || 0, entregado: +r.entregado || 0, fallados: +r.fallados || 0, pend, metros: pend * (+r.consumo || 0), dias, fecha: o.fecha });
+    });
+  });
+  return filas;
+}
+function renderEnProduccion(){
+  const q = normBusqueda(document.getElementById('ep-buscar').value);
+  const t = document.getElementById('ep-taller').value;
+  const agrupar = document.getElementById('ep-agrupar').checked;
+  let filas = filasEnProduccion().filter(f => (!t || f.taller === t) && (!q || q.split(/\s+/).every(w => normBusqueda(`${f.articulo} ${f.sku} ${f.orden} ${f.tela} ${f.taller}`).includes(w))));
+  const totU = filas.reduce((s, f) => s + f.pend, 0), totM = filas.reduce((s, f) => s + f.metros, 0);
+  const chip = (txt) => `<span style="background:var(--cream);border-radius:10px;padding:6px 12px;font-size:0.85rem;">${txt}</span>`;
+  document.getElementById('ep-resumen').innerHTML = chip(`<b>${totU}</b> unidades en producción`) + chip(`≈ <b>${fmtCm(Math.round(totM))}</b> m de tela`) + chip(`<b>${new Set(filas.map(f => f.orden)).size}</b> órdenes`);
+  const cont = document.getElementById('ep-lista');
+  if(!filas.length){ cont.innerHTML = '<p class="empty-msg">No hay productos en producción.</p>'; return; }
+  const color = d => d > DIAS_ALERTA_ENVIO ? '#A6432F' : (d > 7 ? '#8A6417' : '#2F7A47');
+  const th = (x, al) => `<th style="padding:7px 8px;text-align:${al || 'left'};white-space:nowrap;">${x}</th>`;
+  const td = (x, al, extra) => `<td style="padding:7px 8px;text-align:${al || 'left'};${extra || ''}">${x}</td>`;
+  let cuerpo;
+  if(agrupar){
+    const g = new Map();
+    filas.forEach(f => { const k = f.articulo + '|' + f.sku; const x = g.get(k) || { articulo: f.articulo, sku: f.sku, pend: 0, pedido: 0, entregado: 0, metros: 0, dias: 0, talleres: new Set(), ordenes: new Set() }; x.pend += f.pend; x.pedido += f.pedido; x.entregado += f.entregado; x.metros += f.metros; x.dias = Math.max(x.dias, f.dias); x.talleres.add(f.taller); x.ordenes.add(f.orden); g.set(k, x); });
+    const gs = [...g.values()].sort((a, b) => b.pend - a.pend);
+    cuerpo = `<thead><tr style="background:var(--cream);">${th('Producto')}${th('SKU')}${th('En producción', 'right')}${th('Pedido', 'right')}${th('Entregado', 'right')}${th('Talleres')}${th('Más antiguo', 'center')}</tr></thead><tbody>` +
+      gs.map(x => `<tr style="border-top:1px solid var(--line);">${td('<b>' + escaparHtml(x.articulo) + '</b>')}${td(escaparHtml(x.sku || '—'))}${td('<b style="font-size:1.05rem;">' + x.pend + '</b>', 'right')}${td(x.pedido, 'right')}${td(x.entregado, 'right')}${td(escaparHtml([...x.talleres].join(', ')) + `<br><span class="note" style="font-size:0.72rem;">${x.ordenes.size} orden${x.ordenes.size === 1 ? '' : 'es'}</span>`)}${td(`hace ${x.dias} d`, 'center', 'color:' + color(x.dias) + ';white-space:nowrap;')}</tr>`).join('') + '</tbody>';
+  } else {
+    filas.sort((a, b) => b.dias - a.dias);
+    cuerpo = `<thead><tr style="background:var(--cream);">${th('Producto')}${th('SKU')}${th('En producción', 'right')}${th('Pedido', 'right')}${th('Entregado', 'right')}${th('Taller')}${th('Orden')}${th('Tela')}${th('En el taller', 'center')}</tr></thead><tbody>` +
+      filas.map(f => `<tr style="border-top:1px solid var(--line);">${td('<b>' + escaparHtml(f.articulo) + '</b>')}${td(escaparHtml(f.sku || '—'))}${td('<b style="font-size:1.05rem;">' + f.pend + '</b>', 'right')}${td(f.pedido, 'right')}${td(f.entregado + (f.fallados ? `<br><span style="color:#A6432F;font-size:0.72rem;">+${f.fallados} fall.</span>` : ''), 'right')}${td(escaparHtml(f.taller))}${td(escaparHtml(f.orden), 'left', 'white-space:nowrap;font-size:0.82rem;')}${td(escaparHtml(f.tela) + (f.ancho ? `<br><span class="note" style="font-size:0.72rem;">${f.ancho} cm</span>` : ''))}${td(`hace ${f.dias} d<br><span class="note" style="font-size:0.72rem;">${new Date(f.fecha).toLocaleDateString('es-AR')}</span>`, 'center', 'color:' + color(f.dias) + ';white-space:nowrap;')}</tr>`).join('') + '</tbody>';
+  }
+  cont.innerHTML = `<div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;"><table style="width:100%;border-collapse:collapse;font-size:0.88rem;">${cuerpo}</table></div>
+    <p class="note" style="margin-top:6px;">"En producción" = pedido menos lo ya entregado (buenas y falladas). Días desde que se armó la orden: verde hasta 7, amarillo hasta ${DIAS_ALERTA_ENVIO}, rojo más.</p>`;
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -12761,7 +12828,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v53';
+const APP_VERSION = '2026-10-01-v54';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
