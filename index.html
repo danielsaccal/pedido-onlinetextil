@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v64</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v65</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2566,9 +2566,9 @@ function migrarTextosCorte(){
 }
 
 // carga unica de las batas de microfibra (medidas tomadas de la tabla de talles; cinturon de S y M estimado en 190)
-const BATAS_MICROFIBRA = {"Bata microfibra S": [{"nombre": "Espalda", "ancho": 66, "largo": 98, "cantidad": 1, "partes": 1}, {"nombre": "Delantero", "ancho": 44, "largo": 98, "cantidad": 2, "partes": 1}, {"nombre": "Manga", "ancho": 62, "largo": 46, "cantidad": 2, "partes": 1}, {"nombre": "Cuello", "ancho": 16, "largo": 95, "cantidad": 2, "partes": 1}, {"nombre": "Cinturón", "ancho": 12, "largo": 192, "cantidad": 1, "partes": 1}, {"nombre": "Bolsillo", "ancho": 22, "largo": 24, "cantidad": 2, "partes": 1}], "Bata microfibra M": [{"nombre": "Espalda", "ancho": 67, "largo": 100, "cantidad": 1, "partes": 1}, {"nombre": "Delantero", "ancho": 44, "largo": 100, "cantidad": 2, "partes": 1}, {"nombre": "Manga", "ancho": 66, "largo": 49, "cantidad": 2, "partes": 1}, {"nombre": "Cuello", "ancho": 16, "largo": 96, "cantidad": 2, "partes": 1}, {"nombre": "Cinturón", "ancho": 12, "largo": 192, "cantidad": 1, "partes": 1}, {"nombre": "Bolsillo", "ancho": 22, "largo": 24, "cantidad": 2, "partes": 1}], "Bata microfibra L": [{"nombre": "Espalda", "ancho": 72, "largo": 104, "cantidad": 1, "partes": 1}, {"nombre": "Delantero", "ancho": 47, "largo": 104, "cantidad": 2, "partes": 1}, {"nombre": "Manga", "ancho": 70, "largo": 46, "cantidad": 2, "partes": 1}, {"nombre": "Cuello", "ancho": 16, "largo": 100, "cantidad": 2, "partes": 1}, {"nombre": "Cinturón", "ancho": 12, "largo": 202, "cantidad": 1, "partes": 1}, {"nombre": "Bolsillo", "ancho": 22, "largo": 24, "cantidad": 2, "partes": 1}], "Bata microfibra XL": [{"nombre": "Espalda", "ancho": 76, "largo": 112, "cantidad": 1, "partes": 1}, {"nombre": "Delantero", "ancho": 49, "largo": 112, "cantidad": 2, "partes": 1}, {"nombre": "Manga", "ancho": 74, "largo": 47, "cantidad": 2, "partes": 1}, {"nombre": "Cuello", "ancho": 16, "largo": 107, "cantidad": 2, "partes": 1}, {"nombre": "Cinturón", "ancho": 12, "largo": 202, "cantidad": 1, "partes": 1}, {"nombre": "Bolsillo", "ancho": 22, "largo": 24, "cantidad": 2, "partes": 1}], "Bata microfibra XXL": [{"nombre": "Espalda", "ancho": 79, "largo": 114, "cantidad": 1, "partes": 1}, {"nombre": "Delantero", "ancho": 50, "largo": 114, "cantidad": 2, "partes": 1}, {"nombre": "Manga", "ancho": 76, "largo": 46, "cantidad": 2, "partes": 1}, {"nombre": "Cuello", "ancho": 16, "largo": 109, "cantidad": 2, "partes": 1}, {"nombre": "Cinturón", "ancho": 12, "largo": 212, "cantidad": 1, "partes": 1}, {"nombre": "Bolsillo", "ancho": 22, "largo": 24, "cantidad": 2, "partes": 1}]};
+const BATAS_MICROFIBRA = {"Bata microfibra S": [{"nombre": "Espalda", "ancho": 66, "largo": 98, "cantidad": 1, "partes": 1, "achicar": false}, {"nombre": "Delantero", "ancho": 44, "largo": 98, "cantidad": 2, "partes": 1, "achicar": false}, {"nombre": "Manga", "ancho": 62, "largo": 46, "cantidad": 2, "partes": 1, "achicar": false}, {"nombre": "Cuello", "ancho": 16, "largo": 95, "cantidad": 2, "partes": 1, "achicar": false}, {"nombre": "Cinturón", "ancho": 12, "largo": 192, "cantidad": 1, "partes": 1, "achicar": false}, {"nombre": "Bolsillo", "ancho": 22, "largo": 24, "cantidad": 2, "partes": 1, "achicar": false}], "Bata microfibra M": [{"nombre": "Espalda", "ancho": 67, "largo": 100, "cantidad": 1, "partes": 1, "achicar": false}, {"nombre": "Delantero", "ancho": 44, "largo": 100, "cantidad": 2, "partes": 1, "achicar": false}, {"nombre": "Manga", "ancho": 66, "largo": 49, "cantidad": 2, "partes": 1, "achicar": false}, {"nombre": "Cuello", "ancho": 16, "largo": 96, "cantidad": 2, "partes": 1, "achicar": false}, {"nombre": "Cinturón", "ancho": 12, "largo": 192, "cantidad": 1, "partes": 1, "achicar": false}, {"nombre": "Bolsillo", "ancho": 22, "largo": 24, "cantidad": 2, "partes": 1, "achicar": false}], "Bata microfibra L": [{"nombre": "Espalda", "ancho": 72, "largo": 104, "cantidad": 1, "partes": 1, "achicar": false}, {"nombre": "Delantero", "ancho": 47, "largo": 104, "cantidad": 2, "partes": 1, "achicar": false}, {"nombre": "Manga", "ancho": 70, "largo": 46, "cantidad": 2, "partes": 1, "achicar": false}, {"nombre": "Cuello", "ancho": 16, "largo": 100, "cantidad": 2, "partes": 1, "achicar": false}, {"nombre": "Cinturón", "ancho": 12, "largo": 202, "cantidad": 1, "partes": 1, "achicar": false}, {"nombre": "Bolsillo", "ancho": 22, "largo": 24, "cantidad": 2, "partes": 1, "achicar": false}], "Bata microfibra XL": [{"nombre": "Espalda", "ancho": 76, "largo": 112, "cantidad": 1, "partes": 1, "achicar": false}, {"nombre": "Delantero", "ancho": 49, "largo": 112, "cantidad": 2, "partes": 1, "achicar": false}, {"nombre": "Manga", "ancho": 74, "largo": 47, "cantidad": 2, "partes": 1, "achicar": false}, {"nombre": "Cuello", "ancho": 16, "largo": 107, "cantidad": 2, "partes": 1, "achicar": false}, {"nombre": "Cinturón", "ancho": 12, "largo": 202, "cantidad": 1, "partes": 1, "achicar": false}, {"nombre": "Bolsillo", "ancho": 22, "largo": 24, "cantidad": 2, "partes": 1, "achicar": false}], "Bata microfibra XXL": [{"nombre": "Espalda", "ancho": 79, "largo": 114, "cantidad": 1, "partes": 1, "achicar": false}, {"nombre": "Delantero", "ancho": 50, "largo": 114, "cantidad": 2, "partes": 1, "achicar": false}, {"nombre": "Manga", "ancho": 76, "largo": 46, "cantidad": 2, "partes": 1, "achicar": false}, {"nombre": "Cuello", "ancho": 16, "largo": 109, "cantidad": 2, "partes": 1, "achicar": false}, {"nombre": "Cinturón", "ancho": 12, "largo": 212, "cantidad": 1, "partes": 1, "achicar": false}, {"nombre": "Bolsillo", "ancho": 22, "largo": 24, "cantidad": 2, "partes": 1, "achicar": false}]};
 function sembrarBatasMicrofibra(){
-  if(!tablaConsumo || tablaConsumo.sembradoBatas) return;
+  if(!tablaConsumo || (tablaConsumo.sembradoBatas && tablaConsumo.batasFijas)) return;
   tablaConsumo.articulos = tablaConsumo.articulos || {};
   tablaConsumo.instrucciones = tablaConsumo.instrucciones || {};
   Object.entries(BATAS_MICROFIBRA).forEach(([nombre, piezas]) => {
@@ -2579,6 +2579,9 @@ function sembrarBatasMicrofibra(){
     if(tablaConsumo.articulos[nombre][150] === undefined) tablaConsumo.articulos[nombre][150] = corte.metros;
   });
   tablaConsumo.sembradoBatas = true;
+  // las batas son prendas: sus piezas no se achican ni se agrandan
+  Object.keys(BATAS_MICROFIBRA).forEach(nombre => Object.values(tablaConsumo.instrucciones[nombre] || {}).forEach(g => (g.piezas || []).forEach(pz => pz.achicar = false)));
+  tablaConsumo.batasFijas = true;
   db.collection('config').doc('tabla_consumo_telas').set(tablaConsumo).catch(e => console.error('batas', e));
 }
 
@@ -3232,7 +3235,7 @@ function calcularCorteFijo(piezas, W){
 
   porTamano.forEach(t => {
     const p = t.p;
-    if(!entraAchicando(p.ancho, W)) avisos.push(`${p.nombre} consume ${p.ancho} cm de ancho, más que los ${W} cm de la tela.`);
+    if(p.achicar === false ? p.ancho > W + EPS : !entraAchicando(p.ancho, W)) avisos.push(`${p.nombre} consume ${p.ancho} cm de ancho, más que los ${W} cm de la tela.`);
     for(let k = 0; k < t.n; k++){
       let ok = false;
       // 1) arriba de otra igual, en una columna que todavia tiene largo libre
@@ -3246,7 +3249,7 @@ function calcularCorteFijo(piezas, W){
       }
       // 2b) al costado achicando un poco toda la franja (regla 8)
       if(!ok) for(const f of franjas){
-        if(entraAchicando(f.usado + p.ancho, W, true) && p.largo <= f.largo + EPS){ colocar(nuevaCol(f, p), p, false); ok = true; break; }
+        if(p.achicar !== false && !f.cols.some(c => c.p.achicar === false) && entraAchicando(f.usado + p.ancho, W, true) && p.largo <= f.largo + EPS){ colocar(nuevaCol(f, p), p, false); ok = true; break; }
       }
       // 3) franja nueva mas abajo
       if(!ok) colocar(nuevaCol(nuevaFranja(p.largo), p), p, false);
@@ -3328,9 +3331,9 @@ function calcularCorteFijo(piezas, W){
     const libre = Math.round((W - f.usado - (f.reservado || 0)) * 100) / 100;
     if(libre > EPS && f.cols.length){
       const maxW = Math.max(...f.cols.map(c => c.w));
-      const anchas = f.cols.filter(c => Math.abs(c.w - maxW) < EPS);
+      const anchas = f.cols.filter(c => Math.abs(c.w - maxW) < EPS && c.p.achicar !== false);
       const suma = Math.round(libre / anchas.length * 100) / 100;
-      if(suma <= maxW * TOPE_ENSANCHE + EPS){
+      if(anchas.length && suma <= maxW * TOPE_ENSANCHE + EPS){
         anchas.forEach(c => c.w = Math.round((c.w + suma) * 100) / 100);
         let x = 0; f.cols.forEach(c => { c.x = x; x += c.w; });
         f.usado = x;
@@ -4177,6 +4180,7 @@ function agregarPiezaAC(p){
   p = p || {};
   const fila = document.createElement('div');
   fila.className = 'ac-pieza';
+  if(p.achicar === false) fila.dataset.fija = '1';
   fila.style.cssText = 'display:grid;grid-template-columns:minmax(0,1.8fr) 62px 62px 46px 46px 34px 26px;gap:5px;margin-bottom:5px;align-items:center;';
   fila.innerHTML = `
     <input type="text" class="ac-p-nombre" value="${escapeAttr(p.nombre||'')}" placeholder="Plana" oninput="calcularAC()">
@@ -4197,6 +4201,7 @@ function leerPiezasAC(){
     cantidad: Math.max(1, parseInt(f.querySelector('.ac-p-cant').value, 10) || 1),
     partes: Math.max(1, parseInt(f.querySelector('.ac-p-tapas').value, 10) || 1),
     girar: f.querySelector('.ac-p-girar').checked,
+    ...(f.dataset.fija ? { achicar: false } : {}),
   })).filter(p => p.nombre || p.ancho || p.largo);
 }
 
@@ -12918,7 +12923,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v64';
+const APP_VERSION = '2026-10-01-v65';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
