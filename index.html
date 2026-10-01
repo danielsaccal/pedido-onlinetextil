@@ -431,7 +431,7 @@ a.grilla-celda{display:block;}
   <h1>OnLineTextil</h1>
   <p>Pedido mayorista · onlinetextil.com.ar</p>
   <div class="menu-herramientas">
-    <button class="menu-toggle" onclick="toggleMenuHerramientas()">⚙ Herramientas ▾</button>
+    <button class="menu-toggle" onclick="irInicio()">🏠 Inicio</button>
     <div class="menu-dropdown" id="menu-dropdown">
 
       <div class="menu-cat">
@@ -534,6 +534,32 @@ a.grilla-celda{display:block;}
 
 <div class="app">
 
+  <!-- STEP: INICIO (iconos) -->
+  <div class="step" id="step-inicio">
+    <style>
+      .ini-sec{font-size:0.78rem;font-weight:700;letter-spacing:.06em;color:#8A8072;margin:18px 0 10px;}
+      .ini-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
+      .ini-tile{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px 10px;text-align:center;cursor:pointer;transition:transform .1s, box-shadow .1s;}
+      .ini-tile:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(61,43,78,.10);}
+      .ini-tile.sel{border:2px solid var(--purple);}
+      .ini-ic{font-size:2.2rem;line-height:1;margin-bottom:8px;}
+      .ini-tile b{display:block;font-size:0.98rem;color:var(--purple);}
+      .ini-tile span{display:block;font-size:0.75rem;color:#8A8072;margin-top:4px;line-height:1.35;}
+      .ini-ext .ini-tile{background:#F3F8FD;}
+      .ini-sub{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:12px;}
+      .ini-sub-btns{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;}
+      .ini-sub-btns button{text-align:left;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--cream);font-size:0.95rem;cursor:pointer;color:var(--purple);}
+      .ini-sub-btns button:hover{background:var(--gold);}
+    </style>
+    <div class="search-wrap"><input type="text" id="inicio-buscar" placeholder="Buscar producto o SKU..." oninput="buscarDesdeInicio(this.value)"></div>
+    <p class="ini-sec">PARA CLIENTES Y PÚBLICO</p>
+    <div class="ini-grid ini-ext"><div class="ini-tile" id="ini-t-a" onclick="abrirGrupoInicio('a')"><div class="ini-ic">🛒</div><b>Armar pedido</b><span>Catálogo, escanear SKU, buscar por foto</span></div><div class="ini-tile" id="ini-t-b" onclick="abrirGrupoInicio('b')"><div class="ini-ic">🔗</div><b>Compartir catálogo</b><span>Por rubro, enviar a clientes</span></div><div class="ini-tile" id="ini-t-c" onclick="abrirGrupoInicio('c')"><div class="ini-ic">📣</div><b>Redes y anuncios</b><span>Nuevo ingreso, grilla IG, promociones, videos</span></div></div>
+    <div class="ini-sub" id="ini-sub-ext" style="display:none;"></div>
+    <p class="ini-sec">ADMINISTRACIÓN INTERNA</p>
+    <div class="ini-grid"><div class="ini-tile" id="ini-t-d" onclick="abrirGrupoInicio('d')"><div class="ini-ic">📋</div><b>Pedidos</b><span>Historial, pedido con IA, pendientes</span></div><div class="ini-tile" id="ini-t-e" onclick="abrirGrupoInicio('e')"><div class="ini-ic">👥</div><b>Clientes</b><span>Clientes, inactivos</span></div><div class="ini-tile" id="ini-t-f" onclick="abrirGrupoInicio('f')"><div class="ini-ic">🏷️</div><b>Productos y precios</b><span>Altas, edición, fotos, precios</span></div><div class="ini-tile" id="ini-t-g" onclick="abrirGrupoInicio('g')"><div class="ini-ic">✂️</div><b>Producción</b><span>Cortes, a medida, órdenes de trabajo</span></div><div class="ini-tile" id="ini-t-h" onclick="abrirGrupoInicio('h')"><div class="ini-ic">📊</div><b>Finanzas</b><span>Ventas ML, costos</span></div><div class="ini-tile" id="ini-t-i" onclick="abrirGrupoInicio('i')"><div class="ini-ic">⚙️</div><b>Configuración</b><span>Banco, avisos, pantallas anteriores</span></div></div>
+    <div class="ini-sub" id="ini-sub-int" style="display:none;"></div>
+  </div>
+
   <!-- STEP 1: CATALOGO -->
   <div class="step active" id="step-catalogo">
     <p class="filtro-banner" id="filtro-banner" style="display:none;"></p>
@@ -561,7 +587,7 @@ a.grilla-celda{display:block;}
       <h2>Compartir catálogo por rubro</h2>
       <p class="note" style="margin-bottom:14px;">Genera un link que abre el catálogo mostrando solo ese rubro, listo para mandar por WhatsApp o email.</p>
       <div id="rubros-lista"></div>
-      <button class="btn btn-ghost" style="margin-top:12px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:12px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -602,7 +628,7 @@ a.grilla-celda{display:block;}
       </div>
       <div class="actions"><button class="btn btn-gold" onclick="descargarCatalogoExcel()">Descargar Excel</button></div>
 
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -688,7 +714,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ni-error-contenido" style="display:none;">Escriba al menos un SKU.</p>
       <div class="actions">
         <button class="btn btn-gold" onclick="irAFormatoGrafico()">Siguiente: formato gráfico →</button>
-        <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+        <button class="btn btn-ghost" onclick="irInicio()">🏠 Volver al inicio</button>
       </div>
     </div>
   </div>
@@ -752,7 +778,7 @@ a.grilla-celda{display:block;}
       <div class="field"><label>SKU</label><input type="text" id="fs-sku" placeholder="Ej: TOA171B"></div>
       <div class="actions"><button class="btn btn-gold" onclick="buscarProductoParaFoto()">Buscar</button></div>
       <div id="fs-resultado" style="margin-top:16px;"></div>
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -764,7 +790,7 @@ a.grilla-celda{display:block;}
       <div class="field"><label>SKU</label><input type="text" id="cv-sku" placeholder="Ej: IA905"></div>
       <div class="actions"><button class="btn btn-gold" onclick="buscarProductoParaCompartirVideo()">Buscar</button></div>
       <div id="cv-resultado" style="margin-top:16px;"></div>
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -810,7 +836,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="np-error" style="display:none;"></p>
       <div class="actions">
         <button class="btn btn-gold" onclick="guardarProductoNuevo()">Guardar producto</button>
-        <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+        <button class="btn btn-ghost" onclick="irInicio()">🏠 Volver al inicio</button>
       </div>
     </div>
   </div>
@@ -858,7 +884,7 @@ a.grilla-celda{display:block;}
         </div>
       </div>
 
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -871,7 +897,7 @@ a.grilla-celda{display:block;}
       <div class="actions"><button class="btn btn-gold" onclick="buscarProductoParaEliminar()">Buscar</button></div>
       <p class="error" id="dp-error-busqueda" style="display:none;">No encontré ningún producto con ese SKU.</p>
       <div id="dp-resultado" style="margin-top:16px;"></div>
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -940,7 +966,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="an-error" style="display:none;">Escriba al menos el título.</p>
       <div class="actions"><button class="btn btn-gold" onclick="generarAnuncio()">Generar</button></div>
       <div id="an-resultado" class="ni-resultado-grilla"></div>
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -953,7 +979,7 @@ a.grilla-celda{display:block;}
       <div class="actions"><button class="btn btn-gold" onclick="procesarExcelImportado()">Procesar archivo</button></div>
       <p class="error" id="ie-error" style="display:none;"></p>
       <div id="ie-preview" style="margin-top:16px;"></div>
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -991,7 +1017,7 @@ a.grilla-celda{display:block;}
       <button class="btn-mini" onclick="revisarPreciosConFormatoRoto()">🔍 Revisar los precios del catálogo</button>
       <div id="am-revision" style="margin-top:12px;"></div>
 
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -1015,7 +1041,7 @@ a.grilla-celda{display:block;}
       <div class="actions" style="margin-top:14px;">
         <button class="btn-mini" onclick="agregarFilaCostos()">+ Agregar fila</button>
       </div>
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -1126,7 +1152,7 @@ a.grilla-celda{display:block;}
         </table>
       </div>
 
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -1142,7 +1168,7 @@ a.grilla-celda{display:block;}
       <div class="actions"><button class="btn btn-gold" id="pia-btn-analizar" onclick="analizarPedidoIA()">Analizar con IA</button></div>
       <p class="error" id="pia-error" style="display:none;"></p>
       <div id="pia-preview" style="margin-top:16px;"></div>
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -1157,7 +1183,7 @@ a.grilla-celda{display:block;}
       <div id="grilla-cont" class="grilla-ig"></div>
       <div class="actions" style="margin-top:14px;">
         <button class="btn btn-ghost" onclick="vaciarGrilla()">Vaciar grilla</button>
-        <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+        <button class="btn btn-ghost" onclick="irInicio()">🏠 Volver al inicio</button>
       </div>
     </div>
   </div>
@@ -1233,7 +1259,7 @@ a.grilla-celda{display:block;}
       </div>
       <div class="field" id="f-bancarios-wrap">
         <label class="ni-chip" style="display:inline-flex;"><input type="checkbox" id="f-incluir-bancarios"><span>🏦 Incluir mis datos bancarios en el comprobante y en el mail al cliente</span></label>
-        <p class="note" id="f-bancarios-nota" style="display:none;margin-top:6px;">Todavía no cargó sus datos bancarios. Cárguelos en Herramientas → Configuración → Datos bancarios.</p>
+        <p class="note" id="f-bancarios-nota" style="display:none;margin-top:6px;">Todavía no cargó sus datos bancarios. Cárguelos en Inicio → Configuración → Datos bancarios.</p>
       </div>
       <div class="field">
         <label class="ni-chip" style="display:inline-flex;"><input type="checkbox" id="f-incluir-fotos-pdf"><span>🖼️ Incluir fotos de producto en el PDF (gasta bastante más toner al imprimir)</span></label>
@@ -1285,7 +1311,7 @@ a.grilla-celda{display:block;}
     <label class="ni-chip" style="display:inline-flex;margin-bottom:12px;"><input type="checkbox" id="hist-incluir-fotos-pdf"><span>🖼️ Incluir fotos de producto al generar el PDF (gasta más toner)</span></label>
     <div id="hist-lista"><p class="empty-msg">Cargando pedidos...</p></div>
     <div style="display:flex;gap:10px;margin-top:10px;">
-      <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" onclick="irInicio()">🏠 Volver al inicio</button>
       <button class="btn btn-ghost" onclick="mostrarPaso('step-manual')">+ Cargar pedido manual</button>
     </div>
   </div>
@@ -1300,7 +1326,7 @@ a.grilla-celda{display:block;}
         <input type="number" id="ci-dias" min="1" value="60" onchange="renderClientesInactivos()">
       </div>
       <div id="ci-lista" style="margin-top:14px;"></div>
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -1310,7 +1336,7 @@ a.grilla-celda{display:block;}
       <h2>Pendientes de entrega</h2>
       <p class="note" style="margin-bottom:14px;">Pedidos marcados como Pendiente o Parcial, ordenados del más viejo al más nuevo.</p>
       <div id="pe-lista"></div>
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -1322,7 +1348,7 @@ a.grilla-celda{display:block;}
       <div class="field"><label>SKU</label><input type="text" id="hp-sku" placeholder="Ej: TOA171B"></div>
       <div class="actions"><button class="btn btn-gold" onclick="buscarHistorialPrecios()">Buscar</button></div>
       <div id="hp-resultado" style="margin-top:16px;"></div>
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -1344,7 +1370,7 @@ a.grilla-celda{display:block;}
         <button class="btn btn-gold" onclick="activarPush()">Activar notificaciones</button>
         <button class="btn btn-ghost" onclick="guardarConfigPush()">Guardar configuración</button>
       </div>
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -1365,7 +1391,7 @@ a.grilla-celda{display:block;}
       <button class="btn-mini" id="tc-btn-editar" onclick="iniciarEdicionTabla()" style="display:none;margin-top:6px;">✏️ Ver y corregir la tabla completa</button>
       <input type="text" id="tc-editor-buscar" placeholder="Buscar artículo..." style="display:none;width:100%;box-sizing:border-box;padding:9px 10px;margin-top:12px;border:1px solid var(--line);border-radius:8px;font-family:'Work Sans';" oninput="filtrarEditorTablaConsumo()">
       <div id="tc-editor" style="margin-top:10px;"></div>
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -1418,7 +1444,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ot-error" style="display:none;"></p>
       <div id="ot-resultado" style="margin-top:14px;"></div>
 
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -1437,7 +1463,7 @@ a.grilla-celda{display:block;}
       </div>
       <div id="hot-lista"><p class="empty-msg">Cargando órdenes...</p></div>
       <div class="actions" style="margin-top:14px;">
-        <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+        <button class="btn btn-ghost" onclick="irInicio()">🏠 Volver al inicio</button>
         <button class="btn btn-ghost" style="color:#A6432F;border-color:#A6432F;" onclick="borrarTodoHistorialOT()">🗑️ Borrar todo el historial</button>
       </div>
     </div>
@@ -1489,11 +1515,11 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v41</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v42</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -1557,7 +1583,7 @@ a.grilla-celda{display:block;}
         <p class="error" id="fa-error" style="display:none;"></p>
       </div>
 
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -1624,7 +1650,7 @@ a.grilla-celda{display:block;}
           </div>
         </div>
       </div>
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -1653,7 +1679,7 @@ a.grilla-celda{display:block;}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Ajustable: + ancho</label><input type="number" step="1" id="tm-m-ajAncho"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Ajustable: + largo</label><input type="number" step="1" id="tm-m-ajLargo"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Plana: + ancho</label><input type="number" step="1" id="tm-m-plAncho"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Plana: + largo</label><input type="number" step="1" id="tm-m-plLargo"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Funda: ancho</label><input type="number" step="1" id="tm-m-fundaAncho"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Funda: largo</label><input type="number" step="1" id="tm-m-fundaLargo"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>2 fundas desde colchón de</label><input type="number" step="1" id="tm-m-fundasDesde"></div></div>
         <button type="button" class="btn-mini" onclick="guardarMargenesMedida()">Guardar márgenes</button>
       </details>
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
 
@@ -1683,7 +1709,7 @@ a.grilla-celda{display:block;}
         <button class="btn btn-gold" onclick="guardarDatosBancarios()">Guardar</button>
         <button class="btn btn-ghost" onclick="compartirDatosBancariosPantalla('whatsapp')">📤 Compartir por WhatsApp</button>
         <button class="btn btn-ghost" onclick="compartirDatosBancariosPantalla('copiar')">📋 Copiar el texto</button>
-        <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+        <button class="btn btn-ghost" onclick="irInicio()">🏠 Volver al inicio</button>
       </div>
     </div>
   </div>
@@ -1694,7 +1720,7 @@ a.grilla-celda{display:block;}
       <input type="text" id="cli-buscador" placeholder="Buscar por nombre, email o teléfono...">
     </div>
     <div id="cli-lista"><p class="empty-msg">Cargando clientes...</p></div>
-    <button class="btn btn-ghost" style="margin-top:10px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+    <button class="btn btn-ghost" style="margin-top:10px;" onclick="irInicio()">🏠 Volver al inicio</button>
   </div>
 
   <!-- STEP: CARGA MANUAL DE PEDIDO (recuperar pedidos que no quedaron guardados) -->
@@ -4737,6 +4763,54 @@ function aprovechamientoCorte(c, W){
   const consumido = c.metros * 100 * W;
   return consumido > 0 ? Math.min(1, usado / consumido) : 0;
 }
+
+// ===== Pantalla de inicio con iconos =====
+// Reemplaza el menu "Herramientas": dos bloques (para clientes / administracion interna) y un solo
+// nivel de opciones por icono. Ninguna funcion cambia, solo como se llega a cada una.
+const GRUPOS_INICIO = {
+  a: { lado: 'ext', titulo: 'Armar pedido', items: [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['📷 Escanear etiqueta (SKU)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto').click()"], ['🤖 Buscar por foto (IA)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto-producto').click()"]] },
+  b: { lado: 'ext', titulo: 'Compartir catálogo', items: [['🔗 Compartir por rubro', 'abrirCompartirRubro()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()']] },
+  c: { lado: 'ext', titulo: 'Redes y anuncios', items: [['🖼️ Nuevo ingreso (flyers, video)', 'abrirNuevoIngreso()'], ['📱 Vista previa grilla IG', 'abrirGrilla()'], ['📣 Anuncios y promociones', 'abrirAnuncio()'], ['🎬 Compartir video de producto', 'abrirCompartirVideoProducto()']] },
+  d: { lado: 'int', titulo: 'Pedidos', items: [['📋 Historial de pedidos', 'abrirHistorial()'], ['🤖 Pedido con IA (texto libre)', 'abrirPedidoIA()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']] },
+  e: { lado: 'int', titulo: 'Clientes', items: [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
+  f: { lado: 'int', titulo: 'Productos y precios', items: [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📷 Actualizar foto', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
+  g: { lado: 'int', titulo: 'Producción', items: [['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📦 Historial de órdenes', 'abrirHistorialOT()']] },
+  h: { lado: 'int', titulo: 'Finanzas', items: [['💰 Ventas Mercado Libre', 'abrirVentasML()'], ['🧮 Calculadora de costos', 'abrirCalculadoraCostos()']] },
+  i: { lado: 'int', titulo: 'Configuración', items: [['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['🔔 Avisos push', 'abrirConfigPush()'], ['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']] },
+};
+let grupoInicioAbierto = null;
+function irInicio(){
+  const menu = document.querySelector('.menu-dropdown');
+  if(menu) menu.classList.remove('open');
+  mostrarPaso('step-inicio');
+}
+function abrirGrupoInicio(k){
+  const g = GRUPOS_INICIO[k];
+  document.querySelectorAll('.ini-tile').forEach(t => t.classList.remove('sel'));
+  ['ext', 'int'].forEach(l => document.getElementById('ini-sub-' + l).style.display = 'none');
+  if(grupoInicioAbierto === k){ grupoInicioAbierto = null; return; }
+  grupoInicioAbierto = k;
+  document.getElementById('ini-t-' + k).classList.add('sel');
+  const cont = document.getElementById('ini-sub-' + g.lado);
+  cont.innerHTML = `<p style="margin:0 0 10px;font-weight:700;color:var(--purple);">${g.titulo}</p><div class="ini-sub-btns">${g.items.map(([t, f]) => `<button type="button" onclick="${f.replace(/"/g, '&quot;')}">${t}</button>`).join('')}</div>`;
+  cont.style.display = 'block';
+  if(window.innerWidth < 700) cont.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function irACatalogoDesdeInicio(){
+  mostrarPaso('step-catalogo');
+  const wrap = document.querySelector('.catalogo-toggle-wrap');
+  if(wrap) wrap.classList.add('open');
+}
+function buscarDesdeInicio(v){
+  if(!v.trim()) return;
+  irACatalogoDesdeInicio();
+  const b = document.getElementById('buscador');
+  b.value = v; b.focus();
+  b.dispatchEvent(new Event('input', { bubbles: true }));
+  document.getElementById('inicio-buscar').value = '';
+}
+// al abrir la app sin un link especial (ej: catalogo por rubro), se arranca en el inicio
+window.addEventListener('load', () => { if(!location.search) mostrarPaso('step-inicio'); });
 
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
@@ -12086,7 +12160,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v41';
+const APP_VERSION = '2026-10-01-v42';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
