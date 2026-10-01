@@ -1489,7 +1489,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v40</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v41</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -3027,9 +3027,14 @@ function leerPiezasFormularioInstruccion(){
 //    quedan de 157,5). Tope: cada pieza crece como mucho un 10 %; si el sobrante es mayor, queda libre.
 const TOPE_ENSANCHE = 0.10;
 // 8. Si una pieza (o las piezas de una franja juntas) se pasan un poco del ancho de la tela, se
-//    achican para entrar, hasta un 5 %. Ej: una plana que en tela de 250 consume 250 de ancho, en tela
+//    achican para entrar, hasta 10 cm o un 5 % (lo que sea mayor). Ej: una plana que en tela de 250 consume 250 de ancho, en tela
 //    de 240 se corta de 240. Si hay que achicar mas, se busca otra forma de cortarla.
 const TOPE_ACHIQUE = 0.05;
+const TOPE_ACHIQUE_CM = 10;
+// cuanto se puede achicar una medida: hasta 10 cm o hasta el 5 %, lo que sea mayor
+// (ej: mantel de 150 en tela de 140; plana de 250 en tela de 240)
+// (los 10 cm valen solo para una pieza que ocupa todo el ancho; varias piezas juntas, hasta el 5 %)
+function entraAchicando(medida, W, varias){ return medida - W <= (varias ? medida * TOPE_ACHIQUE : Math.max(TOPE_ACHIQUE_CM, medida * TOPE_ACHIQUE)) + 0.01; }
 // 7. Cada pieza se puede cortar derecha o girada (lo que consume del ancho pasa a ser lo que consume
 //    del largo) y el sistema elige la forma que gasta menos tela en ese ancho. Ej: una tapa de
 //    150 x 250 en tela de 250 va con los 250 a lo ancho; en tela de 150 va girada. Por defecto todas
@@ -3067,7 +3072,7 @@ function calcularCorteFijo(piezas, W){
 
   porTamano.forEach(t => {
     const p = t.p;
-    if(p.ancho * (1 - TOPE_ACHIQUE) > W + EPS) avisos.push(`${p.nombre} consume ${p.ancho} cm de ancho, más que los ${W} cm de la tela.`);
+    if(!entraAchicando(p.ancho, W)) avisos.push(`${p.nombre} consume ${p.ancho} cm de ancho, más que los ${W} cm de la tela.`);
     for(let k = 0; k < t.n; k++){
       let ok = false;
       // 1) arriba de otra igual, en una columna que todavia tiene largo libre
@@ -3081,7 +3086,7 @@ function calcularCorteFijo(piezas, W){
       }
       // 2b) al costado achicando un poco toda la franja (regla 8)
       if(!ok) for(const f of franjas){
-        if((f.usado + p.ancho) * (1 - TOPE_ACHIQUE) <= W + EPS && p.largo <= f.largo + EPS){ colocar(nuevaCol(f, p), p, false); ok = true; break; }
+        if(entraAchicando(f.usado + p.ancho, W, true) && p.largo <= f.largo + EPS){ colocar(nuevaCol(f, p), p, false); ok = true; break; }
       }
       // 3) franja nueva mas abajo
       if(!ok) colocar(nuevaCol(nuevaFranja(p.largo), p), p, false);
@@ -12081,7 +12086,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v40';
+const APP_VERSION = '2026-10-01-v41';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
