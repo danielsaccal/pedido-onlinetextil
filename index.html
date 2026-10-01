@@ -876,6 +876,10 @@ a.grilla-celda{display:block;}
           <p class="ni-seccion-tit">Datos del producto</p>
           <div class="field"><label>Título</label><input type="text" id="ep-titulo"></div>
           <div class="field"><label>Subtítulo (calidad, composición, hilos, etc.)</label><input type="text" id="ep-subtitulo"></div>
+          <div id="ep-fab" style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:12px;">
+            <label class="ni-chip" style="margin-bottom:6px;"><input type="checkbox" id="ep-fab-on" onchange="renderFabProducto()"><span>🏭 Fabricación propia</span></label>
+            <div id="ep-fab-cont" style="display:none;"></div>
+          </div>
           <div class="field" id="ep-metros-wrap" style="display:none;">
             <label>Metros por rollo/pieza</label>
             <input type="number" id="ep-metros" min="1">
@@ -1537,7 +1541,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v76</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v77</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1666,6 +1670,7 @@ a.grilla-celda{display:block;}
                 <div><input type="text" id="ac-et-desc" placeholder="Descripción" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Nombre del artículo (etiqueta)</div></div>
                 <div><input type="text" id="ac-et-medida" placeholder="50 X 85 CM (APROX)" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Medida (etiqueta)</div></div>
                 <div><input type="text" id="ac-sku" placeholder="Ej: KA181F" oninput="cambioEmpaqueAC()" style="text-transform:uppercase;"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">SKU (se completa solo en la orden)</div></div>
+                <div><input type="text" id="ac-tela" list="lista-telas" placeholder="Ej: MAC300B" onchange="cambiarTelaArticuloAC()" style="text-transform:uppercase;"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Tela con la que se hace</div><div id="ac-tela-info" style="font-size:0.7rem;color:#6B6258;"></div></div>
               </div>
             </div>
             <div class="actions">
@@ -4788,6 +4793,8 @@ function cargarEmpaqueAC(){
   document.getElementById('ac-et-desc').value = d.etDesc;
   document.getElementById('ac-et-medida').value = d.etMedida;
   document.getElementById('ac-sku').value = d.sku || '';
+  document.getElementById('ac-tela').value = ((tablaConsumo.empaque || {})[acArticulo] || {}).tela || '';
+  if(telasDatos === null) cargarTelas().then(infoTelaAC); else infoTelaAC();
   document.getElementById('ac-por-bolsa').value = d.porBolsa > 1 ? d.porBolsa : '';
   document.getElementById('ac-et-desc').placeholder = String(acArticulo || '').toUpperCase();
 }
@@ -4795,6 +4802,7 @@ function cambioEmpaqueAC(){
   if(!acArticulo) return;
   tablaConsumo.empaque = tablaConsumo.empaque || {};
   tablaConsumo.empaque[acArticulo] = {
+    ...(tablaConsumo.empaque[acArticulo] || {}),
     bolsa: document.getElementById('ac-bolsa').value,
     etDesc: document.getElementById('ac-et-desc').value.trim(),
     etMedida: document.getElementById('ac-et-medida').value.trim(),
@@ -5896,6 +5904,156 @@ async function usoMasivoTelas(agregar){
     tlSeleccion.clear();
     renderTelas();
   } catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+
+// ===== Productos del catalogo <-> fabricacion =====
+// Cada SKU del catalogo que se fabrica puede tener su tela (de la lista de Telas) y su articulo de
+// corte (Articulos y cortes / fichas). Con eso se arma la descripcion del catalogo (corta, para el
+// cliente) y se calcula, solo para uso interno, el peso aproximado.
+// config/fabricacion = { vinculos: { SKU: { tela, articulo } }, propios: { 'nombre producto': true } }
+let fabricacion = null;
+async function cargarFabricacion(){
+  try{ const d = await db.collection('config').doc('fabricacion').get(); fabricacion = d.exists ? d.data() : {}; }
+  catch(e){ fabricacion = fabricacion || {}; }
+  fabricacion.vinculos = fabricacion.vinculos || {};
+  fabricacion.propios = fabricacion.propios || {};
+}
+async function guardarFabricacion(){ await db.collection('config').doc('fabricacion').set(fabricacion); }
+// articulo de corte de un SKU: el vinculado a mano, o el que tiene ese SKU cargado, o una ficha con ese SKU
+function articuloDeSku(sku){
+  const S = String(sku || '').toUpperCase();
+  const v = fabricacion && fabricacion.vinculos[S];
+  if(v && v.articulo) return v.articulo;
+  const emp = (tablaConsumo && tablaConsumo.empaque) || {};
+  const a = Object.keys(emp).find(k => String(emp[k].sku || '').toUpperCase() === S);
+  if(a) return a;
+  if(fichasArticulos && fichasArticulos.fichas && fichasArticulos.fichas[S]) return 'ficha:' + S;
+  return null;
+}
+function telaDeSku(sku){
+  const S = String(sku || '').toUpperCase();
+  const v = fabricacion && fabricacion.vinculos[S];
+  if(v && v.tela) return v.tela;
+  const a = articuloDeSku(S);
+  const emp = (tablaConsumo && tablaConsumo.empaque) || {};
+  return a && emp[a] && emp[a].tela ? emp[a].tela : null;
+}
+function piezasDeArticuloAny(a){
+  if(!a) return null;
+  if(a.startsWith('ficha:')){ const r = piezasDeFicha(a.slice(6)); return r.errores.length ? null : r.piezas; }
+  const g = juegosDePiezasAC(a)[0];
+  return g ? g.piezas : null;
+}
+function pesoAproxGramos(articulo, codTela){
+  const piezas = piezasDeArticuloAny(articulo);
+  const t = datosTela(codTela), r = codTela ? rendimientoTela(String(codTela).toUpperCase()) : null;
+  const g = t && r ? gramaje({ ancho: t.ancho, mPorKg: r.mPorKg }) : null;
+  if(!piezas || !g) return null;
+  const m2 = piezas.reduce((s, p) => s + p.ancho * p.largo * (p.cantidad || 1) * (p.partes || 1), 0) / 10000;
+  return Math.round(m2 * g);
+}
+// texto corto para el cliente: tela + composicion; hilos (sabanas, manteles, cortinas) o gramaje (toallas, batas)
+function descripcionDesdeTela(codTela, categoria){
+  const t = datosTela(codTela);
+  if(!t) return '';
+  const cap = s => String(s || '').toLowerCase().replace(/^\S/, c => c.toUpperCase());
+  const pct = String(t.notas || '').match(/\d+\s*%\s*[a-záéíóúñ]+(\s*[-/y,]?\s*\d+\s*%\s*[a-záéíóúñ]+)*/i);
+  const comp = pct ? pct[0].replace(/\s*[-/,]\s*/g, ' ').replace(/\s+/g, ' ').toLowerCase().replace(/algodon/g, 'algodón').replace(/poliester/g, 'poliéster')
+    : t.composicion === 'Algodón' ? '100% algodón' : t.composicion === 'Poliéster' ? '100% poliéster' : t.composicion === 'Mezcla' ? 'algodón/poliéster' : '';
+  const esToalla = /TOALL|BATA/i.test(categoria || '') || ((t.usos || []).some(u => /toalla|bata/i.test(u)) && !(t.usos || []).some(u => /s[aá]bana|mantel|cortina/i.test(u)));
+  const r = rendimientoTela(String(codTela).toUpperCase());
+  const g = r ? gramaje({ ancho: t.ancho, mPorKg: r.mPorKg }) : null;
+  const partes = [];
+  if(esToalla){ if(comp) partes.push(comp); if(g) partes.push(g + ' g/m²'); }
+  else { partes.push(cap(t.nombre) + (t.hilos ? ' ' + t.hilos + ' hilos' : '')); if(comp) partes.push(comp); }
+  return partes.join(' · ');
+}
+async function renderFabProducto(){
+  if(!productoEnEdicion) return;
+  if(fabricacion === null) await cargarFabricacion();
+  if(telasDatos === null) await cargarTelas();
+  if(tablaConsumo === null) await cargarTablaConsumo();
+  if(fichasArticulos === null) await cargarFichasArticulos();
+  const p = productoEnEdicion.producto;
+  const on = document.getElementById('ep-fab-on').checked;
+  const cont = document.getElementById('ep-fab-cont');
+  if(fabricacion.propios[p.nombre] !== on){ fabricacion.propios[p.nombre] = on; guardarFabricacion().catch(() => {}); }
+  if(!on){ cont.style.display = 'none'; return; }
+  cont.style.display = 'block';
+  const skus = p.variantes.map(v => String(v.sku).toUpperCase());
+  const telaComun = skus.map(telaDeSku).find(Boolean) || '';
+  const opcArt = ['<option value="">— sin vincular —</option>', ...articulosAC().sort((a, b) => a.localeCompare(b, 'es')).map(a => `<option value="${escapeAttr(a)}">${escaparHtml(a)}</option>`),
+    ...(hayFichas() ? Object.keys(fichasArticulos.fichas).map(s => `<option value="ficha:${escapeAttr(s)}">${escaparHtml(nombreFicha(s))}</option>`) : [])].join('');
+  cont.innerHTML = `
+    <div class="field" style="margin:0 0 8px;"><label>Tela con la que se fabrica</label><input id="ep-fab-tela" list="lista-telas" value="${escapeAttr(telaComun)}" placeholder="Código de tela (ej: MAC300B)" style="text-transform:uppercase;" onchange="cambiarTelaProducto(this.value)"><div id="ep-fab-tela-info" class="note" style="text-align:left;margin-top:3px;"></div></div>
+    <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+      <thead><tr style="color:#8A8072;font-size:0.75rem;"><th style="text-align:left;padding:4px;">SKU</th><th style="text-align:left;padding:4px;">Artículo de corte</th><th style="text-align:right;padding:4px;">Peso aprox. (interno)</th></tr></thead>
+      <tbody>${skus.map(s => `<tr style="border-top:1px solid var(--line);"><td style="padding:4px;"><b>${escaparHtml(s)}</b></td>
+        <td style="padding:4px;"><select data-sku="${escapeAttr(s)}" onchange="cambiarArticuloSku(this)" style="width:100%;">${opcArt}</select></td>
+        <td style="padding:4px;text-align:right;" id="ep-fab-peso-${escapeAttr(s)}"></td></tr>`).join('')}</tbody>
+    </table></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;">
+      <button type="button" class="btn-mini" onclick="armarDescripcionProducto()">✨ Armar descripción desde fabricación</button>
+      <span id="ep-fab-aviso" class="note" style="text-align:left;"></span>
+    </div>`;
+  cont.querySelectorAll('select[data-sku]').forEach(sel => { sel.value = articuloDeSku(sel.dataset.sku) || ''; });
+  actualizarInfoFab();
+}
+function actualizarInfoFab(){
+  if(!productoEnEdicion) return;
+  const cod = document.getElementById('ep-fab-tela').value.trim().toUpperCase();
+  const t = datosTela(cod);
+  document.getElementById('ep-fab-tela-info').textContent = t ? `${t.nombre || ''}${t.color ? ' ' + t.color.toLowerCase() : ''} · ${t.ancho} cm${t.hilos ? ' · ' + t.hilos + ' hilos' : ''}${t.composicion ? ' · ' + t.composicion : ''}` : (cod ? 'No está en la lista de Telas.' : '');
+  productoEnEdicion.producto.variantes.forEach(v => {
+    const s = String(v.sku).toUpperCase();
+    const el = document.getElementById('ep-fab-peso-' + s);
+    if(!el) return;
+    const g = pesoAproxGramos(articuloDeSku(s), cod || telaDeSku(s));
+    el.textContent = g ? (g >= 1000 ? fmtCm(Math.round(g / 10) / 100) + ' kg' : g + ' g') : '—';
+  });
+  const propuesta = descripcionDesdeTela(cod, productoEnEdicion.categoria);
+  const actual = document.getElementById('ep-subtitulo').value.trim();
+  document.getElementById('ep-fab-aviso').textContent = propuesta && actual && normBusqueda(propuesta) !== normBusqueda(actual) ? '⚠️ El subtítulo no coincide con la tela.' : '';
+}
+async function cambiarTelaProducto(cod){
+  cod = String(cod || '').trim().toUpperCase();
+  productoEnEdicion.producto.variantes.forEach(v => { const s = String(v.sku).toUpperCase(); fabricacion.vinculos[s] = { ...(fabricacion.vinculos[s] || {}), tela: cod }; });
+  try{ await guardarFabricacion(); } catch(e){ alert('No se pudo guardar la tela: ' + e.message); }
+  actualizarInfoFab();
+}
+async function cambiarArticuloSku(sel){
+  const s = sel.dataset.sku;
+  fabricacion.vinculos[s] = { ...(fabricacion.vinculos[s] || {}), articulo: sel.value || '' };
+  try{ await guardarFabricacion(); } catch(e){ alert('No se pudo guardar: ' + e.message); }
+  actualizarInfoFab();
+}
+function armarDescripcionProducto(){
+  const cod = document.getElementById('ep-fab-tela').value.trim().toUpperCase();
+  const d = descripcionDesdeTela(cod, productoEnEdicion.categoria);
+  if(!d){ alert('Elija primero una tela de la lista de Telas.'); return; }
+  const actual = document.getElementById('ep-subtitulo').value.trim();
+  if(actual && !confirm(`Subtítulo actual:\n${actual}\n\nPropuesta:\n${d}\n\n¿Reemplazar? (después toque Guardar para que quede en el catálogo)`)) return;
+  document.getElementById('ep-subtitulo').value = d;
+  actualizarInfoFab();
+}
+// desde Articulos y cortes: la tela del articulo (tambien queda vinculada a su SKU del catalogo)
+async function cambiarTelaArticuloAC(){
+  if(!acArticulo) return;
+  const cod = document.getElementById('ac-tela').value.trim().toUpperCase();
+  tablaConsumo.empaque = tablaConsumo.empaque || {};
+  tablaConsumo.empaque[acArticulo] = { ...(tablaConsumo.empaque[acArticulo] || {}), tela: cod };
+  const sku = String(tablaConsumo.empaque[acArticulo].sku || '').toUpperCase();
+  try{
+    await guardarTablaYConsumo();
+    if(sku){ if(fabricacion === null) await cargarFabricacion(); fabricacion.vinculos[sku] = { ...(fabricacion.vinculos[sku] || {}), tela: cod }; await guardarFabricacion(); }
+    infoTelaAC();
+  } catch(e){ alert('No se pudo guardar la tela: ' + e.message); }
+}
+function infoTelaAC(){
+  const el = document.getElementById('ac-tela-info'); if(!el) return;
+  const cod = document.getElementById('ac-tela').value.trim().toUpperCase(), t = datosTela(cod);
+  const g = pesoAproxGramos(acArticulo, cod);
+  el.textContent = t ? `${t.nombre || ''}${t.color ? ' ' + t.color.toLowerCase() : ''} · ${t.ancho} cm${g ? ' · peso aprox. ' + (g >= 1000 ? fmtCm(Math.round(g / 10) / 100) + ' kg' : g + ' g') : ''}` : (cod ? 'No está en la lista de Telas.' : '');
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -10021,6 +10179,12 @@ function buscarProductoParaEditar(){
 
   document.getElementById('ep-foto').value = '';
   document.getElementById('ep-form-cont').style.display = 'block';
+  (async () => {
+    if(fabricacion === null) await cargarFabricacion();
+    const skus = p.variantes.map(v => String(v.sku).toUpperCase());
+    document.getElementById('ep-fab-on').checked = !!fabricacion.propios[p.nombre] || skus.some(s => fabricacion.vinculos[s] && fabricacion.vinculos[s].tela);
+    renderFabProducto();
+  })();
 }
 
 function agregarVarianteEP(datos){
@@ -13310,7 +13474,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v76';
+const APP_VERSION = '2026-10-01-v77';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
