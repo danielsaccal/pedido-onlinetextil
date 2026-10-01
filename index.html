@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v74</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v75</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5802,14 +5802,73 @@ function renderAccionesTelas(){
   const cont = document.getElementById('tl-acciones');
   [...tlSeleccion].forEach(c => { if(!telasDatos.telas[c]) tlSeleccion.delete(c); });
   if(!tlSeleccion.size){ cont.style.display = 'none'; cont.innerHTML = ''; return; }
+  if(cont.style.display === 'block' && cont.dataset.n === String(tlSeleccion.size)) return; // no borrar lo que esta escribiendo
+  cont.dataset.n = String(tlSeleccion.size);
   cont.style.display = 'block';
-  cont.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#F3EEF7;border:1px solid #D9CCE6;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
-    <b>${tlSeleccion.size} tela${tlSeleccion.size === 1 ? '' : 's'} seleccionada${tlSeleccion.size === 1 ? '' : 's'}</b>
-    <select id="tl-masivo-uso" style="width:auto;">${telasDatos.usos.map(u => `<option>${escaparHtml(u)}</option>`).join('')}<option value="__nuevo__">+ uso nuevo…</option></select>
-    <button class="btn-mini" onclick="usoMasivoTelas(true)">➕ Agregar uso</button>
-    <button class="btn-mini" onclick="usoMasivoTelas(false)">➖ Quitar uso</button>
-    <a href="#" onclick="event.preventDefault(); tlSeleccion.clear(); renderTelas();" style="font-size:0.82rem;margin-left:auto;">Quitar selección</a>
+  const nc = '<option value="">— no cambiar —</option>';
+  cont.innerHTML = `<div style="background:#F3EEF7;border:1px solid #D9CCE6;border-radius:12px;padding:12px;margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px;">
+      <b>✏️ Editar ${tlSeleccion.size} tela${tlSeleccion.size === 1 ? '' : 's'} a la vez</b>
+      <a href="#" onclick="event.preventDefault(); tlSeleccion.clear(); renderTelas();" style="font-size:0.82rem;">Quitar selección</a>
+    </div>
+    <p class="note" style="margin:0 0 8px;text-align:left;">Complete solo lo que quiera cambiar. Lo que deje vacío no se toca.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
+      <div class="field" style="margin:0;"><label>Composición</label><select id="tm-comp">${nc}${COMPOSICIONES_TELA.map(c => `<option>${c}</option>`).join('')}</select></div>
+      <div class="field" style="margin:0;"><label>Color</label><select id="tm-color">${nc}${COLORES_TELA.map(c => `<option>${c}</option>`).join('')}</select></div>
+      <div class="field" style="margin:0;"><label>Nombre</label><input id="tm-nombre" placeholder="no cambiar"></div>
+      <div class="field" style="margin:0;"><label>Proveedor</label><input id="tm-prov" placeholder="no cambiar" list="lista-proveedores-tela"></div>
+      <div class="field" style="margin:0;"><label>Ancho (cm)</label><input id="tm-ancho" type="number" step="0.1" placeholder="no cambiar"></div>
+      <div class="field" style="margin:0;"><label>Calidad (hilos)</label><input id="tm-hilos" type="number" placeholder="no cambiar"></div>
+      <div class="field" style="margin:0;"><label>Rendimiento (m/kg)</label><input id="tm-mkg" type="text" inputmode="decimal" placeholder="no cambiar"></div>
+    </div>
+    <div class="field" style="margin:10px 0 0;"><label>Usos</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <select id="tl-masivo-uso" style="width:auto;">${telasDatos.usos.map(u => `<option>${escaparHtml(u)}</option>`).join('')}<option value="__nuevo__">+ uso nuevo…</option></select>
+        <select id="tm-uso-accion" style="width:auto;"><option value="">— no cambiar —</option><option value="agregar">Agregar este uso</option><option value="quitar">Quitar este uso</option></select>
+      </div></div>
+    <button class="btn btn-gold" style="width:auto;padding:10px 18px;margin-top:10px;" onclick="aplicarMasivoTelas()">Aplicar a las ${tlSeleccion.size} telas</button>
   </div>`;
+}
+async function aplicarMasivoTelas(){
+  const v = id => document.getElementById(id).value.trim();
+  const cambios = {};
+  if(v('tm-comp')) cambios.composicion = v('tm-comp');
+  if(v('tm-color')) cambios.color = v('tm-color');
+  if(v('tm-nombre')) cambios.nombre = v('tm-nombre');
+  if(v('tm-prov')) cambios.proveedor = v('tm-prov');
+  if(parseFloat(v('tm-ancho')) > 0) cambios.ancho = parseFloat(v('tm-ancho'));
+  if(parseInt(v('tm-hilos'), 10) > 0) cambios.hilos = parseInt(v('tm-hilos'), 10);
+  if(parseFloat(v('tm-mkg').replace(',', '.')) > 0) cambios.mPorKg = parseFloat(v('tm-mkg').replace(',', '.'));
+  const accionUso = v('tm-uso-accion');
+  let uso = document.getElementById('tl-masivo-uso').value;
+  if(accionUso && uso === '__nuevo__'){
+    uso = (prompt('Nombre del uso nuevo:') || '').trim();
+    if(!uso) return;
+    const ya = telasDatos.usos.find(x => normBusqueda(x) === normBusqueda(uso));
+    if(ya) uso = ya; else telasDatos.usos.push(uso);
+  }
+  const desc = Object.entries(cambios).map(([k, x]) => `${{ composicion: 'Composición', color: 'Color', nombre: 'Nombre', proveedor: 'Proveedor', ancho: 'Ancho', hilos: 'Calidad', mPorKg: 'Rendimiento' }[k]}: ${x}`);
+  if(accionUso) desc.push(`${accionUso === 'agregar' ? 'Agregar' : 'Quitar'} uso: ${uso}`);
+  if(!desc.length){ alert('No completó nada para cambiar.'); return; }
+  const codigos = [...tlSeleccion];
+  if(!confirm(`Aplicar a ${codigos.length} tela${codigos.length === 1 ? '' : 's'}:\n\n• ${desc.join('\n• ')}\n\n¿Seguir?`)) return;
+  const nuevas = { ...telasDatos.telas };
+  codigos.forEach(c => {
+    const t = { ...nuevas[c], ...cambios };
+    if(accionUso){ const us = new Set(t.usos || []); if(accionUso === 'agregar') us.add(uso); else us.delete(uso); t.usos = telasDatos.usos.filter(u => us.has(u)); }
+    nuevas[c] = t;
+  });
+  try{
+    await db.collection('config').doc('telas').set({ ...telasDatos, telas: nuevas });
+    telasDatos.telas = nuevas;
+    if(cambios.ancho && tablaConsumo && Array.isArray(tablaConsumo.anchosTela) && !tablaConsumo.anchosTela.includes(cambios.ancho)){
+      tablaConsumo.anchosTela = [...tablaConsumo.anchosTela, cambios.ancho].sort((a, b) => a - b); guardarTablaYConsumo().catch(() => {});
+    }
+    tlSeleccion.clear();
+    document.getElementById('tl-acciones').dataset.n = '';
+    await cargarTelas();
+    renderTelas();
+  } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 async function usoMasivoTelas(agregar){
   let uso = document.getElementById('tl-masivo-uso').value;
@@ -13247,7 +13306,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v74';
+const APP_VERSION = '2026-10-01-v75';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
