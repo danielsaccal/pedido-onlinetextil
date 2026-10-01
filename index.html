@@ -1521,7 +1521,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v50</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v51</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -4311,6 +4311,7 @@ function sugerirRemanenteOT(){
   const combo = mejorCombinacion(cands, resto);
   const solos = cands.map(x => { const n = Math.floor(resto / x.c + 1e-9); return { ...x, n, sobra: Math.round((resto - n * x.c) * 100) / 100 }; })
     .sort((a,b) => a.sobra - b.sobra).slice(0, 6);
+  window.__remSolos = solos;
   const btn = (items) => `<button type="button" class="btn-mini" onclick='agregarSugerenciaOT(${JSON.stringify(items.map(i => ({ v: i.valor, n: i.n })))}, ${ancho})'>+ Agregar</button>`;
   cont.innerHTML = `
     <div style="border:1px solid var(--line);border-radius:10px;padding:12px;">
@@ -4320,11 +4321,22 @@ function sugerirRemanenteOT(){
           <span>${combo.items.map(i => `${i.n} × ${escaparHtml(i.nombre)}`).join(' + ')} <span class="note">→ sobran ${fmtMetros(combo.sobra)} m</span></span>${btn(combo.items)}
         </div>` : ''}
       <p class="note" style="margin:0 0 4px;">Con un solo artículo:</p>
-      ${solos.map(s => `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line);">
-        <span>${s.n} × ${escaparHtml(s.nombre)} <span class="note">(${fmtMetros(s.c)} m c/u) → sobran ${fmtMetros(s.sobra)} m</span></span>${btn([s])}</div>`).join('')}
+      ${solos.map((s, i) => `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line);">
+        <span>Hasta ${s.n} × ${escaparHtml(s.nombre)} <span class="note">(${fmtMetros(s.c)} m c/u) → sobran ${fmtMetros(s.sobra)} m</span></span>
+        <span style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+          <input type="number" min="1" max="${s.n}" value="${s.n}" id="rem-q-${i}" title="Cuántas hacer" style="width:72px;padding:6px;">
+          <button type="button" class="btn-mini" onclick="agregarSugerenciaCant(${i}, ${ancho})">+ Agregar</button>
+        </span></div>`).join('')}
+      <p class="note" style="margin:8px 0 0;">Puede cambiar la cantidad: lo que no use queda sobrando y se vuelve a calcular qué hacer con eso.</p>
     </div>`;
 }
 
+function agregarSugerenciaCant(i, ancho){
+  const s = (window.__remSolos || [])[i];
+  if(!s) return;
+  const n = Math.max(1, Math.min(s.n, parseInt(document.getElementById('rem-q-' + i).value, 10) || 0));
+  agregarSugerenciaOT([{ v: s.valor, n }], ancho);
+}
 function agregarSugerenciaOT(items, ancho){
   items.forEach(it => {
     agregarRenglonOrdenTrabajo();
@@ -12686,7 +12698,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v50';
+const APP_VERSION = '2026-10-01-v51';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
