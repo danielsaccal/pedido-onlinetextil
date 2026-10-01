@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v67</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v68</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5614,14 +5614,23 @@ function calcGramajeTela(){
   const g = gramaje({ ancho: parseFloat(document.getElementById('tl-ancho').value), mPorKg: parseFloat(String(document.getElementById('tl-mkg').value).replace(',', '.')) });
   document.getElementById('tl-gramaje').textContent = g ? `${g} g/m²` : '—';
 }
-async function agregarUsoTela(){
+function agregarUsoTela(){
   const u = (prompt('Nombre del nuevo uso (ej: Almohadones):') || '').trim();
-  if(!u || telasDatos.usos.includes(u)) return;
-  const marcados = [...document.querySelectorAll('.tl-uso:checked')].map(x => x.value);
+  if(!u) return;
+  // si ya existe (aunque este escrito distinto), solo se marca
+  const existente = telasDatos.usos.find(x => normBusqueda(x) === normBusqueda(u));
+  if(existente){
+    const cb = [...document.querySelectorAll('.tl-uso')].find(x => x.value === existente);
+    if(cb) cb.checked = true;
+    return;
+  }
   telasDatos.usos.push(u);
-  const cod = tlEditando;
-  editarTela(cod);
-  document.querySelectorAll('.tl-uso').forEach(x => { if(marcados.includes(x.value) || x.value === u) x.checked = true; });
+  // se agrega el boton sin rearmar el formulario (asi no se pierde lo que ya escribio)
+  const link = document.querySelector('#tl-editor a[onclick*="agregarUsoTela"]');
+  const lab = document.createElement('label');
+  lab.className = 'ni-chip';
+  lab.innerHTML = `<input type="checkbox" class="tl-uso" value="${escapeAttr(u)}" checked><span>${escaparHtml(u)}</span>`;
+  link.parentNode.insertBefore(lab, link);
 }
 async function guardarTela(){
   const err = document.getElementById('tl-error'); err.style.display = 'none';
@@ -13083,7 +13092,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v67';
+const APP_VERSION = '2026-10-01-v68';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
