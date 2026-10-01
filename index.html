@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v75</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v76</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5576,8 +5576,9 @@ function renderTelas(){
   const q = normBusqueda(document.getElementById('tl-buscar').value);
   const lista = Object.entries(telasDatos.telas)
     .filter(([c, t]) => (!tlFiltroUso || (t.usos || []).includes(tlFiltroUso)) && (!tlFiltroComp || t.composicion === tlFiltroComp) && (!q || normBusqueda(c + ' ' + (t.nombre || '') + ' ' + (t.color || '') + ' ' + (t.composicion || '') + ' ' + (t.proveedor || '')).includes(q)))
-    .sort((a, b) => familiaTela(a[1]).localeCompare(familiaTela(b[1])) || (a[1].ancho || 0) - (b[1].ancho || 0) || a[0].localeCompare(b[0]));
-  const cuantos = {}; lista.forEach(([c, t]) => { const f = familiaTela(t); cuantos[f] = (cuantos[f] || 0) + 1; });
+    .sort((a, b) => grupoNombreTela(a[1]).localeCompare(grupoNombreTela(b[1])) || normBusqueda(a[1].proveedor || '').localeCompare(normBusqueda(b[1].proveedor || '')) || (a[1].hilos || 0) - (b[1].hilos || 0) || (a[1].ancho || 0) - (b[1].ancho || 0) || a[0].localeCompare(b[0]));
+  const cuantos = {}, provs = {};
+  lista.forEach(([c, t]) => { const f = grupoNombreTela(t); cuantos[f] = (cuantos[f] || 0) + 1; (provs[f] = provs[f] || new Set()).add(t.proveedor || ''); });
   let famPrevia = null;
   window.__tlVisibles = lista.map(([c]) => c);
   const separables = Object.values(telasDatos.telas).filter(t => !t.color && colorEnNombre(t.nombre)).length;
@@ -5589,11 +5590,12 @@ function renderTelas(){
   cont.innerHTML = `<div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;"><table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
     <thead><tr style="background:var(--cream);"><th style="padding:7px 8px;width:30px;"><input type="checkbox" title="Seleccionar todas las de la lista" onchange="seleccionarTodasTelas(this.checked)" ${lista.length && lista.every(([c]) => tlSeleccion.has(c)) ? 'checked' : ''}></th>${th('Código')}${th('Nombre')}${th('Color')}${th('Composición')}${th('Proveedor')}${th('Ancho', 'right')}${th('Calidad', 'right')}${th('Rendimiento', 'right')}${th('Gramaje', 'right')}${th('Usos')}</tr></thead><tbody>
     ${lista.map(([c, t]) => {
-      const fam = familiaTela(t), r = rendimientoTela(c), g = r ? gramaje({ ancho: t.ancho, mPorKg: r.mPorKg }) : null;
+      const fam = grupoNombreTela(t), r = rendimientoTela(c), g = r ? gramaje({ ancho: t.ancho, mPorKg: r.mPorKg }) : null;
       let cab = '';
       if(fam !== famPrevia){
         famPrevia = fam;
-        if(cuantos[fam] > 1) cab = `<tr style="background:#FAF8F4;border-top:1px solid var(--line);"><td></td><td colspan="10" style="padding:6px 8px;font-size:0.8rem;color:#6B6258;">🧵 <b>${escaparHtml(t.nombre || '')}</b> · ${t.hilos ? t.hilos + ' hilos · ' : ''}${escaparHtml(t.proveedor || '')} — misma tela en ${cuantos[fam]} variantes</td></tr>`;
+        const pv = [...provs[fam]].filter(Boolean);
+        cab = `<tr style="background:var(--purple);"><td colspan="11" style="padding:7px 10px;color:#fff;font-size:0.9rem;">🧵 <b>${escaparHtml((t.nombre || 'Sin nombre').toUpperCase())}</b> <span style="opacity:.8;font-size:0.8rem;">· ${cuantos[fam]} tela${cuantos[fam] === 1 ? '' : 's'}${pv.length ? ' · ' + escaparHtml(pv.join(', ')) : ''}</span></td></tr>`;
       }
       return cab + `<tr onclick="editarTela('${escapeAttr(c)}')" style="border-top:1px solid var(--line);cursor:pointer;${tlSeleccion.has(c) ? 'background:#F3EEF7;' : ''}" title="Toque para editar">
       <td style="padding:7px 8px;" onclick="event.stopPropagation();"><input type="checkbox" ${tlSeleccion.has(c) ? 'checked' : ''} onchange="toggleSeleccionTela('${escapeAttr(c)}', this.checked)"></td>
@@ -5761,6 +5763,8 @@ function aplicarTelaEnOrden(){
 // ----- misma tela en distintos anchos -----
 // Se agrupan solas las telas con mismo nombre, proveedor y calidad. El gramaje es de la tela (no del
 // ancho): con el rendimiento de un ancho se calcula el de los demas.
+// grupo de la lista: el nombre de la tela (Percal, Toalla, Polar…)
+function grupoNombreTela(t){ return normBusqueda(t.nombre || '').replace(/\s+/g, ' ').trim() || '~'; }
 function familiaTela(t){ return [normBusqueda(t.nombre || '').replace(/\s+/g, ' ').trim(), normBusqueda(t.proveedor || '').replace(/\s+/g, ' ').trim(), t.hilos || ''].join('|'); }
 function hermanasTela(codigo){
   const t = telasDatos.telas[codigo]; if(!t || !t.nombre) return [];
@@ -13306,7 +13310,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v75';
+const APP_VERSION = '2026-10-01-v76';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
