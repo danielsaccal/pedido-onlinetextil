@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v66</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v67</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1773,7 +1773,7 @@ a.grilla-celda{display:block;}
       <h2>Telas</h2>
       <p class="note" style="margin-bottom:10px;">Cada tela una sola vez: ancho, calidad, rendimiento y para qué se usa.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
-        <input type="text" id="tl-buscar" placeholder="🔍 Buscar por código o nombre" oninput="renderTelas()" style="flex:1;min-width:200px;">
+        <input type="text" id="tl-buscar" placeholder="🔍 Buscar por código, nombre o proveedor" oninput="renderTelas()" style="flex:1;min-width:200px;">
         <button class="btn btn-gold" style="width:auto;padding:10px 16px;" onclick="editarTela()">+ Nueva tela</button>
       </div>
       <div id="tl-usos-filtro" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
@@ -1783,6 +1783,7 @@ a.grilla-celda{display:block;}
     </div>
   </div>
   <datalist id="lista-telas"></datalist>
+  <datalist id="lista-proveedores-tela"></datalist>
 
   <div class="step" id="step-datos-bancarios">
     <div class="form-card">
@@ -5541,6 +5542,8 @@ async function cargarTelas(){
   catch(e){ console.error('telas', e); telasDatos = telasDatos || {}; }
   telasDatos.telas = telasDatos.telas || {};
   telasDatos.usos = Array.isArray(telasDatos.usos) && telasDatos.usos.length ? telasDatos.usos : [...USOS_TELA_DEF];
+  const dp = document.getElementById('lista-proveedores-tela');
+  if(dp) dp.innerHTML = [...new Set(Object.values(telasDatos.telas).map(t => t.proveedor).filter(Boolean))].sort().map(p => `<option value="${escapeAttr(p)}">`).join('');
   const dl = document.getElementById('lista-telas');
   if(dl) dl.innerHTML = Object.entries(telasDatos.telas).map(([c, t]) => `<option value="${escapeAttr(c)}">${escaparHtml((t.nombre || '') + (t.ancho ? ' · ' + t.ancho + ' cm' : ''))}</option>`).join('');
 }
@@ -5558,16 +5561,17 @@ function renderTelas(){
   document.getElementById('tl-usos-filtro').innerHTML = chip('', 'Todos los usos') + usos.map(u => chip(u, u)).join('');
   const q = normBusqueda(document.getElementById('tl-buscar').value);
   const lista = Object.entries(telasDatos.telas)
-    .filter(([c, t]) => (!tlFiltroUso || (t.usos || []).includes(tlFiltroUso)) && (!q || normBusqueda(c + ' ' + (t.nombre || '')).includes(q)))
+    .filter(([c, t]) => (!tlFiltroUso || (t.usos || []).includes(tlFiltroUso)) && (!q || normBusqueda(c + ' ' + (t.nombre || '') + ' ' + (t.proveedor || '')).includes(q)))
     .sort((a, b) => a[0].localeCompare(b[0]));
   const cont = document.getElementById('tl-lista');
   if(!lista.length){ cont.innerHTML = `<p class="empty-msg">${Object.keys(telasDatos.telas).length ? 'No hay telas que coincidan.' : 'Todavía no hay telas cargadas. Toque "+ Nueva tela".'}</p>`; return; }
   const th = (x, al) => `<th style="padding:7px 8px;text-align:${al || 'left'};white-space:nowrap;">${x}</th>`;
   cont.innerHTML = `<div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;"><table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
-    <thead><tr style="background:var(--cream);">${th('Código')}${th('Nombre')}${th('Ancho', 'right')}${th('Calidad', 'right')}${th('Rendimiento', 'right')}${th('Gramaje', 'right')}${th('Usos')}</tr></thead><tbody>
+    <thead><tr style="background:var(--cream);">${th('Código')}${th('Nombre')}${th('Proveedor')}${th('Ancho', 'right')}${th('Calidad', 'right')}${th('Rendimiento', 'right')}${th('Gramaje', 'right')}${th('Usos')}</tr></thead><tbody>
     ${lista.map(([c, t]) => `<tr onclick="editarTela('${escapeAttr(c)}')" style="border-top:1px solid var(--line);cursor:pointer;" title="Toque para editar">
       <td style="padding:7px 8px;"><b>${escaparHtml(c)}</b></td>
       <td style="padding:7px 8px;">${escaparHtml(t.nombre || '')}</td>
+      <td style="padding:7px 8px;">${escaparHtml(t.proveedor || '—')}</td>
       <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${t.ancho ? t.ancho + ' cm' : '—'}</td>
       <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${t.hilos ? t.hilos + ' hilos' : '—'}</td>
       <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${t.mPorKg ? fmtCm(t.mPorKg) + ' m/kg' : '—'}</td>
@@ -5585,6 +5589,7 @@ function editarTela(codigo){
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
       ${f('tl-codigo', 'Código', codigo || '', 'placeholder="HON315B" style="text-transform:uppercase;"')}
       ${f('tl-nombre', 'Nombre', t.nombre, 'placeholder="Percal 180 blanco"')}
+      ${f('tl-proveedor', 'Proveedor', t.proveedor, 'placeholder="Textil Honeker" list="lista-proveedores-tela"')}
       ${f('tl-ancho', 'Ancho (cm)', t.ancho, 'type="number" step="0.1" placeholder="315" oninput="calcGramajeTela()"')}
       ${f('tl-hilos', 'Calidad (hilos)', t.hilos, 'type="number" placeholder="180"')}
       ${f('tl-mkg', 'Rendimiento (metros por kilo)', t.mPorKg, 'type="text" inputmode="decimal" placeholder="2,8" oninput="calcGramajeTela()"')}
@@ -5623,6 +5628,7 @@ async function guardarTela(){
   const codigo = document.getElementById('tl-codigo').value.trim().toUpperCase();
   const t = {
     nombre: document.getElementById('tl-nombre').value.trim(),
+    proveedor: document.getElementById('tl-proveedor').value.trim(),
     ancho: parseFloat(document.getElementById('tl-ancho').value) || null,
     hilos: parseInt(document.getElementById('tl-hilos').value, 10) || null,
     mPorKg: parseFloat(String(document.getElementById('tl-mkg').value).replace(',', '.')) || null,
@@ -13077,7 +13083,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v66';
+const APP_VERSION = '2026-10-01-v67';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
