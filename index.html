@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v56</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v57</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -3325,49 +3325,57 @@ function textoCorteCorto(piezas, ancho){
 
 function textoCorte(articulo, piezas, ancho, nota){
   const c = calcularCorte(piezas, ancho);
-  const total = piezas.reduce((s,p) => s + (p.cantidad||1), 0);
-  let texto = `${articulo} lleva ${total} pieza(s): ${piezas.map(textoPieza).join(', ')}. Corte en ${fmtCm(ancho)} cm de ancho (medidas: lo que consume del ancho × lo que consume del largo de la tela).`;
+  const pl = (n, nombre) => n === 1 ? nombre : nombre.replace(/^(\S+)/, w => /[aeiouáéó]$/i.test(w) ? w + 's' : w + 'es');
+  const L = [`${articulo} · tela de ${fmtCm(ancho)} cm de ancho`, ''];
+  // que lleva (agrupando piezas iguales)
+  const lleva = new Map();
+  piezas.forEach(p => {
+    const k = p.nombre + '|' + p.ancho + '|' + p.largo + '|' + (p.partes || 1);
+    const x = lleva.get(k) || { p, n: 0 }; x.n += (p.cantidad || 1); lleva.set(k, x);
+  });
+  L.push('Lleva: ' + [...lleva.values()].map(({ p, n }) => (p.partes || 1) > 1
+    ? `${n} ${pl(n, p.nombre)} (${p.partes} tapas de ${fmtCm(p.ancho)} × ${fmtCm(p.largo)} c/u)`
+    : `${n} ${pl(n, p.nombre)} de ${fmtCm(p.ancho)} × ${fmtCm(p.largo)}`).join(' · '));
+  L.push('', 'Cómo cortar:');
   const sobrantes = new Map();
-  c.franjas.forEach((f, i) => {
-    const usadas = new Map(); // clave: pieza + ancho real de corte
+  c.franjas.forEach(f => {
+    const usadas = new Map(); let cols = 0;
     f.cols.forEach(col => {
       const us = col.items.filter(it => !it.sobrante).length;
-      if(us){
-        const k = col.p.nombre + '|' + col.w;
-        const prev = usadas.get(k) || { p: col.p, w: col.w, n: 0 };
-        prev.n += us; usadas.set(k, prev);
-      }
+      if(us){ cols++; const k = col.p.nombre + '|' + col.w; const x = usadas.get(k) || { p: col.p, w: col.w, n: 0 }; x.n += us; usadas.set(k, x); }
       const so = col.items.length - us;
-      if(so && !f.unTipo) sobrantes.set(col.p, (sobrantes.get(col.p)||0) + so);
+      if(so && !f.unTipo) sobrantes.set(col.p, (sobrantes.get(col.p) || 0) + so);
     });
-    const lista = [...usadas.values()].map(u => `${nombreUnidad(u.p, u.n)} (${fmtCm(u.w)} × ${fmtCm(u.p.largo)}${u.p.girada ? ', girada' : ''})`);
-    texto += ` Franja ${i+1} (${fmtCm(f.largo)} cm de largo): ${lista.join(' + ')}.`;
+    const lista = [...usadas.values()].map(u => (u.p.partes || 1) > 1
+      ? `${u.n} ${u.n === 1 ? 'tapa' : 'tapas'} de ${u.p.nombre} ${fmtCm(u.w)} × ${fmtCm(u.p.largo)}`
+      : `${u.n > 1 ? u.n + ' ' : ''}${pl(u.n, u.p.nombre)} ${fmtCm(u.w)} × ${fmtCm(u.p.largo)}`);
+    L.push(`• Franja de ${fmtCm(f.largo)} cm de largo → ${lista.join(' + ')}${cols > 1 ? ([...usadas.values()].every(u => (u.p.partes || 1) > 1) ? ', una al lado de la otra' : ', uno al lado del otro') : ''}`);
     if(f.unTipo && f.factor < 1){
-      const p = f.cols[0].p, tot = f.cols.reduce((s,col) => s + col.items.length, 0);
-      const us = f.cols.reduce((s,col) => s + col.items.filter(it => !it.sobrante).length, 0);
-      texto += ` Esta franja da ${nombreUnidad(p, tot)}; el artículo usa ${us}, el resto va para el artículo siguiente.`;
+      const tot = f.cols.reduce((s, col) => s + col.items.length, 0);
+      const us = f.cols.reduce((s, col) => s + col.items.filter(it => !it.sobrante).length, 0);
+      L.push(`  (la franja da ${tot}; esta unidad usa ${us}, el resto va para la siguiente)`);
     }
   });
   (c.tiras || []).forEach(t => {
-    const de = (t.p.partes||1) > 1 ? 'tapas' : 'piezas';
+    const de = (t.p.partes || 1) > 1 ? 'tapas' : 'piezas';
     const extra = Math.round((t.rinde - t.n) * 10) / 10;
-    texto += ` Tira continua al costado (${fmtCm(t.w)} cm de ancho, a lo largo de todo el tendido): ${t.cols.length > 1 ? t.cols.length + ' columnas de ' : ''}${t.p.nombre} ${fmtCm(t.p.ancho)} × ${fmtCm(t.p.largo)}; rinde ≈ ${fmtCm(Math.round(t.rinde*10)/10)} ${de} por unidad, el artículo usa ${t.n}` + (extra >= 0.1 ? `; las de más (≈ ${fmtCm(extra)} por unidad) quedan para aprovechar.` : '.');
-  });
-  if(c.tiras && c.tiras.retazo && c.tiras.retazo.w >= 5) texto += ` Al costado queda además una tira de ${fmtCm(c.tiras.retazo.w)} cm de ancho para aprovechar.`;
-  sobrantes.forEach((n, p) => {
-    const partes = p.partes || 1;
-    texto += partes > 1
-      ? ` Sobran ${n} tapa(s) de ${p.nombre}` + (Math.floor(n/partes) ? ` = ${Math.floor(n/partes)} ${p.nombre} de más` : '') + '.'
-      : ` Sobran ${n} ${p.nombre}.`;
+    L.push(`• Tira al costado de ${fmtCm(t.w)} cm, a lo largo de todo el tendido → ${(t.p.partes || 1) > 1 ? 'tapas de ' + t.p.nombre : t.p.nombre} ${fmtCm(t.p.ancho)} × ${fmtCm(t.p.largo)}`);
+    L.push(`  (rinde ≈ ${fmtCm(Math.round(t.rinde * 10) / 10)} ${de} por unidad; usa ${t.n}${extra >= 0.1 ? ', las otras quedan para aprovechar' : ''})`);
   });
   const ajustes = new Map();
   c.franjas.forEach(f => f.cols.forEach(col => { if(col.orig && col.w < col.orig - 0.01 && col.items.some(it => !it.sobrante)) ajustes.set(col.p.nombre + '|' + col.orig, `${col.p.nombre} de ${fmtCm(col.orig)} a ${fmtCm(col.w)} cm`); }));
-  if(ajustes.size) texto += ` Ajustado al ancho de la tela: ${[...ajustes.values()].join(', ')}.`;
-  texto += ` Largo total de tela: ${fmtCm(c.largoTotal)} cm. Consumo por unidad: ${fmtMetros(c.metros)} m (${c.detalle}); lo que sobra no se cuenta en el artículo.`;
-  c.avisos.forEach(a => texto += ' ⚠️ ' + a);
-  if(nota) texto += ' ' + nota;
-  return texto;
+  if(ajustes.size) L.push(`• Ajustada al ancho de la tela: ${[...ajustes.values()].join(', ')}`);
+  sobrantes.forEach((n, p) => {
+    const partes = p.partes || 1;
+    L.push(partes > 1 ? `• Sobran ${n} tapas de ${p.nombre}${Math.floor(n / partes) ? ` (= ${Math.floor(n / partes)} de más)` : ''}` : `• Sobran ${n} ${pl(n, p.nombre)}`);
+  });
+  if(c.tiras && c.tiras.retazo && c.tiras.retazo.w >= 5) L.push(`• Queda una tira de ${fmtCm(c.tiras.retazo.w)} cm al costado para aprovechar`);
+  c.avisos.forEach(a => L.push('⚠️ ' + a));
+  L.push('', `Consumo por unidad: ${fmtMetros(c.metros)} m`);
+  if(nota) L.push('Nota: ' + nota);
+  return L.join('\n');
 }
+
 function armarTextoInstruccion(piezas, nota){
   return textoCorte(document.getElementById('ic-articulo').value, piezas, parseFloat(document.getElementById('ic-ancho').value), nota);
 }
@@ -12843,7 +12851,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v56';
+const APP_VERSION = '2026-10-01-v57';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
