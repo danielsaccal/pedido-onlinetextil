@@ -1489,7 +1489,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v39</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v40</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -3712,7 +3712,42 @@ function piezasParaAncho(articulo, ancho){
   const g = buscarInstruccionGuardada(articulo, ancho);
   if(piezasValidas(g)) return { piezas: g.piezas, calculada: false };
   const c = instruccionCalculada(articulo, ancho);
-  return c ? { piezas: c.piezas, calculada: true, desde: c.desde } : null;
+  if(c) return { piezas: c.piezas, calculada: true, desde: c.desde };
+  const d = piezasDeducidas(articulo);
+  if(d && !calcularCorte(d.piezas, parseFloat(ancho)).avisos.length) return { piezas: d.piezas, calculada: true, deducida: d.desde };
+  return null;
+}
+
+// ===== Deducir piezas por el nombre =====
+// Si un articulo no tiene piezas pero hay otro igual que solo cambia un numero del nombre (ej: "Mantel
+// 250" y "Mantel 200"), y en ese otro alguna medida de pieza es justo ese numero (200), se deducen las
+// piezas cambiando esa medida (250). El resto de las medidas quedan iguales.
+function esNumeroNombre(w){ return /^\d+([.,]\d+)?$/.test(w); }
+function piezasDeducidas(articulo){
+  const pal = palabrasNombre(articulo);
+  const nums = pal.filter(esNumeroNombre), letras = pal.filter(w => !esNumeroNombre(w));
+  if(!nums.length) return null;
+  const inst = (tablaConsumo && tablaConsumo.instrucciones) || {};
+  for(const otro of Object.keys(inst)){
+    if(otro === articulo) continue;
+    const g = Object.values(inst[otro] || {}).find(x => piezasValidas(x) && !x.auto) || Object.values(inst[otro] || {}).find(x => piezasValidas(x));
+    if(!g) continue;
+    const p2 = palabrasNombre(otro);
+    const nums2 = p2.filter(esNumeroNombre), letras2 = p2.filter(w => !esNumeroNombre(w));
+    if(letras2.join(' ') !== letras.join(' ') || nums2.length !== nums.length) continue;
+    const distintos = nums.map((n, i) => [parseFloat(nums2[i].replace(',', '.')), parseFloat(n.replace(',', '.'))]).filter(([a, b]) => a !== b);
+    if(distintos.length !== 1) continue;
+    const [viejo, nuevo] = distintos[0];
+    let cambio = false;
+    const piezas = g.piezas.map(p => {
+      const q = { ...p };
+      if(Math.abs(q.ancho - viejo) < 1){ q.ancho = nuevo; cambio = true; }
+      else if(Math.abs(q.largo - viejo) < 1){ q.largo = nuevo; cambio = true; }
+      return q;
+    });
+    if(cambio) return { piezas, desde: otro };
+  }
+  return null;
 }
 
 // ===== Administrar articulos (crear, renombrar, borrar) =====
@@ -3878,6 +3913,7 @@ async function llevarTrabajoMedidaAOrden(){
 // ordenes de trabajo, la tabla y las piezas sueltas de los juegos siguen funcionando igual.
 let acArticulo = null;     // articulo abierto
 let acAnchoVista = null;   // ancho elegido para ver el corte
+let acDeducidaDe = null;   // si las piezas se dedujeron de otro articulo por el nombre
 
 async function abrirArticulosCortes(){
   mostrarPaso('step-articulos-cortes');
@@ -3940,7 +3976,9 @@ function abrirArticuloAC(a, piezasForzadas){
   acAnchoVista = null;
   renderListaAC();
   const grupos = juegosDePiezasAC(a);
-  const base = piezasForzadas || (grupos[0] ? grupos[0].piezas : []);
+  const deducida = !piezasForzadas && !grupos.length ? piezasDeducidas(a) : null;
+  const base = piezasForzadas || (grupos[0] ? grupos[0].piezas : (deducida ? deducida.piezas : []));
+  acDeducidaDe = deducida ? deducida.desde : null;
   document.getElementById('ac-piezas').innerHTML = '';
   (base.length ? base : [{}]).forEach(p => agregarPiezaAC(p));
   const g0 = grupos.length ? (tablaConsumo.instrucciones[a] || {})[grupos[0].anchos[0]] : null;
@@ -3984,7 +4022,8 @@ function renderEditorAC(){
   renderAnchosAC();
   document.getElementById('ac-titulo').textContent = acArticulo;
   const origen = origenAC(acArticulo);
-  document.getElementById('ac-origen').textContent = origen ? `Pieza del ${origen}: se actualiza sola cuando guarda el juego.` : '';
+  document.getElementById('ac-origen').textContent = origen ? `Pieza del ${origen}: se actualiza sola cuando guarda el juego.`
+    : (acDeducidaDe ? `ℹ️ Piezas deducidas de "${acDeducidaDe}" por el nombre. Revíselas y toque Guardar.` : '');
   const grupos = juegosDePiezasAC(acArticulo);
   document.getElementById('ac-variantes').innerHTML = grupos.length > 1
     ? `<p class="note" style="margin:0 0 8px;">Este artículo tiene cortes distintos según el ancho. Está viendo el de ${grupos[0].anchos.join(', ')} cm. Ver el de: ` +
@@ -12042,7 +12081,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v39';
+const APP_VERSION = '2026-10-01-v40';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
