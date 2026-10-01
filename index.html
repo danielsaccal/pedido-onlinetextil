@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v68</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v69</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1777,6 +1777,7 @@ a.grilla-celda{display:block;}
         <button class="btn btn-gold" style="width:auto;padding:10px 16px;" onclick="editarTela()">+ Nueva tela</button>
       </div>
       <div id="tl-usos-filtro" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
+      <div id="tl-acciones" style="display:none;"></div>
       <div id="tl-editor" style="display:none;"></div>
       <div id="tl-lista"><p class="empty-msg">Cargando...</p></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
@@ -5563,12 +5564,15 @@ function renderTelas(){
   const lista = Object.entries(telasDatos.telas)
     .filter(([c, t]) => (!tlFiltroUso || (t.usos || []).includes(tlFiltroUso)) && (!q || normBusqueda(c + ' ' + (t.nombre || '') + ' ' + (t.proveedor || '')).includes(q)))
     .sort((a, b) => a[0].localeCompare(b[0]));
+  window.__tlVisibles = lista.map(([c]) => c);
+  renderAccionesTelas();
   const cont = document.getElementById('tl-lista');
   if(!lista.length){ cont.innerHTML = `<p class="empty-msg">${Object.keys(telasDatos.telas).length ? 'No hay telas que coincidan.' : 'Todavía no hay telas cargadas. Toque "+ Nueva tela".'}</p>`; return; }
   const th = (x, al) => `<th style="padding:7px 8px;text-align:${al || 'left'};white-space:nowrap;">${x}</th>`;
   cont.innerHTML = `<div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;"><table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
-    <thead><tr style="background:var(--cream);">${th('Código')}${th('Nombre')}${th('Proveedor')}${th('Ancho', 'right')}${th('Calidad', 'right')}${th('Rendimiento', 'right')}${th('Gramaje', 'right')}${th('Usos')}</tr></thead><tbody>
-    ${lista.map(([c, t]) => `<tr onclick="editarTela('${escapeAttr(c)}')" style="border-top:1px solid var(--line);cursor:pointer;" title="Toque para editar">
+    <thead><tr style="background:var(--cream);"><th style="padding:7px 8px;width:30px;"><input type="checkbox" title="Seleccionar todas las de la lista" onchange="seleccionarTodasTelas(this.checked)" ${lista.length && lista.every(([c]) => tlSeleccion.has(c)) ? 'checked' : ''}></th>${th('Código')}${th('Nombre')}${th('Proveedor')}${th('Ancho', 'right')}${th('Calidad', 'right')}${th('Rendimiento', 'right')}${th('Gramaje', 'right')}${th('Usos')}</tr></thead><tbody>
+    ${lista.map(([c, t]) => `<tr onclick="editarTela('${escapeAttr(c)}')" style="border-top:1px solid var(--line);cursor:pointer;${tlSeleccion.has(c) ? 'background:#F3EEF7;' : ''}" title="Toque para editar">
+      <td style="padding:7px 8px;" onclick="event.stopPropagation();"><input type="checkbox" ${tlSeleccion.has(c) ? 'checked' : ''} onchange="toggleSeleccionTela('${escapeAttr(c)}', this.checked)"></td>
       <td style="padding:7px 8px;"><b>${escaparHtml(c)}</b></td>
       <td style="padding:7px 8px;">${escaparHtml(t.nombre || '')}</td>
       <td style="padding:7px 8px;">${escaparHtml(t.proveedor || '—')}</td>
@@ -5678,6 +5682,47 @@ function aplicarTelaEnOrden(){
   const rp = document.getElementById('rp-ancho'); if(rp && !rp.value) rp.value = t.ancho;
   document.querySelectorAll('.ot-renglon').forEach(r => { const a = r.querySelector('.ot-r-ancho'); if(a && !a.value){ a.value = t.ancho; resumenRenglonOT(a); } });
   try{ calcularReparto(); } catch(e){}
+}
+
+// ----- cambiar usos de varias telas a la vez -----
+const tlSeleccion = new Set();
+function toggleSeleccionTela(c, on){ if(on) tlSeleccion.add(c); else tlSeleccion.delete(c); renderTelas(); }
+function seleccionarTodasTelas(on){ (window.__tlVisibles || []).forEach(c => on ? tlSeleccion.add(c) : tlSeleccion.delete(c)); renderTelas(); }
+function renderAccionesTelas(){
+  const cont = document.getElementById('tl-acciones');
+  [...tlSeleccion].forEach(c => { if(!telasDatos.telas[c]) tlSeleccion.delete(c); });
+  if(!tlSeleccion.size){ cont.style.display = 'none'; cont.innerHTML = ''; return; }
+  cont.style.display = 'block';
+  cont.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#F3EEF7;border:1px solid #D9CCE6;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+    <b>${tlSeleccion.size} tela${tlSeleccion.size === 1 ? '' : 's'} seleccionada${tlSeleccion.size === 1 ? '' : 's'}</b>
+    <select id="tl-masivo-uso" style="width:auto;">${telasDatos.usos.map(u => `<option>${escaparHtml(u)}</option>`).join('')}<option value="__nuevo__">+ uso nuevo…</option></select>
+    <button class="btn-mini" onclick="usoMasivoTelas(true)">➕ Agregar uso</button>
+    <button class="btn-mini" onclick="usoMasivoTelas(false)">➖ Quitar uso</button>
+    <a href="#" onclick="event.preventDefault(); tlSeleccion.clear(); renderTelas();" style="font-size:0.82rem;margin-left:auto;">Quitar selección</a>
+  </div>`;
+}
+async function usoMasivoTelas(agregar){
+  let uso = document.getElementById('tl-masivo-uso').value;
+  if(uso === '__nuevo__'){
+    uso = (prompt('Nombre del uso nuevo:') || '').trim();
+    if(!uso) return;
+    const ya = telasDatos.usos.find(x => normBusqueda(x) === normBusqueda(uso));
+    if(ya) uso = ya; else telasDatos.usos.push(uso);
+  }
+  const codigos = [...tlSeleccion];
+  if(!confirm(`${agregar ? 'Agregar' : 'Quitar'} el uso "${uso}" ${agregar ? 'a' : 'de'} ${codigos.length} tela${codigos.length === 1 ? '' : 's'}?`)) return;
+  const nuevas = { ...telasDatos.telas };
+  codigos.forEach(c => {
+    const t = { ...nuevas[c] }; const us = new Set(t.usos || []);
+    if(agregar) us.add(uso); else us.delete(uso);
+    t.usos = telasDatos.usos.filter(u => us.has(u)); nuevas[c] = t;
+  });
+  try{
+    await db.collection('config').doc('telas').set({ ...telasDatos, telas: nuevas });
+    telasDatos.telas = nuevas;
+    tlSeleccion.clear();
+    renderTelas();
+  } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -13092,7 +13137,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v68';
+const APP_VERSION = '2026-10-01-v69';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
