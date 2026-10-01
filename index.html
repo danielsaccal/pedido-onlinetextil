@@ -1521,7 +1521,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v46</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v47</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1719,6 +1719,16 @@ a.grilla-celda{display:block;}
       <div class="field" style="margin-top:10px;"><label>Remito / nota del ingreso (opcional)</label><input type="text" id="it-nota" placeholder="Ej: remito 0012"></div>
       <button class="btn btn-gold" style="width:100%;" onclick="registrarIngresoTaller()">Registrar ingreso</button>
       <p class="error" id="it-error" style="display:none;"></p>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-deuda-tela">
+    <div class="form-card">
+      <h2>Tela pendiente de entrega</h2>
+      <p class="note" style="margin-bottom:10px;">Lo que cada taller todavía debe, partida por partida, y cuánto tarda en entregar.</p>
+      <div id="dt-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"></div>
+      <div id="dt-lista"><p class="empty-msg">Cargando...</p></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
@@ -4815,7 +4825,7 @@ const GRUPOS_INICIO = {
   e: { lado: 'int', titulo: 'Clientes', items: [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
   f: { lado: 'int', titulo: 'Productos y precios', items: [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📷 Actualizar foto', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
   g: { lado: 'int', titulo: 'Producción', columnas: [
-    [['✂️ Artículos y cortes', 'abrirArticulosCortes()']],
+    [['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['⏳ Tela pendiente de entrega', 'abrirDeudaTela()']],
     [['🚚 Tela en talleres', 'abrirEnviosTela()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📦 Historial de órdenes', 'abrirHistorialOT()']],
     [['📥 Ingreso del taller', 'abrirIngresoTaller()']],
   ] },
@@ -5050,8 +5060,9 @@ async function registrarIngresoTaller(){
     for(const [id, arr] of cambios){
       const o = historialOT.find(x => x._docId === id);
       const nuevos = o.renglones.map((r, i) => { const c = arr.find(x => x.i === i); if(!c) return r; detalle.push({ orden: o.numero, articulo: r.articulo, sku: r.sku || '', buenas: c.b, falladas: c.f }); return { ...r, entregado: (r.entregado || 0) + c.b, fallados: (r.fallados || 0) + c.f }; });
-      await db.collection('ordenes_trabajo').doc(id).update({ renglones: nuevos });
-      o.renglones = nuevos;
+      const entregas = [...(o.entregas || []), { fecha: new Date().toISOString(), unidades: arr.reduce((s, c) => s + c.b + c.f, 0) }];
+      await db.collection('ordenes_trabajo').doc(id).update({ renglones: nuevos, entregas });
+      o.renglones = nuevos; o.entregas = entregas;
     }
     await db.collection('ingresos_taller').add({ taller: t, fecha: new Date().toISOString(), nota: document.getElementById('it-nota').value.trim(), detalle });
     const tb = detalle.reduce((s, d) => s + d.buenas, 0), tf = detalle.reduce((s, d) => s + d.falladas, 0);
@@ -5096,6 +5107,75 @@ async function cerrarOrdenOT(docId){
     o.cerrada = true; o.merma = m;
     renderHistorialOT(document.getElementById('hot-buscador').value);
   } catch(e){ alert('No se pudo cerrar: ' + e.message); }
+}
+
+// ===== Tela pendiente de entrega (por taller) =====
+// Por cada partida abierta: metros que el taller todavia debe (sin asignar a productos + en trabajo),
+// hace cuanto se envio, y el tiempo que tarda cada taller desde que se le asigna la orden hasta que entrega.
+let dtFiltro = 'todos';
+async function abrirDeudaTela(){
+  mostrarPaso('step-deuda-tela');
+  document.getElementById('dt-lista').innerHTML = '<p class="empty-msg">Cargando...</p>';
+  await Promise.all([cargarEnviosTela(), cargarHistorialOT()]);
+  renderDeudaTela();
+}
+function datosPartida(e){
+  const ots = ordenesDeEnvio(e._id);
+  let asignado = 0, recibido = 0;
+  ots.forEach(o => (o.renglones || []).forEach(r => { const c = +r.consumo || 0; asignado += (+r.cantidad || 0) * c; recibido += ((+r.entregado || 0) + (+r.fallados || 0)) * c; }));
+  const sinAsignar = Math.max(0, e.metros - asignado);
+  const enTrabajo = Math.max(0, asignado - recibido);
+  const dias = Math.max(0, Math.floor((Date.now() - new Date(String(e.fecha).slice(0, 10) + 'T12:00:00').getTime()) / 86400000));
+  return { ots, sinAsignar, enTrabajo, debe: sinAsignar + enTrabajo, dias };
+}
+// dias desde que se armo la orden hasta la ultima entrega (ordenes terminadas)
+function tiemposDeTaller(taller){
+  const dias = [], primera = [];
+  (historialOT || []).filter(o => o.taller === taller && (o.entregas || []).length).forEach(o => {
+    const ini = new Date(o.fecha).getTime();
+    const fechas = o.entregas.map(x => new Date(x.fecha).getTime()).sort((a, b) => a - b);
+    primera.push((fechas[0] - ini) / 86400000);
+    if(estadoOrdenTrabajo(o) === 'entregado') dias.push((fechas[fechas.length - 1] - ini) / 86400000);
+  });
+  const prom = a => a.length ? Math.round(a.reduce((s, x) => s + x, 0) / a.length) : null;
+  return { completo: prom(dias), nCompleto: dias.length, primera: prom(primera), nPrimera: primera.length };
+}
+function renderDeudaTela(){
+  const abiertas = partidasEnTalleres().filter(e => !e.cerrado).map(e => ({ ...e, ...datosPartida(e) })).filter(e => e.debe > 0.5);
+  const talleres = [...new Set(abiertas.map(e => e.taller))].sort();
+  const chip = (v, t) => `<span onclick="dtFiltro='${escapeAttr(v)}'; renderDeudaTela();" style="cursor:pointer;font-size:0.82rem;padding:5px 12px;border-radius:14px;border:1px solid var(--line);${dtFiltro === v ? 'background:var(--purple);color:#fff;border-color:var(--purple);' : ''}">${escaparHtml(t)}</span>`;
+  document.getElementById('dt-filtros').innerHTML = chip('todos', 'Todos los talleres') + talleres.map(t => chip(t, t)).join('');
+  const cont = document.getElementById('dt-lista');
+  const lista = talleres.filter(t => dtFiltro === 'todos' || t === dtFiltro);
+  if(!lista.length){ cont.innerHTML = '<p class="empty-msg">Ningún taller debe tela. 👍</p>'; return; }
+  const m = x => fmtCm(Math.round(x));
+  cont.innerHTML = lista.map(t => {
+    const ps = abiertas.filter(e => e.taller === t).sort((a, b) => b.dias - a.dias);
+    const total = ps.reduce((s, e) => s + e.debe, 0);
+    const tm = tiemposDeTaller(t);
+    const tiempo = tm.completo !== null ? `tarda ≈ ${tm.completo} días en entregar todo (${tm.nCompleto} orden${tm.nCompleto === 1 ? '' : 'es'})` : (tm.primera !== null ? `primera entrega a los ≈ ${tm.primera} días` : 'todavía sin entregas registradas');
+    // por tela
+    const porTela = new Map();
+    ps.forEach(e => porTela.set(e.skuTela, (porTela.get(e.skuTela) || 0) + e.debe));
+    return `<div style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline;">
+        <b style="font-size:1.05rem;">${escaparHtml(t)}</b><b>debe ≈ ${m(total)} m</b>
+      </div>
+      <div style="font-size:0.8rem;color:#8A8072;margin-bottom:8px;">⏱️ ${tiempo} · por tela: ${[...porTela].map(([s, x]) => `${escaparHtml(s)} ${m(x)} m`).join(' · ')}</div>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.86rem;">
+        <thead><tr style="background:var(--cream);"><th style="padding:6px;text-align:left;">Tela</th><th style="padding:6px;">Enviada</th><th style="padding:6px;text-align:right;">Sin asignar</th><th style="padding:6px;text-align:right;">En trabajo</th><th style="padding:6px;text-align:right;">Debe</th></tr></thead>
+        <tbody>${ps.map(e => {
+          const color = e.dias > DIAS_ALERTA_ENVIO ? '#A6432F' : '#6B6258';
+          return `<tr style="border-top:1px solid var(--line);">
+            <td style="padding:6px;"><b>${escaparHtml(e.skuTela)}</b><br><span style="font-size:0.74rem;color:#8A8072;">${e.ots.length ? e.ots.map(o => escaparHtml(o.numero)).join(', ') : 'sin orden'}</span></td>
+            <td style="padding:6px;text-align:center;color:${color};white-space:nowrap;">hace ${e.dias} d<br><span style="font-size:0.74rem;color:#8A8072;">${new Date(String(e.fecha).slice(0, 10) + 'T12:00:00').toLocaleDateString('es-AR')}</span></td>
+            <td style="padding:6px;text-align:right;${e.sinAsignar > 0.5 ? 'color:#8A6417;font-weight:700;' : 'color:#B0A698;'}">${e.sinAsignar > 0.5 ? m(e.sinAsignar) + ' m' : '—'}</td>
+            <td style="padding:6px;text-align:right;">${e.enTrabajo > 0.5 ? m(e.enTrabajo) + ' m' : '—'}</td>
+            <td style="padding:6px;text-align:right;font-weight:700;">${m(e.debe)} m</td></tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </div>`;
+  }).join('') + `<p class="note">"Sin asignar" = tela del envío que todavía no tiene productos asignados en una orden (incluye lo que sobra de cada orden). "En trabajo" = tela de productos asignados que el taller todavía no entregó.</p>`;
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -5958,8 +6038,9 @@ async function registrarEntregaRenglonOT(docId, renglonIdx){
 
   const nuevosRenglones = orden.renglones.map((r, i) => i === renglonIdx ? { ...r, entregado: (r.entregado||0) + cantidadRecibida } : r);
   try{
-    await db.collection('ordenes_trabajo').doc(docId).update({ renglones: nuevosRenglones });
-    orden.renglones = nuevosRenglones;
+    const entregas = [...(orden.entregas || []), { fecha: new Date().toISOString(), unidades: cantidadRecibida }];
+    await db.collection('ordenes_trabajo').doc(docId).update({ renglones: nuevosRenglones, entregas });
+    orden.renglones = nuevosRenglones; orden.entregas = entregas;
     renderHistorialOT(document.getElementById('hot-buscador').value);
   } catch(e){
     alert('No se pudo registrar la entrega: ' + e.message);
@@ -12454,7 +12535,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v46';
+const APP_VERSION = '2026-10-01-v47';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
