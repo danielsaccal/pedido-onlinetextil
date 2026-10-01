@@ -1516,7 +1516,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v43</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v44</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1701,6 +1701,19 @@ a.grilla-celda{display:block;}
       </div>
       <div id="et-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
       <div id="et-lista"><p class="empty-msg">Cargando...</p></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-ingreso-taller">
+    <div class="form-card">
+      <h2>Ingreso del taller</h2>
+      <p class="note" style="margin-bottom:10px;">Elija el taller y cargue lo que entregó: las unidades buenas y las falladas de cada producto. Lo pendiente baja solo.</p>
+      <div class="field"><label>Taller</label><select id="it-taller" onchange="renderIngresoTaller()"></select></div>
+      <div id="it-lista"></div>
+      <div class="field" style="margin-top:10px;"><label>Remito / nota del ingreso (opcional)</label><input type="text" id="it-nota" placeholder="Ej: remito 0012"></div>
+      <button class="btn btn-gold" style="width:100%;" onclick="registrarIngresoTaller()">Registrar ingreso</button>
+      <p class="error" id="it-error" style="display:none;"></p>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
@@ -4796,7 +4809,7 @@ const GRUPOS_INICIO = {
   d: { lado: 'int', titulo: 'Pedidos', items: [['📋 Historial de pedidos', 'abrirHistorial()'], ['🤖 Pedido con IA (texto libre)', 'abrirPedidoIA()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']] },
   e: { lado: 'int', titulo: 'Clientes', items: [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
   f: { lado: 'int', titulo: 'Productos y precios', items: [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📷 Actualizar foto', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
-  g: { lado: 'int', titulo: 'Producción', items: [['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['🚚 Tela en talleres', 'abrirEnviosTela()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📦 Historial de órdenes', 'abrirHistorialOT()']] },
+  g: { lado: 'int', titulo: 'Producción', items: [['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['🚚 Tela en talleres', 'abrirEnviosTela()'], ['📥 Ingreso del taller', 'abrirIngresoTaller()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📦 Historial de órdenes', 'abrirHistorialOT()']] },
   h: { lado: 'int', titulo: 'Finanzas', items: [['💰 Ventas Mercado Libre', 'abrirVentasML()'], ['🧮 Calculadora de costos', 'abrirCalculadoraCostos()']] },
   i: { lado: 'int', titulo: 'Configuración', items: [['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['🔔 Avisos push', 'abrirConfigPush()'], ['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']] },
 };
@@ -4884,19 +4897,21 @@ async function borrarEnvioTela(id){
 function renderEnviosTela(){
   const talleres = [...new Set((enviosTela || []).map(e => e.taller))].sort();
   const chip = (v, t) => `<span onclick="etFiltro='${escapeAttr(v)}'; renderEnviosTela();" style="cursor:pointer;font-size:0.82rem;padding:5px 12px;border-radius:14px;border:1px solid var(--line);${etFiltro === v ? 'background:var(--purple);color:#fff;border-color:var(--purple);' : ''}">${escaparHtml(t)}</span>`;
-  document.getElementById('et-filtros').innerHTML = chip('pendientes', 'Con metros sin asignar') + chip('todos', 'Todos') + talleres.map(t => chip('t:' + t, t)).join('');
+  document.getElementById('et-filtros').innerHTML = chip('pendientes', 'Abiertas') + chip('todos', 'Todos') + talleres.map(t => chip('t:' + t, t)).join('');
   const hoy = Date.now();
   const lista = (enviosTela || []).map(e => {
     const asig = asignadoEnvio(e._id), resto = Math.round((e.metros - asig) * 100) / 100;
     const dias = Math.floor((hoy - new Date(e.fecha + 'T12:00:00').getTime()) / 86400000);
     return { ...e, asig, resto, dias };
-  }).filter(e => etFiltro === 'todos' ? true : etFiltro === 'pendientes' ? e.resto > 0.01 : e.taller === etFiltro.slice(2));
+  }).filter(e => etFiltro === 'todos' ? true : etFiltro === 'pendientes' ? !e.cerrado : e.taller === etFiltro.slice(2));
   const cont = document.getElementById('et-lista');
-  if(!lista.length){ cont.innerHTML = `<p class="empty-msg">${etFiltro === 'pendientes' ? 'No hay tela en talleres sin orden. 👍' : 'No hay envíos.'}</p>`; return; }
+  if(!lista.length){ cont.innerHTML = `<p class="empty-msg">${etFiltro === 'pendientes' ? 'No hay partidas abiertas. Las cerradas se ven en "Todos".' : 'No hay envíos.'}</p>`; return; }
   cont.innerHTML = lista.map(e => {
     const ots = ordenesDeEnvio(e._id);
     const pct = e.metros > 0 ? Math.min(100, e.asig / e.metros * 100) : 0;
-    const tag = e.resto <= 0.01 ? ['Todo asignado', '#EAF6EE', '#2F7A47'] : (e.dias > DIAS_ALERTA_ENVIO ? [`${fmtCm(e.resto)} m sin orden`, '#FBEAE6', '#A6432F'] : [`${fmtCm(e.resto)} m sin orden`, '#FDF4E2', '#8A6417']);
+    const m = ots.length ? calcularMerma(ots) : null;
+    const recibido = m ? m.buenas + m.falladas : 0;
+    const tag = e.cerrado ? ['Cerrada', '#EEEAF2', '#3D2B4E'] : e.resto <= 0.01 ? ['Todo asignado', '#EAF6EE', '#2F7A47'] : (e.dias > DIAS_ALERTA_ENVIO ? [`${fmtCm(e.resto)} m sin orden`, '#FBEAE6', '#A6432F'] : [`${fmtCm(e.resto)} m sin orden`, '#FDF4E2', '#8A6417']);
     const fecha = new Date(e.fecha + 'T12:00:00').toLocaleDateString('es-AR');
     return `<div style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;">
       <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline;">
@@ -4905,9 +4920,12 @@ function renderEnviosTela(){
       </div>
       <div style="font-size:0.8rem;color:#8A8072;">Enviado ${fecha}${e.resto > 0.01 ? ` · hace ${e.dias} día${e.dias === 1 ? '' : 's'}` : ''}${e.comprobante ? ' · ' + escaparHtml(e.comprobante) : ''}</div>
       <div style="height:8px;border-radius:4px;background:var(--cream);overflow:hidden;margin:8px 0 6px;"><div style="height:100%;width:${pct}%;background:var(--purple);"></div></div>
-      <div style="font-size:0.8rem;color:#6B6258;margin-bottom:8px;">${ots.length ? ots.map(o => `${escaparHtml(o.numero)} · ${fmtCm(+o.metrosTotales || 0)} m`).join(' · ') : 'Todavía sin órdenes'}</div>
+      <div style="font-size:0.8rem;color:#6B6258;margin-bottom:4px;">${ots.length ? ots.map(o => `${escaparHtml(o.numero)} · ${fmtCm(+o.metrosTotales || 0)} m`).join(' · ') : 'Todavía sin órdenes'}</div>
+      ${m && m.esperadas ? `<div style="font-size:0.8rem;color:#6B6258;margin-bottom:8px;">Recibido del taller: ${m.buenas} buenas${m.falladas ? ` + ${m.falladas} falladas` : ''} de ${m.esperadas} unidades</div>` : ''}
+      ${e.cerrado && e.merma ? `<div style="font-size:0.85rem;background:#FBF3F1;border-radius:8px;padding:6px 8px;margin-bottom:8px;"><b>Merma ${escaparHtml(textoMerma(e.merma))}</b></div>` : ''}
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        ${e.resto > 0.01 ? `<button class="btn-mini" onclick="armarOrdenDesdeEnvio('${e._id}')">📋 Armar orden con los ${fmtCm(e.resto)} m</button>` : ''}
+        ${e.resto > 0.01 && !e.cerrado ? `<button class="btn-mini" onclick="armarOrdenDesdeEnvio('${e._id}')">📋 Armar orden con los ${fmtCm(e.resto)} m</button>` : ''}
+        ${ots.length && !e.cerrado && recibido > 0 ? `<button class="btn-mini" onclick="cerrarPartidaEnvio('${e._id}')">✔️ Cerrar partida</button>` : ''}
         ${ots.length ? '' : `<button class="btn-mini" onclick="borrarEnvioTela('${e._id}')">🗑️</button>`}
       </div>
     </div>`;
@@ -4930,6 +4948,121 @@ async function armarOrdenDesdeEnvio(id){
   banner.innerHTML = `<b>🚚 Orden para el envío ${escaparHtml(e.skuTela)} (${escaparHtml(e.taller)})</b> — quedan ${fmtCm(resto)} m sin asignar. Puede usar menos y armar otra orden después con el resto.`;
   banner.style.display = 'block';
   try{ calcularReparto(); } catch(err){}
+}
+
+// ===== Ingreso desde el taller y merma =====
+// Lo que entrega el taller (buenas y falladas) baja lo pendiente de cada orden. Al cerrar una partida
+// (un envio de tela, o una orden suelta) se calcula la merma: lo que no llego bueno, en unidades y en
+// metros de tela, separando falladas de faltantes.
+function calcularMerma(ordenes){
+  let esperadas = 0, buenas = 0, falladas = 0, mEsp = 0, mFall = 0, mFalt = 0;
+  ordenes.forEach(o => (o.renglones || []).forEach(r => {
+    const c = +r.consumo || 0, q = +r.cantidad || 0, b = Math.min(q, +r.entregado || 0), f = Math.min(q - b, +r.fallados || 0);
+    esperadas += q; buenas += b; falladas += f;
+    mEsp += q * c; mFall += f * c; mFalt += (q - b - f) * c;
+  }));
+  const faltantes = esperadas - buenas - falladas;
+  const pct = mEsp > 0 ? (mFall + mFalt) / mEsp : 0;
+  return { esperadas, buenas, falladas, faltantes, metrosPerdidos: Math.round((mFall + mFalt) * 100) / 100, pct, pctFalladas: mEsp > 0 ? mFall / mEsp : 0, pctFaltantes: mEsp > 0 ? mFalt / mEsp : 0 };
+}
+function pctTxt(x){ return String(Math.round(x * 1000) / 10).replace('.', ',') + ' %'; }
+function textoMerma(m){
+  if(!m.esperadas) return 'sin producción registrada';
+  const partes = [];
+  if(m.falladas) partes.push(`${m.falladas} falladas (${pctTxt(m.pctFalladas)})`);
+  if(m.faltantes) partes.push(`${m.faltantes} que no llegaron (${pctTxt(m.pctFaltantes)})`);
+  return `${pctTxt(m.pct)}${partes.length ? ': ' + partes.join(' y ') : ''} · ≈ ${fmtCm(m.metrosPerdidos)} m de tela · llegaron ${m.buenas} de ${m.esperadas}`;
+}
+async function abrirIngresoTaller(){
+  mostrarPaso('step-ingreso-taller');
+  if(talleresLista === null) await cargarTalleres();
+  await cargarHistorialOT();
+  const conPendiente = [...new Set((historialOT || []).filter(o => !o.cerrada && (o.renglones || []).some(r => pendienteRenglon(r) > 0)).map(o => o.taller))];
+  const sel = document.getElementById('it-taller');
+  const actual = sel.value;
+  sel.innerHTML = '<option value="">Elija un taller</option>' + [...new Set([...conPendiente, ...talleresLista])].map(t => `<option value="${escapeAttr(t)}">${escaparHtml(t)}${conPendiente.includes(t) ? '' : ' (sin pendientes)'}</option>`).join('');
+  if(actual) sel.value = actual; else if(conPendiente.length === 1) sel.value = conPendiente[0];
+  document.getElementById('it-nota').value = '';
+  renderIngresoTaller();
+}
+function renderIngresoTaller(){
+  const t = document.getElementById('it-taller').value;
+  const cont = document.getElementById('it-lista');
+  if(!t){ cont.innerHTML = ''; return; }
+  const ords = (historialOT || []).filter(o => o.taller === t && !o.cerrada && (o.renglones || []).some(r => pendienteRenglon(r) > 0));
+  if(!ords.length){ cont.innerHTML = '<p class="empty-msg">Este taller no tiene nada pendiente de entregar.</p>'; return; }
+  const metrosPend = ords.reduce((s, o) => s + (o.renglones || []).reduce((a, r) => a + pendienteRenglon(r) * (+r.consumo || 0), 0), 0);
+  cont.innerHTML = `<p class="note" style="margin:0 0 8px;">Pendiente en ${escaparHtml(t)}: ≈ ${fmtCm(Math.round(metrosPend))} m de tela por fabricar.</p>` + ords.map(o => `
+    <div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;">
+      <b>${escaparHtml(o.numero)}</b> <span class="note">· ${escaparHtml(o.skuTela || '')}</span>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.88rem;margin-top:6px;">
+        <thead><tr style="color:#8A8072;font-size:0.78rem;"><th style="text-align:left;padding:4px;">Producto</th><th style="padding:4px;">Pendiente</th><th style="padding:4px;">Buenas</th><th style="padding:4px;">Falladas</th></tr></thead>
+        <tbody>${(o.renglones || []).map((r, i) => pendienteRenglon(r) > 0 ? `<tr style="border-top:1px solid var(--line);">
+          <td style="padding:4px;">${escaparHtml(r.articulo)}${r.sku ? `<br><span class="note" style="font-size:0.72rem;">${escaparHtml(r.sku)}</span>` : ''}</td>
+          <td style="padding:4px;text-align:center;font-weight:700;">${pendienteRenglon(r)}</td>
+          <td style="padding:4px;text-align:center;"><input type="number" min="0" class="it-b" data-o="${o._docId}" data-i="${i}" style="width:70px;"></td>
+          <td style="padding:4px;text-align:center;"><input type="number" min="0" class="it-f" data-o="${o._docId}" data-i="${i}" style="width:70px;"></td></tr>` : '').join('')}</tbody>
+      </table></div>
+    </div>`).join('');
+}
+async function registrarIngresoTaller(){
+  const err = document.getElementById('it-error'); err.style.display = 'none';
+  const t = document.getElementById('it-taller').value;
+  const cambios = new Map(); // docId -> [{i, b, f}]
+  document.querySelectorAll('.it-b').forEach(el => {
+    const b = parseInt(el.value, 10) || 0;
+    const fEl = [...document.querySelectorAll('.it-f')].find(x => x.dataset.o === el.dataset.o && x.dataset.i === el.dataset.i);
+    const f = parseInt(fEl && fEl.value, 10) || 0;
+    if(b < 0 || f < 0 || (!b && !f)) return;
+    const arr = cambios.get(el.dataset.o) || []; arr.push({ i: +el.dataset.i, b, f }); cambios.set(el.dataset.o, arr);
+  });
+  if(!cambios.size){ err.textContent = 'Cargue al menos una cantidad.'; err.style.display = 'block'; return; }
+  // controlar que no se pase de lo pendiente
+  for(const [id, arr] of cambios){
+    const o = historialOT.find(x => x._docId === id);
+    for(const c of arr){ const r = o.renglones[c.i]; if(c.b + c.f > pendienteRenglon(r) && !confirm(`${r.articulo} (${o.numero}): quedan ${pendienteRenglon(r)} pendientes y está cargando ${c.b + c.f}. ¿Registrar igual?`)) return; }
+  }
+  const detalle = [];
+  try{
+    for(const [id, arr] of cambios){
+      const o = historialOT.find(x => x._docId === id);
+      const nuevos = o.renglones.map((r, i) => { const c = arr.find(x => x.i === i); if(!c) return r; detalle.push({ orden: o.numero, articulo: r.articulo, sku: r.sku || '', buenas: c.b, falladas: c.f }); return { ...r, entregado: (r.entregado || 0) + c.b, fallados: (r.fallados || 0) + c.f }; });
+      await db.collection('ordenes_trabajo').doc(id).update({ renglones: nuevos });
+      o.renglones = nuevos;
+    }
+    await db.collection('ingresos_taller').add({ taller: t, fecha: new Date().toISOString(), nota: document.getElementById('it-nota').value.trim(), detalle });
+    const tb = detalle.reduce((s, d) => s + d.buenas, 0), tf = detalle.reduce((s, d) => s + d.falladas, 0);
+    alert(`Ingreso registrado: ${tb} buenas${tf ? ` y ${tf} falladas` : ''}.`);
+    document.getElementById('it-nota').value = '';
+    renderIngresoTaller();
+  } catch(e){ err.textContent = 'No se pudo registrar: ' + e.message; err.style.display = 'block'; }
+}
+// cerrar una partida (envio de tela): sus ordenes quedan cerradas y se guarda la merma
+async function cerrarPartidaEnvio(id){
+  const e = (enviosTela || []).find(x => x._id === id);
+  const ots = ordenesDeEnvio(id);
+  if(!e || !ots.length) return;
+  const m = calcularMerma(ots);
+  const resto = Math.round((e.metros - asignadoEnvio(id)) * 100) / 100;
+  if(!confirm(`Cerrar la partida ${e.skuTela} (${e.taller})\n\nMerma: ${textoMerma(m)}` + (resto > 0.01 ? `\n\nOjo: quedan ${fmtCm(resto)} m sin asignar a ninguna orden.` : '') + `\n\nLo que no llegó deja de figurar como pendiente. ¿Cerrar?`)) return;
+  try{
+    const ahora = new Date().toISOString();
+    for(const o of ots){ await db.collection('ordenes_trabajo').doc(o._docId).update({ cerrada: true, cerradaFecha: ahora }); o.cerrada = true; }
+    await db.collection('envios_tela').doc(id).update({ cerrado: true, cerradoFecha: ahora, merma: m });
+    e.cerrado = true; e.merma = m;
+    renderEnviosTela();
+  } catch(err){ alert('No se pudo cerrar: ' + err.message); }
+}
+async function cerrarOrdenOT(docId){
+  const o = (historialOT || []).find(x => x._docId === docId);
+  if(!o) return;
+  const m = calcularMerma([o]);
+  if(!confirm(`Cerrar ${o.numero}\n\nMerma: ${textoMerma(m)}\n\nLo que no llegó deja de figurar como pendiente. ¿Cerrar?`)) return;
+  try{
+    await db.collection('ordenes_trabajo').doc(docId).update({ cerrada: true, cerradaFecha: new Date().toISOString(), merma: m });
+    o.cerrada = true; o.merma = m;
+    renderHistorialOT(document.getElementById('hot-buscador').value);
+  } catch(e){ alert('No se pudo cerrar: ' + e.message); }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -5623,14 +5756,15 @@ async function cargarHistorialOT(){
 
 // pendiente = lo que falta entregar de un renglon; entregado nunca se muestra por encima de lo pedido
 function pendienteRenglon(r){
-  return Math.max(0, (r.cantidad||0) - (r.entregado||0));
+  return Math.max(0, (r.cantidad||0) - (r.entregado||0) - (r.fallados||0));
 }
 
 function estadoOrdenTrabajo(orden){
+  if(orden.cerrada) return 'entregado';
   const renglones = orden.renglones || [];
   if(renglones.length === 0) return 'pendiente';
   const totalPedido = renglones.reduce((s,r) => s + (r.cantidad||0), 0);
-  const totalEntregado = renglones.reduce((s,r) => s + (r.entregado||0), 0);
+  const totalEntregado = renglones.reduce((s,r) => s + (r.entregado||0) + (r.fallados||0), 0);
   if(totalEntregado <= 0) return 'pendiente';
   if(totalEntregado >= totalPedido) return 'entregado';
   return 'parcial';
@@ -5718,7 +5852,7 @@ function renderHistorialOT(filtro){
   cont.innerHTML = filtradas.map(o => {
     const fecha = o.fecha ? new Date(o.fecha).toLocaleString('es-AR') : '';
     const estado = estadoOrdenTrabajo(o);
-    const etiquetaEstado = estado === 'entregado' ? 'Entregado' : estado === 'parcial' ? 'Parcial' : 'Pendiente';
+    const etiquetaEstado = o.cerrada ? 'Cerrada' : estado === 'entregado' ? 'Entregado' : estado === 'parcial' ? 'Parcial' : 'Pendiente';
     const renglonesFilas = (o.renglones||[]).map((r, i) => {
       const pendiente = pendienteRenglon(r);
       const metrosPendientes = Math.round(pendiente * r.consumo * 100) / 100;
@@ -5726,10 +5860,10 @@ function renderHistorialOT(filtro){
         <tr>
           <td>${escaparHtml(r.articulo)}<br><span style="color:#8A8072;font-size:0.78rem;">SKU: ${escaparHtml(r.sku||'—')}</span></td>
           <td class="n">${r.cantidad}</td>
-          <td class="n">${r.entregado||0}</td>
-          <td class="n">${pendiente > 0 ? `<b>${pendiente}</b><br><span style="color:#8A8072;font-size:0.76rem;">≈ ${metrosPendientes} m</span>` : '✓'}</td>
+          <td class="n">${r.entregado||0}${r.fallados ? `<br><span style="color:#A6432F;font-size:0.76rem;">+${r.fallados} falladas</span>` : ''}</td>
+          <td class="n">${o.cerrada ? (pendiente > 0 ? `<span style="color:#A6432F;">${pendiente} no llegaron</span>` : '✓') : pendiente > 0 ? `<b>${pendiente}</b><br><span style="color:#8A8072;font-size:0.76rem;">≈ ${metrosPendientes} m</span>` : '✓'}</td>
           <td>
-            ${pendiente > 0 ? `
+            ${pendiente > 0 && !o.cerrada ? `
               <div style="display:flex;gap:4px;align-items:center;">
                 <input type="number" min="1" max="${pendiente}" id="hot-entrega-${o._docId}-${i}" style="width:60px;padding:4px;border:1px solid var(--line);border-radius:4px;" placeholder="cant.">
                 <button class="btn-mini" onclick="event.stopPropagation(); registrarEntregaRenglonOT('${o._docId}', ${i})">Registrar</button>
@@ -5755,6 +5889,7 @@ function renderHistorialOT(filtro){
             <b>Tela:</b> ${escaparHtml(o.skuTela||'')} — ${o.metrosTotales||0} m entregados
             ${o.comprobante ? `<br><b>Comprobante:</b> ${escaparHtml(o.comprobante)}` : ''}
             ${o.notaGeneral ? `<br><b>Nota:</b> ${escaparHtml(o.notaGeneral)}` : ''}
+            ${o.merma ? `<br><b>Merma:</b> ${escaparHtml(textoMerma(o.merma))}` : ''}
           </div>
           <table>
             <thead><tr><th>Producto</th><th>Pedido</th><th>Entregado</th><th>Pendiente</th><th>Registrar entrega</th></tr></thead>
@@ -5764,6 +5899,7 @@ function renderHistorialOT(filtro){
             <button class="btn-mini" onclick="event.stopPropagation(); compartirTextoOrdenGuardada('${o._docId}', 'whatsapp')">📤 Reenviar por WhatsApp</button>
             <button class="btn-mini" onclick="event.stopPropagation(); pdfOrdenGuardada('${o._docId}')">📄 PDF</button>
             <button class="btn-mini" onclick="event.stopPropagation(); etiquetasOrdenGuardada('${o._docId}')">🏷️ Etiquetas</button>
+            ${o.cerrada || o.envioId ? '' : `<button class="btn-mini" onclick="event.stopPropagation(); cerrarOrdenOT('${o._docId}')">✔️ Cerrar orden</button>`}
             <button class="btn-mini" onclick="event.stopPropagation(); modificarOrdenOT('${o._docId}')">✏️ Modificar</button>
             <button class="btn-mini" onclick="event.stopPropagation(); borrarOrdenOT('${o._docId}')">🗑️ Borrar</button>
           </div>
@@ -12285,7 +12421,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v43';
+const APP_VERSION = '2026-10-01-v44';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
