@@ -1470,7 +1470,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v28</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v29</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2786,6 +2786,7 @@ function buscarBosquejoCorte(articulo, ancho){
   if(sku){ const r = piezasDeFicha(sku); return r.piezas.length ? dibujarBosquejoCorte(parseFloat(ancho), r.piezas) : ''; }
   const g = buscarInstruccionGuardada(articulo, ancho);
   if(!g){ const c = instruccionCalculada(articulo, ancho); return c ? dibujarBosquejoCorte(parseFloat(ancho), c.piezas) : ''; }
+  if(piezasValidas(g)) return dibujarBosquejoCorte(parseFloat(ancho), g.piezas);
   if(g.bosquejoBase64) return g.bosquejoBase64;
   return Array.isArray(g.piezas) && g.piezas.length ? dibujarBosquejoCorte(parseFloat(ancho), g.piezas) : '';
 }
@@ -3161,14 +3162,26 @@ function dibujarBosquejoCorte(anchoTela, piezas){
   const margen = 70;
   const canvas = document.createElement('canvas');
   canvas.width = anchoPx + margen*2;
-  canvas.height = altoPx + margen*2 + 30;
+  canvas.height = altoPx + margen*2 + 60;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.strokeStyle = '#000000'; ctx.fillStyle = '#000000'; ctx.lineWidth = 1.5;
   ctx.textAlign = 'center';
 
+  // colores: cada pieza del articulo con su color; lo que sobra en blanco; la tela sin usar, rayada
+  const PALETA = ['#BFDBF7', '#F9D3A8', '#CDE8BE', '#E3CCF2', '#F5E09A', '#F4C2CA', '#BFE8E3'];
+  const colorDe = new Map();
+  const rayado = (x, y, w, hh) => {
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, hh); ctx.clip();
+    ctx.fillStyle = '#F2F0EC'; ctx.fillRect(x, y, w, hh);
+    ctx.strokeStyle = '#CFC8BC'; ctx.lineWidth = 1;
+    for(let d = -hh; d < w; d += 10){ ctx.beginPath(); ctx.moveTo(x + d, y + hh); ctx.lineTo(x + d + hh, y); ctx.stroke(); }
+    ctx.restore();
+  };
+
   ctx.save();
   ctx.beginPath(); ctx.rect(margen, margen, anchoPx, altoPx); ctx.clip();
+  rayado(margen, margen, anchoPx, altoPx);
   const numTapa = new Map(); // numera las tapas de cada pieza en orden: 1, 2, 1, 2...
   c.franjas.forEach(f => {
     f.cols.forEach(col => {
@@ -3178,6 +3191,10 @@ function dibujarBosquejoCorte(anchoTela, piezas){
         const partes = it.p.partes || 1;
         const nro = numTapa.get(it.p) || 0; numTapa.set(it.p, nro + 1);
         const tapa = partes > 1 ? `Tapa ${(nro % partes) + 1}` : '';
+        if(!colorDe.has(it.p.nombre)) colorDe.set(it.p.nombre, PALETA[colorDe.size % PALETA.length]);
+        ctx.fillStyle = it.sobrante ? '#FFFFFF' : colorDe.get(it.p.nombre);
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#000000';
         if(it.sobrante) ctx.setLineDash([4,3]);
         ctx.strokeRect(x, y, w, h);
         ctx.setLineDash([]);
@@ -3202,6 +3219,15 @@ function dibujarBosquejoCorte(anchoTela, piezas){
   ctx.beginPath(); ctx.moveTo(margen, yFlecha); ctx.lineTo(margen+anchoPx, yFlecha); ctx.stroke();
   ctx.fillText(fmtCm(anchoTela) + ' cm de ancho', margen + anchoPx/2, yFlecha - 8);
   if(c.franjas.length > 1) ctx.fillText('Largo total: ' + fmtCm(c.largoTotal) + ' cm', margen + anchoPx/2, margen + altoPx + 24);
+  // referencias
+  const yR = margen + altoPx + 44;
+  let xR = margen;
+  ctx.font = '12px Arial'; ctx.textAlign = 'left';
+  const ref = (pintar, txt) => { pintar(xR, yR - 10, 14, 14); ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(xR, yR - 10, 14, 14); ctx.fillStyle = '#000'; ctx.fillText(txt, xR + 20, yR + 2); xR += 26 + ctx.measureText(txt).width + 18; };
+  ref((x, y, w, hh) => { ctx.fillStyle = PALETA[0]; ctx.fillRect(x, y, w, hh); }, 'Lo que usa 1 unidad');
+  ref((x, y, w, hh) => { ctx.fillStyle = '#fff'; ctx.fillRect(x, y, w, hh); }, 'Sobra / siguiente unidad');
+  ref((x, y, w, hh) => rayado(x, y, w, hh), 'Tela sin usar');
+  ctx.lineWidth = 1.5;
   return canvas.toDataURL('image/png');
 }
 
@@ -11439,7 +11465,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-09-30-v28';
+const APP_VERSION = '2026-09-30-v29';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
