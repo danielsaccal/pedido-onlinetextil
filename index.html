@@ -534,6 +534,22 @@ a.grilla-celda{display:block;}
 
 <div class="app">
 
+  <style>
+    .otc{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;background:#fff;}
+    .otc-top{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+    .otc-top > div{flex:1;min-width:0;}
+    .otc-top select{width:100%;}
+    .otc-x{border:none;background:none;font-size:1.1rem;color:#B0A698;cursor:pointer;padding:4px 6px;flex-shrink:0;}
+    .otc-x:hover{color:#A6432F;}
+    .otc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:6px;margin-bottom:6px;}
+    .otc-f{display:flex;flex-direction:column;font-size:0.7rem;color:#8A8072;gap:2px;margin:0;}
+    .otc-f input, .otc-f select{padding:7px 8px;font-size:0.9rem;min-width:0;width:100%;box-sizing:border-box;}
+    .otc-w2{grid-column:span 2;}
+    .otc-res:empty{display:none;}
+    .otc-res{display:flex;gap:10px;align-items:center;background:var(--cream);border-radius:10px;padding:6px 8px;font-size:0.85rem;}
+    .otc-res img{width:54px;height:54px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:6px;cursor:zoom-in;}
+  </style>
+
   <!-- STEP: INICIO (iconos) -->
   <div class="step" id="step-inicio">
     <style>
@@ -1521,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v52</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v53</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2822,7 +2838,7 @@ function lineaRenglonTexto(r, i, anchoComun){
   const corte = corteCortoRenglon(r);
   if(corte) lineas.push(`   ✂️ ${corte}`);
   if(r.deSobras > 0) lineas.push(`   ♻️ ${r.deSobras} salen de lo que sobra de los otros cortes${r.deSobras < r.cantidad ? `, ${r.cantidad - r.deSobras} de tela nueva` : ' (no usan tela nueva)'}`);
-  else if(r.sobrasPara) lineas.push(`   ♻️ ${r.sobrasTexto ? 'Sobra ' + r.sobrasTexto + ', de donde' : 'De lo que sobra'} salen ≈ ${r.sobrasN} ${plural(r.sobrasN, r.sobrasPara)} (se hacen en esta orden)`);
+  else if(r.sobrasPara) lineas.push(`   ♻️ ${r.sobrasTexto ? 'Sobra ' + r.sobrasTexto + ', de donde' : 'De lo que sobra'} salen ${r.sobrasN ? '≈ ' + r.sobrasN + ' ' + plural(r.sobrasN, r.sobrasPara) : r.sobrasPara} (se hacen en esta orden)`);
   else {
     let ap = null, tx = '';
     try{ ap = aprovechaRenglon(r); if(ap){ const s = sobrasDeRenglon(r); tx = s ? textoLonjas(s, +r.cantidad || 0) : ''; } } catch(e){}
@@ -4625,7 +4641,13 @@ function aprovecharSobrasOrden(renglones){
       pozo.tapas -= k * partes;
       grandes.forEach(g => {
         const t = tapasDeSobras(g.s, +g.r.cantidad || 0, p);
-        if(t > 0){ g.r.sobrasPara = r.articulo; g.r.sobrasN = Math.floor(t / partes); g.r.sobrasTexto = textoLonjas(g.s, +g.r.cantidad || 0); }
+        if(t > 0){
+          const lista = (g.r.sobrasPara ? g.r.sobrasPara.split(' y ') : []);
+          if(!lista.includes(r.articulo)) lista.push(r.articulo);
+          g.r.sobrasPara = lista.join(' y ');
+          g.r.sobrasN = lista.length > 1 ? null : Math.floor(t / partes);
+          g.r.sobrasTexto = textoLonjas(g.s, +g.r.cantidad || 0);
+        }
       });
       r.metrosConsumidos = Math.round((r.cantidad - k) * r.consumo * 100) / 100;
     }
@@ -5208,7 +5230,8 @@ function piezasGenericoDe(renglon){
   return [{ nombre: renglon.querySelector('.ot-r-g-nombre').value.trim() || 'Pieza', ancho: a, largo: l, cantidad: 1,
     partes: Math.max(1, parseInt(renglon.querySelector('.ot-r-g-piezas').value, 10) || 1), girar: renglon.querySelector('.ot-r-g-girar').value === 'si' }];
 }
-function calcularGenericoOT(el){
+function calcularGenericoOT(el){ resumenRenglonOT(el); }
+function calcularGenericoOTViejo(el){
   const renglon = el.closest('.ot-renglon');
   if(!renglon || renglon.querySelector('.ot-r-articulo').value !== '__generico__') return;
   const res = renglon.querySelector('.ot-r-g-res');
@@ -5307,6 +5330,36 @@ async function irAIngresoDe(taller){
   await abrirIngresoTaller();
   document.getElementById('it-taller').value = taller;
   renderIngresoTaller();
+}
+
+// resumen de cada producto de la orden: consumo, total, desperdicio y bosquejo chico
+function resumenRenglonOT(el){
+  const r = el.closest ? el.closest('.ot-renglon') : el;
+  if(!r) return;
+  const res = r.querySelector('.otc-res');
+  const v = r.querySelector('.ot-r-articulo').value;
+  const cant = parseInt(r.querySelector('.ot-r-cantidad').value, 10) || 0;
+  const W = parseFloat(r.querySelector('.ot-r-ancho').value);
+  if(!v){ res.innerHTML = ''; return; }
+  if(v === '__personalizado__'){
+    const c = parseFloat(r.querySelector('.ot-r-consumo-personal').value);
+    res.innerHTML = c > 0 ? `<span><b>${fmtMetros(c)} m c/u</b>${cant ? ` × ${cant} = <b>${fmtMetros(c * cant)} m</b>` : ''} <span class="note">· sin bosquejo</span></span>` : '';
+    return;
+  }
+  let piezas = null;
+  if(v === '__generico__') piezas = piezasGenericoDe(r);
+  else if(W > 0){ try{ if(v.startsWith('ficha:')){ const f = piezasDeFicha(v.slice(6)); piezas = f.errores.length ? null : f.piezas; } else { const pp = piezasParaAncho(v, W); piezas = pp ? pp.piezas : null; } } catch(e){} }
+  if(!(W > 0)){ res.innerHTML = '<span class="note">Escriba el ancho de la tela.</span>'; return; }
+  if(!piezas){
+    const c = consumoUnitarioOT(v, W);
+    res.innerHTML = c ? `<span><b>${fmtMetros(c)} m c/u</b>${cant ? ` × ${cant} = <b>${fmtMetros(c * cant)} m</b>` : ''} <span class="note">· consumo de la tabla</span></span>` : '<span class="note" style="color:#A6432F;">No hay consumo para ese ancho.</span>';
+    return;
+  }
+  const c = calcularCorte(piezas, W);
+  if(c.avisos.length){ res.innerHTML = `<span class="note" style="color:#A6432F;">${escaparHtml(c.avisos.join(' '))}</span>`; return; }
+  const sobra = Math.round((1 - aprovechamientoCorte(c, W)) * 100);
+  const desp = sobra <= 3 ? '<span style="color:#2F7A47;">✓ sin desperdicio</span>' : `<span style="color:${sobra <= 15 ? '#8A6417' : '#A6432F'};">sobra ${sobra} %</span>`;
+  res.innerHTML = `<img src="${dibujarBosquejoCorte(W, piezas)}" onclick="verImagenGrandeAC(this.src)" title="Ver bosquejo"><span><b>${fmtMetros(c.metros)} m c/u</b>${cant ? ` × ${cant} = <b>${fmtMetros(c.metros * cant)} m</b>` : ''} · ${desp}<br><span class="note" style="font-size:0.78rem;">✂️ ${escaparHtml(textoCorteCorto(piezas, W))}</span></span>`;
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -5526,29 +5579,32 @@ function agregarRenglonOrdenTrabajo(){
   div.className = 'ot-renglon';
   div.dataset.id = id;
   div.style.cssText = 'border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;';
+  div.className = 'ot-renglon otc';
+  div.style.cssText = '';
   div.innerHTML = `
-    <div class="field"><label>Artículo</label><select class="ot-r-articulo" onchange="cambiarModoRenglonOT(this)"><option value="">Elija un artículo</option>${opcionesArticuloOT()}<option value="__generico__">🧩 Genérico (por medida de pieza)</option><option value="__personalizado__">✏️ Personalizado (a medida, consumo a mano)</option></select></div>
-    <div class="ot-r-normal">
-      <div class="field"><label>Ancho real de la tela (cm)</label><input type="number" step="0.1" class="ot-r-ancho" placeholder="Ej: 315" oninput="calcularGenericoOT(this)"></div>
+    <div class="otc-top">
+      <select class="ot-r-articulo" onchange="cambiarModoRenglonOT(this)"><option value="">Elija un artículo</option>${opcionesArticuloOT()}<option value="__generico__">🧩 Genérico (por medida de pieza)</option><option value="__personalizado__">✏️ Personalizado (consumo a mano)</option></select>
+      <button type="button" class="otc-x" title="Quitar este producto" onclick="eliminarRenglonOrdenTrabajo(${id})">✕</button>
     </div>
-    <div class="ot-r-generico" style="display:none;">
-      <div class="field"><label>Nombre</label><input type="text" class="ot-r-g-nombre" placeholder="Ej: Paño 150 × 175" oninput="calcularGenericoOT(this)"></div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;">
-        <div class="field" style="margin:0;"><label>Pieza: ancho (cm)</label><input type="number" step="0.1" class="ot-r-g-ancho" placeholder="150" oninput="calcularGenericoOT(this)"></div>
-        <div class="field" style="margin:0;"><label>Pieza: largo (cm)</label><input type="number" step="0.1" class="ot-r-g-largo" placeholder="175" oninput="calcularGenericoOT(this)"></div>
-        <div class="field" style="margin:0;"><label>Piezas por unidad</label><input type="number" min="1" step="1" class="ot-r-g-piezas" value="1" oninput="calcularGenericoOT(this)"></div>
-        <div class="field" style="margin:0;"><label>¿Se puede girar?</label><select class="ot-r-g-girar" onchange="calcularGenericoOT(this)"><option value="si">Sí, si ahorra tela</option><option value="no">No</option></select></div>
-      </div>
-      <div class="ot-r-g-res" style="margin-top:8px;"></div>
+    <div class="ot-r-generico otc-grid" style="display:none;">
+      <label class="otc-f otc-w2">Nombre<input type="text" class="ot-r-g-nombre" placeholder="Ej: Paño 150 × 175" oninput="resumenRenglonOT(this)"></label>
+      <label class="otc-f">Pieza ancho<input type="number" step="0.1" class="ot-r-g-ancho" placeholder="150" oninput="resumenRenglonOT(this)"></label>
+      <label class="otc-f">Pieza largo<input type="number" step="0.1" class="ot-r-g-largo" placeholder="175" oninput="resumenRenglonOT(this)"></label>
+      <label class="otc-f">Piezas/u<input type="number" min="1" step="1" class="ot-r-g-piezas" value="1" oninput="resumenRenglonOT(this)"></label>
+      <label class="otc-f">Girar<select class="ot-r-g-girar" onchange="resumenRenglonOT(this)"><option value="si">Sí</option><option value="no">No</option></select></label>
+      <div class="ot-r-g-res" style="display:none;"></div>
     </div>
-    <div class="ot-r-personalizado" style="display:none;">
-      <div class="field"><label>Nombre del producto (a medida)</label><input type="text" class="ot-r-nombre-personal" placeholder="Ej: Cubrepava a medida"></div>
-      <div class="field"><label>Consumo de tela por unidad (m)</label><input type="number" step="0.01" class="ot-r-consumo-personal" placeholder="Ej: 1.2"></div>
+    <div class="ot-r-personalizado otc-grid" style="display:none;">
+      <label class="otc-f otc-w2">Nombre (a medida)<input type="text" class="ot-r-nombre-personal" placeholder="Ej: Cubrepava a medida" oninput="resumenRenglonOT(this)"></label>
+      <label class="otc-f">Consumo c/u (m)<input type="number" step="0.01" class="ot-r-consumo-personal" placeholder="1.2" oninput="resumenRenglonOT(this)"></label>
     </div>
-    <div class="field"><label>Cantidad de unidades a fabricar</label><input type="number" step="1" min="1" class="ot-r-cantidad" placeholder="Ej: 100"></div>
-    <div class="field"><label>SKU del producto terminado</label><input type="text" class="ot-r-sku" placeholder="Ej: JQ315B"></div>
-    <div class="field"><label>Nota de este producto (opcional)</label><input type="text" class="ot-r-nota"></div>
-    <button type="button" class="btn-mini" onclick="eliminarRenglonOrdenTrabajo(${id})">🗑️ Quitar este producto</button>
+    <div class="otc-grid">
+      <label class="otc-f ot-r-normal">Tela (cm)<input type="number" step="0.1" class="ot-r-ancho" placeholder="315" oninput="resumenRenglonOT(this)"></label>
+      <label class="otc-f">Cantidad<input type="number" step="1" min="1" class="ot-r-cantidad" placeholder="100" oninput="resumenRenglonOT(this)"></label>
+      <label class="otc-f">SKU<input type="text" class="ot-r-sku" placeholder="Opcional"></label>
+      <label class="otc-f">Nota<input type="text" class="ot-r-nota" placeholder="Opcional"></label>
+    </div>
+    <div class="otc-res"></div>
   `;
   cont.appendChild(div);
   hacerSelectBuscable(div.querySelector('.ot-r-articulo'));
@@ -5568,8 +5624,10 @@ function cambiarModoRenglonOT(selectEl){
   const generico = selectEl.value === '__generico__';
   renglon.querySelector('.ot-r-normal').style.display = personalizado ? 'none' : 'block';
   renglon.querySelector('.ot-r-personalizado').style.display = personalizado ? 'block' : 'none';
-  renglon.querySelector('.ot-r-generico').style.display = generico ? 'block' : 'none';
-  if(generico) calcularGenericoOT(selectEl);
+  renglon.querySelector('.ot-r-generico').style.display = generico ? 'grid' : 'none';
+  renglon.querySelector('.ot-r-personalizado').style.display = personalizado ? 'grid' : 'none';
+  renglon.querySelector('.ot-r-normal').style.display = personalizado ? 'none' : 'flex';
+  setTimeout(() => resumenRenglonOT(renglon), 0);
 }
 
 function eliminarRenglonOrdenTrabajo(id){
@@ -5911,7 +5969,7 @@ async function generarPDFOrden(o){
       limpiarPDF(r.sku || ''),
       numPDF(r.consumo), numPDF(r.metrosConsumidos),
       limpiarPDF(corteCortoRenglon(r)),
-      (() => { if(r.sobrasPara) return limpiarPDF(`${r.sobrasTexto ? 'Sobra ' + r.sobrasTexto + ': ' : ''}~ ${r.sobrasN} ${r.sobrasPara} (en esta orden)`); if(r.deSobras > 0) return `${r.deSobras} salen de las sobras` + (r.deSobras < r.cantidad ? `, ${r.cantidad - r.deSobras} de tela nueva` : ''); try{ const ap = aprovechaRenglon(r); if(!ap) return ''; const s = sobrasDeRenglon(r); const tx = s ? textoLonjas(s, +r.cantidad || 0) : ''; return limpiarPDF(`${tx ? 'Sobra ' + tx + ': ' : ''}~ ${ap.n} ${ap.nombre}`); } catch(e){ return ''; } })(),
+      (() => { if(r.sobrasPara) return limpiarPDF(`${r.sobrasTexto ? 'Sobra ' + r.sobrasTexto + ': ' : ''}${r.sobrasN ? '~ ' + r.sobrasN + ' ' : ''}${r.sobrasPara} (en esta orden)`); if(r.deSobras > 0) return `${r.deSobras} salen de las sobras` + (r.deSobras < r.cantidad ? `, ${r.cantidad - r.deSobras} de tela nueva` : ''); try{ const ap = aprovechaRenglon(r); if(!ap) return ''; const s = sobrasDeRenglon(r); const tx = s ? textoLonjas(s, +r.cantidad || 0) : ''; return limpiarPDF(`${tx ? 'Sobra ' + tx + ': ' : ''}~ ${ap.n} ${ap.nombre}`); } catch(e){ return ''; } })(),
     ]),
     styles: { fontSize: 8.5, cellPadding: 2, valign: 'top' },
     headStyles: { fillColor: [245, 212, 112], textColor: [42, 29, 54], fontStyle: 'bold' },
@@ -12703,7 +12761,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v52';
+const APP_VERSION = '2026-10-01-v53';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
