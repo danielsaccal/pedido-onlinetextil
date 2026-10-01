@@ -1489,7 +1489,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v38</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v39</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1598,6 +1598,10 @@ a.grilla-celda{display:block;}
             <div id="ac-piezas"></div>
             <button type="button" class="btn-mini" onclick="agregarPiezaAC(); calcularAC();">+ Pieza</button>
             <p class="note" style="margin:6px 0 12px;font-size:0.75rem;">Ancho y largo = lo que consume del ancho y del largo de la tela.</p>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;font-size:0.78rem;color:#8A8072;">
+              <span>Anchos de tela: <span id="ac-anchos-lista"></span></span>
+              <a href="#" onclick="event.preventDefault(); editarAnchosTela()">✏️ Editar anchos</a>
+            </div>
             <div id="ac-consumos" style="margin-bottom:8px;"></div>
             <div id="ac-corte" style="margin-bottom:10px;"></div>
             <input type="text" id="ac-nota" placeholder="Nota para el taller (opcional)" oninput="calcularAC()" style="margin-bottom:10px;">
@@ -3684,6 +3688,7 @@ function previsualizarBosquejoCorte(){
 // consumo en cualquier otro ancho de tela, usando las mismas piezas. Si hay varias cargadas, usa la
 // que da menos consumo sin pasarse del ancho. Lo cargado a mano en un ancho siempre tiene prioridad.
 function anchosConocidos(){
+  if(tablaConsumo && Array.isArray(tablaConsumo.anchosTela) && tablaConsumo.anchosTela.length) return [...tablaConsumo.anchosTela].map(Number).filter(a => a > 0).sort((a,b) => a-b);
   const s = new Set();
   Object.values((tablaConsumo && tablaConsumo.articulos) || {}).forEach(x => Object.keys(x || {}).forEach(k => s.add(parseFloat(k))));
   Object.values((tablaConsumo && tablaConsumo.instrucciones) || {}).forEach(x => Object.keys(x || {}).forEach(k => s.add(parseFloat(k))));
@@ -3885,6 +3890,7 @@ async function abrirArticulosCortes(){
   acArticulo = null;
   renderListaAC();
   renderEditorAC();
+  renderAnchosAC();
 }
 
 function articulosAC(){
@@ -3975,6 +3981,7 @@ function renderEditorAC(){
   const vacio = document.getElementById('ac-vacio'), ed = document.getElementById('ac-editor');
   if(!acArticulo){ vacio.style.display = 'block'; ed.style.display = 'none'; return; }
   vacio.style.display = 'none'; ed.style.display = 'block';
+  renderAnchosAC();
   document.getElementById('ac-titulo').textContent = acArticulo;
   const origen = origenAC(acArticulo);
   document.getElementById('ac-origen').textContent = origen ? `Pieza del ${origen}: se actualiza sola cuando guarda el juego.` : '';
@@ -4008,7 +4015,12 @@ function calcularAC(anchoElegido){
   cont.innerHTML = res.map(r => {
     if(r.c.avisos.length) return `<span style="display:inline-block;margin:0 6px 6px 0;padding:5px 10px;border:1px dashed var(--line);border-radius:8px;font-size:0.85rem;color:#B0A698;">${r.W} · no entra</span>`;
     const sel = r.W === acAnchoVista;
-    return `<span onclick="calcularAC(${r.W})" style="display:inline-block;margin:0 6px 6px 0;padding:5px 10px;border-radius:8px;font-size:0.85rem;cursor:pointer;${sel ? 'background:var(--purple);color:#fff;border:1px solid var(--purple);' : 'border:1px solid var(--line);'}">${r.W} · ${fmtMetros(r.c.metros)} m${mejor && r.W === mejor.W ? ' ⭐' : ''}</span>`;
+    const ap = aprovechamientoCorte(r.c, r.W);
+    const sobra = Math.round((1 - ap) * 100);
+    const sinDesp = sobra <= 3;
+    const borde = sinDesp ? '#3D9A5B' : (sobra <= 15 ? '#D9A23B' : '#C9563F');
+    const fondo = sel ? 'var(--purple)' : (sinDesp ? '#EAF6EE' : (sobra <= 15 ? '#FDF4E2' : '#FBEAE6'));
+    return `<span onclick="calcularAC(${r.W})" title="${sinDesp ? 'Sin desperdicio' : 'Sobra ' + sobra + ' % de la tela consumida'}" style="display:inline-block;margin:0 6px 6px 0;padding:5px 10px;border-radius:8px;font-size:0.85rem;cursor:pointer;line-height:1.25;text-align:center;background:${fondo};${sel ? 'color:#fff;' : ''}border:1.5px solid ${borde};">${r.W} · ${fmtMetros(r.c.metros)} m${mejor && r.W === mejor.W ? ' ⭐' : ''}<br><span style="font-size:0.72rem;${sel ? '' : 'color:' + borde + ';'}">${sinDesp ? '✓ sin desperdicio' : 'sobra ' + sobra + ' %'}</span></span>`;
   }).join('');
   if(!acAnchoVista){ corteEl.innerHTML = '<p class="note" style="color:#A6432F;">Estas piezas no entran en ninguno de sus anchos de tela.</p>'; return; }
   const img = dibujarBosquejoCorte(acAnchoVista, piezas);
@@ -4658,6 +4670,28 @@ function cargarRepartoEnOrden(){
   });
   document.getElementById('rp-panel').open = false;
   document.getElementById('ot-renglones').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ===== Anchos de tela y aprovechamiento =====
+async function editarAnchosTela(){
+  const r = prompt('Anchos de tela que usa (cm), separados por coma:', anchosConocidos().join(', '));
+  if(r === null) return;
+  const lista = [...new Set(r.split(/[,;\s]+/).map(x => parseFloat(x.replace(',', '.'))).filter(x => x > 0))].sort((a,b) => a-b);
+  if(!lista.length){ alert('Escriba al menos un ancho.'); return; }
+  tablaConsumo.anchosTela = lista;
+  try{ await guardarTablaYConsumo(); renderAnchosAC(); calcularAC(); } catch(e){ alert('No se pudieron guardar los anchos: ' + e.message); }
+}
+function renderAnchosAC(){
+  const el = document.getElementById('ac-anchos-lista');
+  if(el) el.textContent = anchosConocidos().join(', ') + ' cm';
+}
+// porcentaje de la tela consumida que termina en el producto (lo demas sobra)
+function aprovechamientoCorte(c, W){
+  let usado = 0;
+  c.franjas.forEach(f => f.cols.forEach(col => col.items.forEach(it => { if(!it.sobrante) usado += col.w * it.p.largo * (f.factor < 1 ? 1 : 1); })));
+  (c.tiras || []).forEach(t => t.cols.forEach(col => col.items.forEach(it => { if(!it.sobrante) usado += col.w * Math.min(it.p.largo, t.L - it.y); })));
+  const consumido = c.metros * 100 * W;
+  return consumido > 0 ? Math.min(1, usado / consumido) : 0;
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -12008,7 +12042,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v38';
+const APP_VERSION = '2026-10-01-v39';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
