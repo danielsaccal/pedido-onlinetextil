@@ -1473,7 +1473,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v35</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v36</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2709,8 +2709,12 @@ function lineaRenglonTexto(r, i, anchoComun){
   const corte = corteCortoRenglon(r);
   if(corte) lineas.push(`   ✂️ ${corte}`);
   if(r.deSobras > 0) lineas.push(`   ♻️ ${r.deSobras} salen de lo que sobra de los otros cortes${r.deSobras < r.cantidad ? `, ${r.cantidad - r.deSobras} de tela nueva` : ' (no usan tela nueva)'}`);
-  else if(r.sobrasPara) lineas.push(`   ♻️ Lo que sobra se usa para ${r.sobrasPara} de esta orden`);
-  else { let ap = null; try{ ap = aprovechaRenglon(r); } catch(e){} if(ap) lineas.push(`   ♻️ Con lo que sobra: ≈ ${ap.n} ${ap.nombre}`); }
+  else if(r.sobrasPara) lineas.push(`   ♻️ ${r.sobrasTexto ? 'Sobra ' + r.sobrasTexto + ', de donde' : 'De lo que sobra'} salen ≈ ${r.sobrasN} ${plural(r.sobrasN, r.sobrasPara)} (se hacen en esta orden)`);
+  else {
+    let ap = null, tx = '';
+    try{ ap = aprovechaRenglon(r); if(ap){ const s = sobrasDeRenglon(r); tx = s ? textoLonjas(s, +r.cantidad || 0) : ''; } } catch(e){}
+    if(ap) lineas.push(`   ♻️ ${tx ? 'Sobra ' + tx + ', de donde' : 'De lo que sobra'} salen ≈ ${ap.n} ${plural(ap.n, ap.nombre)}`);
+  }
   if(r.nota) lineas.push(`   📝 ${r.nota}`);
   return lineas.join('\n');
 }
@@ -4359,7 +4363,7 @@ function sobrasDeRenglon(r){
   });
   if(c.tiras && c.tiras.retazo && c.tiras.retazo.w >= 20) tiras.push([c.tiras.retazo.w, c.tiras.retazo.L]);
   const deMas = []; // { pz, n por unidad }
-  (c.tiras || []).forEach(t => { if(t.rinde > t.n) deMas.push({ pz: t.p, n: t.rinde - t.n }); });
+  (c.tiras || []).forEach(t => { if(t.rinde > t.n) deMas.push({ pz: t.p, n: t.rinde - t.n, lonja: [t.w, (t.rinde - t.n) / t.cols.length * t.p.largo] }); });
   c.franjas.forEach(f => { if(!f.unTipo) f.cols.forEach(col => { const so = col.items.filter(it => it.sobrante).length; if(so) deMas.push({ pz: col.p, n: so }); }); });
   return { tiras, deMas, piezas };
 }
@@ -4383,6 +4387,19 @@ function piezaChicaDeRenglon(r){
   const p = pz[0];
   return p.ancho * p.largo <= 6000 ? p : null;
 }
+// "Sobra una lonja de 50 cm × 91 m" + piezas ya cortadas de mas
+function textoLonjas(s, N){
+  const porAncho = new Map();
+  s.tiras.forEach(([w, l]) => { const k = Math.round(w); porAncho.set(k, (porAncho.get(k) || 0) + N * l); });
+  s.deMas.forEach(d => { if(d.lonja){ const k = Math.round(d.lonja[0]); porAncho.set(k, (porAncho.get(k) || 0) + N * d.lonja[1]); } });
+  const lonjas = [...porAncho].sort((a,b) => b[1] - a[1]).map(([w, cm]) => `${w} cm × ${fmtCm(Math.round(cm / 10) / 10)} m`);
+  const tapas = s.deMas.filter(d => !d.lonja).reduce((t, d) => t + Math.floor(d.n * N), 0);
+  const partes = [];
+  if(lonjas.length) partes.push(`${lonjas.length > 1 ? 'lonjas' : 'una lonja'} de ≈ ${lonjas.join(' y ')}`);
+  if(tapas) partes.push(`${tapas} tapas ya cortadas de más`);
+  return partes.join(' y ');
+}
+function plural(n, nombre){ return n === 1 ? nombre : nombre.replace(/^(\S+)/, w => /[aeiouáéó]$/i.test(w) ? w + 's' : w + 'es'); }
 function aprovechaRenglon(r){
   if(r.deSobras !== undefined || piezaChicaDeRenglon(r)) return null;
   const s = sobrasDeRenglon(r);
@@ -4403,7 +4420,7 @@ function aprovecharSobrasOrden(renglones){
   const grandes = renglones.filter(r => !r.personalizado && !piezaChicaDeRenglon(r)).map(r => ({ r, s: sobrasDeRenglon(r) })).filter(x => x.s);
   const pozos = new Map();
   const resumen = [];
-  renglones.forEach(r => { delete r.deSobras; delete r.sobrasPara; });
+  renglones.forEach(r => { delete r.deSobras; delete r.sobrasPara; delete r.sobrasN; delete r.sobrasTexto; });
   renglones.forEach(r => {
     const p = piezaChicaDeRenglon(r);
     if(!p) return;
@@ -4415,7 +4432,10 @@ function aprovecharSobrasOrden(renglones){
     r.deSobras = Math.max(0, k);
     if(k > 0){
       pozo.tapas -= k * partes;
-      grandes.forEach(g => { if(tapasDeSobras(g.s, +g.r.cantidad || 0, p) > 0) g.r.sobrasPara = r.articulo; });
+      grandes.forEach(g => {
+        const t = tapasDeSobras(g.s, +g.r.cantidad || 0, p);
+        if(t > 0){ g.r.sobrasPara = r.articulo; g.r.sobrasN = Math.floor(t / partes); g.r.sobrasTexto = textoLonjas(g.s, +g.r.cantidad || 0); }
+      });
       r.metrosConsumidos = Math.round((r.cantidad - k) * r.consumo * 100) / 100;
     }
   });
@@ -4879,7 +4899,7 @@ async function generarOrdenTrabajoCompleta(){
   cont.innerHTML = `
     ${avisosAncho.map(a => `<p class="note" style="color:#A6432F;margin-bottom:6px;">${escaparHtml(a)}</p>`).join('')}
     ${excede ? `<p class="note" style="color:#A6432F;font-weight:700;margin-bottom:8px;">⚠️ Lo que pidió fabricar consume más tela de la entregada — revíselo antes de mandarlo.</p>` : ''}
-    <div style="background:var(--cream);border-radius:10px;padding:14px;white-space:pre-wrap;font-size:0.88rem;margin-bottom:12px;">${escaparHtml(textoOrden)}</div>
+    <div style="background:var(--cream);border-radius:10px;padding:16px;white-space:pre-wrap;font-size:1.05rem;line-height:1.55;margin-bottom:12px;">${escaparHtml(textoOrden)}</div>
     ${renglones.some(r => r.tieneBosquejo) ? `
       <p class="note" style="margin-bottom:8px;">Bosquejos de corte disponibles:</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
@@ -4988,7 +5008,7 @@ async function generarPDFOrden(o){
       limpiarPDF(r.sku || ''),
       numPDF(r.consumo), numPDF(r.metrosConsumidos),
       limpiarPDF(corteCortoRenglon(r)),
-      (() => { if(r.sobrasPara) return limpiarPDF(`Lo que sobra va a ${r.sobrasPara}`); if(r.deSobras > 0) return `${r.deSobras} salen de las sobras` + (r.deSobras < r.cantidad ? `, ${r.cantidad - r.deSobras} de tela nueva` : ''); try{ const ap = aprovechaRenglon(r); return ap ? limpiarPDF(`~ ${ap.n} ${ap.nombre}`) : ''; } catch(e){ return ''; } })(),
+      (() => { if(r.sobrasPara) return limpiarPDF(`${r.sobrasTexto ? 'Sobra ' + r.sobrasTexto + ': ' : ''}~ ${r.sobrasN} ${r.sobrasPara} (en esta orden)`); if(r.deSobras > 0) return `${r.deSobras} salen de las sobras` + (r.deSobras < r.cantidad ? `, ${r.cantidad - r.deSobras} de tela nueva` : ''); try{ const ap = aprovechaRenglon(r); if(!ap) return ''; const s = sobrasDeRenglon(r); const tx = s ? textoLonjas(s, +r.cantidad || 0) : ''; return limpiarPDF(`${tx ? 'Sobra ' + tx + ': ' : ''}~ ${ap.n} ${ap.nombre}`); } catch(e){ return ''; } })(),
     ]),
     styles: { fontSize: 8.5, cellPadding: 2, valign: 'top' },
     headStyles: { fillColor: [245, 212, 112], textColor: [42, 29, 54], fontStyle: 'bold' },
@@ -11764,7 +11784,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v35';
+const APP_VERSION = '2026-10-01-v36';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
