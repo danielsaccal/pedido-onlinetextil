@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v70</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v71</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5593,13 +5593,14 @@ function renderTelas(){
     }).join('')}
     </tbody></table></div>`;
 }
-function editarTela(codigo){
+function editarTela(codigo, base){
   tlEditando = codigo || null;
-  const t = codigo ? telasDatos.telas[codigo] : { usos: [] };
+  const t = codigo ? telasDatos.telas[codigo] : (base ? { nombre: base.nombre, proveedor: base.proveedor, hilos: base.hilos, usos: [...(base.usos || [])], notas: base.notas } : { usos: [] });
   const ed = document.getElementById('tl-editor');
   const f = (id, lab, val, extra) => `<div class="field" style="margin:0;"><label>${lab}</label><input id="${id}" value="${escapeAttr(val == null ? '' : val)}" ${extra || ''}></div>`;
   ed.innerHTML = `<div style="border:2px solid var(--purple);border-radius:12px;padding:12px;margin-bottom:12px;">
-    <p style="margin:0 0 8px;font-weight:700;">${codigo ? 'Editar ' + escaparHtml(codigo) : 'Nueva tela'}</p>
+    <p style="margin:0 0 8px;font-weight:700;">${codigo ? 'Editar ' + escaparHtml(codigo) : (base ? `Otro ancho de ${escaparHtml(base.nombre || '')}` : 'Nueva tela')}</p>
+    ${base && !codigo ? '<p class="note" style="margin:0 0 8px;text-align:left;">Ya están copiados el nombre, el proveedor, la calidad y los usos. Ponga el código y el ancho nuevos.</p>' : ''}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
       ${f('tl-codigo', 'Código', codigo || '', 'placeholder="HON315B" style="text-transform:uppercase;"')}
       ${f('tl-nombre', 'Nombre', t.nombre, 'placeholder="Percal 180 blanco"')}
@@ -5617,12 +5618,14 @@ function editarTela(codigo){
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
       <button class="btn btn-gold" style="width:auto;padding:10px 18px;" onclick="guardarTela()">Guardar</button>
       <button class="btn btn-ghost" style="width:auto;padding:10px 18px;" onclick="document.getElementById('tl-editor').style.display='none'">Cancelar</button>
+      ${codigo ? `<button class="btn btn-ghost" style="width:auto;padding:10px 18px;" onclick="editarTela(null, telasDatos.telas['${escapeAttr(codigo)}'])">➕ Agregar otro ancho de esta tela</button>` : ''}
       ${codigo ? `<button class="btn btn-ghost" style="width:auto;padding:10px 18px;color:#A6432F;" onclick="borrarTela('${escapeAttr(codigo)}')">🗑️ Borrar</button>` : ''}
     </div>
     <p class="error" id="tl-error" style="display:none;"></p>
   </div>`;
   ed.style.display = 'block';
   calcGramajeTela();
+  if(base && !codigo) setTimeout(() => document.getElementById('tl-codigo').focus(), 50);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 function calcGramajeTela(){
@@ -13177,7 +13180,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v70';
+const APP_VERSION = '2026-10-01-v71';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
