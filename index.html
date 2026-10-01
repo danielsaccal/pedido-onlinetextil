@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v63</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v64</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2565,11 +2565,29 @@ function migrarTextosCorte(){
   } catch(e){ console.error('migrar textos', e); }
 }
 
+// carga unica de las batas de microfibra (medidas tomadas de la tabla de talles; cinturon de S y M estimado en 190)
+const BATAS_MICROFIBRA = {"Bata microfibra S": [{"nombre": "Espalda", "ancho": 66, "largo": 98, "cantidad": 1, "partes": 1}, {"nombre": "Delantero", "ancho": 44, "largo": 98, "cantidad": 2, "partes": 1}, {"nombre": "Manga", "ancho": 62, "largo": 46, "cantidad": 2, "partes": 1}, {"nombre": "Cuello", "ancho": 16, "largo": 95, "cantidad": 2, "partes": 1}, {"nombre": "Cinturón", "ancho": 12, "largo": 192, "cantidad": 1, "partes": 1}, {"nombre": "Bolsillo", "ancho": 22, "largo": 24, "cantidad": 2, "partes": 1}], "Bata microfibra M": [{"nombre": "Espalda", "ancho": 67, "largo": 100, "cantidad": 1, "partes": 1}, {"nombre": "Delantero", "ancho": 44, "largo": 100, "cantidad": 2, "partes": 1}, {"nombre": "Manga", "ancho": 66, "largo": 49, "cantidad": 2, "partes": 1}, {"nombre": "Cuello", "ancho": 16, "largo": 96, "cantidad": 2, "partes": 1}, {"nombre": "Cinturón", "ancho": 12, "largo": 192, "cantidad": 1, "partes": 1}, {"nombre": "Bolsillo", "ancho": 22, "largo": 24, "cantidad": 2, "partes": 1}], "Bata microfibra L": [{"nombre": "Espalda", "ancho": 72, "largo": 104, "cantidad": 1, "partes": 1}, {"nombre": "Delantero", "ancho": 47, "largo": 104, "cantidad": 2, "partes": 1}, {"nombre": "Manga", "ancho": 70, "largo": 46, "cantidad": 2, "partes": 1}, {"nombre": "Cuello", "ancho": 16, "largo": 100, "cantidad": 2, "partes": 1}, {"nombre": "Cinturón", "ancho": 12, "largo": 202, "cantidad": 1, "partes": 1}, {"nombre": "Bolsillo", "ancho": 22, "largo": 24, "cantidad": 2, "partes": 1}], "Bata microfibra XL": [{"nombre": "Espalda", "ancho": 76, "largo": 112, "cantidad": 1, "partes": 1}, {"nombre": "Delantero", "ancho": 49, "largo": 112, "cantidad": 2, "partes": 1}, {"nombre": "Manga", "ancho": 74, "largo": 47, "cantidad": 2, "partes": 1}, {"nombre": "Cuello", "ancho": 16, "largo": 107, "cantidad": 2, "partes": 1}, {"nombre": "Cinturón", "ancho": 12, "largo": 202, "cantidad": 1, "partes": 1}, {"nombre": "Bolsillo", "ancho": 22, "largo": 24, "cantidad": 2, "partes": 1}], "Bata microfibra XXL": [{"nombre": "Espalda", "ancho": 79, "largo": 114, "cantidad": 1, "partes": 1}, {"nombre": "Delantero", "ancho": 50, "largo": 114, "cantidad": 2, "partes": 1}, {"nombre": "Manga", "ancho": 76, "largo": 46, "cantidad": 2, "partes": 1}, {"nombre": "Cuello", "ancho": 16, "largo": 109, "cantidad": 2, "partes": 1}, {"nombre": "Cinturón", "ancho": 12, "largo": 212, "cantidad": 1, "partes": 1}, {"nombre": "Bolsillo", "ancho": 22, "largo": 24, "cantidad": 2, "partes": 1}]};
+function sembrarBatasMicrofibra(){
+  if(!tablaConsumo || tablaConsumo.sembradoBatas) return;
+  tablaConsumo.articulos = tablaConsumo.articulos || {};
+  tablaConsumo.instrucciones = tablaConsumo.instrucciones || {};
+  Object.entries(BATAS_MICROFIBRA).forEach(([nombre, piezas]) => {
+    if(tablaConsumo.instrucciones[nombre]) return;
+    const corte = calcularCorte(piezas, 150);
+    tablaConsumo.instrucciones[nombre] = { 150: { texto: textoCorte(nombre, piezas, 150, ''), bosquejoBase64: '', piezas, nota: 'Medidas estimadas desde la tabla de talles: revisar con el taller.', tipo: 'personalizado', consumo: corte.metros, guardado: Date.now() } };
+    tablaConsumo.articulos[nombre] = tablaConsumo.articulos[nombre] || {};
+    if(tablaConsumo.articulos[nombre][150] === undefined) tablaConsumo.articulos[nombre][150] = corte.metros;
+  });
+  tablaConsumo.sembradoBatas = true;
+  db.collection('config').doc('tabla_consumo_telas').set(tablaConsumo).catch(e => console.error('batas', e));
+}
+
 async function cargarTablaConsumo(){
   try{
     const doc = await db.collection('config').doc('tabla_consumo_telas').get();
     tablaConsumo = doc.exists ? doc.data() : {};
     migrarTextosCorte();
+    sembrarBatasMicrofibra();
   } catch(e){
     console.error('Error cargando la tabla de consumo:', e);
     tablaConsumo = tablaConsumo || {};
@@ -12900,7 +12918,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v63';
+const APP_VERSION = '2026-10-01-v64';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
