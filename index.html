@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v55</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v56</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1658,10 +1658,11 @@ a.grilla-celda{display:block;}
                 <span style="font-size:0.8rem;color:#8A8072;">🛍️ Bolsa y etiqueta (para stock) <span id="ac-empaque-ok" style="color:#3D7A3D;"></span></span>
                 <a href="#" onclick="event.preventDefault(); editarBolsasDisponibles()" style="font-size:0.75rem;">medidas de bolsa</a>
               </div>
-              <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(0,1.2fr);gap:6px;">
-                <select id="ac-bolsa" onchange="cambioEmpaqueAC()"></select>
-                <input type="text" id="ac-et-desc" placeholder="Descripción" oninput="cambioEmpaqueAC()">
-                <input type="text" id="ac-et-medida" placeholder="Medida (ej: 50 X 85 CM APROX)" oninput="cambioEmpaqueAC()">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;">
+                <div><select id="ac-bolsa" onchange="cambioEmpaqueAC()"></select><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Bolsa</div></div>
+                <div><input type="text" id="ac-et-desc" placeholder="Descripción" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Nombre del artículo (etiqueta)</div></div>
+                <div><input type="text" id="ac-et-medida" placeholder="50 X 85 CM (APROX)" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Medida (etiqueta)</div></div>
+                <div><input type="text" id="ac-sku" placeholder="Ej: KA181F" oninput="cambioEmpaqueAC()" style="text-transform:uppercase;"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">SKU (se completa solo en la orden)</div></div>
               </div>
             </div>
             <div class="actions">
@@ -4680,7 +4681,7 @@ function bolsasDisponibles(){ return (tablaConsumo && Array.isArray(tablaConsumo
 function datosEmpaque(articulo, fichaSku){
   if(fichaSku && fichasArticulos && fichasArticulos.fichas[fichaSku]){ const f = fichasArticulos.fichas[fichaSku]; return { bolsa: f.bolsa || '', etDesc: f.etDesc || '', etMedida: f.etMedida || '' }; }
   const d = (tablaConsumo && tablaConsumo.empaque && tablaConsumo.empaque[articulo]) || {};
-  return { bolsa: d.bolsa || '', etDesc: d.etDesc || '', etMedida: d.etMedida || '' };
+  return { bolsa: d.bolsa || '', etDesc: d.etDesc || '', etMedida: d.etMedida || '', sku: d.sku || '' };
 }
 function opcionesBolsa(sel){
   return `<option value="">Sin bolsa</option>` + bolsasDisponibles().map(b => `<option value="${escapeAttr(b)}" ${b === sel ? 'selected' : ''}>Bolsa ${escaparHtml(b)}</option>`).join('');
@@ -4692,6 +4693,7 @@ function cargarEmpaqueAC(){
   document.getElementById('ac-bolsa').innerHTML = opcionesBolsa(d.bolsa);
   document.getElementById('ac-et-desc').value = d.etDesc;
   document.getElementById('ac-et-medida').value = d.etMedida;
+  document.getElementById('ac-sku').value = d.sku || '';
   document.getElementById('ac-et-desc').placeholder = String(acArticulo || '').toUpperCase();
 }
 function cambioEmpaqueAC(){
@@ -4701,6 +4703,7 @@ function cambioEmpaqueAC(){
     bolsa: document.getElementById('ac-bolsa').value,
     etDesc: document.getElementById('ac-et-desc').value.trim(),
     etMedida: document.getElementById('ac-et-medida').value.trim(),
+    sku: document.getElementById('ac-sku').value.trim().toUpperCase(),
   };
   clearTimeout(empaqueTimer);
   empaqueTimer = setTimeout(async () => {
@@ -5686,6 +5689,11 @@ function cambiarModoRenglonOT(selectEl){
     const skuEl = renglon.querySelector('.ot-r-sku'), anchoEl = renglon.querySelector('.ot-r-ancho');
     if(!skuEl.value.trim()) skuEl.value = sku;
     if(!anchoEl.value && f && f.anchoHabitual) anchoEl.value = f.anchoHabitual;
+  }
+  if(selectEl.value && !selectEl.value.startsWith('ficha:') && !selectEl.value.startsWith('__')){
+    const d = datosEmpaque(selectEl.value);
+    const skuEl = renglon.querySelector('.ot-r-sku');
+    if(d.sku && !skuEl.value.trim()) skuEl.value = d.sku;
   }
   const personalizado = selectEl.value === '__personalizado__';
   const generico = selectEl.value === '__generico__';
@@ -12835,7 +12843,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v55';
+const APP_VERSION = '2026-10-01-v56';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
