@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v71</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v72</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5611,6 +5611,8 @@ function editarTela(codigo, base){
       <div class="field" style="margin:0;"><label>Gramaje (calculado)</label><div id="tl-gramaje" style="padding:10px 0;font-weight:700;"></div></div>
     </div>
     ${codigo && hermanasTela(codigo).length ? `<p class="note" style="margin:6px 0 0;text-align:left;">🧵 Misma tela en otros anchos: ${hermanasTela(codigo).map(c => `<b>${escaparHtml(c)}</b> (${telasDatos.telas[c].ancho || '?'} cm)`).join(', ')}${!t.mPorKg && rendimientoTela(codigo) ? ` · rendimiento calculado ≈ ${fmtCm(rendimientoTela(codigo).mPorKg)} m/kg` : ''}</p>` : ''}
+    <div id="tl-extras" style="margin-top:8px;"></div>
+    <button type="button" class="btn-mini" style="margin-top:6px;" onclick="agregarFilaAnchoTela()">➕ Agregar otro ancho de esta tela</button>
     <div class="field" style="margin:10px 0 0;"><label>Usos (puede marcar varios)</label>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">${telasDatos.usos.map(u => `<label class="ni-chip"><input type="checkbox" class="tl-uso" value="${escapeAttr(u)}" ${(t.usos || []).includes(u) ? 'checked' : ''}><span>${escaparHtml(u)}</span></label>`).join('')}
         <a href="#" onclick="event.preventDefault(); agregarUsoTela()" style="align-self:center;font-size:0.82rem;">+ otro uso</a></div></div>
@@ -5618,7 +5620,6 @@ function editarTela(codigo, base){
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
       <button class="btn btn-gold" style="width:auto;padding:10px 18px;" onclick="guardarTela()">Guardar</button>
       <button class="btn btn-ghost" style="width:auto;padding:10px 18px;" onclick="document.getElementById('tl-editor').style.display='none'">Cancelar</button>
-      ${codigo ? `<button class="btn btn-ghost" style="width:auto;padding:10px 18px;" onclick="editarTela(null, telasDatos.telas['${escapeAttr(codigo)}'])">➕ Agregar otro ancho de esta tela</button>` : ''}
       ${codigo ? `<button class="btn btn-ghost" style="width:auto;padding:10px 18px;color:#A6432F;" onclick="borrarTela('${escapeAttr(codigo)}')">🗑️ Borrar</button>` : ''}
     </div>
     <p class="error" id="tl-error" style="display:none;"></p>
@@ -5628,6 +5629,21 @@ function editarTela(codigo, base){
   if(base && !codigo) setTimeout(() => document.getElementById('tl-codigo').focus(), 50);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+// filas de anchos extra: se cargan antes de guardar y se crean como telas hermanas
+function agregarFilaAnchoTela(){
+  const cont = document.getElementById('tl-extras');
+  if(!cont.children.length) cont.insertAdjacentHTML('beforeend', '<p style="margin:0 0 4px;font-size:0.8rem;color:#8A8072;">Otros anchos de esta misma tela (se crean al guardar, con el mismo nombre, proveedor, calidad y usos):</p>');
+  const fila = document.createElement('div');
+  fila.className = 'tl-extra';
+  fila.style.cssText = 'display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.2fr) 30px;gap:6px;margin-bottom:6px;align-items:center;';
+  fila.innerHTML = `<input class="tl-x-cod" placeholder="Código (ej: HON280B)" style="text-transform:uppercase;">
+    <input class="tl-x-ancho" type="number" step="0.1" placeholder="Ancho (cm)">
+    <input class="tl-x-mkg" type="text" inputmode="decimal" placeholder="Rendimiento m/kg (opcional)">
+    <button type="button" onclick="this.closest('.tl-extra').remove()" title="Quitar" style="border:none;background:none;cursor:pointer;color:#8A8072;font-size:1rem;">✕</button>`;
+  cont.appendChild(fila);
+  fila.querySelector('.tl-x-cod').focus();
+}
+
 function calcGramajeTela(){
   let mkg = parseFloat(String(document.getElementById('tl-mkg').value).replace(',', '.'));
   if(!(mkg > 0) && tlEditando){ const r = rendimientoTela(tlEditando); if(r) mkg = r.mPorKg; }
@@ -5667,9 +5683,20 @@ async function guardarTela(){
   if(!codigo){ err.textContent = 'Falta el código de la tela.'; err.style.display = 'block'; return; }
   if(!t.ancho){ err.textContent = 'Falta el ancho.'; err.style.display = 'block'; return; }
   if(codigo !== tlEditando && telasDatos.telas[codigo]){ err.textContent = 'Ya existe una tela con ese código.'; err.style.display = 'block'; return; }
+  const extras = [...document.querySelectorAll('.tl-extra')].map(f => ({
+    codigo: f.querySelector('.tl-x-cod').value.trim().toUpperCase(),
+    ancho: parseFloat(f.querySelector('.tl-x-ancho').value) || null,
+    mPorKg: parseFloat(String(f.querySelector('.tl-x-mkg').value).replace(',', '.')) || null,
+  })).filter(x => x.codigo || x.ancho);
+  for(const x of extras){
+    if(!x.codigo || !x.ancho){ err.textContent = 'En los otros anchos, complete código y ancho (o quite la fila con ✕).'; err.style.display = 'block'; return; }
+    if(x.codigo === codigo || (telasDatos.telas[x.codigo] && x.codigo !== tlEditando) || extras.filter(y => y.codigo === x.codigo).length > 1){ err.textContent = `El código ${x.codigo} ya existe o está repetido.`; err.style.display = 'block'; return; }
+  }
+  if(!t.nombre && extras.length){ err.textContent = 'Para cargar varios anchos, ponga el nombre de la tela.'; err.style.display = 'block'; return; }
   const nuevas = { ...telasDatos.telas };
   if(tlEditando && tlEditando !== codigo) delete nuevas[tlEditando];
   nuevas[codigo] = t;
+  extras.forEach(x => { nuevas[x.codigo] = { ...t, ancho: x.ancho, mPorKg: x.mPorKg }; });
   // misma tela en otros anchos: ofrecer copiar los usos
   const fam = familiaTela(t);
   const otros = Object.keys(nuevas).filter(c => c !== codigo && familiaTela(nuevas[c]) === fam && t.nombre);
@@ -5681,8 +5708,9 @@ async function guardarTela(){
     await db.collection('config').doc('telas').set({ ...telasDatos, telas: nuevas });
     telasDatos.telas = nuevas;
     // si el ancho no estaba en la lista de anchos de tela, se suma
-    if(tablaConsumo && Array.isArray(tablaConsumo.anchosTela) && !tablaConsumo.anchosTela.includes(t.ancho)){
-      tablaConsumo.anchosTela = [...tablaConsumo.anchosTela, t.ancho].sort((a, b) => a - b);
+    const anchosNuevos = [t.ancho, ...extras.map(x => x.ancho)].filter(a => tablaConsumo && Array.isArray(tablaConsumo.anchosTela) && !tablaConsumo.anchosTela.includes(a));
+    if(anchosNuevos.length){
+      tablaConsumo.anchosTela = [...new Set([...tablaConsumo.anchosTela, ...anchosNuevos])].sort((a, b) => a - b);
       guardarTablaYConsumo().catch(() => {});
     }
     await cargarTelas();
@@ -13180,7 +13208,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v71';
+const APP_VERSION = '2026-10-01-v72';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
