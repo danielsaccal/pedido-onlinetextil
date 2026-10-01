@@ -1420,7 +1420,10 @@ a.grilla-celda{display:block;}
         <label class="ni-chip"><input type="radio" name="hot-filtro-estado" value="entregado" onchange="renderHistorialOT(document.getElementById('hot-buscador').value)"><span>Entregadas</span></label>
       </div>
       <div id="hot-lista"><p class="empty-msg">Cargando órdenes...</p></div>
-      <button class="btn btn-ghost" style="margin-top:14px;" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+      <div class="actions" style="margin-top:14px;">
+        <button class="btn btn-ghost" onclick="mostrarPaso('step-catalogo')">Volver al catálogo</button>
+        <button class="btn btn-ghost" style="color:#A6432F;border-color:#A6432F;" onclick="borrarTodoHistorialOT()">🗑️ Borrar todo el historial</button>
+      </div>
     </div>
   </div>
 
@@ -1470,7 +1473,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v34</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v35</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5069,6 +5072,25 @@ async function compartirConBosquejos(texto, renglones){
 
 // ---------- historial de ordenes de trabajo (seguimiento de entregas parciales) ----------
 let historialOT = null; // null = no cargado; array = cargado, cada item con _docId
+
+async function borrarTodoHistorialOT(){
+  await cargarHistorialOT();
+  const n = (historialOT || []).length;
+  if(!n){ alert('El historial ya está vacío.'); return; }
+  const r = prompt(`Se van a borrar las ${n} órdenes de trabajo del historial, con sus entregas. No se puede deshacer.\n\nPara confirmar, escriba BORRAR:`);
+  if((r || '').trim().toUpperCase() !== 'BORRAR') return;
+  try{
+    const ids = historialOT.map(o => o._docId);
+    for(let i = 0; i < ids.length; i += 400){
+      const lote = db.batch();
+      ids.slice(i, i + 400).forEach(id => lote.delete(db.collection('ordenes_trabajo').doc(id)));
+      await lote.commit();
+    }
+    historialOT = [];
+    renderHistorialOT('');
+    alert(`Listo, se borraron ${n} órdenes.`);
+  } catch(e){ alert('No se pudo borrar todo: ' + e.message); }
+}
 
 async function cargarHistorialOT(){
   try{
@@ -11742,7 +11764,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v34';
+const APP_VERSION = '2026-10-01-v35';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
