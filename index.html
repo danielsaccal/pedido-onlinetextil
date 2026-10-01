@@ -1473,7 +1473,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v36</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v37</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1526,6 +1526,11 @@ a.grilla-celda{display:block;}
           <button type="button" class="btn-mini" onclick="agregarComponenteFicha(); calcularVistaFicha();">+ Agregar componente</button>
         </div>
 
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(0,1.2fr);gap:6px;margin-top:12px;">
+          <div class="field" style="margin:0;"><label>Bolsa</label><select id="fa-bolsa"></select></div>
+          <div class="field" style="margin:0;"><label>Etiqueta: descripción</label><input type="text" id="fa-et-desc" placeholder="FUNDA DE ALMOHADA"></div>
+          <div class="field" style="margin:0;"><label>Etiqueta: medida</label><input type="text" id="fa-et-medida" placeholder="50 X 85 CM (APROX)"></div>
+        </div>
         <div id="fa-resultado" style="margin-top:14px;"></div>
 
         <div class="actions" style="margin-top:12px;">
@@ -1580,6 +1585,17 @@ a.grilla-celda{display:block;}
             <div id="ac-consumos" style="margin-bottom:8px;"></div>
             <div id="ac-corte" style="margin-bottom:10px;"></div>
             <input type="text" id="ac-nota" placeholder="Nota para el taller (opcional)" oninput="calcularAC()" style="margin-bottom:10px;">
+            <div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <span style="font-size:0.8rem;color:#8A8072;">🛍️ Bolsa y etiqueta (para stock) <span id="ac-empaque-ok" style="color:#3D7A3D;"></span></span>
+                <a href="#" onclick="event.preventDefault(); editarBolsasDisponibles()" style="font-size:0.75rem;">medidas de bolsa</a>
+              </div>
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(0,1.2fr);gap:6px;">
+                <select id="ac-bolsa" onchange="cambioEmpaqueAC()"></select>
+                <input type="text" id="ac-et-desc" placeholder="Descripción" oninput="cambioEmpaqueAC()">
+                <input type="text" id="ac-et-medida" placeholder="Medida (ej: 50 X 85 CM APROX)" oninput="cambioEmpaqueAC()">
+              </div>
+            </div>
             <div class="actions">
               <button class="btn btn-gold" onclick="guardarAC()">Guardar</button>
               <button class="btn btn-ghost" onclick="ordenDesdeAC()">📋 Orden de trabajo</button>
@@ -2705,7 +2721,7 @@ function anchoComunOT(renglones){
 function lineaRenglonTexto(r, i, anchoComun){
   const lineas = [`• ${r.cantidad} × ${r.articulo}${r.personalizado ? ' (a medida)' : ''}`];
   const tela = r.anchoUsado && !anchoComun ? 'Tela ' + r.anchoUsado + ' cm · ' : '';
-  lineas.push(`   ${tela}${String(r.consumo).replace('.', ',')} m c/u · usa ${String(r.metrosConsumidos).replace('.', ',')} m${r.sku ? ' · Código ' + r.sku : ''}`);
+  lineas.push(`   ${tela}${String(r.consumo).replace('.', ',')} m c/u · usa ${String(r.metrosConsumidos).replace('.', ',')} m${r.sku ? ' · Código ' + r.sku : ''}${r.bolsa ? ' · Bolsa ' + r.bolsa : ''}`);
   const corte = corteCortoRenglon(r);
   if(corte) lineas.push(`   ✂️ ${corte}`);
   if(r.deSobras > 0) lineas.push(`   ♻️ ${r.deSobras} salen de lo que sobra de los otros cortes${r.deSobras < r.cantidad ? `, ${r.cantidad - r.deSobras} de tela nueva` : ' (no usan tela nueva)'}`);
@@ -3455,6 +3471,9 @@ function abrirEditorFicha(sku){
   document.getElementById('fa-nombre').value = f.nombre || '';
   document.getElementById('fa-tipo').value = f.tipo || 'simple';
   document.getElementById('fa-habitual').innerHTML = opcionesAnchoHabitual(f.anchoHabitual);
+  document.getElementById('fa-bolsa').innerHTML = opcionesBolsa(f.bolsa || '');
+  document.getElementById('fa-et-desc').value = f.etDesc || '';
+  document.getElementById('fa-et-medida').value = f.etMedida || '';
   document.getElementById('fa-piezas').innerHTML = '';
   (f.piezas && f.piezas.length ? f.piezas : [{ nombre: '', ancho: '', largo: '', partes: 1 }]).forEach(p => agregarPiezaFicha(p));
   document.getElementById('fa-componentes').innerHTML = '';
@@ -3510,6 +3529,9 @@ function leerFichaFormulario(){
     nombre: document.getElementById('fa-nombre').value.trim(),
     tipo,
     anchoHabitual: parseFloat(document.getElementById('fa-habitual').value) || fichasArticulos.anchos[0],
+    bolsa: document.getElementById('fa-bolsa').value,
+    etDesc: document.getElementById('fa-et-desc').value.trim(),
+    etMedida: document.getElementById('fa-et-medida').value.trim(),
   };
   if(tipo === 'compuesto'){
     f.componentes = [...document.querySelectorAll('.fa-comp')].map(el => ({ sku: normalizarSku(el.querySelector('.fa-c-sku').value), cantidad: Math.max(1, parseInt(el.querySelector('.fa-c-cant').value, 10) || 1) })).filter(c => c.sku);
@@ -3901,6 +3923,7 @@ function abrirArticuloAC(a, piezasForzadas){
   (base.length ? base : [{}]).forEach(p => agregarPiezaAC(p));
   const g0 = grupos.length ? (tablaConsumo.instrucciones[a] || {})[grupos[0].anchos[0]] : null;
   document.getElementById('ac-nota').value = (g0 && g0.nota) || '';
+  cargarEmpaqueAC();
   renderEditorAC();
   if(window.innerWidth < 820) document.getElementById('ac-editor').scrollIntoView({ behavior: 'smooth' });
 }
@@ -4443,6 +4466,95 @@ function aprovecharSobrasOrden(renglones){
   return resumen;
 }
 
+// ===== Bolsas y etiquetas =====
+// Cada articulo (o ficha por SKU) puede tener bolsa de presentacion y el texto de su etiqueta. Los
+// trabajos a medida van sin bolsa; lo que va a stock (incluido lo hecho con sobrantes) lleva bolsa y
+// etiqueta con descripcion, medida aproximada y SKU. Etiquetas para impresora de 50 x 25 mm.
+const BOLSAS_DEF = ['25 × 42', '30 × 45'];
+function bolsasDisponibles(){ return (tablaConsumo && Array.isArray(tablaConsumo.bolsas) && tablaConsumo.bolsas.length) ? tablaConsumo.bolsas : BOLSAS_DEF; }
+function datosEmpaque(articulo, fichaSku){
+  if(fichaSku && fichasArticulos && fichasArticulos.fichas[fichaSku]){ const f = fichasArticulos.fichas[fichaSku]; return { bolsa: f.bolsa || '', etDesc: f.etDesc || '', etMedida: f.etMedida || '' }; }
+  const d = (tablaConsumo && tablaConsumo.empaque && tablaConsumo.empaque[articulo]) || {};
+  return { bolsa: d.bolsa || '', etDesc: d.etDesc || '', etMedida: d.etMedida || '' };
+}
+function opcionesBolsa(sel){
+  return `<option value="">Sin bolsa</option>` + bolsasDisponibles().map(b => `<option value="${escapeAttr(b)}" ${b === sel ? 'selected' : ''}>Bolsa ${escaparHtml(b)}</option>`).join('');
+}
+// pantalla Articulos y cortes: se guarda al cambiar
+let empaqueTimer = null;
+function cargarEmpaqueAC(){
+  const d = datosEmpaque(acArticulo);
+  document.getElementById('ac-bolsa').innerHTML = opcionesBolsa(d.bolsa);
+  document.getElementById('ac-et-desc').value = d.etDesc;
+  document.getElementById('ac-et-medida').value = d.etMedida;
+  document.getElementById('ac-et-desc').placeholder = String(acArticulo || '').toUpperCase();
+}
+function cambioEmpaqueAC(){
+  if(!acArticulo) return;
+  tablaConsumo.empaque = tablaConsumo.empaque || {};
+  tablaConsumo.empaque[acArticulo] = {
+    bolsa: document.getElementById('ac-bolsa').value,
+    etDesc: document.getElementById('ac-et-desc').value.trim(),
+    etMedida: document.getElementById('ac-et-medida').value.trim(),
+  };
+  clearTimeout(empaqueTimer);
+  empaqueTimer = setTimeout(async () => {
+    try{ await guardarTablaYConsumo(); document.getElementById('ac-empaque-ok').textContent = '✓ Guardado'; setTimeout(() => { const e = document.getElementById('ac-empaque-ok'); if(e) e.textContent = ''; }, 1500); }
+    catch(e){ alert('No se pudo guardar la bolsa/etiqueta: ' + e.message); }
+  }, 700);
+}
+async function editarBolsasDisponibles(){
+  const r = prompt('Medidas de bolsa que usa, separadas por coma (ej: 25 × 42, 30 × 45):', bolsasDisponibles().join(', '));
+  if(r === null) return;
+  const lista = r.split(',').map(x => x.trim()).filter(Boolean);
+  if(!lista.length) return;
+  tablaConsumo.bolsas = lista;
+  try{ await guardarTablaYConsumo(); cargarEmpaqueAC(); } catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+// resumen de bolsas y etiquetas de una orden
+function resumenBolsas(renglones){
+  const porBolsa = new Map(); let etiquetas = 0;
+  (renglones || []).forEach(r => { if(!r.bolsa) return; porBolsa.set(r.bolsa, (porBolsa.get(r.bolsa) || 0) + (+r.cantidad || 0)); etiquetas += +r.cantidad || 0; });
+  if(!etiquetas) return '';
+  return `🛍️ Bolsas: ${[...porBolsa].map(([b, n]) => `${b} → ${n}`).join(' · ')} · Etiquetas: ${etiquetas}`;
+}
+// PDF de etiquetas 50 x 25 mm, una por pagina, tantas como unidades
+async function etiquetasOrden(o){
+  const rs = (o.renglones || []).filter(r => r.bolsa && (+r.cantidad || 0) > 0);
+  if(!rs.length){ alert('Ningún producto de esta orden lleva bolsa con etiqueta.'); return; }
+  const total = rs.reduce((s, r) => s + (+r.cantidad || 0), 0);
+  if(total > 300 && !confirm(`Son ${total} etiquetas. ¿Armar el PDF con todas?`)) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: [50, 25], orientation: 'landscape' });
+  let primera = true;
+  rs.forEach(r => {
+    const desc = limpiarPDF(r.etDesc || r.articulo).toUpperCase();
+    const medida = limpiarPDF(r.etMedida || '').toUpperCase();
+    const sku = limpiarPDF(r.sku || r.fichaSku || '');
+    for(let i = 0; i < r.cantidad; i++){
+      if(!primera) doc.addPage([50, 25], 'landscape');
+      primera = false;
+      doc.setFont('helvetica', 'bold');
+      let fs = 11; doc.setFontSize(fs);
+      while(fs > 7 && doc.getTextWidth(desc) > 46){ fs -= 0.5; doc.setFontSize(fs); }
+      const lineas = doc.splitTextToSize(desc, 46).slice(0, 2);
+      let y = lineas.length > 1 ? 6.5 : 8;
+      lineas.forEach(l => { doc.text(l, 25, y, { align: 'center' }); y += fs * 0.42; });
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+      if(medida) doc.text(medida, 25, 16, { align: 'center', maxWidth: 46 });
+      if(sku){ doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.text('SKU ' + sku, 25, 21.5, { align: 'center' }); }
+    }
+  });
+  const nombre = 'etiquetas-' + (limpiarPDF(o.numero) || 'orden') + '.pdf';
+  const file = new File([doc.output('blob')], nombre, { type: 'application/pdf' });
+  if(navigator.canShare && navigator.canShare({ files: [file] }) && /Android|iPhone|iPad/i.test(navigator.userAgent)){
+    try{ await navigator.share({ files: [file], title: nombre }); return; } catch(e){ if(e && e.name === 'AbortError') return; }
+  }
+  doc.save(nombre);
+}
+function etiquetasOrdenActual(){ if(window.ultimaOTDatos) etiquetasOrden(window.ultimaOTDatos); }
+function etiquetasOrdenGuardada(docId){ const o = (historialOT || []).find(x => x._docId === docId); if(o) etiquetasOrden(o); }
+
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -4857,6 +4969,7 @@ async function generarOrdenTrabajoCompleta(){
     renglones.push({ articulo, anchoIngresado: ancho, anchoUsado: resultado.anchoUsado, exacto: resultado.exacto, consumo: resultado.consumo, cantidad, metrosConsumidos, sku, nota, instruccion, tieneBosquejo, entregado: 0 });
   }
 
+  renglones.forEach(r => { if(r.personalizado) return; const d = datosEmpaque(r.articulo, r.fichaSku); if(d.bolsa){ r.bolsa = d.bolsa; r.etDesc = d.etDesc; r.etMedida = d.etMedida; } });
   let quedanSobras = [];
   try{ quedanSobras = aprovecharSobrasOrden(renglones); } catch(e){ console.error('aprovechar sobras', e); }
   const metrosConsumidosTotal = Math.round(renglones.reduce((s,r) => s + r.metrosConsumidos, 0) * 100) / 100;
@@ -4891,6 +5004,7 @@ async function generarOrdenTrabajoCompleta(){
       ? `⚠️ Se necesitan ≈ ${fmtMetros(metrosConsumidosTotal)} m y se entregan ${metrosTotales} m.`
       : `Total a usar ≈ ${fmtMetros(metrosConsumidosTotal)} m · Sobran ≈ ${fmtMetros(metrosRemanentes)} m`,
     ...(quedanSobras.length ? [`♻️ Con lo que todavía sobra de los cortes salen ≈ ${quedanSobras.join(', ')} más.`] : []),
+    ...(resumenBolsas(renglones) ? [resumenBolsas(renglones)] : []),
     ...(renglones.some(r => r.tieneBosquejo) ? ['Bosquejos de corte adjuntos.'] : []),
   ];
   if(notaGeneral) lineas.push(notaGeneral);
@@ -4915,6 +5029,7 @@ async function generarOrdenTrabajoCompleta(){
       <button class="btn btn-gold" onclick="compartirOrdenTrabajo('whatsapp')">📤 Compartir por WhatsApp</button>
       <button class="btn btn-ghost" onclick="compartirOrdenTrabajo('copiar')">📋 Copiar texto</button>
       <button class="btn btn-ghost" onclick="pdfOrdenActual()">📄 PDF</button>
+      <button class="btn btn-ghost" onclick="etiquetasOrdenActual()">🏷️ Etiquetas</button>
     </div>
   `;
   cont.dataset.texto = textoOrden;
@@ -5018,6 +5133,7 @@ async function generarPDFOrden(o){
   const usa = o.metrosConsumidosTotal != null ? o.metrosConsumidosTotal : renglones.reduce((s, r) => s + (+r.metrosConsumidos || 0), 0);
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
   doc.text(`Total a usar ~ ${numPDF(usa)} m · Sobran ~ ${numPDF((+o.metrosTotales || 0) - usa)} m`, M, y); y += 7;
+  if(resumenBolsas(renglones)){ doc.setFont('helvetica', 'normal'); doc.text(limpiarPDF(resumenBolsas(renglones)), M, y); y += 6; }
   if(o.notaGeneral){ doc.setFont('helvetica', 'normal'); const l = doc.splitTextToSize('Nota: ' + limpiarPDF(o.notaGeneral), W - 2*M); doc.text(l, M, y); y += l.length * 5; }
   // bosquejos: uno por pagina, lo mas grande posible
   for(const r of renglones){
@@ -5264,6 +5380,7 @@ function renderHistorialOT(filtro){
           <div class="hist-acciones">
             <button class="btn-mini" onclick="event.stopPropagation(); compartirTextoOrdenGuardada('${o._docId}', 'whatsapp')">📤 Reenviar por WhatsApp</button>
             <button class="btn-mini" onclick="event.stopPropagation(); pdfOrdenGuardada('${o._docId}')">📄 PDF</button>
+            <button class="btn-mini" onclick="event.stopPropagation(); etiquetasOrdenGuardada('${o._docId}')">🏷️ Etiquetas</button>
             <button class="btn-mini" onclick="event.stopPropagation(); modificarOrdenOT('${o._docId}')">✏️ Modificar</button>
             <button class="btn-mini" onclick="event.stopPropagation(); borrarOrdenOT('${o._docId}')">🗑️ Borrar</button>
           </div>
@@ -5308,6 +5425,7 @@ function compartirTextoOrdenGuardada(docId, modo){
     ...(orden.comprobante ? [`Comprobante: ${orden.comprobante}`] : []),
     '',
     ...(orden.renglones||[]).map((r,i) => lineaRenglonTexto(r, i, anchoComunOT(orden.renglones))),
+    ...(resumenBolsas(orden.renglones) ? ['', resumenBolsas(orden.renglones)] : []),
   ];
   if(orden.notaGeneral) lineas.push('', orden.notaGeneral);
   const texto = lineas.join('\n');
@@ -11784,7 +11902,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v36';
+const APP_VERSION = '2026-10-01-v37';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
