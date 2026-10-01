@@ -1521,7 +1521,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v49</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v50</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1726,7 +1726,7 @@ a.grilla-celda{display:block;}
   <div class="step" id="step-deuda-tela">
     <div class="form-card">
       <h2>Tela pendiente de entrega</h2>
-      <p class="note" style="margin-bottom:10px;">Lo que cada taller todavía debe, partida por partida, y cuánto tarda en entregar.</p>
+      <p class="note" style="margin-bottom:10px;">Lo que cada taller todavía debe, partida por partida, y cuánto tarda en entregar. Toque una tela para ver sus opciones.</p>
       <div id="dt-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"></div>
       <div id="dt-lista"><p class="empty-msg">Cargando...</p></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
@@ -5173,12 +5173,13 @@ function renderDeudaTela(){
         <thead><tr style="background:var(--cream);"><th style="padding:6px;text-align:left;">Tela</th><th style="padding:6px;">Enviada</th><th style="padding:6px;text-align:right;">Sin asignar</th><th style="padding:6px;text-align:right;">En trabajo</th><th style="padding:6px;text-align:right;">Debe</th></tr></thead>
         <tbody>${ps.map(e => {
           const color = e.dias > DIAS_ALERTA_ENVIO ? '#A6432F' : '#6B6258';
-          return `<tr style="border-top:1px solid var(--line);">
-            <td style="padding:6px;"><b>${escaparHtml(e.skuTela)}</b><br><span style="font-size:0.74rem;color:#8A8072;">${e.ots.length ? e.ots.map(o => escaparHtml(o.numero)).join(', ') : 'sin orden'}</span></td>
+          return `<tr style="border-top:1px solid var(--line);cursor:pointer;" onclick="toggleDetallePartida('${e._id}')" title="Ver opciones">
+            <td style="padding:6px;"><b>${escaparHtml(e.skuTela)}</b> <span style="color:#B0A698;font-size:0.75rem;">▾</span><br><span style="font-size:0.74rem;color:#8A8072;">${e.ots.length ? e.ots.map(o => escaparHtml(o.numero)).join(', ') : 'sin orden'}</span></td>
             <td style="padding:6px;text-align:center;color:${color};white-space:nowrap;">hace ${e.dias} d<br><span style="font-size:0.74rem;color:#8A8072;">${new Date(String(e.fecha).slice(0, 10) + 'T12:00:00').toLocaleDateString('es-AR')}</span></td>
             <td style="padding:6px;text-align:right;${e.sinAsignar > 0.5 ? 'color:#8A6417;font-weight:700;' : 'color:#B0A698;'}">${e.sinAsignar > 0.5 ? m(e.sinAsignar) + ' m' : '—'}</td>
             <td style="padding:6px;text-align:right;">${e.enTrabajo > 0.5 ? m(e.enTrabajo) + ' m' : '—'}</td>
-            <td style="padding:6px;text-align:right;font-weight:700;">${m(e.debe)} m</td></tr>`;
+            <td style="padding:6px;text-align:right;font-weight:700;">${m(e.debe)} m</td></tr>
+            <tr id="dt-det-${e._id.replace(':', '_')}" style="display:${dtAbierta === e._id ? 'table-row' : 'none'};"><td colspan="5" style="padding:0 6px 10px;">${dtAbierta === e._id ? detallePartidaHTML(e) : ''}</td></tr>`;
         }).join('')}</tbody>
       </table></div>
     </div>`;
@@ -5210,6 +5211,85 @@ function calcularGenericoOT(el){
 function bosquejoDeRenglon(r){
   if(r.piezasGen && r.anchoUsado) return dibujarBosquejoCorte(+r.anchoUsado, r.piezasGen);
   return buscarBosquejoCorte(r.articulo, r.anchoUsado);
+}
+
+// ----- opciones de cada partida (entrar, modificar, eliminar, asignar trabajo) -----
+let dtAbierta = null, dtEditando = false;
+function toggleDetallePartida(id){ dtAbierta = dtAbierta === id ? null : id; dtEditando = false; renderDeudaTela(); }
+function detallePartidaHTML(e){
+  const desdeOrden = String(e._id).startsWith('ot:');
+  const ots = e.ots || [];
+  const caja = 'background:var(--cream);border-radius:10px;padding:10px;';
+  if(dtEditando && !desdeOrden){
+    return `<div style="${caja}">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px;">
+        <div class="field" style="margin:0;"><label>Taller</label><select id="dte-taller">${(talleresLista || [e.taller]).map(t => `<option ${t === e.taller ? 'selected' : ''}>${escaparHtml(t)}</option>`).join('')}</select></div>
+        <div class="field" style="margin:0;"><label>Código de tela</label><input id="dte-sku" value="${escapeAttr(e.skuTela)}"></div>
+        <div class="field" style="margin:0;"><label>Metros</label><input id="dte-metros" type="number" step="0.01" value="${e.metros}"></div>
+        <div class="field" style="margin:0;"><label>Comprobante</label><input id="dte-comp" value="${escapeAttr(e.comprobante || '')}"></div>
+        <div class="field" style="margin:0;"><label>Fecha</label><input id="dte-fecha" type="date" value="${String(e.fecha).slice(0, 10)}"></div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px;"><button class="btn-mini" onclick="event.stopPropagation(); guardarEdicionEnvio('${e._id}')">💾 Guardar</button><button class="btn-mini" onclick="event.stopPropagation(); dtEditando=false; renderDeudaTela();">Cancelar</button></div>
+    </div>`;
+  }
+  const b = (txt, fn) => `<button class="btn-mini" onclick="event.stopPropagation(); ${fn}">${txt}</button>`;
+  const botones = [];
+  if(!desdeOrden){
+    if(e.sinAsignar > 0.5) botones.push(b(`📋 Asignar trabajo (${fmtCm(Math.round(e.sinAsignar))} m)`, `armarOrdenDesdeEnvio('${e._id}')`));
+    botones.push(b('✏️ Modificar envío', `dtEditando=true; if(talleresLista === null){ cargarTalleres().then(renderDeudaTela); } else renderDeudaTela();`));
+  } else {
+    const o = ots[0];
+    if(e.sinAsignar > 0.5) botones.push(b(`📋 Asignar el sobrante (${fmtCm(Math.round(e.sinAsignar))} m)`, `modificarOrdenOT('${o._docId}')`));
+    botones.push(b('✏️ Modificar orden', `modificarOrdenOT('${o._docId}')`));
+  }
+  if(ots.some(o => (o.renglones || []).some(r => pendienteRenglon(r) > 0))) botones.push(b('📥 Registrar ingreso', `irAIngresoDe('${escapeAttr(e.taller)}')`));
+  ots.forEach(o => botones.push(b(`📄 ${escaparHtml(o.numero)}`, `pdfOrden((historialOT || []).find(x => x._docId === '${o._docId}'))`)));
+  if(ots.some(o => (o.renglones || []).some(r => (r.entregado || 0) + (r.fallados || 0) > 0))) botones.push(b('✔️ Cerrar partida', `cerrarPartidaEnvio('${e._id}').then(() => abrirDeudaTela())`));
+  botones.push(b('🗑️ Eliminar', `eliminarPartidaDT('${e._id}')`));
+  const detOts = ots.map(o => `<div style="font-size:0.82rem;margin-top:4px;"><b>${escaparHtml(o.numero)}</b> · ${(o.renglones || []).map(r => `${r.cantidad} ${escaparHtml(r.articulo)}${(r.entregado || r.fallados) ? ` (entregó ${r.entregado || 0}${r.fallados ? ' + ' + r.fallados + ' falladas' : ''})` : ''}`).join(' · ')}</div>`).join('');
+  return `<div style="${caja}">
+    <div style="font-size:0.82rem;color:#6B6258;">${escaparHtml(e.taller)} · ${escaparHtml(e.skuTela)} · ${fmtCm(e.metros)} m${e.comprobante ? ' · ' + escaparHtml(e.comprobante) : ''}</div>
+    ${detOts || '<div style="font-size:0.82rem;margin-top:4px;color:#8A8072;">Todavía sin trabajo asignado.</div>'}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">${botones.join('')}</div>
+  </div>`;
+}
+async function guardarEdicionEnvio(id){
+  const e = (enviosTela || []).find(x => x._id === id);
+  if(!e) return;
+  const d = {
+    taller: document.getElementById('dte-taller').value,
+    skuTela: document.getElementById('dte-sku').value.trim().toUpperCase(),
+    metros: parseFloat(document.getElementById('dte-metros').value),
+    comprobante: document.getElementById('dte-comp').value.trim(),
+    fecha: document.getElementById('dte-fecha').value || e.fecha,
+  };
+  if(!d.taller || !d.skuTela || !(d.metros > 0)){ alert('Complete taller, código de tela y metros.'); return; }
+  const asignado = asignadoEnvio(id);
+  if(d.metros + 0.01 < asignado && !confirm(`Las órdenes de este envío ya usan ${fmtCm(asignado)} m y está poniendo ${fmtCm(d.metros)} m. ¿Guardar igual?`)) return;
+  try{ await db.collection('envios_tela').doc(id).update(d); Object.assign(e, d); dtEditando = false; renderDeudaTela(); }
+  catch(err){ alert('No se pudo guardar: ' + err.message); }
+}
+async function eliminarPartidaDT(id){
+  if(String(id).startsWith('ot:')){
+    await borrarOrdenOT(id.slice(3));
+    dtAbierta = null; renderDeudaTela();
+    return;
+  }
+  const ots = ordenesDeEnvio(id);
+  if(ots.length){
+    if(!confirm(`Este envío tiene ${ots.length} orden(es): ${ots.map(o => o.numero).join(', ')}.\n\nSe borran el envío y sus órdenes, con sus entregas. No se puede deshacer. ¿Seguir?`)) return;
+    try{
+      for(const o of ots) await db.collection('ordenes_trabajo').doc(o._docId).delete();
+      historialOT = (historialOT || []).filter(o => !ots.includes(o));
+    } catch(err){ alert('No se pudieron borrar las órdenes: ' + err.message); return; }
+  } else if(!confirm('¿Eliminar este envío de tela?')) return;
+  try{ await db.collection('envios_tela').doc(id).delete(); enviosTela = enviosTela.filter(x => x._id !== id); dtAbierta = null; renderDeudaTela(); }
+  catch(err){ alert('No se pudo eliminar: ' + err.message); }
+}
+async function irAIngresoDe(taller){
+  await abrirIngresoTaller();
+  document.getElementById('it-taller').value = taller;
+  renderIngresoTaller();
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -12606,7 +12686,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v49';
+const APP_VERSION = '2026-10-01-v50';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
