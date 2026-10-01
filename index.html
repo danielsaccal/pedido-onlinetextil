@@ -1521,7 +1521,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v45</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v46</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -4880,7 +4880,18 @@ async function cargarEnviosTela(){
     enviosTela = snap.docs.map(d => ({ _id: d.id, ...d.data() })).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
   } catch(e){ console.error('envios', e); enviosTela = enviosTela || []; }
 }
-function ordenesDeEnvio(id){ return (historialOT || []).filter(o => o.envioId === id); }
+function ordenesDeEnvio(id){
+  if(String(id).startsWith('ot:')) return (historialOT || []).filter(o => o._docId === id.slice(3));
+  return (historialOT || []).filter(o => o.envioId === id);
+}
+// las ordenes armadas directo (sin registrar el envio) tambien son tela que esta en el taller
+function partidasEnTalleres(){
+  const sueltas = (historialOT || []).filter(o => !o.envioId).map(o => ({
+    _id: 'ot:' + o._docId, taller: o.taller, skuTela: o.skuTela, metros: +o.metrosTotales || 0, comprobante: o.comprobante,
+    fecha: String(o.fecha || '').slice(0, 10), cerrado: !!o.cerrada, merma: o.merma, desdeOrden: true,
+  }));
+  return [...(enviosTela || []), ...sueltas].sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+}
 function asignadoEnvio(id){ return Math.round(ordenesDeEnvio(id).reduce((s, o) => s + (+o.metrosTotales || 0), 0) * 100) / 100; }
 async function guardarEnvioTela(){
   const err = document.getElementById('et-error'); err.style.display = 'none';
@@ -4907,11 +4918,11 @@ async function borrarEnvioTela(id){
   catch(e){ alert('No se pudo borrar: ' + e.message); }
 }
 function renderEnviosTela(){
-  const talleres = [...new Set((enviosTela || []).map(e => e.taller))].sort();
+  const talleres = [...new Set(partidasEnTalleres().map(e => e.taller))].sort();
   const chip = (v, t) => `<span onclick="etFiltro='${escapeAttr(v)}'; renderEnviosTela();" style="cursor:pointer;font-size:0.82rem;padding:5px 12px;border-radius:14px;border:1px solid var(--line);${etFiltro === v ? 'background:var(--purple);color:#fff;border-color:var(--purple);' : ''}">${escaparHtml(t)}</span>`;
   document.getElementById('et-filtros').innerHTML = chip('pendientes', 'Abiertas') + chip('todos', 'Todos') + talleres.map(t => chip('t:' + t, t)).join('');
   const hoy = Date.now();
-  const lista = (enviosTela || []).map(e => {
+  const lista = partidasEnTalleres().map(e => {
     const asig = asignadoEnvio(e._id), resto = Math.round((e.metros - asig) * 100) / 100;
     const dias = Math.floor((hoy - new Date(e.fecha + 'T12:00:00').getTime()) / 86400000);
     return { ...e, asig, resto, dias };
@@ -4930,7 +4941,7 @@ function renderEnviosTela(){
         <b>${escaparHtml(e.taller)} · ${escaparHtml(e.skuTela)} · ${fmtCm(e.metros)} m</b>
         <span style="font-size:0.75rem;padding:2px 9px;border-radius:10px;background:${tag[1]};color:${tag[2]};white-space:nowrap;">${tag[0]}</span>
       </div>
-      <div style="font-size:0.8rem;color:#8A8072;">Enviado ${fecha}${e.resto > 0.01 ? ` · hace ${e.dias} día${e.dias === 1 ? '' : 's'}` : ''}${e.comprobante ? ' · ' + escaparHtml(e.comprobante) : ''}</div>
+      <div style="font-size:0.8rem;color:#8A8072;">${e.desdeOrden ? '📋 Cargada desde la orden · ' : ''}Enviado ${fecha}${e.resto > 0.01 ? ` · hace ${e.dias} día${e.dias === 1 ? '' : 's'}` : ''}${e.comprobante ? ' · ' + escaparHtml(e.comprobante) : ''}</div>
       <div style="height:8px;border-radius:4px;background:var(--cream);overflow:hidden;margin:8px 0 6px;"><div style="height:100%;width:${pct}%;background:var(--purple);"></div></div>
       <div style="font-size:0.8rem;color:#6B6258;margin-bottom:4px;">${ots.length ? ots.map(o => `${escaparHtml(o.numero)} · ${fmtCm(+o.metrosTotales || 0)} m`).join(' · ') : 'Todavía sin órdenes'}</div>
       ${m && m.esperadas ? `<div style="font-size:0.8rem;color:#6B6258;margin-bottom:8px;">Recibido del taller: ${m.buenas} buenas${m.falladas ? ` + ${m.falladas} falladas` : ''} de ${m.esperadas} unidades</div>` : ''}
@@ -4938,7 +4949,7 @@ function renderEnviosTela(){
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         ${e.resto > 0.01 && !e.cerrado ? `<button class="btn-mini" onclick="armarOrdenDesdeEnvio('${e._id}')">📋 Armar orden con los ${fmtCm(e.resto)} m</button>` : ''}
         ${ots.length && !e.cerrado && recibido > 0 ? `<button class="btn-mini" onclick="cerrarPartidaEnvio('${e._id}')">✔️ Cerrar partida</button>` : ''}
-        ${ots.length ? '' : `<button class="btn-mini" onclick="borrarEnvioTela('${e._id}')">🗑️</button>`}
+        ${ots.length || e.desdeOrden ? '' : `<button class="btn-mini" onclick="borrarEnvioTela('${e._id}')">🗑️</button>`}
       </div>
     </div>`;
   }).join('');
@@ -5051,6 +5062,16 @@ async function registrarIngresoTaller(){
 }
 // cerrar una partida (envio de tela): sus ordenes quedan cerradas y se guarda la merma
 async function cerrarPartidaEnvio(id){
+  if(String(id).startsWith('ot:')){
+    // orden armada sin envio: se cierra la orden
+    const o = (historialOT || []).find(x => x._docId === id.slice(3));
+    if(!o) return;
+    const m = calcularMerma([o]);
+    if(!confirm(`Cerrar ${o.numero}\n\nMerma: ${textoMerma(m)}\n\nLo que no llegó deja de figurar como pendiente. ¿Cerrar?`)) return;
+    try{ await db.collection('ordenes_trabajo').doc(o._docId).update({ cerrada: true, cerradaFecha: new Date().toISOString(), merma: m }); o.cerrada = true; o.merma = m; renderEnviosTela(); }
+    catch(err){ alert('No se pudo cerrar: ' + err.message); }
+    return;
+  }
   const e = (enviosTela || []).find(x => x._id === id);
   const ots = ordenesDeEnvio(id);
   if(!e || !ots.length) return;
@@ -12433,7 +12454,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v45';
+const APP_VERSION = '2026-10-01-v46';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
