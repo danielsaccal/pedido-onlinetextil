@@ -1385,7 +1385,23 @@ a.grilla-celda{display:block;}
       <div class="field" id="ot-taller-nuevo-wrap" style="display:none;"><label>Nombre del taller nuevo</label><input type="text" id="ot-taller-nuevo" placeholder="Ej: Mendez"></div>
       <div class="field"><label>SKU de la tela entregada</label><input type="text" id="ot-sku-tela" placeholder="Ej: MAC315B"></div>
       <div class="field"><label>Comprobante de referencia (con qué le entregó la tela el proveedor)</label><input type="text" id="ot-comprobante" placeholder="Ej: Remito 0001-00023456"></div>
-      <div class="field"><label>Metros totales entregados</label><input type="number" id="ot-metros-totales" min="0" step="0.01" placeholder="Ej: 600"></div>
+      <div class="field"><label>Metros totales entregados</label><input type="number" id="ot-metros-totales" min="0" step="0.01" placeholder="Ej: 600" oninput="calcularReparto()"></div>
+
+      <details id="rp-panel" style="margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;">
+        <summary style="cursor:pointer;font-weight:700;">📦 Para stock: repartir la tela entre varios productos</summary>
+        <p class="note" style="margin:8px 0;">Elija los productos y cómo repartir los metros entregados. Después se cargan solos abajo.</p>
+        <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+          <div class="field" style="flex:3;min-width:200px;margin:0;"><label>Producto</label><select id="rp-art"><option value="">Elija un artículo</option></select></div>
+          <div class="field" style="flex:1;min-width:90px;margin:0;"><label>Ancho tela (cm)</label><input type="number" id="rp-ancho" placeholder="315" oninput="calcularReparto()"></div>
+          <button type="button" class="btn-mini" style="margin-bottom:4px;" onclick="agregarAlReparto()">+ Sumar</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0;">
+          <label class="ni-chip"><input type="radio" name="rp-modo" value="metros" checked onchange="calcularReparto()"><span>Misma tela para cada uno</span></label>
+          <label class="ni-chip"><input type="radio" name="rp-modo" value="unidades" onchange="calcularReparto()"><span>Mismas unidades</span></label>
+          <label class="ni-chip"><input type="radio" name="rp-modo" value="porcentaje" onchange="calcularReparto()"><span>Por porcentaje</span></label>
+        </div>
+        <div id="rp-tabla"></div>
+      </details>
 
       <p class="ni-seccion-tit" style="margin-top:18px;">Productos a fabricar con esta tela</p>
       <p class="note" style="margin-bottom:10px;">Si con la misma partida hace más de un producto (ej: juegos de sábanas y fundas sueltas), agregue uno por cada uno — reparta entre ellos los metros que use cada uno.</p>
@@ -1473,7 +1489,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v37</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v38</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -4555,6 +4571,95 @@ async function etiquetasOrden(o){
 function etiquetasOrdenActual(){ if(window.ultimaOTDatos) etiquetasOrden(window.ultimaOTDatos); }
 function etiquetasOrdenGuardada(docId){ const o = (historialOT || []).find(x => x._docId === docId); if(o) etiquetasOrden(o); }
 
+// ===== Repartir la tela para stock =====
+// Con los metros entregados y varios productos elegidos, calcula cuantas unidades de cada uno:
+// misma cantidad de tela para cada uno, mismas unidades, o por porcentaje de la tela.
+let repartoItems = []; // { valor, nombre, pct }
+function prepararReparto(){
+  const sel = document.getElementById('rp-art');
+  sel.innerHTML = '<option value="">Elija un artículo</option>' + opcionesArticuloOT();
+  hacerSelectBuscable(sel);
+  if(sel._sync) sel._sync();
+  repartoItems = [];
+  calcularReparto();
+}
+function agregarAlReparto(){
+  const sel = document.getElementById('rp-art');
+  const v = sel.value;
+  if(!v) return;
+  if(repartoItems.some(x => x.valor === v)) return;
+  repartoItems.push({ valor: v, nombre: sel.options[sel.selectedIndex].text, pct: 0 });
+  // porcentajes parejos por defecto
+  const base = Math.floor(100 / repartoItems.length);
+  repartoItems.forEach((x, i) => x.pct = i === repartoItems.length - 1 ? 100 - base * (repartoItems.length - 1) : base);
+  if(!document.getElementById('rp-ancho').value && v.startsWith('ficha:')){ const f = fichasArticulos.fichas[v.slice(6)]; if(f && f.anchoHabitual) document.getElementById('rp-ancho').value = f.anchoHabitual; }
+  sel.value = ''; if(sel._sync) sel._sync();
+  calcularReparto();
+}
+function quitarDelReparto(i){ repartoItems.splice(i, 1); calcularReparto(); }
+function calcularRepartoDatos(){
+  const total = parseFloat(document.getElementById('ot-metros-totales').value) || 0;
+  const W = parseFloat(document.getElementById('rp-ancho').value) || 0;
+  const modo = (document.querySelector('input[name="rp-modo"]:checked') || {}).value || 'metros';
+  const items = repartoItems.map(x => ({ ...x, c: W > 0 ? consumoUnitarioOT(x.valor, W) : null }));
+  if(!total || !W || !items.length || items.some(x => !x.c)) return { total, W, modo, items, listo: false };
+  if(modo === 'unidades'){
+    const q = Math.floor(total / items.reduce((s, x) => s + x.c, 0) + 1e-9);
+    items.forEach(x => x.q = q);
+  } else {
+    const pesos = modo === 'porcentaje' ? items.map(x => Math.max(0, +x.pct || 0)) : items.map(() => 1);
+    const suma = pesos.reduce((a, b) => a + b, 0) || 1;
+    items.forEach((x, i) => x.q = Math.floor(total * pesos[i] / suma / x.c + 1e-9));
+    // lo que queda se reparte de a una unidad, mientras entre, empezando por el que menos consume
+    let resto = total - items.reduce((s, x) => s + x.q * x.c, 0);
+    const orden = [...items].sort((a, b) => a.c - b.c);
+    let sumo = true;
+    while(sumo){ sumo = false; for(const x of orden){ if(x.c <= resto + 1e-9){ x.q++; resto -= x.c; sumo = true; } } if(modo === 'porcentaje') break; }
+  }
+  items.forEach(x => x.m = Math.round(x.q * x.c * 100) / 100);
+  return { total, W, modo, items, listo: true, usado: items.reduce((s, x) => s + x.m, 0) };
+}
+function calcularReparto(){
+  const cont = document.getElementById('rp-tabla');
+  if(!cont) return;
+  const d = calcularRepartoDatos();
+  if(!repartoItems.length){ cont.innerHTML = '<p class="note">Sume los productos que quiere fabricar.</p>'; return; }
+  const aviso = !d.total ? 'Escriba arriba los metros totales entregados.' : !d.W ? 'Escriba el ancho de la tela.' : d.items.some(x => !x.c) ? 'Algún producto no tiene consumo calculable en ese ancho (cargue sus piezas).' : '';
+  cont.innerHTML = `
+    <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
+      <thead><tr style="background:var(--cream);"><th style="padding:6px;text-align:left;">Producto</th>${d.modo === 'porcentaje' ? '<th style="padding:6px;">%</th>' : ''}<th style="padding:6px;text-align:right;">m c/u</th><th style="padding:6px;text-align:right;">Unidades</th><th style="padding:6px;text-align:right;">Metros</th><th></th></tr></thead>
+      <tbody>${d.items.map((x, i) => `<tr style="border-top:1px solid var(--line);">
+        <td style="padding:6px;">${escaparHtml(x.nombre)}</td>
+        ${d.modo === 'porcentaje' ? `<td style="padding:6px;"><input type="number" min="0" max="100" value="${x.pct}" style="width:64px;" onchange="repartoItems[${i}].pct = +this.value; calcularReparto();"></td>` : ''}
+        <td style="padding:6px;text-align:right;">${x.c ? fmtMetros(x.c) : '—'}</td>
+        <td style="padding:6px;text-align:right;font-weight:700;">${d.listo ? x.q : '—'}</td>
+        <td style="padding:6px;text-align:right;">${d.listo ? fmtMetros(x.m) : '—'}</td>
+        <td style="padding:6px;text-align:right;"><button type="button" class="btn-mini" onclick="quitarDelReparto(${i})">✕</button></td></tr>`).join('')}</tbody>
+    </table></div>
+    ${d.modo === 'porcentaje' ? `<p class="note" style="margin:4px 0;">Suma de porcentajes: ${repartoItems.reduce((s, x) => s + (+x.pct || 0), 0)} %</p>` : ''}
+    ${aviso ? `<p class="note" style="color:#A6432F;margin-top:6px;">${aviso}</p>` : `<p class="note" style="margin-top:6px;">Usa ≈ ${fmtMetros(d.usado)} m de ${fmtMetros(d.total)} m · sobran ≈ ${fmtMetros(d.total - d.usado)} m</p>
+      <button type="button" class="btn btn-gold" style="margin-top:6px;" onclick="cargarRepartoEnOrden()">Cargar en la orden</button>`}`;
+}
+function cargarRepartoEnOrden(){
+  const d = calcularRepartoDatos();
+  if(!d.listo) return;
+  const hay = [...document.querySelectorAll('.ot-renglon')].some(el => el.querySelector('.ot-r-articulo').value);
+  if(hay && !confirm('¿Reemplazar los productos que ya cargó en la orden por este reparto?')) return;
+  document.getElementById('ot-renglones').innerHTML = '';
+  d.items.forEach(x => {
+    if(!x.q) return;
+    agregarRenglonOrdenTrabajo();
+    const rs = document.querySelectorAll('.ot-renglon'), r = rs[rs.length - 1];
+    const sel = r.querySelector('.ot-r-articulo');
+    sel.value = x.valor;
+    cambiarModoRenglonOT(sel);
+    r.querySelector('.ot-r-ancho').value = d.W;
+    r.querySelector('.ot-r-cantidad').value = x.q;
+  });
+  document.getElementById('rp-panel').open = false;
+  document.getElementById('ot-renglones').scrollIntoView({ behavior: 'smooth' });
+}
+
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -4822,6 +4927,7 @@ async function abrirOrdenTrabajo(modoEdicion){
   if(fichasArticulos === null) await cargarFichasArticulos();
   if(talleresLista === null) await cargarTalleres();
   poblarSelectTalleres();
+  try{ prepararReparto(); } catch(e){ console.error(e); }
 
   const hay = (tablaConsumo && tablaConsumo.articulos && Object.keys(tablaConsumo.articulos).length > 0) || hayFichas();
   document.getElementById('ot-sin-tabla').style.display = hay ? 'none' : 'block';
@@ -11902,7 +12008,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v37';
+const APP_VERSION = '2026-10-01-v38';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
