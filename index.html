@@ -1541,7 +1541,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v80</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v81</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1671,6 +1671,11 @@ a.grilla-celda{display:block;}
                 <div><input type="text" id="ac-et-medida" placeholder="50 X 85 CM (APROX)" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Medida (etiqueta)</div></div>
                 <div><input type="text" id="ac-sku" placeholder="Ej: KA181F" oninput="cambioEmpaqueAC()" style="text-transform:uppercase;"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">SKU (se completa solo en la orden)</div></div>
                 <div style="grid-column:1 / -1;"><select id="ac-tela" onchange="cambiarTelaArticuloAC()" style="width:100%;padding:9px 8px;box-sizing:border-box;"></select><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Calidad de tela de este SKU (cualquier ancho)</div><div id="ac-tela-info" style="font-size:0.7rem;color:#6B6258;"></div></div>
+                <div style="grid-column:1 / -1;border-top:1px dashed var(--line);padding-top:8px;">
+                  <div style="font-size:0.78rem;color:#6B6258;margin-bottom:4px;">Otros SKU de este mismo artículo (en otra calidad o color de tela):</div>
+                  <div id="ac-otros-sku"></div>
+                  <button type="button" class="btn-mini" onclick="agregarOtroSkuAC()">+ Agregar otro SKU</button>
+                </div>
               </div>
             </div>
             <div class="actions">
@@ -4799,6 +4804,7 @@ function cargarEmpaqueAC(){
     const cal = (sku && calidadDeSku(sku)) || ((tablaConsumo.empaque || {})[acArticulo] || {}).calidad || '';
     document.getElementById('ac-tela').innerHTML = opcionesCalidad(cal);
     infoTelaAC();
+    renderOtrosSkuAC();
   };
   if(telasDatos === null) cargarTelas().then(pintarCal); else pintarCal();
   document.getElementById('ac-por-bolsa').value = d.porBolsa > 1 ? d.porBolsa : '';
@@ -5997,14 +6003,28 @@ function claveComposicion(t){
 }
 function claveCalidad(t){ return [normBusqueda(t.nombre || '').replace(/\s+/g, ' ').trim(), parseInt(t.hilos, 10) || '', claveComposicion(t)].join('|'); }
 function etiquetaCalidad(t){ const c = composicionTexto(t); return `${String(t.nombre || '').trim().replace(/\s+/g, ' ').toUpperCase()}${t.hilos ? ' · ' + parseInt(t.hilos, 10) + ' hilos' : ''}${c ? ' · ' + c : ''}`; }
+// cada calidad aparece "en cualquier color" y, si tiene colores cargados, tambien por color
+// (ej: el juego en tela blanca es un SKU y en tela de color es otro)
 function calidadesTela(){
   const m = new Map();
-  Object.entries((telasDatos && telasDatos.telas) || {}).forEach(([c, t]) => { const k = claveCalidad(t); const x = m.get(k) || { clave: k, etiqueta: etiquetaCalidad(t), codigos: [] }; x.codigos.push(c); m.set(k, x); });
+  Object.entries((telasDatos && telasDatos.telas) || {}).forEach(([c, t]) => {
+    const k = claveCalidad(t);
+    const x = m.get(k) || { clave: k, etiqueta: etiquetaCalidad(t) + ' · cualquier color', codigos: [] }; x.codigos.push(c); m.set(k, x);
+    if(t.color){
+      const kc = k + '#' + normBusqueda(t.color);
+      const y = m.get(kc) || { clave: kc, etiqueta: etiquetaCalidad(t) + ' · ' + t.color.toLowerCase(), codigos: [] }; y.codigos.push(c); m.set(kc, y);
+    }
+  });
   return [...m.values()].sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, 'es'));
+}
+function telaCumpleCalidad(t, clave){
+  if(!t || !clave) return false;
+  const [base, color] = String(clave).split('#');
+  return claveCalidad(t) === base && (!color || normBusqueda(t.color || '') === color);
 }
 // una tela representativa de la calidad (preferentemente con rendimiento cargado)
 function telaDeCalidad(clave){
-  const cs = Object.keys((telasDatos && telasDatos.telas) || {}).filter(c => claveCalidad(telasDatos.telas[c]) === clave);
+  const cs = Object.keys((telasDatos && telasDatos.telas) || {}).filter(c => telaCumpleCalidad(telasDatos.telas[c], clave));
   return cs.find(c => telasDatos.telas[c].mPorKg > 0) || cs.find(c => rendimientoTela(c)) || cs[0] || null;
 }
 // clave con la formula anterior (para reconocer los vinculos guardados antes del cambio)
@@ -6014,7 +6034,7 @@ function calidadDeSku(sku){
   const v = fabricacion && fabricacion.vinculos[S];
   if(v && v.calidad){
     const telas = Object.values((telasDatos && telasDatos.telas) || {});
-    if(telas.some(t => claveCalidad(t) === v.calidad)) return v.calidad;
+    if(telas.some(t => telaCumpleCalidad(t, v.calidad))) return v.calidad;
     const t = telas.find(t => claveCalidadVieja(t) === v.calidad);
     if(t){ v.calidad = claveCalidad(t); return v.calidad; }
     return v.calidad;
@@ -6028,8 +6048,8 @@ function opcionesCalidad(sel){
 // en la orden: con el articulo y la tela entregada, el SKU que corresponde
 function skuPorArticuloYTela(articuloValor, codTela){
   const t = datosTela(codTela); if(!t || !fabricacion) return null;
-  const k = claveCalidad(t);
-  return Object.keys(fabricacion.vinculos).find(s => calidadDeSku(s) === k && articuloDeSku(s) === articuloValor) || null;
+  const cands = Object.keys(fabricacion.vinculos).filter(s => articuloDeSku(s) === articuloValor && telaCumpleCalidad(t, calidadDeSku(s)));
+  return cands.find(s => String(calidadDeSku(s)).includes('#')) || cands[0] || null;
 }
 
 async function renderFabProducto(){
@@ -6119,6 +6139,34 @@ function infoTelaAC(){
   const g = clave ? pesoAproxGramos(acArticulo, telaDeCalidad(clave)) : null;
   const sku = document.getElementById('ac-sku').value.trim();
   el.textContent = q ? `Se hace con: ${q.codigos.join(', ')}${g ? ' · peso aprox. ' + (g >= 1000 ? fmtCm(Math.round(g / 10) / 100) + ' kg' : g + ' g') : ''}${sku ? '' : ' · ⚠️ cargue el SKU para vincularlo al catálogo'}` : '';
+}
+
+// ----- un mismo articulo de corte con varios SKU segun la tela (ej: blanco y color) -----
+function renderOtrosSkuAC(){
+  const cont = document.getElementById('ac-otros-sku'); if(!cont || !fabricacion) return;
+  const principal = String(((tablaConsumo.empaque || {})[acArticulo] || {}).sku || '').toUpperCase();
+  const otros = Object.keys(fabricacion.vinculos).filter(s => s !== principal && fabricacion.vinculos[s].articulo === acArticulo);
+  cont.innerHTML = otros.map(s => `<div style="display:grid;grid-template-columns:minmax(0,0.8fr) minmax(0,2fr) 30px;gap:6px;margin-bottom:6px;align-items:center;">
+      <input value="${escapeAttr(s)}" disabled style="font-weight:700;">
+      <select onchange="cambiarCalidadOtroSku('${escapeAttr(s)}', this.value)">${opcionesCalidad(calidadDeSku(s) || '')}</select>
+      <button type="button" onclick="quitarOtroSkuAC('${escapeAttr(s)}')" title="Quitar" style="border:none;background:none;cursor:pointer;color:#8A8072;">✕</button>
+    </div>`).join('');
+}
+async function agregarOtroSkuAC(){
+  const sku = (prompt('SKU del catálogo (ej: KA131JC):') || '').trim().toUpperCase();
+  if(!sku) return;
+  if(fabricacion === null) await cargarFabricacion();
+  fabricacion.vinculos[sku] = { ...(fabricacion.vinculos[sku] || {}), articulo: acArticulo };
+  try{ await guardarFabricacion(); renderOtrosSkuAC(); } catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+async function cambiarCalidadOtroSku(sku, clave){
+  fabricacion.vinculos[sku] = { ...(fabricacion.vinculos[sku] || {}), calidad: clave, tela: '', articulo: acArticulo };
+  try{ await guardarFabricacion(); } catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+async function quitarOtroSkuAC(sku){
+  if(!confirm(`¿Desvincular ${sku} de este artículo?`)) return;
+  delete fabricacion.vinculos[sku].articulo;
+  try{ await guardarFabricacion(); renderOtrosSkuAC(); } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -13541,7 +13589,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v80';
+const APP_VERSION = '2026-10-01-v81';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
