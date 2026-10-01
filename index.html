@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v60</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v61</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1620,6 +1620,7 @@ a.grilla-celda{display:block;}
       <div class="ac-grid">
         <div style="border:1px solid var(--line);border-radius:12px;padding:10px;align-self:start;">
           <input type="text" id="ac-buscar" placeholder="🔍 Buscar" oninput="renderListaAC()" style="margin-bottom:8px;">
+          <div style="display:flex;gap:10px;font-size:0.72rem;color:#8A8072;margin-bottom:6px;"><span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#E3F4E8;border:1px solid #9CCFAE;vertical-align:-1px;"></span> con instrucciones</span><span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#fff;border:1px solid var(--line);vertical-align:-1px;"></span> sin cargar</span></div>
           <div id="ac-lista" style="max-height:60vh;overflow-y:auto;"></div>
           <div style="display:flex;gap:6px;margin-top:8px;">
             <button type="button" class="btn-mini" style="flex:1;" onclick="nuevoArticuloAC()">+ Nuevo artículo</button>
@@ -4078,7 +4079,11 @@ function renderListaAC(){
   const todos = articulosAC();
   const padres = todos.filter(a => !origenAC(a) || !todos.includes(origenAC(a))).sort((x,y) => x.localeCompare(y, 'es'));
   const tienePiezas = a => Object.values(tablaConsumo.instrucciones[a] || {}).some(g => piezasValidas(g));
-  const item = (a, hija) => `<div onclick="abrirArticuloAC('${escapeAttr(a)}')" title="${tienePiezas(a) ? 'Tiene piezas cargadas' : 'Sin piezas cargadas'}" style="display:flex;justify-content:space-between;gap:6px;padding:7px 10px;border-radius:8px;cursor:pointer;font-size:0.88rem;${hija ? 'padding-left:24px;color:#6B6258;' : ''}${a === acArticulo ? 'background:var(--purple);color:#fff;' : ''}"><span>${hija ? '↳ ' : ''}${escaparHtml(a)}</span>${tienePiezas(a) ? '<span style="opacity:.6;">✂️</span>' : ''}</div>`;
+  const item = (a, hija) => {
+    const ok = tienePiezas(a), sel = a === acArticulo;
+    const estilo = sel ? 'background:var(--purple);color:#fff;' : (ok ? 'background:#E3F4E8;color:#1F5A34;' : 'background:#fff;');
+    return `<div onclick="abrirArticuloAC('${escapeAttr(a)}')" title="${ok ? 'Tiene instrucciones de corte cargadas' : 'Sin instrucciones de corte'}" style="display:flex;justify-content:space-between;gap:6px;padding:7px 10px;border-radius:8px;cursor:pointer;font-size:0.88rem;margin-bottom:3px;${hija ? 'padding-left:24px;' : ''}${estilo}"><span>${hija ? '↳ ' : ''}${escaparHtml(a)}</span>${ok ? '<span style="opacity:.7;">✂️</span>' : ''}</div>`;
+  };
   let html = '';
   padres.forEach(p => {
     const hijas = todos.filter(a => origenAC(a) === p).sort((x,y) => x.localeCompare(y, 'es'));
@@ -12864,7 +12869,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v60';
+const APP_VERSION = '2026-10-01-v61';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
