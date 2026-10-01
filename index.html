@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v59</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v60</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1729,12 +1729,12 @@ a.grilla-celda{display:block;}
 
   <div class="step" id="step-ingreso-taller">
     <div class="form-card">
-      <h2>Ingreso del taller</h2>
+      <h2>Entregas del taller</h2>
       <p class="note" style="margin-bottom:10px;">Elija el taller y cargue lo que entregó: las unidades buenas y las falladas de cada producto. Lo pendiente baja solo.</p>
       <div class="field"><label>Taller</label><select id="it-taller" onchange="renderIngresoTaller()"></select></div>
       <div id="it-lista"></div>
-      <div class="field" style="margin-top:10px;"><label>Remito / nota del ingreso (opcional)</label><input type="text" id="it-nota" placeholder="Ej: remito 0012"></div>
-      <button class="btn btn-gold" style="width:100%;" onclick="registrarIngresoTaller()">Registrar ingreso</button>
+      <div class="field" style="margin-top:10px;"><label>Remito / nota de la entrega (opcional)</label><input type="text" id="it-nota" placeholder="Ej: remito 0012"></div>
+      <button class="btn btn-gold" style="width:100%;" onclick="registrarIngresoTaller()">Registrar entrega</button>
       <p class="error" id="it-error" style="display:none;"></p>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
@@ -4908,7 +4908,7 @@ const GRUPOS_INICIO = {
   g: { lado: 'int', titulo: 'Producción', columnas: [
     [['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🚚 Ingreso a los talleres', 'abrirEnviosTela()']],
     [['🏭 Productos en producción', 'abrirEnProduccion()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📦 Historial de órdenes', 'abrirHistorialOT()']],
-    [['📥 Ingreso del taller', 'abrirIngresoTaller()']],
+    [['📥 Entregas del taller', 'abrirIngresoTaller()']],
   ] },
   h: { lado: 'int', titulo: 'Finanzas', items: [['💰 Ventas Mercado Libre', 'abrirVentasML()'], ['🧮 Calculadora de costos', 'abrirCalculadoraCostos()']] },
   i: { lado: 'int', titulo: 'Configuración', items: [['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['🔔 Avisos push', 'abrirConfigPush()'], ['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']] },
@@ -5147,7 +5147,7 @@ async function registrarIngresoTaller(){
     }
     await db.collection('ingresos_taller').add({ taller: t, fecha: new Date().toISOString(), nota: document.getElementById('it-nota').value.trim(), detalle });
     const tb = detalle.reduce((s, d) => s + d.buenas, 0), tf = detalle.reduce((s, d) => s + d.falladas, 0);
-    alert(`Ingreso registrado: ${tb} buenas${tf ? ` y ${tf} falladas` : ''}.`);
+    alert(`Entrega registrada: ${tb} buenas${tf ? ` y ${tf} falladas` : ''}.`);
     document.getElementById('it-nota').value = '';
     renderIngresoTaller();
   } catch(e){ err.textContent = 'No se pudo registrar: ' + e.message; err.style.display = 'block'; }
@@ -5321,7 +5321,7 @@ function detallePartidaHTML(e){
     if(e.sinAsignar > 0.5) botones.push(b(`📋 Asignar el sobrante (${fmtCm(Math.round(e.sinAsignar))} m)`, `modificarOrdenOT('${o._docId}')`));
     botones.push(b('✏️ Modificar orden', `modificarOrdenOT('${o._docId}')`));
   }
-  if(ots.some(o => (o.renglones || []).some(r => pendienteRenglon(r) > 0))) botones.push(b('📥 Registrar ingreso', `irAIngresoDe('${escapeAttr(e.taller)}')`));
+  if(ots.some(o => (o.renglones || []).some(r => pendienteRenglon(r) > 0))) botones.push(b('📥 Registrar entrega', `irAIngresoDe('${escapeAttr(e.taller)}')`));
   ots.forEach(o => botones.push(b(`📄 ${escaparHtml(o.numero)}`, `pdfOrden((historialOT || []).find(x => x._docId === '${o._docId}'))`)));
   if(ots.some(o => (o.renglones || []).some(r => (r.entregado || 0) + (r.fallados || 0) > 0))) botones.push(b('✔️ Cerrar partida', `cerrarPartidaEnvio('${e._id}').then(() => abrirDeudaTela())`));
   botones.push(b('🗑️ Eliminar', `eliminarPartidaDT('${e._id}')`));
@@ -12864,7 +12864,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v59';
+const APP_VERSION = '2026-10-01-v60';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
