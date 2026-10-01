@@ -1470,7 +1470,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/09 v29</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v30</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2820,6 +2820,8 @@ async function abrirInstruccionesCorte(){
     // refresca la lista de articulos para que aparezcan las piezas nuevas
     sel.innerHTML = '<option value="">Elija un artículo</option>' + Object.keys(tablaConsumo.articulos).sort().map(n => `<option value="${escapeAttr(n)}">${n}</option>`).join('');
   }
+  hacerSelectBuscable(sel);
+  if(sel._sync) sel._sync();
   renderListaInstrucciones();
   if(agregadas.length) alert('Cargué las piezas sueltas de los juegos que ya tenía guardados:\n• ' + agregadas.join('\n• '));
 }
@@ -2849,7 +2851,10 @@ function cambiarTipoCorteInstruccion(){
 }
 
 function cambiarArticuloInstruccion(){
-  const articulo = document.getElementById('ic-articulo').value;
+  const selArt = document.getElementById('ic-articulo');
+  hacerSelectBuscable(selArt);
+  if(selArt._sync) selArt._sync();
+  const articulo = selArt.value;
   const selAncho = document.getElementById('ic-ancho');
   limpiarFormularioInstruccion();
   if(!articulo || !tablaConsumo.articulos[articulo]){
@@ -3564,6 +3569,7 @@ function refrescarArticulosInstruccion(seleccionar){
   const sel = document.getElementById('ic-articulo');
   sel.innerHTML = '<option value="">Elija un artículo</option>' + Object.keys(tablaConsumo.articulos || {}).sort((a,b) => a.localeCompare(b, 'es')).map(n => `<option value="${escapeAttr(n)}">${escaparHtml(n)}</option>`).join('');
   if(seleccionar){ sel.value = seleccionar; cambiarArticuloInstruccion(); }
+  if(sel._sync) sel._sync();
   renderListaInstrucciones();
 }
 async function guardarTablaYConsumo(){
@@ -4149,6 +4155,65 @@ async function borrarDuplicadoAC(a){
   verDuplicadosAC();
 }
 
+// ===== Lista con buscador =====
+// Convierte un <select> en un cuadro de texto: al escribir unas letras muestra las opciones que
+// coinciden (sin importar mayusculas ni tildes). El <select> sigue existiendo oculto, asi que el resto
+// del codigo lo lee igual que siempre.
+function normBusqueda(t){ return String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+function hacerSelectBuscable(sel){
+  if(sel._buscable) return;
+  sel._buscable = true;
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:relative;';
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.autocomplete = 'off';
+  inp.placeholder = '🔍 Escriba para buscar…';
+  const lista = document.createElement('div');
+  lista.style.cssText = 'display:none;position:absolute;left:0;right:0;top:100%;z-index:60;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.12);max-height:260px;overflow-y:auto;margin-top:2px;';
+  sel.parentNode.insertBefore(wrap, sel);
+  wrap.appendChild(inp); wrap.appendChild(lista); wrap.appendChild(sel);
+  sel.style.display = 'none';
+  const sync = () => { const op = sel.options[sel.selectedIndex]; inp.value = op && op.value ? op.text : ''; };
+  sel._sync = sync;
+  let marcado = -1, visibles = [];
+  const elegir = op => { sel.value = op.value; lista.style.display = 'none'; sync(); sel.dispatchEvent(new Event('change', { bubbles: true })); };
+  const pintar = () => {
+    const q = normBusqueda(inp.value).split(/\s+/).filter(Boolean);
+    visibles = [...sel.options].filter(op => op.value && q.every(w => normBusqueda(op.text).includes(w)));
+    marcado = visibles.length ? 0 : -1;
+    lista.innerHTML = visibles.length
+      ? visibles.slice(0, 80).map((op, i) => {
+          const grupo = op.parentNode && op.parentNode.tagName === 'OPTGROUP' ? `<span style="color:#A89E90;font-size:0.72rem;margin-left:6px;">${op.parentNode.label.split(' (')[0]}</span>` : '';
+          return `<div data-i="${i}" style="padding:8px 10px;cursor:pointer;font-size:0.9rem;${i === 0 ? 'background:var(--cream);' : ''}">${escaparHtml(op.text)}${grupo}</div>`;
+        }).join('')
+      : '<div style="padding:8px 10px;color:#A89E90;font-size:0.85rem;">No hay coincidencias</div>';
+    lista.style.display = 'block';
+  };
+  inp.addEventListener('focus', () => { inp.select(); pintar(); });
+  inp.addEventListener('input', pintar);
+  inp.addEventListener('keydown', e => {
+    if(lista.style.display === 'none') return;
+    const items = lista.querySelectorAll('[data-i]');
+    if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+      e.preventDefault();
+      marcado = Math.max(0, Math.min(items.length - 1, marcado + (e.key === 'ArrowDown' ? 1 : -1)));
+      items.forEach((it, i) => it.style.background = i === marcado ? 'var(--cream)' : '');
+      if(items[marcado]) items[marcado].scrollIntoView({ block: 'nearest' });
+    } else if(e.key === 'Enter'){
+      e.preventDefault();
+      if(visibles[marcado]) elegir(visibles[marcado]);
+    } else if(e.key === 'Escape'){ lista.style.display = 'none'; sync(); }
+  });
+  lista.addEventListener('mousedown', e => {
+    const it = e.target.closest('[data-i]');
+    if(!it) return;
+    e.preventDefault();
+    elegir(visibles[+it.dataset.i]);
+  });
+  inp.addEventListener('blur', () => setTimeout(() => { lista.style.display = 'none'; sync(); }, 150));
+  sync();
+}
+
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -4381,9 +4446,11 @@ function agregarRenglonOrdenTrabajo(){
     <button type="button" class="btn-mini" onclick="eliminarRenglonOrdenTrabajo(${id})">🗑️ Quitar este producto</button>
   `;
   cont.appendChild(div);
+  hacerSelectBuscable(div.querySelector('.ot-r-articulo'));
 }
 
 function cambiarModoRenglonOT(selectEl){
+  if(selectEl._sync) selectEl._sync();
   const renglon = selectEl.closest('.ot-renglon');
   if(selectEl.value.startsWith('ficha:')){
     // ficha: completa el SKU y el ancho habitual si estan vacios
@@ -11465,7 +11532,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-09-30-v29';
+const APP_VERSION = '2026-10-01-v30';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
