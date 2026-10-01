@@ -1470,7 +1470,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v30</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v31</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -3173,7 +3173,7 @@ function dibujarBosquejoCorte(anchoTela, piezas){
   ctx.strokeStyle = '#000000'; ctx.fillStyle = '#000000'; ctx.lineWidth = 1.5;
   ctx.textAlign = 'center';
 
-  // colores: cada pieza del articulo con su color; lo que sobra en blanco; la tela sin usar, rayada
+  // colores: lo que usa la unidad en color; piezas de mas en blanco; retazos (aprovechables), rayados
   const PALETA = ['#BFDBF7', '#F9D3A8', '#CDE8BE', '#E3CCF2', '#F5E09A', '#F4C2CA', '#BFE8E3'];
   const colorDe = new Map();
   const rayado = (x, y, w, hh) => {
@@ -3207,11 +3207,24 @@ function dibujarBosquejoCorte(anchoTela, piezas){
         ctx.font = (chico ? 'bold 10px' : 'bold 13px') + ' Arial';
         ctx.fillText(it.p.nombre, x + w/2, y + h/2 - 6, w - 4);
         ctx.font = (chico ? '9px' : '11px') + ' Arial';
-        const extra = f.unTipo ? 'Siguiente artículo' : 'Sobrante';
+        const extra = f.unTipo ? 'Siguiente unidad' : 'De más';
         ctx.fillText(it.sobrante ? (tapa ? tapa + ' · ' : '') + extra : (tapa ? tapa + ' · ' : '') + `${fmtCm(col.w)} × ${fmtCm(it.p.largo)}`, x + w/2, y + h/2 + 10, w - 4);
       });
     });
     ctx.beginPath(); ctx.moveTo(margen, margen + f.y*escala); ctx.lineTo(margen + anchoPx, margen + f.y*escala); ctx.stroke();
+    // retazos que quedan (se pueden aprovechar): se rotulan con su medida si son de un tamaño util
+    const retazos = [];
+    f.cols.forEach(col => { const resto = f.largo - col.alto; if(resto > 0.5) retazos.push({ x: col.x, y: f.y + col.alto, w: col.w, l: resto }); });
+    const libre = anchoTela - f.cols.reduce((s, col) => s + col.w, 0);
+    if(libre > 0.5) retazos.push({ x: anchoTela - libre, y: f.y, w: libre, l: f.largo });
+    retazos.forEach(r => {
+      if(r.w < 20 || r.l < 20) return;
+      const x = margen + r.x * escala, y = margen + r.y * escala, w = r.w * escala, hh = r.l * escala;
+      ctx.fillStyle = '#6B6258'; ctx.font = (w < 90 ? '9px' : '11px') + ' Arial';
+      ctx.fillText('Retazo', x + w/2, y + hh/2 - 4, w - 4);
+      ctx.fillText(`${fmtCm(r.w)} × ${fmtCm(r.l)}`, x + w/2, y + hh/2 + 9, w - 4);
+      ctx.fillStyle = '#000000';
+    });
   });
   ctx.restore();
 
@@ -3230,8 +3243,8 @@ function dibujarBosquejoCorte(anchoTela, piezas){
   ctx.font = '12px Arial'; ctx.textAlign = 'left';
   const ref = (pintar, txt) => { pintar(xR, yR - 10, 14, 14); ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(xR, yR - 10, 14, 14); ctx.fillStyle = '#000'; ctx.fillText(txt, xR + 20, yR + 2); xR += 26 + ctx.measureText(txt).width + 18; };
   ref((x, y, w, hh) => { ctx.fillStyle = PALETA[0]; ctx.fillRect(x, y, w, hh); }, 'Lo que usa 1 unidad');
-  ref((x, y, w, hh) => { ctx.fillStyle = '#fff'; ctx.fillRect(x, y, w, hh); }, 'Sobra / siguiente unidad');
-  ref((x, y, w, hh) => rayado(x, y, w, hh), 'Tela sin usar');
+  ref((x, y, w, hh) => { ctx.fillStyle = '#fff'; ctx.fillRect(x, y, w, hh); }, 'Piezas para la siguiente unidad / de más');
+  ref((x, y, w, hh) => rayado(x, y, w, hh), 'Retazo para aprovechar');
   ctx.lineWidth = 1.5;
   return canvas.toDataURL('image/png');
 }
@@ -11532,7 +11545,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v30';
+const APP_VERSION = '2026-10-01-v31';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
