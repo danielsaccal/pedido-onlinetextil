@@ -556,7 +556,7 @@ a.grilla-celda{display:block;}
     <div class="ini-grid ini-ext"><div class="ini-tile" id="ini-t-a" onclick="abrirGrupoInicio('a')"><div class="ini-ic">🛒</div><b>Armar pedido</b><span>Catálogo, escanear SKU, buscar por foto</span></div><div class="ini-tile" id="ini-t-b" onclick="abrirGrupoInicio('b')"><div class="ini-ic">🔗</div><b>Compartir catálogo</b><span>Por rubro, enviar a clientes</span></div><div class="ini-tile" id="ini-t-c" onclick="abrirGrupoInicio('c')"><div class="ini-ic">📣</div><b>Redes y anuncios</b><span>Nuevo ingreso, grilla IG, promociones, videos</span></div></div>
     <div class="ini-sub" id="ini-sub-ext" style="display:none;"></div>
     <p class="ini-sec">ADMINISTRACIÓN INTERNA</p>
-    <div class="ini-grid"><div class="ini-tile" id="ini-t-d" onclick="abrirGrupoInicio('d')"><div class="ini-ic">📋</div><b>Pedidos</b><span>Historial, pedido con IA, pendientes</span></div><div class="ini-tile" id="ini-t-e" onclick="abrirGrupoInicio('e')"><div class="ini-ic">👥</div><b>Clientes</b><span>Clientes, inactivos</span></div><div class="ini-tile" id="ini-t-f" onclick="abrirGrupoInicio('f')"><div class="ini-ic">🏷️</div><b>Productos y precios</b><span>Altas, edición, fotos, precios</span></div><div class="ini-tile" id="ini-t-g" onclick="abrirGrupoInicio('g')"><div class="ini-ic">✂️</div><b>Producción</b><span>Cortes, a medida, órdenes de trabajo</span></div><div class="ini-tile" id="ini-t-h" onclick="abrirGrupoInicio('h')"><div class="ini-ic">📊</div><b>Finanzas</b><span>Ventas ML, costos</span></div><div class="ini-tile" id="ini-t-i" onclick="abrirGrupoInicio('i')"><div class="ini-ic">⚙️</div><b>Configuración</b><span>Banco, avisos, pantallas anteriores</span></div></div>
+    <div class="ini-grid"><div class="ini-tile" id="ini-t-d" onclick="abrirGrupoInicio('d')"><div class="ini-ic">📋</div><b>Pedidos</b><span>Historial, pedido con IA, pendientes</span></div><div class="ini-tile" id="ini-t-e" onclick="abrirGrupoInicio('e')"><div class="ini-ic">👥</div><b>Clientes</b><span>Clientes, inactivos</span></div><div class="ini-tile" id="ini-t-f" onclick="abrirGrupoInicio('f')"><div class="ini-ic">🏷️</div><b>Productos y precios</b><span>Altas, edición, fotos, precios</span></div><div class="ini-tile" id="ini-t-g" onclick="abrirGrupoInicio('g')"><div class="ini-ic">✂️</div><b>Producción</b><span>Cortes, a medida, tela en talleres, órdenes</span></div><div class="ini-tile" id="ini-t-h" onclick="abrirGrupoInicio('h')"><div class="ini-ic">📊</div><b>Finanzas</b><span>Ventas ML, costos</span></div><div class="ini-tile" id="ini-t-i" onclick="abrirGrupoInicio('i')"><div class="ini-ic">⚙️</div><b>Configuración</b><span>Banco, avisos, pantallas anteriores</span></div></div>
     <div class="ini-sub" id="ini-sub-int" style="display:none;"></div>
   </div>
 
@@ -1403,6 +1403,7 @@ a.grilla-celda{display:block;}
         <b id="ot-editando-num"></b> — está modificando esta orden. Al tocar "Guardar cambios" se actualiza, sin usar un número nuevo.
         <a href="#" onclick="event.preventDefault(); otEditando = null; abrirOrdenTrabajo();" style="margin-left:6px;">Cancelar</a>
       </div>
+      <div id="ot-envio-banner" style="display:none;background:#EAF2FB;border-radius:10px;padding:10px 12px;margin-bottom:12px;"></div>
       <p class="note" id="ot-sin-tabla" style="display:none;margin-bottom:14px;color:#A6432F;">Todavía no cargó la tabla de consumo — <a href="#" onclick="event.preventDefault(); abrirTablaConsumo();">cárguela acá</a> antes de seguir.</p>
       <div class="field">
         <label>Taller</label>
@@ -1515,7 +1516,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v42</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v43</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1679,6 +1680,27 @@ a.grilla-celda{display:block;}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Ajustable: + ancho</label><input type="number" step="1" id="tm-m-ajAncho"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Ajustable: + largo</label><input type="number" step="1" id="tm-m-ajLargo"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Plana: + ancho</label><input type="number" step="1" id="tm-m-plAncho"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Plana: + largo</label><input type="number" step="1" id="tm-m-plLargo"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Funda: ancho</label><input type="number" step="1" id="tm-m-fundaAncho"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>Funda: largo</label><input type="number" step="1" id="tm-m-fundaLargo"></div><div class="field" style="flex:1;min-width:110px;margin:0;"><label>2 fundas desde colchón de</label><input type="number" step="1" id="tm-m-fundasDesde"></div></div>
         <button type="button" class="btn-mini" onclick="guardarMargenesMedida()">Guardar márgenes</button>
       </details>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-envios-tela">
+    <div class="form-card">
+      <h2>Tela en talleres</h2>
+      <div style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:14px;">
+        <p style="margin:0 0 8px;font-weight:700;">🚚 Registrar envío de tela</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;">
+          <div class="field" style="margin:0;"><label>Taller</label><select id="et-taller"></select></div>
+          <div class="field" style="margin:0;"><label>Código de tela</label><input type="text" id="et-sku" placeholder="HON315B"></div>
+          <div class="field" style="margin:0;"><label>Metros</label><input type="number" id="et-metros" min="0" step="0.01" placeholder="640"></div>
+          <div class="field" style="margin:0;"><label>Comprobante</label><input type="text" id="et-comprobante" placeholder="R-7343"></div>
+          <div class="field" style="margin:0;"><label>Fecha</label><input type="date" id="et-fecha"></div>
+        </div>
+        <button class="btn btn-gold" style="width:100%;margin-top:10px;" onclick="guardarEnvioTela()">Guardar envío</button>
+        <p class="error" id="et-error" style="display:none;"></p>
+      </div>
+      <div id="et-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
+      <div id="et-lista"><p class="empty-msg">Cargando...</p></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
@@ -4774,7 +4796,7 @@ const GRUPOS_INICIO = {
   d: { lado: 'int', titulo: 'Pedidos', items: [['📋 Historial de pedidos', 'abrirHistorial()'], ['🤖 Pedido con IA (texto libre)', 'abrirPedidoIA()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']] },
   e: { lado: 'int', titulo: 'Clientes', items: [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
   f: { lado: 'int', titulo: 'Productos y precios', items: [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📷 Actualizar foto', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
-  g: { lado: 'int', titulo: 'Producción', items: [['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📦 Historial de órdenes', 'abrirHistorialOT()']] },
+  g: { lado: 'int', titulo: 'Producción', items: [['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['🚚 Tela en talleres', 'abrirEnviosTela()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📦 Historial de órdenes', 'abrirHistorialOT()']] },
   h: { lado: 'int', titulo: 'Finanzas', items: [['💰 Ventas Mercado Libre', 'abrirVentasML()'], ['🧮 Calculadora de costos', 'abrirCalculadoraCostos()']] },
   i: { lado: 'int', titulo: 'Configuración', items: [['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['🔔 Avisos push', 'abrirConfigPush()'], ['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']] },
 };
@@ -4811,6 +4833,104 @@ function buscarDesdeInicio(v){
 }
 // al abrir la app sin un link especial (ej: catalogo por rubro), se arranca en el inicio
 window.addEventListener('load', () => { if(!location.search) mostrarPaso('step-inicio'); });
+
+// ===== Tela en talleres (envios de tela) =====
+// Se registra la tela que se manda a cada taller aunque todavia no se arme la orden. Despues, desde el
+// envio, se arman una o varias ordenes; se ve cuantos metros quedan sin asignar.
+let enviosTela = null;
+let etFiltro = 'pendientes';
+const DIAS_ALERTA_ENVIO = 15;
+async function abrirEnviosTela(){
+  mostrarPaso('step-envios-tela');
+  if(talleresLista === null) await cargarTalleres();
+  document.getElementById('et-taller').innerHTML = '<option value="">Elija un taller</option>' + talleresLista.map(t => `<option value="${escapeAttr(t)}">${escaparHtml(t)}</option>`).join('');
+  document.getElementById('et-fecha').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('et-lista').innerHTML = '<p class="empty-msg">Cargando...</p>';
+  await Promise.all([cargarEnviosTela(), cargarHistorialOT()]);
+  renderEnviosTela();
+}
+async function cargarEnviosTela(){
+  try{
+    const snap = await db.collection('envios_tela').get();
+    enviosTela = snap.docs.map(d => ({ _id: d.id, ...d.data() })).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  } catch(e){ console.error('envios', e); enviosTela = enviosTela || []; }
+}
+function ordenesDeEnvio(id){ return (historialOT || []).filter(o => o.envioId === id); }
+function asignadoEnvio(id){ return Math.round(ordenesDeEnvio(id).reduce((s, o) => s + (+o.metrosTotales || 0), 0) * 100) / 100; }
+async function guardarEnvioTela(){
+  const err = document.getElementById('et-error'); err.style.display = 'none';
+  const d = {
+    taller: document.getElementById('et-taller').value,
+    skuTela: document.getElementById('et-sku').value.trim().toUpperCase(),
+    metros: parseFloat(document.getElementById('et-metros').value),
+    comprobante: document.getElementById('et-comprobante').value.trim(),
+    fecha: document.getElementById('et-fecha').value || new Date().toISOString().slice(0, 10),
+    creado: new Date().toISOString(),
+  };
+  if(!d.taller || !d.skuTela || !(d.metros > 0)){ err.textContent = 'Complete taller, código de tela y metros.'; err.style.display = 'block'; return; }
+  try{
+    const ref = await db.collection('envios_tela').add(d);
+    enviosTela.unshift({ _id: ref.id, ...d });
+    ['et-sku', 'et-metros', 'et-comprobante'].forEach(id => document.getElementById(id).value = '');
+    renderEnviosTela();
+  } catch(e){ err.textContent = 'No se pudo guardar: ' + e.message; err.style.display = 'block'; }
+}
+async function borrarEnvioTela(id){
+  if(ordenesDeEnvio(id).length){ alert('Este envío ya tiene órdenes armadas. Bórrelas primero desde el historial de órdenes.'); return; }
+  if(!confirm('¿Borrar este envío de tela?')) return;
+  try{ await db.collection('envios_tela').doc(id).delete(); enviosTela = enviosTela.filter(e => e._id !== id); renderEnviosTela(); }
+  catch(e){ alert('No se pudo borrar: ' + e.message); }
+}
+function renderEnviosTela(){
+  const talleres = [...new Set((enviosTela || []).map(e => e.taller))].sort();
+  const chip = (v, t) => `<span onclick="etFiltro='${escapeAttr(v)}'; renderEnviosTela();" style="cursor:pointer;font-size:0.82rem;padding:5px 12px;border-radius:14px;border:1px solid var(--line);${etFiltro === v ? 'background:var(--purple);color:#fff;border-color:var(--purple);' : ''}">${escaparHtml(t)}</span>`;
+  document.getElementById('et-filtros').innerHTML = chip('pendientes', 'Con metros sin asignar') + chip('todos', 'Todos') + talleres.map(t => chip('t:' + t, t)).join('');
+  const hoy = Date.now();
+  const lista = (enviosTela || []).map(e => {
+    const asig = asignadoEnvio(e._id), resto = Math.round((e.metros - asig) * 100) / 100;
+    const dias = Math.floor((hoy - new Date(e.fecha + 'T12:00:00').getTime()) / 86400000);
+    return { ...e, asig, resto, dias };
+  }).filter(e => etFiltro === 'todos' ? true : etFiltro === 'pendientes' ? e.resto > 0.01 : e.taller === etFiltro.slice(2));
+  const cont = document.getElementById('et-lista');
+  if(!lista.length){ cont.innerHTML = `<p class="empty-msg">${etFiltro === 'pendientes' ? 'No hay tela en talleres sin orden. 👍' : 'No hay envíos.'}</p>`; return; }
+  cont.innerHTML = lista.map(e => {
+    const ots = ordenesDeEnvio(e._id);
+    const pct = e.metros > 0 ? Math.min(100, e.asig / e.metros * 100) : 0;
+    const tag = e.resto <= 0.01 ? ['Todo asignado', '#EAF6EE', '#2F7A47'] : (e.dias > DIAS_ALERTA_ENVIO ? [`${fmtCm(e.resto)} m sin orden`, '#FBEAE6', '#A6432F'] : [`${fmtCm(e.resto)} m sin orden`, '#FDF4E2', '#8A6417']);
+    const fecha = new Date(e.fecha + 'T12:00:00').toLocaleDateString('es-AR');
+    return `<div style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline;">
+        <b>${escaparHtml(e.taller)} · ${escaparHtml(e.skuTela)} · ${fmtCm(e.metros)} m</b>
+        <span style="font-size:0.75rem;padding:2px 9px;border-radius:10px;background:${tag[1]};color:${tag[2]};white-space:nowrap;">${tag[0]}</span>
+      </div>
+      <div style="font-size:0.8rem;color:#8A8072;">Enviado ${fecha}${e.resto > 0.01 ? ` · hace ${e.dias} día${e.dias === 1 ? '' : 's'}` : ''}${e.comprobante ? ' · ' + escaparHtml(e.comprobante) : ''}</div>
+      <div style="height:8px;border-radius:4px;background:var(--cream);overflow:hidden;margin:8px 0 6px;"><div style="height:100%;width:${pct}%;background:var(--purple);"></div></div>
+      <div style="font-size:0.8rem;color:#6B6258;margin-bottom:8px;">${ots.length ? ots.map(o => `${escaparHtml(o.numero)} · ${fmtCm(+o.metrosTotales || 0)} m`).join(' · ') : 'Todavía sin órdenes'}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${e.resto > 0.01 ? `<button class="btn-mini" onclick="armarOrdenDesdeEnvio('${e._id}')">📋 Armar orden con los ${fmtCm(e.resto)} m</button>` : ''}
+        ${ots.length ? '' : `<button class="btn-mini" onclick="borrarEnvioTela('${e._id}')">🗑️</button>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+let otEnvioId = null;
+async function armarOrdenDesdeEnvio(id){
+  const e = (enviosTela || []).find(x => x._id === id);
+  if(!e) return;
+  const resto = Math.round((e.metros - asignadoEnvio(id)) * 100) / 100;
+  await abrirOrdenTrabajo();
+  otEnvioId = id;
+  const selT = document.getElementById('ot-taller');
+  if(![...selT.options].some(op => op.value === e.taller)) selT.insertAdjacentHTML('afterbegin', `<option value="${escapeAttr(e.taller)}">${escaparHtml(e.taller)}</option>`);
+  selT.value = e.taller;
+  document.getElementById('ot-sku-tela').value = e.skuTela;
+  document.getElementById('ot-comprobante').value = e.comprobante || '';
+  document.getElementById('ot-metros-totales').value = resto;
+  const banner = document.getElementById('ot-envio-banner');
+  banner.innerHTML = `<b>🚚 Orden para el envío ${escaparHtml(e.skuTela)} (${escaparHtml(e.taller)})</b> — quedan ${fmtCm(resto)} m sin asignar. Puede usar menos y armar otra orden después con el resto.`;
+  banner.style.display = 'block';
+  try{ calcularReparto(); } catch(err){}
+}
 
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
@@ -5072,6 +5192,8 @@ async function abrirOrdenTrabajo(modoEdicion){
   mostrarPaso('step-orden-trabajo');
   if(!modoEdicion){
     otEditando = null;
+    otEnvioId = null;
+    document.getElementById('ot-envio-banner').style.display = 'none';
     document.getElementById('ot-editando').style.display = 'none';
     document.getElementById('ot-btn-generar').textContent = 'Generar orden de trabajo';
   }
@@ -5300,6 +5422,7 @@ async function generarOrdenTrabajoCompleta(){
     if(editando){
       await db.collection('ordenes_trabajo').doc(editando.docId).set({
         numero: numeroFormateado, taller, fecha: editando.fecha || new Date().toISOString(), modificada: new Date().toISOString(), skuTela, comprobante, metrosTotales, metrosConsumidosTotal, renglones, notaGeneral,
+        ...(editando.envioId ? { envioId: editando.envioId } : {}),
       });
       otEditando = null;
       historialOT = null;
@@ -5309,7 +5432,9 @@ async function generarOrdenTrabajoCompleta(){
     } else {
       await db.collection('ordenes_trabajo').add({
         numero: numeroFormateado, taller, fecha: new Date().toISOString(), skuTela, comprobante, metrosTotales, metrosConsumidosTotal, renglones, notaGeneral,
+        ...(otEnvioId ? { envioId: otEnvioId } : {}),
       });
+      if(otEnvioId){ otEnvioId = null; historialOT = null; document.getElementById('ot-envio-banner').style.display = 'none'; }
     }
   } catch(e){
     console.error('No se pudo guardar el registro de la orden (el texto ya se generó bien):', e);
@@ -5526,7 +5651,7 @@ async function borrarOrdenOT(docId){
 async function modificarOrdenOT(docId){
   const o = (historialOT || []).find(x => x._docId === docId);
   if(!o) return;
-  otEditando = { docId, numero: o.numero, fecha: o.fecha, renglones: o.renglones || [] };
+  otEditando = { docId, numero: o.numero, fecha: o.fecha, renglones: o.renglones || [], envioId: o.envioId || null };
   await abrirOrdenTrabajo(true);
   document.getElementById('ot-editando-num').textContent = o.numero;
   document.getElementById('ot-editando').style.display = 'block';
@@ -12160,7 +12285,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v42';
+const APP_VERSION = '2026-10-01-v43';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
