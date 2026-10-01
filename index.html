@@ -1422,7 +1422,7 @@ a.grilla-celda{display:block;}
       <h2>Orden de trabajo para taller</h2>
       <div id="ot-editando" style="display:none;background:var(--gold);border-radius:10px;padding:10px 12px;margin-bottom:12px;display:none;">
         <b id="ot-editando-num"></b> — está modificando esta orden. Al tocar "Guardar cambios" se actualiza, sin usar un número nuevo.
-        <a href="#" onclick="event.preventDefault(); otEditando = null; abrirOrdenTrabajo();" style="margin-left:6px;">Cancelar</a>
+        <a href="#" onclick="event.preventDefault(); otEditando = null; abrirOrdenTrabajo();" style="margin-left:6px;">Terminar y empezar una orden nueva</a>
       </div>
       <div id="ot-envio-banner" style="display:none;background:#EAF2FB;border-radius:10px;padding:10px 12px;margin-bottom:12px;"></div>
       <p class="note" id="ot-sin-tabla" style="display:none;margin-bottom:14px;color:#A6432F;">Todavía no cargó la tabla de consumo — <a href="#" onclick="event.preventDefault(); abrirTablaConsumo();">cárguela acá</a> antes de seguir.</p>
@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v54</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v55</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5954,17 +5954,24 @@ async function generarOrdenTrabajoCompleta(){
         numero: numeroFormateado, taller, fecha: editando.fecha || new Date().toISOString(), modificada: new Date().toISOString(), skuTela, comprobante, metrosTotales, metrosConsumidosTotal, renglones, notaGeneral,
         ...(editando.envioId ? { envioId: editando.envioId } : {}),
       });
-      otEditando = null;
+      // se sigue en modo edicion de ESTA orden: si vuelve a tocar el boton, se actualiza la misma (no se crea otra)
+      otEditando = { ...editando, renglones: JSON.parse(JSON.stringify(renglones)) };
       historialOT = null;
-      document.getElementById('ot-editando').style.display = 'none';
-      document.getElementById('ot-btn-generar').textContent = 'Generar orden de trabajo';
       cont.insertAdjacentHTML('afterbegin', `<p class="note" style="color:#3D7A3D;font-weight:700;margin-bottom:8px;">✓ Cambios guardados en ${escaparHtml(numeroFormateado)}.</p>`);
     } else {
-      await db.collection('ordenes_trabajo').add({
-        numero: numeroFormateado, taller, fecha: new Date().toISOString(), skuTela, comprobante, metrosTotales, metrosConsumidosTotal, renglones, notaGeneral,
-        ...(otEnvioId ? { envioId: otEnvioId } : {}),
+      const fechaNueva = new Date().toISOString();
+      const envioUsado = otEnvioId;
+      const ref = await db.collection('ordenes_trabajo').add({
+        numero: numeroFormateado, taller, fecha: fechaNueva, skuTela, comprobante, metrosTotales, metrosConsumidosTotal, renglones, notaGeneral,
+        ...(envioUsado ? { envioId: envioUsado } : {}),
       });
-      if(otEnvioId){ otEnvioId = null; historialOT = null; document.getElementById('ot-envio-banner').style.display = 'none'; }
+      historialOT = null;
+      if(envioUsado){ otEnvioId = null; document.getElementById('ot-envio-banner').style.display = 'none'; }
+      // la orden recien generada queda abierta para corregir: volver a tocar el boton la actualiza, no crea otra
+      otEditando = { docId: ref.id, numero: numeroFormateado, fecha: fechaNueva, renglones: JSON.parse(JSON.stringify(renglones)), envioId: envioUsado || null };
+      document.getElementById('ot-editando-num').textContent = numeroFormateado;
+      document.getElementById('ot-editando').style.display = 'block';
+      document.getElementById('ot-btn-generar').textContent = 'Guardar cambios';
     }
   } catch(e){
     console.error('No se pudo guardar el registro de la orden (el texto ya se generó bien):', e);
@@ -12828,7 +12835,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v54';
+const APP_VERSION = '2026-10-01-v55';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
