@@ -1541,7 +1541,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v81</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v82</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1675,6 +1675,9 @@ a.grilla-celda{display:block;}
                   <div style="font-size:0.78rem;color:#6B6258;margin-bottom:4px;">Otros SKU de este mismo artículo (en otra calidad o color de tela):</div>
                   <div id="ac-otros-sku"></div>
                   <button type="button" class="btn-mini" onclick="agregarOtroSkuAC()">+ Agregar otro SKU</button>
+                </div>
+                <div style="grid-column:1 / -1;">
+                  <button type="button" id="ac-empaque-guardar" onclick="guardarEmpaqueAC()" disabled style="width:100%;padding:11px;border:none;border-radius:10px;background:#3D9A5B;color:#fff;font-weight:700;font-size:0.95rem;cursor:pointer;opacity:0.5;">💾 Guardar bolsa, etiqueta y SKU</button>
                 </div>
               </div>
             </div>
@@ -4189,6 +4192,8 @@ function juegosDePiezasAC(a){
 }
 
 function abrirArticuloAC(a, piezasForzadas){
+  if(empaquePendiente && a !== acArticulo && !confirm('Hay cambios sin guardar en bolsa, etiqueta o SKU. ¿Descartarlos?')) return;
+  if(a !== acArticulo){ if(empaquePendiente) cargarTablaConsumo(); limpiarEmpaquePendiente(); }
   acArticulo = a;
   acAnchoVista = null;
   renderListaAC();
@@ -4323,6 +4328,7 @@ async function guardarAC(){
   const derivadas = cargarPiezasDelJuego(a, String(W), piezas);
   try{
     await guardarTablaYConsumo();
+    if(empaquePendiente) await guardarEmpaqueAC();
     renderListaAC();
     renderEditorAC();
     alert('Guardado.' + (derivadas.length ? '\n\nPiezas sueltas actualizadas:\n• ' + derivadas.join('\n• ') : ''));
@@ -4821,11 +4827,39 @@ function cambioEmpaqueAC(){
     sku: document.getElementById('ac-sku').value.trim().toUpperCase(),
     porBolsa: Math.max(1, parseInt(document.getElementById('ac-por-bolsa').value, 10) || 1),
   };
-  clearTimeout(empaqueTimer);
-  empaqueTimer = setTimeout(async () => {
-    try{ await guardarTablaYConsumo(); document.getElementById('ac-empaque-ok').textContent = '✓ Guardado'; setTimeout(() => { const e = document.getElementById('ac-empaque-ok'); if(e) e.textContent = ''; }, 1500); }
-    catch(e){ alert('No se pudo guardar la bolsa/etiqueta: ' + e.message); }
-  }, 700);
+  marcarEmpaquePendiente();
+}
+// los datos del recuadro (bolsa, etiqueta, SKU, calidad y otros SKU) se guardan con su propio boton
+let empaquePendiente = false, otrosSkuPend = null;
+function marcarEmpaquePendiente(){
+  empaquePendiente = true;
+  const b = document.getElementById('ac-empaque-guardar'), m = document.getElementById('ac-empaque-ok');
+  if(b){ b.disabled = false; b.style.opacity = '1'; }
+  if(m){ m.textContent = '● Cambios sin guardar'; m.style.color = '#A6432F'; }
+}
+function limpiarEmpaquePendiente(){
+  empaquePendiente = false; otrosSkuPend = null;
+  const b = document.getElementById('ac-empaque-guardar'), m = document.getElementById('ac-empaque-ok');
+  if(b){ b.disabled = true; b.style.opacity = '0.5'; }
+  if(m){ m.textContent = ''; }
+}
+async function guardarEmpaqueAC(){
+  if(!acArticulo) return;
+  const emp = tablaConsumo.empaque[acArticulo] || {};
+  const sku = String(emp.sku || '').toUpperCase();
+  try{
+    if(fabricacion === null) await cargarFabricacion();
+    await guardarTablaYConsumo();
+    if(sku) fabricacion.vinculos[sku] = { ...(fabricacion.vinculos[sku] || {}), calidad: emp.calidad || '', tela: '', articulo: acArticulo };
+    if(otrosSkuPend){
+      Object.keys(fabricacion.vinculos).forEach(s => { if(s !== sku && fabricacion.vinculos[s].articulo === acArticulo && !otrosSkuPend.some(o => o.sku === s)) delete fabricacion.vinculos[s].articulo; });
+      otrosSkuPend.forEach(o => { fabricacion.vinculos[o.sku] = { ...(fabricacion.vinculos[o.sku] || {}), calidad: o.calidad || '', tela: '', articulo: acArticulo }; });
+    }
+    await guardarFabricacion();
+    limpiarEmpaquePendiente();
+    const m = document.getElementById('ac-empaque-ok'); if(m){ m.textContent = '✓ Guardado'; m.style.color = '#2F7A47'; }
+    renderOtrosSkuAC();
+  } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 async function editarBolsasDisponibles(){
   const r = prompt('Medidas de bolsa que usa, separadas por coma (ej: 25 × 42, 30 × 45):', bolsasDisponibles().join(', '));
@@ -6125,12 +6159,8 @@ async function cambiarTelaArticuloAC(){
   const clave = document.getElementById('ac-tela').value;
   tablaConsumo.empaque = tablaConsumo.empaque || {};
   tablaConsumo.empaque[acArticulo] = { ...(tablaConsumo.empaque[acArticulo] || {}), calidad: clave, tela: '' };
-  const sku = String(tablaConsumo.empaque[acArticulo].sku || '').toUpperCase();
-  try{
-    await guardarTablaYConsumo();
-    if(sku){ if(fabricacion === null) await cargarFabricacion(); fabricacion.vinculos[sku] = { ...(fabricacion.vinculos[sku] || {}), calidad: clave, tela: '', articulo: acArticulo }; await guardarFabricacion(); }
-    infoTelaAC();
-  } catch(e){ alert('No se pudo guardar la tela: ' + e.message); }
+  infoTelaAC();
+  marcarEmpaquePendiente();
 }
 function infoTelaAC(){
   const el = document.getElementById('ac-tela-info'); if(!el) return;
@@ -6142,32 +6172,29 @@ function infoTelaAC(){
 }
 
 // ----- un mismo articulo de corte con varios SKU segun la tela (ej: blanco y color) -----
+function otrosSkuActuales(){
+  if(otrosSkuPend) return otrosSkuPend;
+  const principal = String(((tablaConsumo.empaque || {})[acArticulo] || {}).sku || '').toUpperCase();
+  return Object.keys((fabricacion && fabricacion.vinculos) || {}).filter(s => s !== principal && fabricacion.vinculos[s].articulo === acArticulo).map(s => ({ sku: s, calidad: calidadDeSku(s) || '' }));
+}
 function renderOtrosSkuAC(){
   const cont = document.getElementById('ac-otros-sku'); if(!cont || !fabricacion) return;
-  const principal = String(((tablaConsumo.empaque || {})[acArticulo] || {}).sku || '').toUpperCase();
-  const otros = Object.keys(fabricacion.vinculos).filter(s => s !== principal && fabricacion.vinculos[s].articulo === acArticulo);
-  cont.innerHTML = otros.map(s => `<div style="display:grid;grid-template-columns:minmax(0,0.8fr) minmax(0,2fr) 30px;gap:6px;margin-bottom:6px;align-items:center;">
-      <input value="${escapeAttr(s)}" disabled style="font-weight:700;">
-      <select onchange="cambiarCalidadOtroSku('${escapeAttr(s)}', this.value)">${opcionesCalidad(calidadDeSku(s) || '')}</select>
-      <button type="button" onclick="quitarOtroSkuAC('${escapeAttr(s)}')" title="Quitar" style="border:none;background:none;cursor:pointer;color:#8A8072;">✕</button>
+  cont.innerHTML = otrosSkuActuales().map((o, i) => `<div style="display:grid;grid-template-columns:minmax(0,0.8fr) minmax(0,2fr) 30px;gap:6px;margin-bottom:6px;align-items:center;">
+      <input value="${escapeAttr(o.sku)}" disabled style="font-weight:700;">
+      <select onchange="cambiarCalidadOtroSku(${i}, this.value)">${opcionesCalidad(o.calidad || '')}</select>
+      <button type="button" onclick="quitarOtroSkuAC(${i})" title="Quitar" style="border:none;background:none;cursor:pointer;color:#8A8072;">✕</button>
     </div>`).join('');
 }
 async function agregarOtroSkuAC(){
   const sku = (prompt('SKU del catálogo (ej: KA131JC):') || '').trim().toUpperCase();
   if(!sku) return;
   if(fabricacion === null) await cargarFabricacion();
-  fabricacion.vinculos[sku] = { ...(fabricacion.vinculos[sku] || {}), articulo: acArticulo };
-  try{ await guardarFabricacion(); renderOtrosSkuAC(); } catch(e){ alert('No se pudo guardar: ' + e.message); }
+  otrosSkuPend = [...otrosSkuActuales()];
+  if(!otrosSkuPend.some(o => o.sku === sku)) otrosSkuPend.push({ sku, calidad: '' });
+  renderOtrosSkuAC(); marcarEmpaquePendiente();
 }
-async function cambiarCalidadOtroSku(sku, clave){
-  fabricacion.vinculos[sku] = { ...(fabricacion.vinculos[sku] || {}), calidad: clave, tela: '', articulo: acArticulo };
-  try{ await guardarFabricacion(); } catch(e){ alert('No se pudo guardar: ' + e.message); }
-}
-async function quitarOtroSkuAC(sku){
-  if(!confirm(`¿Desvincular ${sku} de este artículo?`)) return;
-  delete fabricacion.vinculos[sku].articulo;
-  try{ await guardarFabricacion(); renderOtrosSkuAC(); } catch(e){ alert('No se pudo guardar: ' + e.message); }
-}
+function cambiarCalidadOtroSku(i, clave){ otrosSkuPend = [...otrosSkuActuales()]; otrosSkuPend[i] = { ...otrosSkuPend[i], calidad: clave }; marcarEmpaquePendiente(); }
+function quitarOtroSkuAC(i){ otrosSkuPend = [...otrosSkuActuales()]; otrosSkuPend.splice(i, 1); renderOtrosSkuAC(); marcarEmpaquePendiente(); }
 
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
@@ -13589,7 +13616,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v81';
+const APP_VERSION = '2026-10-01-v82';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
