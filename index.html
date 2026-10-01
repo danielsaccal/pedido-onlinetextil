@@ -1470,7 +1470,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v33</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v34</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2705,8 +2705,9 @@ function lineaRenglonTexto(r, i, anchoComun){
   lineas.push(`   ${tela}${String(r.consumo).replace('.', ',')} m c/u · usa ${String(r.metrosConsumidos).replace('.', ',')} m${r.sku ? ' · Código ' + r.sku : ''}`);
   const corte = corteCortoRenglon(r);
   if(corte) lineas.push(`   ✂️ ${corte}`);
-  let ap = null; try{ ap = aprovechaRenglon(r); } catch(e){}
-  if(ap) lineas.push(`   ♻️ Con lo que sobra: ≈ ${ap.n} ${ap.nombre}`);
+  if(r.deSobras > 0) lineas.push(`   ♻️ ${r.deSobras} salen de lo que sobra de los otros cortes${r.deSobras < r.cantidad ? `, ${r.cantidad - r.deSobras} de tela nueva` : ' (no usan tela nueva)'}`);
+  else if(r.sobrasPara) lineas.push(`   ♻️ Lo que sobra se usa para ${r.sobrasPara} de esta orden`);
+  else { let ap = null; try{ ap = aprovechaRenglon(r); } catch(e){} if(ap) lineas.push(`   ♻️ Con lo que sobra: ≈ ${ap.n} ${ap.nombre}`); }
   if(r.nota) lineas.push(`   📝 ${r.nota}`);
   return lineas.join('\n');
 }
@@ -4063,16 +4064,19 @@ function consumoUnitarioOT(valor, ancho){
 }
 
 function leerConsumoActualOT(){
-  let usados = 0, ancho = null;
+  let personal = 0, ancho = null;
+  const rs = [];
   document.querySelectorAll('.ot-renglon').forEach(el => {
     const v = el.querySelector('.ot-r-articulo').value;
     const cant = parseInt(el.querySelector('.ot-r-cantidad').value, 10) || 0;
-    if(v === '__personalizado__'){ usados += cant * (parseFloat(el.querySelector('.ot-r-consumo-personal').value) || 0); return; }
+    if(v === '__personalizado__'){ personal += cant * (parseFloat(el.querySelector('.ot-r-consumo-personal').value) || 0); return; }
     const w = parseFloat(el.querySelector('.ot-r-ancho').value);
     if(w > 0 && !ancho) ancho = w;
     const c = consumoUnitarioOT(v, w);
-    if(c) usados += cant * c;
+    if(c) rs.push({ articulo: v.startsWith('ficha:') ? nombreFicha(v.slice(6)) : v, fichaSku: v.startsWith('ficha:') ? v.slice(6) : undefined, anchoUsado: w, cantidad: cant, consumo: c, metrosConsumidos: cant * c });
   });
+  try{ aprovecharSobrasOrden(rs); } catch(e){}
+  const usados = personal + rs.reduce((s, r) => s + r.metrosConsumidos, 0);
   return { usados: Math.round(usados * 100) / 100, ancho };
 }
 
@@ -4337,13 +4341,12 @@ function candidatosAprovechar(W){
   if(hayFichas()) Object.keys(fichasArticulos.fichas).forEach(s => { const r = piezasDeFicha(s); if(!r.errores.length) agregar(nombreFicha(s), r.piezas); });
   return lista;
 }
-function aprovechaRenglon(r){
+// tiras libres que deja un renglon (por unidad) y piezas que ya quedaron de mas
+function sobrasDeRenglon(r){
   const piezas = piezasDeRenglon(r);
   if(!piezas) return null;
-  const W = +r.anchoUsado, N = +r.cantidad || 0;
-  if(!N) return null;
+  const W = +r.anchoUsado;
   const c = calcularCorte(piezas, W);
-  // tiras libres por unidad: [ancho, largo]
   const tiras = [];
   c.franjas.forEach(f => {
     if(f.factor < 1) return; // franja compartida: lo que sobra ya es de la unidad siguiente
@@ -4352,28 +4355,69 @@ function aprovechaRenglon(r){
     f.cols.forEach(col => { const resto = f.largo - col.alto; if(resto >= 20 && col.w >= 20) tiras.push([col.w, resto]); });
   });
   if(c.tiras && c.tiras.retazo && c.tiras.retazo.w >= 20) tiras.push([c.tiras.retazo.w, c.tiras.retazo.L]);
-  // piezas que ya quedaron de mas (tira continua y franjas mezcladas)
-  const deMas = new Map();
-  (c.tiras || []).forEach(t => deMas.set(t.p.nombre, (deMas.get(t.p.nombre) || 0) + Math.max(0, t.rinde - t.n) * N));
-  c.franjas.forEach(f => { if(!f.unTipo) f.cols.forEach(col => { const so = col.items.filter(it => it.sobrante).length; if(so) deMas.set(col.p.nombre, (deMas.get(col.p.nombre) || 0) + so * N); }); });
+  const deMas = []; // { pz, n por unidad }
+  (c.tiras || []).forEach(t => { if(t.rinde > t.n) deMas.push({ pz: t.p, n: t.rinde - t.n }); });
+  c.franjas.forEach(f => { if(!f.unTipo) f.cols.forEach(col => { const so = col.items.filter(it => it.sobrante).length; if(so) deMas.push({ pz: col.p, n: so }); }); });
+  return { tiras, deMas, piezas };
+}
+function tapasDeSobras(s, N, p){
+  let tapas = 0;
+  s.tiras.forEach(([w, l]) => {
+    const derecha = Math.floor(w / p.ancho) * Math.floor(N * l / p.largo);
+    const girada = puedeGirar(p) ? Math.floor(w / p.largo) * Math.floor(N * l / p.ancho) : 0;
+    tapas += Math.max(derecha, girada);
+  });
+  s.deMas.forEach(d => {
+    const mismo = (Math.abs(d.pz.ancho - p.ancho) < 3 && Math.abs(d.pz.largo - p.largo) < 6) || (Math.abs(d.pz.ancho - p.largo) < 6 && Math.abs(d.pz.largo - p.ancho) < 3);
+    if(mismo) tapas += Math.floor(d.n * N);
+  });
+  return tapas;
+}
+// un renglon "chico" es un articulo de una sola pieza chica (ej: fundas): puede salir de las sobras
+function piezaChicaDeRenglon(r){
+  const pz = piezasDeRenglon(r);
+  if(!pz || pz.length !== 1) return null;
+  const p = pz[0];
+  return p.ancho * p.largo <= 6000 ? p : null;
+}
+function aprovechaRenglon(r){
+  if(r.deSobras !== undefined || piezaChicaDeRenglon(r)) return null;
+  const s = sobrasDeRenglon(r);
+  const N = +r.cantidad || 0;
+  if(!s || !N) return null;
   let mejor = null;
-  candidatosAprovechar(W).forEach(cand => {
+  candidatosAprovechar(+r.anchoUsado).forEach(cand => {
     if(cand.nombre === r.articulo) return;
-    const { p, partes } = cand;
-    let tapas = 0;
-    tiras.forEach(([w, l]) => {
-      const derecha = Math.floor(w / p.ancho) * Math.floor(N * l / p.largo);
-      const girada = puedeGirar(p) ? Math.floor(w / p.largo) * Math.floor(N * l / p.ancho) : 0;
-      tapas += Math.max(derecha, girada);
-    });
-    deMas.forEach((n, nombre) => {
-      const pz = piezas.find(x => x.nombre === nombre);
-      if(pz && Math.abs(pz.ancho - p.ancho) < 3 && Math.abs(pz.largo - p.largo) < 6) tapas += Math.floor(n);
-    });
-    const unidades = Math.floor(tapas / partes);
-    if(unidades > 0 && (!mejor || unidades * p.ancho * p.largo * partes > mejor.n * mejor.area)) mejor = { n: unidades, nombre: cand.nombre, area: p.ancho * p.largo * partes };
+    const unidades = Math.floor(tapasDeSobras(s, N, cand.p) / cand.partes);
+    const area = cand.p.ancho * cand.p.largo * cand.partes;
+    if(unidades > 0 && (!mejor || unidades * area > mejor.n * mejor.area)) mejor = { n: unidades, nombre: cand.nombre, area };
   });
   return mejor;
+}
+// reparte las sobras de toda la orden: los articulos chicos (fundas) salen primero de lo que sobra de
+// los demas productos, y solo lo que falta consume tela nueva
+function aprovecharSobrasOrden(renglones){
+  const grandes = renglones.filter(r => !r.personalizado && !piezaChicaDeRenglon(r)).map(r => ({ r, s: sobrasDeRenglon(r) })).filter(x => x.s);
+  const pozos = new Map();
+  const resumen = [];
+  renglones.forEach(r => { delete r.deSobras; delete r.sobrasPara; });
+  renglones.forEach(r => {
+    const p = piezaChicaDeRenglon(r);
+    if(!p) return;
+    const clave = Math.round(p.ancho) + 'x' + Math.round(p.largo);
+    if(!pozos.has(clave)) pozos.set(clave, { p, tapas: grandes.reduce((t, g) => t + tapasDeSobras(g.s, +g.r.cantidad || 0, p), 0), nombre: r.articulo });
+    const pozo = pozos.get(clave);
+    const partes = (p.partes || 1) * (p.cantidad || 1);
+    const k = Math.min(r.cantidad, Math.floor(pozo.tapas / partes));
+    r.deSobras = Math.max(0, k);
+    if(k > 0){
+      pozo.tapas -= k * partes;
+      grandes.forEach(g => { if(tapasDeSobras(g.s, +g.r.cantidad || 0, p) > 0) g.r.sobrasPara = r.articulo; });
+      r.metrosConsumidos = Math.round((r.cantidad - k) * r.consumo * 100) / 100;
+    }
+  });
+  pozos.forEach(pz => { const partes = (pz.p.partes || 1) * (pz.p.cantidad || 1); const n = Math.floor(pz.tapas / partes); if(n > 0) resumen.push(`${n} ${pz.nombre}`); });
+  return resumen;
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -4790,6 +4834,8 @@ async function generarOrdenTrabajoCompleta(){
     renglones.push({ articulo, anchoIngresado: ancho, anchoUsado: resultado.anchoUsado, exacto: resultado.exacto, consumo: resultado.consumo, cantidad, metrosConsumidos, sku, nota, instruccion, tieneBosquejo, entregado: 0 });
   }
 
+  let quedanSobras = [];
+  try{ quedanSobras = aprovecharSobrasOrden(renglones); } catch(e){ console.error('aprovechar sobras', e); }
   const metrosConsumidosTotal = Math.round(renglones.reduce((s,r) => s + r.metrosConsumidos, 0) * 100) / 100;
   const metrosRemanentes = Math.round((metrosTotales - metrosConsumidosTotal) * 100) / 100;
   const excede = metrosConsumidosTotal > metrosTotales + 0.005;
@@ -4821,6 +4867,7 @@ async function generarOrdenTrabajoCompleta(){
     excede
       ? `⚠️ Se necesitan ≈ ${fmtMetros(metrosConsumidosTotal)} m y se entregan ${metrosTotales} m.`
       : `Total a usar ≈ ${fmtMetros(metrosConsumidosTotal)} m · Sobran ≈ ${fmtMetros(metrosRemanentes)} m`,
+    ...(quedanSobras.length ? [`♻️ Con lo que todavía sobra de los cortes salen ≈ ${quedanSobras.join(', ')} más.`] : []),
     ...(renglones.some(r => r.tieneBosquejo) ? ['Bosquejos de corte adjuntos.'] : []),
   ];
   if(notaGeneral) lineas.push(notaGeneral);
@@ -4938,7 +4985,7 @@ async function generarPDFOrden(o){
       limpiarPDF(r.sku || ''),
       numPDF(r.consumo), numPDF(r.metrosConsumidos),
       limpiarPDF(corteCortoRenglon(r)),
-      (() => { try{ const ap = aprovechaRenglon(r); return ap ? limpiarPDF(`~ ${ap.n} ${ap.nombre}`) : ''; } catch(e){ return ''; } })(),
+      (() => { if(r.sobrasPara) return limpiarPDF(`Lo que sobra va a ${r.sobrasPara}`); if(r.deSobras > 0) return `${r.deSobras} salen de las sobras` + (r.deSobras < r.cantidad ? `, ${r.cantidad - r.deSobras} de tela nueva` : ''); try{ const ap = aprovechaRenglon(r); return ap ? limpiarPDF(`~ ${ap.n} ${ap.nombre}`) : ''; } catch(e){ return ''; } })(),
     ]),
     styles: { fontSize: 8.5, cellPadding: 2, valign: 'top' },
     headStyles: { fillColor: [245, 212, 112], textColor: [42, 29, 54], fontStyle: 'bold' },
@@ -11695,7 +11742,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v33';
+const APP_VERSION = '2026-10-01-v34';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
