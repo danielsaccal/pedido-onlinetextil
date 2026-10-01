@@ -1470,7 +1470,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v32</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v33</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2705,6 +2705,8 @@ function lineaRenglonTexto(r, i, anchoComun){
   lineas.push(`   ${tela}${String(r.consumo).replace('.', ',')} m c/u · usa ${String(r.metrosConsumidos).replace('.', ',')} m${r.sku ? ' · Código ' + r.sku : ''}`);
   const corte = corteCortoRenglon(r);
   if(corte) lineas.push(`   ✂️ ${corte}`);
+  let ap = null; try{ ap = aprovechaRenglon(r); } catch(e){}
+  if(ap) lineas.push(`   ♻️ Con lo que sobra: ≈ ${ap.n} ${ap.nombre}`);
   if(r.nota) lineas.push(`   📝 ${r.nota}`);
   return lineas.join('\n');
 }
@@ -4312,6 +4314,68 @@ function hacerSelectBuscable(sel){
   sync();
 }
 
+// ===== Que se hace con lo que sobra de cada producto =====
+// La tela se tiende a lo largo, asi que lo que queda al costado de las piezas es una tira continua a lo
+// largo de todo el corte. Se calcula cuantas unidades de un articulo chico (ej: fundas) salen de esas
+// tiras, sumando las piezas que ya quedaron de mas. Es aproximado.
+function piezasDeRenglon(r){
+  if(r.personalizado || !r.anchoUsado) return null;
+  if(r.fichaSku){ const f = piezasDeFicha(r.fichaSku); return f.piezas.length && !f.errores.length ? f.piezas : null; }
+  const c = piezasParaAncho(r.articulo, r.anchoUsado);
+  return c ? c.piezas : null;
+}
+function candidatosAprovechar(W){
+  const lista = [];
+  const agregar = (nombre, piezas) => {
+    if(!piezas || piezas.length !== 1) return;
+    const p = piezas[0];
+    if(!(p.ancho > 0 && p.largo > 0) || p.ancho * p.largo > 6000) return; // solo piezas chicas (hasta 0,6 m2 por tapa)
+    if(lista.some(x => x.nombre === nombre)) return;
+    lista.push({ nombre, p, partes: (p.partes || 1) * (p.cantidad || 1) });
+  };
+  articulosAC().forEach(a => { const c = piezasParaAncho(a, W); if(c) agregar(a, c.piezas); });
+  if(hayFichas()) Object.keys(fichasArticulos.fichas).forEach(s => { const r = piezasDeFicha(s); if(!r.errores.length) agregar(nombreFicha(s), r.piezas); });
+  return lista;
+}
+function aprovechaRenglon(r){
+  const piezas = piezasDeRenglon(r);
+  if(!piezas) return null;
+  const W = +r.anchoUsado, N = +r.cantidad || 0;
+  if(!N) return null;
+  const c = calcularCorte(piezas, W);
+  // tiras libres por unidad: [ancho, largo]
+  const tiras = [];
+  c.franjas.forEach(f => {
+    if(f.factor < 1) return; // franja compartida: lo que sobra ya es de la unidad siguiente
+    const libre = W - (f.reservado || 0) - f.cols.reduce((s, col) => s + col.w, 0);
+    if(libre >= 20) tiras.push([libre, f.largo]);
+    f.cols.forEach(col => { const resto = f.largo - col.alto; if(resto >= 20 && col.w >= 20) tiras.push([col.w, resto]); });
+  });
+  if(c.tiras && c.tiras.retazo && c.tiras.retazo.w >= 20) tiras.push([c.tiras.retazo.w, c.tiras.retazo.L]);
+  // piezas que ya quedaron de mas (tira continua y franjas mezcladas)
+  const deMas = new Map();
+  (c.tiras || []).forEach(t => deMas.set(t.p.nombre, (deMas.get(t.p.nombre) || 0) + Math.max(0, t.rinde - t.n) * N));
+  c.franjas.forEach(f => { if(!f.unTipo) f.cols.forEach(col => { const so = col.items.filter(it => it.sobrante).length; if(so) deMas.set(col.p.nombre, (deMas.get(col.p.nombre) || 0) + so * N); }); });
+  let mejor = null;
+  candidatosAprovechar(W).forEach(cand => {
+    if(cand.nombre === r.articulo) return;
+    const { p, partes } = cand;
+    let tapas = 0;
+    tiras.forEach(([w, l]) => {
+      const derecha = Math.floor(w / p.ancho) * Math.floor(N * l / p.largo);
+      const girada = puedeGirar(p) ? Math.floor(w / p.largo) * Math.floor(N * l / p.ancho) : 0;
+      tapas += Math.max(derecha, girada);
+    });
+    deMas.forEach((n, nombre) => {
+      const pz = piezas.find(x => x.nombre === nombre);
+      if(pz && Math.abs(pz.ancho - p.ancho) < 3 && Math.abs(pz.largo - p.largo) < 6) tapas += Math.floor(n);
+    });
+    const unidades = Math.floor(tapas / partes);
+    if(unidades > 0 && (!mejor || unidades * p.ancho * p.largo * partes > mejor.n * mejor.area)) mejor = { n: unidades, nombre: cand.nombre, area: p.ancho * p.largo * partes };
+  });
+  return mejor;
+}
+
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -4867,17 +4931,18 @@ async function generarPDFOrden(o){
   y += 2;
   doc.autoTable({
     startY: y, margin: { left: M, right: M },
-    head: [['Cant.', 'Producto', 'Código', 'm c/u', 'Usa (m)', 'Corte']],
+    head: [['Cant.', 'Producto', 'Código', 'm c/u', 'Usa (m)', 'Corte', 'Con lo que sobra']],
     body: renglones.map(r => [
       r.cantidad,
       limpiarPDF(r.articulo + (r.personalizado ? ' (a medida)' : '') + (!ancho && r.anchoUsado ? ` — tela ${r.anchoUsado} cm` : '') + (r.nota ? ` — ${r.nota}` : '')),
       limpiarPDF(r.sku || ''),
       numPDF(r.consumo), numPDF(r.metrosConsumidos),
       limpiarPDF(corteCortoRenglon(r)),
+      (() => { try{ const ap = aprovechaRenglon(r); return ap ? limpiarPDF(`~ ${ap.n} ${ap.nombre}`) : ''; } catch(e){ return ''; } })(),
     ]),
     styles: { fontSize: 8.5, cellPadding: 2, valign: 'top' },
     headStyles: { fillColor: [245, 212, 112], textColor: [42, 29, 54], fontStyle: 'bold' },
-    columnStyles: { 0: { cellWidth: 13, halign: 'right' }, 2: { cellWidth: 20 }, 3: { cellWidth: 14, halign: 'right' }, 4: { cellWidth: 17, halign: 'right' } },
+    columnStyles: { 0: { cellWidth: 12, halign: 'right' }, 1: { cellWidth: 32 }, 2: { cellWidth: 18 }, 3: { cellWidth: 13, halign: 'right' }, 4: { cellWidth: 16, halign: 'right' }, 6: { cellWidth: 28 } },
   });
   y = doc.lastAutoTable.finalY + 8;
   const usa = o.metrosConsumidosTotal != null ? o.metrosConsumidosTotal : renglones.reduce((s, r) => s + (+r.metrosConsumidos || 0), 0);
@@ -11630,7 +11695,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v32';
+const APP_VERSION = '2026-10-01-v33';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
