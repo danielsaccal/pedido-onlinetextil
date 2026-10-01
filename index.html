@@ -1470,7 +1470,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v31</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v32</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -3042,6 +3042,50 @@ function calcularCorteFijo(piezas, W){
     }
   });
 
+  // regla 9: tira continua. La tela se tiende en capas y se cortan las franjas a lo ancho, asi que lo
+  // que queda al costado de las piezas grandes es una tira larga a lo largo de todo el tendido. Las
+  // piezas chicas (ej: tapas de funda) se sacan de esa tira de corrido, sin cortarse en cada unidad.
+  const tiras = [];
+  const maxArea = Math.max(...tipos.map(t => t.p.ancho * t.p.largo));
+  const esChica = p => p.ancho * p.largo < maxArea * 0.5;
+  const grandes = franjas.filter(f => f.cols.some(c => !esChica(c.p)));
+  if(grandes.length && tipos.some(t => esChica(t.p))){
+    const anchoGrandes = f => f.cols.filter(c => !esChica(c.p)).reduce((s, c) => s + c.w, 0);
+    const S0 = Math.min(...grandes.map(f => W - anchoGrandes(f)));
+    const L = grandes.reduce((s, f) => s + f.largo, 0);
+    let S = S0;
+    const x0 = W - S0;
+    const reemplazadas = [];
+    tipos.filter(t => esChica(t.p)).sort((a,b) => (b.p.ancho*b.p.largo) - (a.p.ancho*a.p.largo)).forEach(t => {
+      const p = t.p;
+      if(S0 <= EPS || S < p.ancho - EPS) return;
+      const porCol = L / p.largo;
+      const k = Math.min(Math.floor((S + EPS) / p.ancho), Math.ceil(t.n / porCol - 1e-9));
+      if(k < 1 || k * porCol + EPS < t.n) return;
+      reemplazadas.push(p);
+      const xT = x0 + (S0 - S);
+      const cols = [];
+      let usados = 0;
+      for(let j = 0; j < k; j++){
+        const col = { p, x: xT + j * p.ancho, w: p.ancho, items: [] };
+        for(let yy = 0; yy < L - EPS; yy += p.largo){
+          const parcial = yy + p.largo > L + EPS;
+          col.items.push({ p, y: yy, sobrante: usados >= t.n, parcial });
+          usados++;
+        }
+        cols.push(col);
+      }
+      tiras.push({ x: xT, w: k * p.ancho, L, cols, p, n: t.n, rinde: k * porCol });
+      S -= k * p.ancho;
+    });
+    if(reemplazadas.length){
+      franjas.forEach(f => { f.cols = f.cols.filter(c => !reemplazadas.includes(c.p)); let x = 0; f.cols.forEach(c => { c.x = x; x += c.w; }); f.usado = x; });
+      for(let i = franjas.length - 1; i >= 0; i--) if(!franjas[i].cols.length) franjas.splice(i, 1);
+      grandes.forEach(f => { f.reservado = S0; });
+      tiras.retazo = S > 0.5 ? { x: x0 + (S0 - S), w: S, L } : null;
+    }
+  }
+
   const chicas = [...tipos].sort((a,b) => (a.p.ancho*a.p.largo) - (b.p.ancho*b.p.largo));
   let y = 0;
   franjas.forEach(f => {
@@ -3057,7 +3101,7 @@ function calcularCorteFijo(piezas, W){
     // llenar lo libre: columnas a medio llenar, y despues columnas nuevas en el ancho libre
     f.cols.forEach(c => { while(c.alto + c.p.largo <= f.largo + EPS) colocar(c, c.p, true); });
     for(;;){
-      const libre = W - f.usado;
+      const libre = W - f.usado - (f.reservado || 0);
       const t = f.unTipo ? (tiposEnFranja[0].ancho <= libre + EPS ? { p: tiposEnFranja[0] } : null)
                          : chicas.find(t => t.p.ancho <= libre + EPS && t.p.largo <= f.largo + EPS);
       if(!t) break;
@@ -3065,7 +3109,7 @@ function calcularCorteFijo(piezas, W){
       while(col.alto + t.p.largo <= f.largo + EPS) colocar(col, t.p, true);
     }
     // regla 6: repartir el ancho que sobra entre las piezas mas anchas de la franja
-    const libre = Math.round((W - f.usado) * 100) / 100;
+    const libre = Math.round((W - f.usado - (f.reservado || 0)) * 100) / 100;
     if(libre > EPS && f.cols.length){
       const maxW = Math.max(...f.cols.map(c => c.w));
       const anchas = f.cols.filter(c => Math.abs(c.w - maxW) < EPS);
@@ -3083,7 +3127,7 @@ function calcularCorteFijo(piezas, W){
 
   const cm = franjas.reduce((s,f) => s + f.largo * f.factor, 0);
   const detalle = franjas.map(f => f.factor < 1 ? `${f.largo} cm ÷ ${String(Math.round(1/f.factor*100)/100).replace('.', ',')}` : `${f.largo} cm`).join(' + ');
-  return { franjas, avisos, largoTotal: y, metros: Math.round(cm) / 100, detalle };
+  return { franjas, tiras, avisos, largoTotal: y, metros: Math.round(cm) / 100, detalle };
 }
 
 function fmtCm(n){ return String(Math.round(n*100)/100).replace('.', ','); }
@@ -3107,6 +3151,10 @@ function textoCorteCorto(piezas, ancho){
     const k = col.p.nombre + '|' + col.w + '|' + col.p.largo;
     const x = m.get(k) || { p: col.p, w: col.w, n: 0 }; x.n += n; m.set(k, x);
   }));
+  (c.tiras || []).forEach(t => {
+    const k = t.p.nombre + '|' + t.p.ancho + '|' + t.p.largo;
+    const x = m.get(k) || { p: t.p, w: t.p.ancho, n: 0 }; x.n += t.n; m.set(k, x);
+  });
   // las piezas de varias tapas (fundas) se cuentan por unidad: "2 Fundas", el detalle de tapas va en el bosquejo
   const plural = t => t.replace(/^(\S+)/, w => /[aeiouáéó]$/i.test(w) ? w + 's' : w + 'es');
   return [...m.values()].map(x => {
@@ -3140,6 +3188,12 @@ function textoCorte(articulo, piezas, ancho, nota){
       texto += ` Esta franja da ${nombreUnidad(p, tot)}; el artículo usa ${us}, el resto va para el artículo siguiente.`;
     }
   });
+  (c.tiras || []).forEach(t => {
+    const de = (t.p.partes||1) > 1 ? 'tapas' : 'piezas';
+    const extra = Math.round((t.rinde - t.n) * 10) / 10;
+    texto += ` Tira continua al costado (${fmtCm(t.w)} cm de ancho, a lo largo de todo el tendido): ${t.cols.length > 1 ? t.cols.length + ' columnas de ' : ''}${t.p.nombre} ${fmtCm(t.p.ancho)} × ${fmtCm(t.p.largo)}; rinde ≈ ${fmtCm(Math.round(t.rinde*10)/10)} ${de} por unidad, el artículo usa ${t.n}` + (extra >= 0.1 ? `; las de más (≈ ${fmtCm(extra)} por unidad) quedan para aprovechar.` : '.');
+  });
+  if(c.tiras && c.tiras.retazo && c.tiras.retazo.w >= 5) texto += ` Al costado queda además una tira de ${fmtCm(c.tiras.retazo.w)} cm de ancho para aprovechar.`;
   sobrantes.forEach((n, p) => {
     const partes = p.partes || 1;
     texto += partes > 1
@@ -3211,12 +3265,12 @@ function dibujarBosquejoCorte(anchoTela, piezas){
         ctx.fillText(it.sobrante ? (tapa ? tapa + ' · ' : '') + extra : (tapa ? tapa + ' · ' : '') + `${fmtCm(col.w)} × ${fmtCm(it.p.largo)}`, x + w/2, y + h/2 + 10, w - 4);
       });
     });
-    ctx.beginPath(); ctx.moveTo(margen, margen + f.y*escala); ctx.lineTo(margen + anchoPx, margen + f.y*escala); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(margen, margen + f.y*escala); ctx.lineTo(margen + (anchoTela - (f.reservado || 0)) * escala, margen + f.y*escala); ctx.stroke();
     // retazos que quedan (se pueden aprovechar): se rotulan con su medida si son de un tamaño util
     const retazos = [];
     f.cols.forEach(col => { const resto = f.largo - col.alto; if(resto > 0.5) retazos.push({ x: col.x, y: f.y + col.alto, w: col.w, l: resto }); });
-    const libre = anchoTela - f.cols.reduce((s, col) => s + col.w, 0);
-    if(libre > 0.5) retazos.push({ x: anchoTela - libre, y: f.y, w: libre, l: f.largo });
+    const libre = anchoTela - (f.reservado || 0) - f.cols.reduce((s, col) => s + col.w, 0);
+    if(libre > 0.5) retazos.push({ x: f.cols.reduce((s, col) => s + col.w, 0), y: f.y, w: libre, l: f.largo });
     retazos.forEach(r => {
       if(r.w < 20 || r.l < 20) return;
       const x = margen + r.x * escala, y = margen + r.y * escala, w = r.w * escala, hh = r.l * escala;
@@ -3226,6 +3280,37 @@ function dibujarBosquejoCorte(anchoTela, piezas){
       ctx.fillStyle = '#000000';
     });
   });
+  // tira continua al costado: las piezas siguen de corrido a lo largo del tendido
+  (c.tiras || []).forEach(t => {
+    t.cols.forEach(col => {
+      col.items.forEach(it => {
+        const x = margen + col.x * escala, y = margen + it.y * escala;
+        const w = col.w * escala, hh = Math.min(it.p.largo, t.L - it.y) * escala;
+        const partes = it.p.partes || 1;
+        const nro = numTapa.get(it.p) || 0; numTapa.set(it.p, nro + 1);
+        const tapa = partes > 1 ? `Tapa ${(nro % partes) + 1}` : '';
+        if(!colorDe.has(it.p.nombre)) colorDe.set(it.p.nombre, PALETA[colorDe.size % PALETA.length]);
+        ctx.fillStyle = it.sobrante ? '#FFFFFF' : colorDe.get(it.p.nombre);
+        ctx.fillRect(x, y, w, hh);
+        ctx.fillStyle = '#000000';
+        if(it.sobrante || it.parcial) ctx.setLineDash([4,3]);
+        ctx.strokeRect(x, y, w, hh);
+        ctx.setLineDash([]);
+        const chico = w < 90;
+        ctx.font = (chico ? 'bold 10px' : 'bold 13px') + ' Arial';
+        ctx.fillText(it.p.nombre, x + w/2, y + hh/2 - 6, w - 4);
+        ctx.font = (chico ? '9px' : '11px') + ' Arial';
+        ctx.fillText(it.parcial ? 'sigue en la próxima' : (tapa ? tapa + ' · ' : '') + (it.sobrante ? 'De más' : `${fmtCm(col.w)} × ${fmtCm(it.p.largo)}`), x + w/2, y + hh/2 + 10, w - 4);
+      });
+    });
+  });
+  if(c.tiras && c.tiras.retazo && c.tiras.retazo.w >= 20){
+    const r = c.tiras.retazo, x = margen + r.x * escala, w = r.w * escala;
+    ctx.save(); ctx.translate(x + w/2, margen + r.L * escala / 2); ctx.rotate(-Math.PI/2);
+    ctx.fillStyle = '#6B6258'; ctx.font = '11px Arial';
+    ctx.fillText(`Tira para aprovechar · ${fmtCm(r.w)} cm`, 0, 4);
+    ctx.restore(); ctx.fillStyle = '#000000';
+  }
   ctx.restore();
 
   ctx.setLineDash([6,4]); ctx.strokeRect(margen, margen, anchoPx, altoPx); ctx.setLineDash([]);
@@ -11545,7 +11630,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v31';
+const APP_VERSION = '2026-10-01-v32';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
