@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v62</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v63</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -3169,7 +3169,24 @@ function puedeGirar(p){
   if(p.girar === false || p.girar === 'no') return false;
   return true; // por defecto todas se pueden girar (fundas incluidas) si eso ahorra tela
 }
+// 10. Una forma de cortar que sirve en una tela mas angosta sirve tambien en una mas ancha (sobra el
+//     costado). Por eso en cada ancho se prueba tambien como se cortaria en los anchos mas angostos y se
+//     queda con lo que menos consume: nunca una tela mas ancha puede dar mas consumo que una mas angosta.
+const cacheCorte = new Map();
 function calcularCorte(piezas, W){
+  const clave = W + '|' + JSON.stringify(piezas);
+  if(cacheCorte.has(clave)) return cacheCorte.get(clave);
+  let mejor = calcularCorteBase(piezas, W);
+  const otros = (typeof anchosConocidos === 'function' ? anchosConocidos() : []).filter(a => a < W - 0.5);
+  otros.forEach(a => {
+    const c = calcularCorteBase(piezas, a);
+    if(!c.avisos.length && (mejor.avisos.length || c.metros < mejor.metros - 0.001)) mejor = { ...c, anchoEfectivo: a };
+  });
+  if(cacheCorte.size > 800) cacheCorte.clear();
+  cacheCorte.set(clave, mejor);
+  return mejor;
+}
+function calcularCorteBase(piezas, W){
   const girables = piezas.map((p, i) => i).filter(i => puedeGirar(piezas[i]) && Math.abs(piezas[i].ancho - piezas[i].largo) > 0.01);
   if(!girables.length || girables.length > 6) return calcularCorteFijo(piezas, W);
   let mejor = null;
@@ -3255,7 +3272,12 @@ function calcularCorteFijo(piezas, W){
       S -= k * p.ancho;
     });
     if(reemplazadas.length){
-      franjas.forEach(f => { f.cols = f.cols.filter(c => !reemplazadas.includes(c.p)); let x = 0; f.cols.forEach(c => { c.x = x; x += c.w; }); f.usado = x; });
+      franjas.forEach(f => {
+        f.cols = f.cols.filter(c => !reemplazadas.includes(c.p));
+        let x = 0; f.cols.forEach(c => { c.x = x; x += c.w; }); f.usado = x;
+        // si se fue la pieza que definia el largo de la franja, la franja se acorta a lo que queda
+        if(f.cols.length){ const nl = Math.max(...f.cols.map(c => c.alto)); if(nl < f.largo - EPS) f.largo = nl; }
+      });
       for(let i = franjas.length - 1; i >= 0; i--) if(!franjas[i].cols.length) franjas.splice(i, 1);
       grandes.forEach(f => { f.reservado = S0; });
       tiras.retazo = S > 0.5 ? { x: x0 + (S0 - S), w: S, L } : null;
@@ -12878,7 +12900,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v62';
+const APP_VERSION = '2026-10-01-v63';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
