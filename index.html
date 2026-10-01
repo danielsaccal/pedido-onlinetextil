@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v57</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v58</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2550,10 +2550,23 @@ function actualizarCasillasBancarios(){
 // ---------- tabla de consumo de tela (talleres) ----------
 let tablaConsumo = null; // null = no revisada; {} = revisada, vacia; {anchos:[...], articulos:{...}} = cargada
 
+// los textos de corte guardados con el formato viejo se rearman con el formato nuevo (una sola vez)
+function migrarTextosCorte(){
+  if(!tablaConsumo || !tablaConsumo.instrucciones || tablaConsumo.formatoTexto === 2) return;
+  try{
+    Object.entries(tablaConsumo.instrucciones).forEach(([articulo, porAncho]) => Object.entries(porAncho || {}).forEach(([ancho, g]) => {
+      if(g && piezasValidas(g)) g.texto = textoCorte(articulo, g.piezas, parseFloat(ancho), g.nota || '');
+    }));
+    tablaConsumo.formatoTexto = 2;
+    db.collection('config').doc('tabla_consumo_telas').set(tablaConsumo).catch(e => console.error('migrar textos', e));
+  } catch(e){ console.error('migrar textos', e); }
+}
+
 async function cargarTablaConsumo(){
   try{
     const doc = await db.collection('config').doc('tabla_consumo_telas').get();
     tablaConsumo = doc.exists ? doc.data() : {};
+    migrarTextosCorte();
   } catch(e){
     console.error('Error cargando la tabla de consumo:', e);
     tablaConsumo = tablaConsumo || {};
@@ -2932,7 +2945,7 @@ function buscarInstruccionCorte(articulo, ancho){
   const sku = fichaDesdeArticulo(articulo);
   if(sku){ const r = piezasDeFicha(sku); return r.piezas.length ? textoCorte(nombreFicha(sku), r.piezas, parseFloat(ancho), '') : ''; }
   const g = buscarInstruccionGuardada(articulo, ancho);
-  if(g) return g.texto;
+  if(g) return piezasValidas(g) ? textoCorte(articulo, g.piezas, parseFloat(ancho), g.nota || '') : g.texto;
   const c = instruccionCalculada(articulo, ancho);
   return c ? textoCorte(articulo, c.piezas, parseFloat(ancho), '') : '';
 }
@@ -12851,7 +12864,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v57';
+const APP_VERSION = '2026-10-01-v58';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
