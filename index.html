@@ -1537,7 +1537,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v72</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v73</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1777,6 +1777,7 @@ a.grilla-celda{display:block;}
         <button class="btn btn-gold" style="width:auto;padding:10px 16px;" onclick="editarTela()">+ Nueva tela</button>
       </div>
       <div id="tl-usos-filtro" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
+      <div id="tl-separar"></div>
       <div id="tl-acciones" style="display:none;"></div>
       <div id="tl-editor" style="display:none;"></div>
       <div id="tl-lista"><p class="empty-msg">Cargando...</p></div>
@@ -5537,6 +5538,8 @@ function renderEnProduccion(){
 // El gramaje (g/m2) se calcula solo: 1000 / (metros por kilo x ancho en metros).
 // Vive en config/telas = { telas: { CODIGO: {...} }, usos: [...] }
 const USOS_TELA_DEF = ['Sábanas', 'Toallas', 'Manteles', 'Cortinas', 'Acolchados', 'Batas'];
+const COLORES_TELA = ['Blanco', 'Color', 'Crudo'];
+function opcionesColorTela(sel){ return `<option value="">—</option>` + COLORES_TELA.map(c => `<option ${c === sel ? 'selected' : ''}>${c}</option>`).join(''); }
 let telasDatos = null, tlFiltroUso = '', tlEditando = null;
 async function cargarTelas(){
   try{ const d = await db.collection('config').doc('telas').get(); telasDatos = d.exists ? d.data() : {}; }
@@ -5546,7 +5549,7 @@ async function cargarTelas(){
   const dp = document.getElementById('lista-proveedores-tela');
   if(dp) dp.innerHTML = [...new Set(Object.values(telasDatos.telas).map(t => t.proveedor).filter(Boolean))].sort().map(p => `<option value="${escapeAttr(p)}">`).join('');
   const dl = document.getElementById('lista-telas');
-  if(dl) dl.innerHTML = Object.entries(telasDatos.telas).map(([c, t]) => `<option value="${escapeAttr(c)}">${escaparHtml((t.nombre || '') + (t.ancho ? ' · ' + t.ancho + ' cm' : ''))}</option>`).join('');
+  if(dl) dl.innerHTML = Object.entries(telasDatos.telas).map(([c, t]) => `<option value="${escapeAttr(c)}">${escaparHtml((t.nombre || '') + (t.color ? ' ' + t.color.toLowerCase() : '') + (t.ancho ? ' · ' + t.ancho + ' cm' : ''))}</option>`).join('');
 }
 function datosTela(codigo){ return telasDatos && telasDatos.telas ? telasDatos.telas[String(codigo || '').trim().toUpperCase()] || null : null; }
 function gramaje(t){ return t && t.mPorKg > 0 && t.ancho > 0 ? Math.round(1000 / (t.mPorKg * t.ancho / 100)) : null; }
@@ -5562,28 +5565,31 @@ function renderTelas(){
   document.getElementById('tl-usos-filtro').innerHTML = chip('', 'Todos los usos') + usos.map(u => chip(u, u)).join('');
   const q = normBusqueda(document.getElementById('tl-buscar').value);
   const lista = Object.entries(telasDatos.telas)
-    .filter(([c, t]) => (!tlFiltroUso || (t.usos || []).includes(tlFiltroUso)) && (!q || normBusqueda(c + ' ' + (t.nombre || '') + ' ' + (t.proveedor || '')).includes(q)))
+    .filter(([c, t]) => (!tlFiltroUso || (t.usos || []).includes(tlFiltroUso)) && (!q || normBusqueda(c + ' ' + (t.nombre || '') + ' ' + (t.color || '') + ' ' + (t.proveedor || '')).includes(q)))
     .sort((a, b) => familiaTela(a[1]).localeCompare(familiaTela(b[1])) || (a[1].ancho || 0) - (b[1].ancho || 0) || a[0].localeCompare(b[0]));
   const cuantos = {}; lista.forEach(([c, t]) => { const f = familiaTela(t); cuantos[f] = (cuantos[f] || 0) + 1; });
   let famPrevia = null;
   window.__tlVisibles = lista.map(([c]) => c);
+  const separables = Object.values(telasDatos.telas).filter(t => !t.color && colorEnNombre(t.nombre)).length;
+  document.getElementById('tl-separar').innerHTML = separables ? `<div style="background:#FDF4E2;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:0.85rem;">Hay ${separables} tela${separables === 1 ? '' : 's'} con el color dentro del nombre (ej: "PERCAL BLANCO"). <a href="#" onclick="event.preventDefault(); separarColorTelas()">Separar el color en su campo</a> para que se agrupen como la misma tela.</div>` : '';
   renderAccionesTelas();
   const cont = document.getElementById('tl-lista');
   if(!lista.length){ cont.innerHTML = `<p class="empty-msg">${Object.keys(telasDatos.telas).length ? 'No hay telas que coincidan.' : 'Todavía no hay telas cargadas. Toque "+ Nueva tela".'}</p>`; return; }
   const th = (x, al) => `<th style="padding:7px 8px;text-align:${al || 'left'};white-space:nowrap;">${x}</th>`;
   cont.innerHTML = `<div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;"><table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
-    <thead><tr style="background:var(--cream);"><th style="padding:7px 8px;width:30px;"><input type="checkbox" title="Seleccionar todas las de la lista" onchange="seleccionarTodasTelas(this.checked)" ${lista.length && lista.every(([c]) => tlSeleccion.has(c)) ? 'checked' : ''}></th>${th('Código')}${th('Nombre')}${th('Proveedor')}${th('Ancho', 'right')}${th('Calidad', 'right')}${th('Rendimiento', 'right')}${th('Gramaje', 'right')}${th('Usos')}</tr></thead><tbody>
+    <thead><tr style="background:var(--cream);"><th style="padding:7px 8px;width:30px;"><input type="checkbox" title="Seleccionar todas las de la lista" onchange="seleccionarTodasTelas(this.checked)" ${lista.length && lista.every(([c]) => tlSeleccion.has(c)) ? 'checked' : ''}></th>${th('Código')}${th('Nombre')}${th('Color')}${th('Proveedor')}${th('Ancho', 'right')}${th('Calidad', 'right')}${th('Rendimiento', 'right')}${th('Gramaje', 'right')}${th('Usos')}</tr></thead><tbody>
     ${lista.map(([c, t]) => {
       const fam = familiaTela(t), r = rendimientoTela(c), g = r ? gramaje({ ancho: t.ancho, mPorKg: r.mPorKg }) : null;
       let cab = '';
       if(fam !== famPrevia){
         famPrevia = fam;
-        if(cuantos[fam] > 1) cab = `<tr style="background:#FAF8F4;border-top:1px solid var(--line);"><td></td><td colspan="8" style="padding:6px 8px;font-size:0.8rem;color:#6B6258;">🧵 <b>${escaparHtml(t.nombre || '')}</b> · ${t.hilos ? t.hilos + ' hilos · ' : ''}${escaparHtml(t.proveedor || '')} — misma tela en ${cuantos[fam]} anchos</td></tr>`;
+        if(cuantos[fam] > 1) cab = `<tr style="background:#FAF8F4;border-top:1px solid var(--line);"><td></td><td colspan="9" style="padding:6px 8px;font-size:0.8rem;color:#6B6258;">🧵 <b>${escaparHtml(t.nombre || '')}</b> · ${t.hilos ? t.hilos + ' hilos · ' : ''}${escaparHtml(t.proveedor || '')} — misma tela en ${cuantos[fam]} variantes</td></tr>`;
       }
       return cab + `<tr onclick="editarTela('${escapeAttr(c)}')" style="border-top:1px solid var(--line);cursor:pointer;${tlSeleccion.has(c) ? 'background:#F3EEF7;' : ''}" title="Toque para editar">
       <td style="padding:7px 8px;" onclick="event.stopPropagation();"><input type="checkbox" ${tlSeleccion.has(c) ? 'checked' : ''} onchange="toggleSeleccionTela('${escapeAttr(c)}', this.checked)"></td>
       <td style="padding:7px 8px;"><b>${escaparHtml(c)}</b></td>
       <td style="padding:7px 8px;">${escaparHtml(t.nombre || '')}</td>
+      <td style="padding:7px 8px;">${escaparHtml(t.color || '—')}</td>
       <td style="padding:7px 8px;">${escaparHtml(t.proveedor || '—')}</td>
       <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${t.ancho ? t.ancho + ' cm' : '—'}</td>
       <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${t.hilos ? t.hilos + ' hilos' : '—'}</td>
@@ -5603,7 +5609,8 @@ function editarTela(codigo, base){
     ${base && !codigo ? '<p class="note" style="margin:0 0 8px;text-align:left;">Ya están copiados el nombre, el proveedor, la calidad y los usos. Ponga el código y el ancho nuevos.</p>' : ''}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
       ${f('tl-codigo', 'Código', codigo || '', 'placeholder="HON315B" style="text-transform:uppercase;"')}
-      ${f('tl-nombre', 'Nombre', t.nombre, 'placeholder="Percal 180 blanco"')}
+      ${f('tl-nombre', 'Nombre (sin el color)', t.nombre, 'placeholder="Percal"')}
+      <div class="field" style="margin:0;"><label>Color</label><select id="tl-color">${opcionesColorTela(t.color || '')}</select></div>
       ${f('tl-proveedor', 'Proveedor', t.proveedor, 'placeholder="Textil Honeker" list="lista-proveedores-tela"')}
       ${f('tl-ancho', 'Ancho (cm)', t.ancho, 'type="number" step="0.1" placeholder="315" oninput="calcGramajeTela()"')}
       ${f('tl-hilos', 'Calidad (hilos)', t.hilos, 'type="number" placeholder="180"')}
@@ -5612,7 +5619,7 @@ function editarTela(codigo, base){
     </div>
     ${codigo && hermanasTela(codigo).length ? `<p class="note" style="margin:6px 0 0;text-align:left;">🧵 Misma tela en otros anchos: ${hermanasTela(codigo).map(c => `<b>${escaparHtml(c)}</b> (${telasDatos.telas[c].ancho || '?'} cm)`).join(', ')}${!t.mPorKg && rendimientoTela(codigo) ? ` · rendimiento calculado ≈ ${fmtCm(rendimientoTela(codigo).mPorKg)} m/kg` : ''}</p>` : ''}
     <div id="tl-extras" style="margin-top:8px;"></div>
-    <button type="button" class="btn-mini" style="margin-top:6px;" onclick="agregarFilaAnchoTela()">➕ Agregar otro ancho de esta tela</button>
+    <button type="button" class="btn-mini" style="margin-top:6px;" onclick="agregarFilaAnchoTela()">➕ Agregar otra variante (ancho o color)</button>
     <div class="field" style="margin:10px 0 0;"><label>Usos (puede marcar varios)</label>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">${telasDatos.usos.map(u => `<label class="ni-chip"><input type="checkbox" class="tl-uso" value="${escapeAttr(u)}" ${(t.usos || []).includes(u) ? 'checked' : ''}><span>${escaparHtml(u)}</span></label>`).join('')}
         <a href="#" onclick="event.preventDefault(); agregarUsoTela()" style="align-self:center;font-size:0.82rem;">+ otro uso</a></div></div>
@@ -5632,12 +5639,13 @@ function editarTela(codigo, base){
 // filas de anchos extra: se cargan antes de guardar y se crean como telas hermanas
 function agregarFilaAnchoTela(){
   const cont = document.getElementById('tl-extras');
-  if(!cont.children.length) cont.insertAdjacentHTML('beforeend', '<p style="margin:0 0 4px;font-size:0.8rem;color:#8A8072;">Otros anchos de esta misma tela (se crean al guardar, con el mismo nombre, proveedor, calidad y usos):</p>');
+  if(!cont.children.length) cont.insertAdjacentHTML('beforeend', '<p style="margin:0 0 4px;font-size:0.8rem;color:#8A8072;">Otras variantes de esta misma tela, por ancho y/o color (se crean al guardar, con el mismo nombre, proveedor, calidad y usos):</p>');
   const fila = document.createElement('div');
   fila.className = 'tl-extra';
-  fila.style.cssText = 'display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.2fr) 30px;gap:6px;margin-bottom:6px;align-items:center;';
+  fila.style.cssText = 'display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,0.9fr) minmax(0,0.9fr) minmax(0,1.2fr) 30px;gap:6px;margin-bottom:6px;align-items:center;';
   fila.innerHTML = `<input class="tl-x-cod" placeholder="Código (ej: HON280B)" style="text-transform:uppercase;">
-    <input class="tl-x-ancho" type="number" step="0.1" placeholder="Ancho (cm)">
+    <input class="tl-x-ancho" type="number" step="0.1" placeholder="Ancho (cm)" value="${document.getElementById('tl-ancho').value || ''}">
+    <select class="tl-x-color" title="Color">${opcionesColorTela(document.getElementById('tl-color').value)}</select>
     <input class="tl-x-mkg" type="text" inputmode="decimal" placeholder="Rendimiento m/kg (opcional)">
     <button type="button" onclick="this.closest('.tl-extra').remove()" title="Quitar" style="border:none;background:none;cursor:pointer;color:#8A8072;font-size:1rem;">✕</button>`;
   cont.appendChild(fila);
@@ -5673,6 +5681,7 @@ async function guardarTela(){
   const codigo = document.getElementById('tl-codigo').value.trim().toUpperCase();
   const t = {
     nombre: document.getElementById('tl-nombre').value.trim(),
+    color: document.getElementById('tl-color').value,
     proveedor: document.getElementById('tl-proveedor').value.trim(),
     ancho: parseFloat(document.getElementById('tl-ancho').value) || null,
     hilos: parseInt(document.getElementById('tl-hilos').value, 10) || null,
@@ -5686,8 +5695,9 @@ async function guardarTela(){
   const extras = [...document.querySelectorAll('.tl-extra')].map(f => ({
     codigo: f.querySelector('.tl-x-cod').value.trim().toUpperCase(),
     ancho: parseFloat(f.querySelector('.tl-x-ancho').value) || null,
+    color: f.querySelector('.tl-x-color').value,
     mPorKg: parseFloat(String(f.querySelector('.tl-x-mkg').value).replace(',', '.')) || null,
-  })).filter(x => x.codigo || x.ancho);
+  })).filter(x => x.codigo);
   for(const x of extras){
     if(!x.codigo || !x.ancho){ err.textContent = 'En los otros anchos, complete código y ancho (o quite la fila con ✕).'; err.style.display = 'block'; return; }
     if(x.codigo === codigo || (telasDatos.telas[x.codigo] && x.codigo !== tlEditando) || extras.filter(y => y.codigo === x.codigo).length > 1){ err.textContent = `El código ${x.codigo} ya existe o está repetido.`; err.style.display = 'block'; return; }
@@ -5696,7 +5706,7 @@ async function guardarTela(){
   const nuevas = { ...telasDatos.telas };
   if(tlEditando && tlEditando !== codigo) delete nuevas[tlEditando];
   nuevas[codigo] = t;
-  extras.forEach(x => { nuevas[x.codigo] = { ...t, ancho: x.ancho, mPorKg: x.mPorKg }; });
+  extras.forEach(x => { nuevas[x.codigo] = { ...t, ancho: x.ancho, color: x.color, mPorKg: x.mPorKg }; });
   // misma tela en otros anchos: ofrecer copiar los usos
   const fam = familiaTela(t);
   const otros = Object.keys(nuevas).filter(c => c !== codigo && familiaTela(nuevas[c]) === fam && t.nombre);
@@ -5753,6 +5763,22 @@ function rendimientoTela(codigo){
   if(!h || !(t.ancho > 0)) return null;
   const g = 1000 / (h.mPorKg * h.ancho / 100);
   return { mPorKg: Math.round(1000 / (g * t.ancho / 100) * 100) / 100, calculado: true, desde: h };
+}
+
+function colorEnNombre(nombre){
+  const m = String(nombre || '').trim().match(/^(.*\S)\s+(blanco|blanca|color|colores|crudo|cruda)$/i);
+  if(!m) return null;
+  const c = m[2].toLowerCase();
+  return { nombre: m[1].trim(), color: c.startsWith('blanc') ? 'Blanco' : c.startsWith('crud') ? 'Crudo' : 'Color' };
+}
+async function separarColorTelas(){
+  const cambios = Object.entries(telasDatos.telas).filter(([c, t]) => !t.color && colorEnNombre(t.nombre));
+  if(!cambios.length) return;
+  if(!confirm(cambios.map(([c, t]) => { const s = colorEnNombre(t.nombre); return `${c}: "${t.nombre}" → nombre "${s.nombre}", color ${s.color}`; }).join('\n') + '\n\n¿Aplicar?')) return;
+  const nuevas = { ...telasDatos.telas };
+  cambios.forEach(([c, t]) => { const s = colorEnNombre(t.nombre); nuevas[c] = { ...t, nombre: s.nombre, color: s.color }; });
+  try{ await db.collection('config').doc('telas').set({ ...telasDatos, telas: nuevas }); telasDatos.telas = nuevas; await cargarTelas(); renderTelas(); }
+  catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 
 // ----- cambiar usos de varias telas a la vez -----
@@ -13208,7 +13234,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v72';
+const APP_VERSION = '2026-10-01-v73';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
