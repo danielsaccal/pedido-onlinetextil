@@ -1547,7 +1547,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v104</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v105</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1758,6 +1758,7 @@ a.grilla-celda{display:block;}
       <div id="it-lista"></div>
       <div class="field" style="margin-top:10px;"><label>Remito / nota de la entrega (opcional)</label><input type="text" id="it-nota" placeholder="Ej: remito 0012"></div>
       <button class="btn btn-gold" style="width:100%;" onclick="registrarIngresoTaller()">Registrar entrega</button>
+      <button class="btn btn-ghost" style="width:100%;margin-top:8px;" onclick="abrirHistorialEntregas()">🗂️ Ver historial de entregas</button>
       <p class="error" id="it-error" style="display:none;"></p>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
@@ -1815,6 +1816,21 @@ a.grilla-celda{display:block;}
       <div id="pf-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
       <button type="button" class="btn-mini" style="margin-bottom:10px;" onclick="actualizarTodasDescripciones()">✨ Actualizar todas las descripciones del catálogo</button>
       <div id="pf-lista"><p class="empty-msg">Cargando...</p></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-historial-entregas">
+    <div class="form-card" style="max-width:1000px;">
+      <h2>Historial de entregas del taller</h2>
+      <p class="note" style="margin-bottom:10px;">Todo lo que entregó cada taller, entrega por entrega.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+        <input type="text" id="he-buscar" placeholder="🔍 Buscar producto, SKU, orden o remito" oninput="renderHistorialEntregas()" style="flex:1;min-width:200px;">
+        <select id="he-taller" onchange="renderHistorialEntregas()" style="width:auto;"></select>
+        <select id="he-periodo" onchange="renderHistorialEntregas()" style="width:auto;"><option value="0">Todo</option><option value="7">Últimos 7 días</option><option value="30" selected>Últimos 30 días</option><option value="90">Últimos 90 días</option></select>
+      </div>
+      <div id="he-resumen" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;"></div>
+      <div id="he-lista"><p class="empty-msg">Cargando...</p></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
@@ -5152,7 +5168,7 @@ const GRUPOS_INICIO = {
     [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()']],
     [['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🚚 Ingreso a los talleres', 'abrirEnviosTela()']],
     [['🏭 Productos en producción', 'abrirEnProduccion()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📦 Historial de órdenes', 'abrirHistorialOT()']],
-    [['📥 Entregas del taller', 'abrirIngresoTaller()']],
+    [['📥 Entregas del taller', 'abrirIngresoTaller()'], ['🗂️ Historial de entregas', 'abrirHistorialEntregas()']],
   ] },
   h: { lado: 'int', titulo: 'Finanzas', items: [['💰 Ventas Mercado Libre', 'abrirVentasML()'], ['🧮 Calculadora de costos', 'abrirCalculadoraCostos()']] },
   i: { lado: 'int', titulo: 'Configuración', items: [['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['🔔 Avisos push', 'abrirConfigPush()'], ['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']] },
@@ -6641,6 +6657,51 @@ async function sincronizarDescripcionesCatalogo(){
   } catch(e){ console.error('sincronizar descripciones', e); }
 }
 
+// ===== Historial de entregas del taller =====
+let entregasTaller = null;
+async function abrirHistorialEntregas(){
+  mostrarPaso('step-historial-entregas');
+  document.getElementById('he-lista').innerHTML = '<p class="empty-msg">Cargando...</p>';
+  try{
+    const snap = await db.collection('ingresos_taller').get();
+    entregasTaller = snap.docs.map(d => ({ _id: d.id, ...d.data() })).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  } catch(e){ entregasTaller = []; document.getElementById('he-lista').innerHTML = '<p class="error">No se pudo cargar: ' + escaparHtml(e.message) + '</p>'; return; }
+  const talleres = [...new Set(entregasTaller.map(x => x.taller).filter(Boolean))].sort();
+  const sel = document.getElementById('he-taller'), act = sel.value;
+  sel.innerHTML = '<option value="">Todos los talleres</option>' + talleres.map(t => `<option value="${escapeAttr(t)}">${escaparHtml(t)}</option>`).join('');
+  if(talleres.includes(act)) sel.value = act;
+  renderHistorialEntregas();
+}
+function renderHistorialEntregas(){
+  const q = normBusqueda(document.getElementById('he-buscar').value);
+  const t = document.getElementById('he-taller').value;
+  const dias = parseInt(document.getElementById('he-periodo').value, 10) || 0;
+  const desde = dias ? Date.now() - dias * 86400000 : 0;
+  const lista = (entregasTaller || []).filter(x => (!t || x.taller === t) && (!desde || new Date(x.fecha).getTime() >= desde) &&
+    (!q || normBusqueda(`${x.taller} ${x.nota || ''} ${(x.detalle || []).map(d => `${d.articulo} ${d.sku} ${d.orden}`).join(' ')}`).includes(q)));
+  const tb = lista.reduce((s, x) => s + (x.detalle || []).reduce((a, d) => a + (+d.buenas || 0), 0), 0);
+  const tf = lista.reduce((s, x) => s + (x.detalle || []).reduce((a, d) => a + (+d.falladas || 0), 0), 0);
+  const chip = txt => `<span style="background:var(--cream);border-radius:10px;padding:6px 12px;font-size:0.85rem;">${txt}</span>`;
+  document.getElementById('he-resumen').innerHTML = chip(`<b>${lista.length}</b> entrega${lista.length === 1 ? '' : 's'}`) + chip(`<b>${tb}</b> unidades buenas`) + (tf ? chip(`<b style="color:#A6432F;">${tf}</b> falladas`) : '');
+  const cont = document.getElementById('he-lista');
+  if(!lista.length){ cont.innerHTML = '<p class="empty-msg">No hay entregas en ese período.</p>'; return; }
+  cont.innerHTML = lista.map(x => {
+    const f = new Date(x.fecha);
+    const b = (x.detalle || []).reduce((a, d) => a + (+d.buenas || 0), 0), fa = (x.detalle || []).reduce((a, d) => a + (+d.falladas || 0), 0);
+    return `<div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline;">
+        <b>${escaparHtml(x.taller || '')} · ${f.toLocaleDateString('es-AR')} ${f.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</b>
+        <span style="font-size:0.85rem;">${b} buenas${fa ? ` · <span style="color:#A6432F;">${fa} falladas</span>` : ''}</span>
+      </div>
+      ${x.nota ? `<div class="note" style="text-align:left;">📄 ${escaparHtml(x.nota)}</div>` : ''}
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-top:6px;">
+        <thead><tr style="color:#8A8072;font-size:0.75rem;"><th style="text-align:left;padding:3px 4px;">Producto</th><th style="text-align:left;padding:3px 4px;">SKU</th><th style="text-align:left;padding:3px 4px;">Orden</th><th style="text-align:right;padding:3px 4px;">Buenas</th><th style="text-align:right;padding:3px 4px;">Falladas</th></tr></thead>
+        <tbody>${(x.detalle || []).map(d => `<tr style="border-top:1px solid var(--line);"><td style="padding:4px;">${escaparHtml(d.articulo || '')}</td><td style="padding:4px;">${escaparHtml(d.sku || '—')}</td><td style="padding:4px;white-space:nowrap;">${escaparHtml(d.orden || '')}</td><td style="padding:4px;text-align:right;font-weight:700;">${+d.buenas || 0}</td><td style="padding:4px;text-align:right;${d.falladas ? 'color:#A6432F;' : ''}">${+d.falladas || 0}</td></tr>`).join('')}</tbody>
+      </table></div>
+    </div>`;
+  }).join('');
+}
+
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -7574,6 +7635,7 @@ async function registrarEntregaRenglonOT(docId, renglonIdx){
     const entregas = [...(orden.entregas || []), { fecha: new Date().toISOString(), unidades: cantidadRecibida }];
     await db.collection('ordenes_trabajo').doc(docId).update({ renglones: nuevosRenglones, entregas });
     orden.renglones = nuevosRenglones; orden.entregas = entregas;
+    db.collection('ingresos_taller').add({ taller: orden.taller, fecha: new Date().toISOString(), nota: 'Cargada desde el historial de órdenes', detalle: [{ orden: orden.numero, articulo: renglon.articulo, sku: renglon.sku || '', buenas: cantidadRecibida, falladas: 0 }] }).catch(e => console.error(e));
     renderHistorialOT(document.getElementById('hot-buscador').value);
   } catch(e){
     alert('No se pudo registrar la entrega: ' + e.message);
@@ -14077,7 +14139,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v104';
+const APP_VERSION = '2026-10-02-v105';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
