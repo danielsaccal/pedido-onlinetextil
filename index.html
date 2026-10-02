@@ -1547,7 +1547,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v107</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v108</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1675,6 +1675,8 @@ a.grilla-celda{display:block;}
                 <div><input type="number" id="ac-por-bolsa" min="1" step="1" placeholder="1" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Unidades por bolsa</div></div>
                 <div><input type="text" id="ac-et-desc" placeholder="Descripción" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Nombre del artículo (etiqueta)</div></div>
                 <div><input type="text" id="ac-et-medida" placeholder="50 X 85 CM (APROX)" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Medida (etiqueta)</div></div>
+                <div><input type="text" id="ac-confeccion" inputmode="decimal" placeholder="$ por unidad" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Confección ($ por unidad)</div></div>
+                <div><input type="text" id="ac-insumos" inputmode="decimal" placeholder="$ por unidad" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Insumos: bolsa, etiqueta, elástico… ($ por unidad)</div></div>
                 <div><input type="text" id="ac-colchon" placeholder="90 × 190 × 30" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Colchón (para la ajustable, en cm)</div></div>
                 <div><input type="text" id="ac-sku" placeholder="Ej: KA181F" oninput="cambioEmpaqueAC(); infoTelaAC();" style="text-transform:uppercase;"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">SKU (se completa solo en la orden)</div></div>
                 <div style="grid-column:1 / -1;"><select id="ac-tela" onchange="cambiarTelaArticuloAC()" style="width:100%;padding:9px 8px;box-sizing:border-box;"></select><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Calidad de tela de este SKU (cualquier ancho)</div><div id="ac-tela-info" style="font-size:0.7rem;color:#6B6258;"></div></div>
@@ -4985,6 +4987,7 @@ function cargarEmpaqueAC(){
   if(telasDatos === null) cargarTelas().then(pintarCal); else pintarCal();
   document.getElementById('ac-por-bolsa').value = d.porBolsa > 1 ? d.porBolsa : '';
   document.getElementById('ac-colchon').value = ((tablaConsumo.empaque || {})[acArticulo] || {}).colchon || '';
+  { const e = (tablaConsumo.empaque || {})[acArticulo] || {}; document.getElementById('ac-confeccion').value = e.confeccion ? String(e.confeccion).replace('.', ',') : ''; document.getElementById('ac-insumos').value = e.insumos ? String(e.insumos).replace('.', ',') : ''; }
   { const sk = String(((tablaConsumo.empaque || {})[acArticulo] || {}).sku || '').toUpperCase(); const mm = String(DESC_ORIGINAL_SKU[sk] || '').match(/(\d+\s*[x×]\s*\d+(?:\s*[x×]\s*\d+(?:[.,]\d+)?)?)/i); document.getElementById('ac-colchon').placeholder = mm ? mm[1] + ' (del catálogo)' : '90 × 190 × 30'; }
   document.getElementById('ac-et-desc').placeholder = String(acArticulo || '').toUpperCase();
 }
@@ -4999,6 +5002,8 @@ function cambioEmpaqueAC(){
     sku: document.getElementById('ac-sku').value.trim().toUpperCase(),
     porBolsa: Math.max(1, parseInt(document.getElementById('ac-por-bolsa').value, 10) || 1),
     colchon: document.getElementById('ac-colchon').value.trim(),
+    confeccion: parseFloat(String(document.getElementById('ac-confeccion').value).replace(/\./g, '').replace(',', '.')) || 0,
+    insumos: parseFloat(String(document.getElementById('ac-insumos').value).replace(/\./g, '').replace(',', '.')) || 0,
   };
   marcarEmpaquePendiente();
 }
@@ -5835,7 +5840,7 @@ function renderTelas(){
         return `<div class="tl-fila${tlSeleccion.has(c) ? ' sel' : ''}" onclick="editarTela('${escapeAttr(c)}')" title="Toque para editar">
           <input type="checkbox" ${tlSeleccion.has(c) ? 'checked' : ''} onclick="event.stopPropagation();" onchange="toggleSeleccionTela('${escapeAttr(c)}', this.checked)">
           <div><div class="tl-cod">${escaparHtml(c)}</div><div class="tl-tags">${tags}</div></div>
-          <div class="tl-num"><b>${t.ancho ? t.ancho + ' cm' : '—'}</b><br>${r ? (r.calculado ? '<i>≈ ' + fmtCm(r.mPorKg) + ' m/kg</i>' : fmtCm(r.mPorKg) + ' m/kg') : '—'}${g ? ' · ' + g + ' g/m²' : ''}</div>
+          <div class="tl-num"><b>${t.ancho ? t.ancho + ' cm' : '—'}</b>${t.precio ? `<br><span style="color:#2F7A47;font-weight:700;">$ ${formatoPesos(t.precio)}/${t.precioUnidad === 'kg' ? 'kg' : 'm'}</span>` : ''}<br>${r ? (r.calculado ? '<i>≈ ' + fmtCm(r.mPorKg) + ' m/kg</i>' : fmtCm(r.mPorKg) + ' m/kg') : '—'}${g ? ' · ' + g + ' g/m²' : ''}</div>
         </div>`;
       }).join('')}
     </div>`;
@@ -5858,6 +5863,7 @@ function editarTela(codigo, base){
       ${f('tl-ancho', 'Ancho (cm)', t.ancho, 'type="number" step="0.1" placeholder="315" oninput="calcGramajeTela()"')}
       ${f('tl-hilos', 'Calidad (hilos)', t.hilos, 'type="number" placeholder="180"')}
       ${f('tl-mkg', 'Rendimiento (metros por kilo)', t.mPorKg, 'type="text" inputmode="decimal" placeholder="2,8" oninput="calcGramajeTela()"')}
+      <div class="field" style="margin:0;"><label>Precio de la tela</label><div style="display:flex;gap:4px;"><input id="tl-precio" type="text" inputmode="decimal" value="${escapeAttr(t.precio == null ? '' : String(t.precio).replace('.', ','))}" placeholder="2500" style="min-width:0;"><select id="tl-precio-u" style="width:auto;"><option value="m" ${t.precioUnidad !== 'kg' ? 'selected' : ''}>por metro</option><option value="kg" ${t.precioUnidad === 'kg' ? 'selected' : ''}>por kilo</option></select></div></div>
       <div class="field" style="margin:0;"><label>Gramaje (calculado)</label><div id="tl-gramaje" style="padding:10px 0;font-weight:700;"></div></div>
     </div>
     ${codigo && hermanasTela(codigo).length ? `<p class="note" style="margin:6px 0 0;text-align:left;">🧵 Misma tela en otros anchos: ${hermanasTela(codigo).map(c => `<b>${escaparHtml(c)}</b> (${telasDatos.telas[c].ancho || '?'} cm)`).join(', ')}${!t.mPorKg && rendimientoTela(codigo) ? ` · rendimiento calculado ≈ ${fmtCm(rendimientoTela(codigo).mPorKg)} m/kg` : ''}</p>` : ''}
@@ -5930,6 +5936,8 @@ async function guardarTela(){
     ancho: parseFloat(document.getElementById('tl-ancho').value) || null,
     hilos: parseInt(document.getElementById('tl-hilos').value, 10) || null,
     mPorKg: parseFloat(String(document.getElementById('tl-mkg').value).replace(',', '.')) || null,
+    precio: parseFloat(String(document.getElementById('tl-precio').value).replace(/\./g, '').replace(',', '.')) || null,
+    precioUnidad: document.getElementById('tl-precio-u').value,
     usos: [...document.querySelectorAll('.tl-uso:checked')].map(x => x.value),
     notas: document.getElementById('tl-notas').value.trim(),
   };
@@ -6059,6 +6067,7 @@ function renderAccionesTelas(){
       <div class="field" style="margin:0;"><label>Ancho (cm)</label><input id="tm-ancho" type="number" step="0.1" placeholder="no cambiar"></div>
       <div class="field" style="margin:0;"><label>Calidad (hilos)</label><input id="tm-hilos" type="number" placeholder="no cambiar"></div>
       <div class="field" style="margin:0;"><label>Rendimiento (m/kg)</label><input id="tm-mkg" type="text" inputmode="decimal" placeholder="no cambiar"></div>
+      <div class="field" style="margin:0;"><label>Precio</label><div style="display:flex;gap:4px;"><input id="tm-precio" type="text" inputmode="decimal" placeholder="no cambiar" style="min-width:0;"><select id="tm-precio-u" style="width:auto;"><option value="m">por metro</option><option value="kg">por kilo</option></select></div></div>
     </div>
     <div class="field" style="margin:10px 0 0;"><label>Usos</label>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
@@ -6078,6 +6087,7 @@ async function aplicarMasivoTelas(){
   if(parseFloat(v('tm-ancho')) > 0) cambios.ancho = parseFloat(v('tm-ancho'));
   if(parseInt(v('tm-hilos'), 10) > 0) cambios.hilos = parseInt(v('tm-hilos'), 10);
   if(parseFloat(v('tm-mkg').replace(',', '.')) > 0) cambios.mPorKg = parseFloat(v('tm-mkg').replace(',', '.'));
+  if(parseFloat(v('tm-precio').replace(/\./g, '').replace(',', '.')) > 0){ cambios.precio = parseFloat(v('tm-precio').replace(/\./g, '').replace(',', '.')); cambios.precioUnidad = v('tm-precio-u'); }
   const accionUso = v('tm-uso-accion');
   let uso = document.getElementById('tl-masivo-uso').value;
   if(accionUso && uso === '__nuevo__'){
@@ -6086,7 +6096,7 @@ async function aplicarMasivoTelas(){
     const ya = telasDatos.usos.find(x => normBusqueda(x) === normBusqueda(uso));
     if(ya) uso = ya; else telasDatos.usos.push(uso);
   }
-  const desc = Object.entries(cambios).map(([k, x]) => `${{ composicion: 'Composición', color: 'Color', nombre: 'Nombre', proveedor: 'Proveedor', ancho: 'Ancho', hilos: 'Calidad', mPorKg: 'Rendimiento' }[k]}: ${x}`);
+  const desc = Object.entries(cambios).map(([k, x]) => `${{ composicion: 'Composición', color: 'Color', nombre: 'Nombre', proveedor: 'Proveedor', ancho: 'Ancho', hilos: 'Calidad', mPorKg: 'Rendimiento', precio: 'Precio', precioUnidad: 'Precio por' }[k]}: ${x}`);
   if(accionUso) desc.push(`${accionUso === 'agregar' ? 'Agregar' : 'Quitar'} uso: ${uso}`);
   if(!desc.length){ alert('No completó nada para cambiar.'); return; }
   const codigos = [...tlSeleccion];
@@ -6381,6 +6391,10 @@ function infoTelaAC(){
   const g = clave ? pesoAproxGramos(acArticulo, telaDeCalidad(clave)) : null;
   const sku = document.getElementById('ac-sku').value.trim();
   el.textContent = q ? `Se hace con: ${q.codigos.join(', ')}${g ? ' · peso aprox. ' + (g >= 1000 ? fmtCm(Math.round(g / 10) / 100) + ' kg' : g + ' g') : ''}${sku ? '' : ' · ⚠️ cargue el SKU para vincularlo al catálogo'}` : '';
+  // costo de fabricacion del SKU principal
+  let ec = document.getElementById('ac-costo-info');
+  if(!ec){ ec = document.createElement('div'); ec.id = 'ac-costo-info'; ec.style.cssText = 'font-size:0.78rem;color:#2F7A47;font-weight:700;margin-top:3px;'; el.after(ec); }
+  try{ ec.textContent = sku && clave && fabricacion ? (() => { const prev = fabricacion.vinculos[sku.toUpperCase()]; const tmp = { ...(prev || {}) }; fabricacion.vinculos[sku.toUpperCase()] = { ...tmp, calidad: clave, articulo: acArticulo }; const t = textoCostoSku(sku.toUpperCase()); if(prev) fabricacion.vinculos[sku.toUpperCase()] = prev; else delete fabricacion.vinculos[sku.toUpperCase()]; return t ? '💲 ' + t : ''; })() : ''; } catch(e){ ec.textContent = ''; }
 }
 
 // ----- un mismo articulo de corte con varios SKU segun la tela (ej: blanco y color) -----
@@ -6579,12 +6593,12 @@ function renderProductosFabrico(){
   let prodPrev = null;
   const nombreArt = a => a ? (a.startsWith('ficha:') ? nombreFicha(a.slice(6)) : a) : '';
   cont.innerHTML = `<div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;"><table style="width:100%;border-collapse:collapse;font-size:0.86rem;">
-    <thead><tr style="background:var(--cream);"><th style="padding:7px 8px;text-align:left;">SKU</th><th style="padding:7px 8px;text-align:left;">Medida / variante</th><th style="padding:7px 8px;text-align:left;">Se corta como</th><th style="padding:7px 8px;text-align:left;">Calidad de tela</th><th style="padding:7px 8px;text-align:center;">Estado</th></tr></thead><tbody>
+    <thead><tr style="background:var(--cream);"><th style="padding:7px 8px;text-align:left;">SKU</th><th style="padding:7px 8px;text-align:left;">Medida / variante</th><th style="padding:7px 8px;text-align:left;">Se corta como</th><th style="padding:7px 8px;text-align:left;">Calidad de tela</th><th style="padding:7px 8px;text-align:right;">Costo</th><th style="padding:7px 8px;text-align:right;">Precio</th><th style="padding:7px 8px;text-align:right;">Margen</th><th style="padding:7px 8px;text-align:center;">Estado</th></tr></thead><tbody>
     ${filas.map(f => {
       let cab = '';
       if(f.producto !== prodPrev){
         prodPrev = f.producto;
-        cab = `<tr style="background:var(--purple);"><td colspan="5" style="padding:7px 10px;color:#fff;"><b>${escaparHtml(f.producto)}</b>${f.subtitulo ? `<br><span style="font-size:0.78rem;opacity:.85;">En el catálogo: ${escaparHtml(f.subtitulo)}</span>` : ''}</td></tr>`;
+        cab = `<tr style="background:var(--purple);"><td colspan="8" style="padding:7px 10px;color:#fff;"><b>${escaparHtml(f.producto)}</b>${f.subtitulo ? `<br><span style="font-size:0.78rem;opacity:.85;">En el catálogo: ${escaparHtml(f.subtitulo)}</span>` : ''}</td></tr>`;
       }
       const ok = completo(f);
       return cab + `<tr style="border-top:1px solid var(--line);">
@@ -6592,9 +6606,18 @@ function renderProductosFabrico(){
         <td style="padding:7px 8px;font-size:0.8rem;">${escaparHtml(f.desc || '—')}</td>
         <td style="padding:7px 8px;">${f.articulo ? `<a href="#" onclick="event.preventDefault(); abrirArticulosCortes().then(() => abrirArticuloAC('${escapeAttr(f.articulo)}'))">${escaparHtml(nombreArt(f.articulo))}</a>` : '<span style="color:#A6432F;">falta</span>'}</td>
         <td style="padding:7px 8px;font-size:0.8rem;">${f.calidad ? escaparHtml(f.calidad) + `<br><span class="note" style="font-size:0.72rem;">${escaparHtml(f.telas.join(', '))}</span>` : '<span style="color:#A6432F;">falta</span>'}</td>
+        ${(() => {
+          const c = costosDeSku(f.sku), x = c && c.porTela.find(y => y.total != null);
+          const r = buscarProductoPorSku(f.sku), v = r && r.variante, pr = v ? parsePrice(v.precio) : null;
+          const costo = x ? x.total : null;
+          const mg = costo != null && pr ? (pr - costo) / pr : null;
+          return `<td style="padding:7px 8px;text-align:right;white-space:nowrap;" title="${escapeAttr(textoCostoSku(f.sku))}">${costo != null ? '$ ' + formatoPesos(Math.round(costo)) : '<span class="note">—</span>'}</td>
+            <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${pr ? '$ ' + formatoPesos(Math.round(pr)) : '—'}</td>
+            <td style="padding:7px 8px;text-align:right;white-space:nowrap;font-weight:700;color:${mg == null ? '#8A8072' : mg < 0.2 ? '#A6432F' : mg < 0.4 ? '#8A6417' : '#2F7A47'};">${mg != null ? Math.round(mg * 100) + ' %' : '—'}</td>`;
+        })()}
         <td style="padding:7px 8px;text-align:center;">${ok ? '✅' : '⚠️'}</td></tr>`;
     }).join('')}</tbody></table></div>
-    <p class="note" style="margin-top:6px;">Aparecen los productos del catálogo marcados como fabricación propia. Para completar lo que falta: Artículos y cortes (SKU y calidad) o Editar producto (🏭 Fabricación propia).</p>`;
+    <p class="note" style="margin-top:6px;">Costo = tela (con la tela más barata de su calidad) + confección + insumos. Margen sobre el precio del catálogo: rojo menos de 20 %, amarillo menos de 40 %. Aparecen los productos del catálogo marcados como fabricación propia. Para completar lo que falta: Artículos y cortes (SKU y calidad) o Editar producto (🏭 Fabricación propia).</p>`;
 }
 
 // ----- piezas iguales: no repetir articulos que son lo mismo (ej: fundas de 1 1/2, 2 1/2, Queen y Twin) -----
@@ -6748,6 +6771,41 @@ function renderHistorialEntregas(){
       <div class="he-tot"><b>${b}</b><span>buenas</span>${fa ? `<div class="f">${fa} falladas</div>` : ''}</div>
     </div>`;
   }).join('');
+}
+
+// ===== Costo de fabricacion =====
+// costo por unidad = tela (consumo en el ancho de esa tela x precio por metro) + confeccion + insumos.
+// La confeccion es un precio por articulo (igual para todos los talleres).
+function formatoPesos(n){ return (Math.round(n * 100) / 100).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
+function precioMetroTela(cod){
+  const t = datosTela(cod); if(!t || !(t.precio > 0)) return null;
+  if(t.precioUnidad === 'kg'){ const r = rendimientoTela(String(cod).toUpperCase()); return r && r.mPorKg > 0 ? t.precio / r.mPorKg : null; }
+  return t.precio;
+}
+// costos de un SKU con cada tela de su calidad (ordenados del mas barato al mas caro)
+function costosDeSku(sku){
+  const art = articuloDeSku(sku); if(!art) return null;
+  const piezas = piezasDeArticuloAny(art); if(!piezas) return null;
+  const emp = art.startsWith('ficha:') ? {} : ((tablaConsumo.empaque || {})[art] || {});
+  const conf = +emp.confeccion || 0, ins = +emp.insumos || 0;
+  const cal = calidadDeSku(sku);
+  const telas = cal ? Object.keys(telasDatos.telas).filter(c => telaCumpleCalidad(telasDatos.telas[c], cal)) : [];
+  const res = telas.map(c => {
+    const t = telasDatos.telas[c], pm = precioMetroTela(c);
+    let metros = null; try{ const k = calcularCorte(piezas, +t.ancho); if(!k.avisos.length) metros = k.metros; } catch(e){}
+    const tela = pm != null && metros != null ? metros * pm : null;
+    return { tela: c, ancho: t.ancho, metros, precioMetro: pm, costoTela: tela, confeccion: conf, insumos: ins, total: tela != null ? tela + conf + ins : null };
+  }).sort((a, b) => (a.total == null) - (b.total == null) || (a.total || 0) - (b.total || 0));
+  return { confeccion: conf, insumos: ins, porTela: res };
+}
+function textoCostoSku(sku){
+  const c = costosDeSku(sku);
+  if(!c) return '';
+  const ok = c.porTela.filter(x => x.total != null);
+  if(!ok.length) return c.confeccion || c.insumos ? `Confección $ ${formatoPesos(c.confeccion)}${c.insumos ? ' + insumos $ ' + formatoPesos(c.insumos) : ''} · falta el precio de la tela` : '';
+  const x = ok[0];
+  const rango = ok.length > 1 && ok[ok.length - 1].total - x.total > 1 ? ` (hasta $ ${formatoPesos(ok[ok.length - 1].total)} con ${ok[ok.length - 1].tela})` : '';
+  return `Costo ≈ $ ${formatoPesos(x.total)} con ${x.tela}: tela $ ${formatoPesos(x.costoTela)} (${fmtCm(x.metros)} m) + confección $ ${formatoPesos(x.confeccion)}${x.insumos ? ' + insumos $ ' + formatoPesos(x.insumos) : ''}${rango}`;
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -14187,7 +14245,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v107';
+const APP_VERSION = '2026-10-02-v108';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
