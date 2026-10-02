@@ -1543,7 +1543,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v94</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v96</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -3239,7 +3239,14 @@ const TOPE_ACHIQUE_CM = 10;
 // cuanto se puede achicar una medida: hasta 10 cm o hasta el 5 %, lo que sea mayor
 // (ej: mantel de 150 en tela de 140; plana de 250 en tela de 240)
 // (los 10 cm valen solo para una pieza que ocupa todo el ancho; varias piezas juntas, hasta el 5 %)
-function entraAchicando(medida, W, varias){ return medida - W <= (varias ? medida * TOPE_ACHIQUE : Math.max(TOPE_ACHIQUE_CM, medida * TOPE_ACHIQUE)) + 0.01; }
+// las sabanas (plana y ajustable) que ocupan todo el ancho pueden achicarse hasta un 10 %: el largo de
+// la sabana se adapta al ancho de la tela (ej: plana de 260 en tela de 240 => 240)
+const TOPE_ACHIQUE_SABANA = 0.10;
+function esSabana(p){ return p && /plana|ajustable|s[aá]bana/i.test(p.nombre || ''); }
+function entraAchicando(medida, W, varias, pieza){
+  const tope = varias ? medida * TOPE_ACHIQUE : Math.max(TOPE_ACHIQUE_CM, medida * (esSabana(pieza) ? TOPE_ACHIQUE_SABANA : TOPE_ACHIQUE));
+  return medida - W <= tope + 0.01;
+}
 // 7. Cada pieza se puede cortar derecha o girada (lo que consume del ancho pasa a ser lo que consume
 //    del largo) y el sistema elige la forma que gasta menos tela en ese ancho. Ej: una tapa de
 //    150 x 250 en tela de 250 va con los 250 a lo ancho; en tela de 150 va girada. Por defecto todas
@@ -3294,7 +3301,7 @@ function calcularCorteFijo(piezas, W){
 
   porTamano.forEach(t => {
     const p = t.p;
-    if(p.achicar === false ? p.ancho > W + EPS : !entraAchicando(p.ancho, W)) avisos.push(`${p.nombre} consume ${p.ancho} cm de ancho, más que los ${W} cm de la tela.`);
+    if(p.achicar === false ? p.ancho > W + EPS : !entraAchicando(p.ancho, W, false, p)) avisos.push(`${p.nombre} consume ${p.ancho} cm de ancho, más que los ${W} cm de la tela.`);
     for(let k = 0; k < t.n; k++){
       let ok = false;
       // 1) arriba de otra igual, en una columna que todavia tiene largo libre
@@ -6280,6 +6287,32 @@ function descripcionAutomaticaProducto(producto, categoria){
   const clave = Object.keys(cuenta).sort((a, b) => cuenta[b] - cuenta[a])[0];
   return descripcionDesdeCalidad(clave, categoria);
 }
+// medida real de cada pieza segun la tela con que se hace: si la tela es mas angosta, la pieza se achica
+// (ej: plana de 260 en microfibra de 240 => 240). Nunca se muestra mas grande que la medida cargada.
+// Si la calidad viene en varios anchos, se toma la medida mas chica que pueda salir.
+function medidasAdaptadas(piezas, anchos){
+  const res = piezas.map(p => ({ a: p.ancho, l: p.largo }));
+  (anchos || []).forEach(W => {
+    if(!(W > 0)) return;
+    let c; try{ c = calcularCorte(piezas, W); } catch(e){ return; }
+    if(!c || c.avisos.length) return;
+    c.franjas.forEach(f => f.cols.forEach(col => {
+      if(!col.items.some(it => !it.sobrante)) return;
+      const i = piezas.findIndex(p => p.nombre === col.p.nombre && ((Math.abs(p.ancho - (col.p.girada ? col.p.largo : col.p.ancho)) < 0.01) && Math.abs(p.largo - (col.p.girada ? col.p.ancho : col.p.largo)) < 0.01));
+      if(i < 0) return;
+      // medidas cortadas, llevadas al sentido original de la pieza
+      const a = col.p.girada ? col.p.largo : col.w, l = col.p.girada ? col.w : col.p.largo;
+      res[i].a = Math.min(res[i].a, a); res[i].l = Math.min(res[i].l, l);
+    }));
+  });
+  return res;
+}
+function anchosDeCalidadSku(sku){
+  const cal = calidadDeSku(sku);
+  if(!cal || !telasDatos) return [];
+  return [...new Set(Object.values(telasDatos.telas).filter(t => telaCumpleCalidad(t, cal) && t.ancho > 0).map(t => +t.ancho))];
+}
+
 // descripcion de cada SKU armada desde fabricacion: "Juego 1½ plaza — Ajustable para colchón 90 × 190 × 30 cm / Plana 150 × 250 cm · 1 funda 50 × 85 cm"
 function nombreLindoArticulo(n){
   return String(n || '').replace(/\b1\s*1\/2\b/, '1½ plaza').replace(/\b2\s*1\/2\b/, '2½ plazas').replace(/^juego/i, 'Juego').trim();
@@ -6292,19 +6325,22 @@ function descripcionVarianteFab(sku){
   const nombreArt = art.startsWith('ficha:') ? ((fichasArticulos.fichas[art.slice(6)] || {}).nombre || art.slice(6)) : art;
   const titulo = nombreLindoArticulo(nombreArt);
   const emp = art.startsWith('ficha:') ? {} : ((tablaConsumo.empaque || {})[art] || {});
-  const m = (a, l) => `${fmtCm(a)} × ${fmtCm(l)} cm`;
+  const m = (a, l) => `${fmtCm(Math.round(a))} × ${fmtCm(Math.round(l))} cm`;
+  // medidas segun la tela de este SKU
+  const adapt = medidasAdaptadas(piezas, anchosDeCalidadSku(sku));
+  const md = p => { const i = piezas.indexOf(p); return i >= 0 ? m(adapt[i].a, adapt[i].l) : m(p.ancho, p.largo); };
   const esJuego = /juego/i.test(nombreArt) || piezas.some(p => /ajustable/i.test(p.nombre)) && piezas.some(p => /plana/i.test(p.nombre));
   if(!esJuego){
-    if(piezas.length === 1) return `${titulo} — ${m(piezas[0].ancho, piezas[0].largo)}`;
+    if(piezas.length === 1) return `${titulo} — ${md(piezas[0])}`;
     return null; // prendas de varias piezas (ej: batas): se deja la descripcion que tenga
   }
   const ajus = piezas.find(p => /ajustable/i.test(p.nombre));
   const linea1 = ajus ? (emp.colchon ? `Ajustable para colchón ${String(emp.colchon).replace(/\s*[x×]\s*/gi, ' × ').replace(/\s*cm$/i, '')} cm` : 'Ajustable') : '';
   const resto = piezas.filter(p => p !== ajus).map(p => {
     const n = p.cantidad || 1;
-    if(/funda/i.test(p.nombre)) return `${n} funda${n === 1 ? '' : 's'} ${m(p.ancho, p.largo)}`;
+    if(/funda/i.test(p.nombre)) return `${n} funda${n === 1 ? '' : 's'} ${md(p)}`;
     const nom = String(p.nombre).trim();
-    return `${n > 1 ? n + ' ' : ''}${nom.charAt(0).toUpperCase() + nom.slice(1).toLowerCase()} ${m(p.ancho, p.largo)}`;
+    return `${n > 1 ? n + ' ' : ''}${nom.charAt(0).toUpperCase() + nom.slice(1).toLowerCase()} ${md(p)}`;
   });
   return `${titulo} — ${[linea1, resto.join(' · ')].filter(Boolean).join(' / ')}`;
 }
@@ -13902,7 +13938,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v94';
+const APP_VERSION = '2026-10-02-v96';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
