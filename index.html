@@ -1541,7 +1541,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v87</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v88</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -4150,7 +4150,7 @@ async function abrirArticulosCortes(){
   tablaConsumo.articulos = tablaConsumo.articulos || {};
   tablaConsumo.instrucciones = tablaConsumo.instrucciones || {};
   await completarPiezasDeJuegosGuardados();
-  if(!window.__limpiezaOfrecida){ window.__limpiezaOfrecida = true; setTimeout(() => limpiarPiezasRepetidas(true), 300); }
+  if(!window.__limpiezaOfrecida){ window.__limpiezaOfrecida = true; setTimeout(async () => { await normalizarFundas5085(); await limpiarPiezasRepetidas(true); }, 300); }
   document.getElementById('ac-buscar').value = '';
   acArticulo = null;
   renderListaAC();
@@ -6387,6 +6387,35 @@ async function limpiarPiezasRepetidas(silencioso){
   if(!confirm(`Encontré piezas sueltas que son exactamente iguales a otra:\n\n${txt}\n\n¿Quitarlas? En las órdenes se usa la que queda.`)) return;
   grupos.forEach(g => g.borrar.forEach(a => { delete tablaConsumo.instrucciones[a]; delete tablaConsumo.articulos[a]; }));
   try{ await guardarTablaYConsumo(); renderListaAC(); } catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+
+// ----- una sola vez: todas las fundas de almohada pasan a 50 x 85, salvo las King -----
+async function normalizarFundas5085(){
+  if(!tablaConsumo || tablaConsumo.fundas5085) return;
+  const cambios = [];
+  Object.entries(tablaConsumo.instrucciones || {}).forEach(([art, porAncho]) => {
+    if(/king/i.test(art)) return;
+    Object.values(porAncho || {}).forEach(g => (g && g.piezas || []).forEach(pz => {
+      if(!/funda/i.test(pz.nombre || '') || /king/i.test(pz.nombre || '')) return;
+      const a = Math.min(pz.ancho, pz.largo), l = Math.max(pz.ancho, pz.largo);
+      if(a >= 45 && a <= 55 && l >= 75 && l <= 90 && !(a === 50 && l === 85)){
+        cambios.push(`${art}: ${pz.nombre} ${pz.ancho} × ${pz.largo} → 50 × 85`);
+        pz.ancho = 50; pz.largo = 85;
+      }
+    }));
+  });
+  tablaConsumo.fundas5085 = true;
+  if(!cambios.length){ guardarTablaYConsumo().catch(() => {}); return; }
+  const unicos = [...new Set(cambios)];
+  if(!confirm(`Paso todas las fundas de almohada (salvo King) a 50 × 85:\n\n${unicos.slice(0, 25).join('\n')}${unicos.length > 25 ? `\n… y ${unicos.length - 25} más` : ''}\n\n¿Aplicar?`)){
+    await cargarTablaConsumo(); tablaConsumo.fundas5085 = true; guardarTablaYConsumo().catch(() => {}); return;
+  }
+  // los textos guardados se rearman con la medida nueva
+  Object.entries(tablaConsumo.instrucciones).forEach(([art, porAncho]) => Object.entries(porAncho || {}).forEach(([w, g]) => {
+    if(g && piezasValidas(g)){ g.texto = textoCorte(art, g.piezas, parseFloat(w), g.nota || ''); g.consumo = calcularCorte(g.piezas, parseFloat(w)).metros; }
+  }));
+  try{ await guardarTablaYConsumo(); renderListaAC(); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  await limpiarPiezasRepetidas(true);
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -13811,7 +13840,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v87';
+const APP_VERSION = '2026-10-01-v88';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
