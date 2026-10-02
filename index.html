@@ -1541,7 +1541,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v83</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v84</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1806,6 +1806,7 @@ a.grilla-celda{display:block;}
       <p class="note" style="margin-bottom:10px;">Cada producto del catálogo con su forma de corte y su tela.</p>
       <input type="text" id="pf-buscar" placeholder="🔍 Buscar producto o SKU" oninput="renderProductosFabrico()" style="margin-bottom:8px;">
       <div id="pf-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
+      <button type="button" class="btn-mini" style="margin-bottom:10px;" onclick="actualizarTodasDescripciones()">✨ Actualizar todas las descripciones del catálogo</button>
       <div id="pf-lista"><p class="empty-msg">Cargando...</p></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
@@ -6242,6 +6243,13 @@ async function aplicarDescripcionAutomatica(skus){
 }
 
 let pfFiltro = 'todos';
+async function actualizarTodasDescripciones(){
+  const skus = filasProductosFabrico().filter(f => f.calidad && !f.fuera).map(f => f.sku);
+  if(!skus.length){ alert('Todavía no hay productos con calidad de tela cargada.'); return; }
+  const n = await aplicarDescripcionAutomatica(skus);
+  renderProductosFabrico();
+  alert(n ? `Listo: se revisaron los productos y se actualizaron las descripciones que no coincidían.` : 'Las descripciones ya estaban al día.');
+}
 async function abrirProductosFabrico(){
   mostrarPaso('step-productos-fabrico');
   document.getElementById('pf-lista').innerHTML = '<p class="empty-msg">Cargando...</p>';
@@ -13724,7 +13732,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v83';
+const APP_VERSION = '2026-10-01-v84';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
