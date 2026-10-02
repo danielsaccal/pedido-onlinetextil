@@ -1541,7 +1541,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v91</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v92</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2030,6 +2030,7 @@ function renderCatalogo(filtro){
   CATALOGO.forEach((cat, ci) => {
     const productosFiltrados = cat.productos
       .map((p, pi) => ({p, pi}))
+      .filter(({p}) => Array.isArray(p.variantes) && p.variantes.length) // un producto sin variantes no rompe el catalogo
       .filter(({p}) => {
         if(!filtro) return true;
         const palabras = filtro.split(/\s+/).filter(Boolean);
@@ -6275,7 +6276,7 @@ async function aplicarDescripcionAutomatica(skus){
     if(!d || normBusqueda(d) === normBusqueda(p.composicion || '')) continue;
     try{
       if(p._editKey && p._editKey.startsWith('nuevo-')) await db.collection('productos_nuevos').doc(p._docId).update({ composicion: d });
-      else if(p._editKey) await db.collection('productos_editados').doc(p._editKey).set({ composicion: d }, { merge: true });
+      else if(p._editKey) await db.collection('productos_editados').doc(p._editKey).set({ nombre: p.nombre, composicion: d, variantes: p.variantes, metros: p.metros || null }, { merge: true });
       else continue;
       p.composicion = d;
       if(fabricacion){ fabricacion.propios[p.nombre] = true; }
@@ -10882,10 +10883,11 @@ function cargarProductosEditados(){
       for(const cat of CATALOGO){
         const prod = cat.productos.find(p => p._editKey === d.id);
         if(prod){
-          prod.nombre = datos.nombre;
-          prod.composicion = datos.composicion;
-          prod.variantes = datos.variantes;
-          prod.metros = datos.metros || undefined;
+          // solo se pisan los datos que la edicion trae (una edicion parcial no borra el resto)
+          if(datos.nombre !== undefined) prod.nombre = datos.nombre;
+          if(datos.composicion !== undefined) prod.composicion = datos.composicion;
+          if(Array.isArray(datos.variantes) && datos.variantes.length) prod.variantes = datos.variantes;
+          if(datos.metros !== undefined) prod.metros = datos.metros || undefined;
           if(datos.imagenBase64) prod.imagen = datos.imagenBase64;
           break;
         }
@@ -13850,7 +13852,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v91';
+const APP_VERSION = '2026-10-02-v92';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
