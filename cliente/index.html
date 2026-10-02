@@ -610,6 +610,7 @@ function renderCatalogo(filtro){
   CATALOGO.forEach((cat, ci) => {
     const productosFiltrados = cat.productos
       .map((p, pi) => ({p, pi}))
+      .filter(({p}) => Array.isArray(p.variantes) && p.variantes.length) // un producto sin variantes no rompe el catalogo
       .filter(({p}) => {
         if(!filtro) return true;
         const palabras = filtro.split(/\s+/).filter(Boolean);
@@ -2608,10 +2609,11 @@ function cargarProductosEditados(){
       for(const cat of CATALOGO){
         const prod = cat.productos.find(p => p._editKey === d.id);
         if(prod){
-          prod.nombre = datos.nombre;
-          prod.composicion = datos.composicion;
-          prod.variantes = datos.variantes;
-          prod.metros = datos.metros || undefined;
+          // solo se pisan los datos que la edicion trae (una edicion parcial no borra el resto)
+          if(datos.nombre !== undefined) prod.nombre = datos.nombre;
+          if(datos.composicion !== undefined) prod.composicion = datos.composicion;
+          if(Array.isArray(datos.variantes) && datos.variantes.length) prod.variantes = datos.variantes;
+          if(datos.metros !== undefined) prod.metros = datos.metros || undefined;
           if(datos.imagenBase64) prod.imagen = datos.imagenBase64;
           break;
         }
