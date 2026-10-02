@@ -1547,7 +1547,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v106</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v107</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1790,14 +1790,36 @@ a.grilla-celda{display:block;}
   </div>
 
   <div class="step" id="step-telas">
-    <div class="form-card" style="max-width:1100px;">
+    <style>
+      .tl-top{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
+      .tl-top input{flex:1;min-width:200px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:0.92rem;background:#fff;}
+      .tl-top button{border:none;border-radius:12px;padding:10px 16px;background:var(--gold);color:var(--purple);font-weight:700;cursor:pointer;font-size:0.92rem;}
+      .tl-fil{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center;}
+      .tl-fil .lbl{font-size:0.72rem;color:#8A8072;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-right:2px;}
+      .tl-fil span.ch{cursor:pointer;font-size:0.8rem;padding:4px 11px;border-radius:14px;border:1px solid var(--line);background:#fff;}
+      .tl-fil span.ch.on{background:var(--purple);color:#fff;border-color:var(--purple);}
+      .tl-grupo{background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:12px;overflow:hidden;}
+      .tl-gcab{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;background:var(--cream);}
+      .tl-gcab b{font-size:1rem;color:var(--purple);}
+      .tl-gcab span{font-size:0.75rem;color:#8A8072;}
+      .tl-fila{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid var(--line);cursor:pointer;}
+      .tl-fila:hover{background:#FBFAF7;}
+      .tl-fila.sel{background:#F3EEF7;}
+      .tl-cod{font-weight:700;font-size:0.92rem;}
+      .tl-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px;}
+      .tl-tag{font-size:0.74rem;padding:2px 8px;border-radius:8px;background:var(--cream);color:#5A4F44;}
+      .tl-tag.uso{background:#EEF3FB;color:#2E5A8C;}
+      .tl-num{text-align:right;font-size:0.8rem;color:#6B6258;white-space:nowrap;line-height:1.4;}
+      .tl-num b{color:var(--purple);font-size:0.95rem;}
+      .tl-num i{color:#A89E90;}
+    </style>
+    <div class="form-card" style="max-width:900px;">
       <h2>Telas</h2>
-      <p class="note" style="margin-bottom:10px;">Cada tela una sola vez: ancho, calidad, rendimiento y para qué se usa.</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
-        <input type="text" id="tl-buscar" placeholder="🔍 Buscar por código, nombre o proveedor" oninput="renderTelas()" style="flex:1;min-width:200px;">
-        <button class="btn btn-gold" style="width:auto;padding:10px 16px;" onclick="editarTela()">+ Nueva tela</button>
+      <div class="tl-top">
+        <input type="text" id="tl-buscar" placeholder="🔍 Código, nombre, color o proveedor" oninput="renderTelas()">
+        <button type="button" onclick="editarTela()">+ Nueva tela</button>
       </div>
-      <div id="tl-usos-filtro" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
+      <div id="tl-usos-filtro"></div>
       <div id="tl-separar"></div>
       <div id="tl-acciones" style="display:none;"></div>
       <div id="tl-editor" style="display:none;"></div>
@@ -5781,8 +5803,10 @@ function renderTelas(){
   const usos = telasDatos.usos;
   const chip = (v, t) => `<span onclick="tlFiltroUso='${escapeAttr(v)}'; renderTelas();" style="cursor:pointer;font-size:0.82rem;padding:5px 12px;border-radius:14px;border:1px solid var(--line);${tlFiltroUso === v ? 'background:var(--purple);color:#fff;border-color:var(--purple);' : ''}">${escaparHtml(t)}</span>`;
   const chipC = (v, t) => `<span onclick="tlFiltroComp='${escapeAttr(v)}'; renderTelas();" style="cursor:pointer;font-size:0.82rem;padding:5px 12px;border-radius:14px;border:1px solid var(--line);${tlFiltroComp === v ? 'background:#6B5A2E;color:#fff;border-color:#6B5A2E;' : ''}">${escaparHtml(t)}</span>`;
-  document.getElementById('tl-usos-filtro').innerHTML = chip('', 'Todos los usos') + usos.map(u => chip(u, u)).join('') +
-    '<span style="width:100%;height:0;"></span>' + chipC('', 'Toda composición') + COMPOSICIONES_TELA.map(c => chipC(c, c)).join('');
+  const ch = (on, fn, t) => `<span class="ch${on ? ' on' : ''}" onclick="${fn}; renderTelas();">${escaparHtml(t)}</span>`;
+  document.getElementById('tl-usos-filtro').innerHTML =
+    `<div class="tl-fil"><span class="lbl">Uso</span>${ch(!tlFiltroUso, "tlFiltroUso=''", 'Todos')}${usos.map(u => ch(tlFiltroUso === u, `tlFiltroUso='${escapeAttr(u)}'`, u)).join('')}</div>` +
+    `<div class="tl-fil" style="margin-bottom:14px;"><span class="lbl">Composición</span>${ch(!tlFiltroComp, "tlFiltroComp=''", 'Todas')}${COMPOSICIONES_TELA.map(c => ch(tlFiltroComp === c, `tlFiltroComp='${c}'`, c)).join('')}</div>`;
   const q = normBusqueda(document.getElementById('tl-buscar').value);
   const lista = Object.entries(telasDatos.telas)
     .filter(([c, t]) => (!tlFiltroUso || (t.usos || []).includes(tlFiltroUso)) && (!tlFiltroComp || t.composicion === tlFiltroComp) && (!q || normBusqueda(c + ' ' + (t.nombre || '') + ' ' + (t.color || '') + ' ' + (t.composicion || '') + ' ' + (t.proveedor || '')).includes(q)))
@@ -5796,31 +5820,26 @@ function renderTelas(){
   renderAccionesTelas();
   const cont = document.getElementById('tl-lista');
   if(!lista.length){ cont.innerHTML = `<p class="empty-msg">${Object.keys(telasDatos.telas).length ? 'No hay telas que coincidan.' : 'Todavía no hay telas cargadas. Toque "+ Nueva tela".'}</p>`; return; }
-  const th = (x, al) => `<th style="padding:7px 8px;text-align:${al || 'left'};white-space:nowrap;">${x}</th>`;
-  cont.innerHTML = `<div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;"><table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
-    <thead><tr style="background:var(--cream);"><th style="padding:7px 8px;width:30px;"><input type="checkbox" title="Seleccionar todas las de la lista" onchange="seleccionarTodasTelas(this.checked)" ${lista.length && lista.every(([c]) => tlSeleccion.has(c)) ? 'checked' : ''}></th>${th('Código')}${th('Nombre')}${th('Color')}${th('Composición')}${th('Proveedor')}${th('Ancho', 'right')}${th('Calidad', 'right')}${th('Rendimiento', 'right')}${th('Gramaje', 'right')}${th('Usos')}</tr></thead><tbody>
-    ${lista.map(([c, t]) => {
-      const fam = grupoNombreTela(t), r = rendimientoTela(c), g = r ? gramaje({ ancho: t.ancho, mPorKg: r.mPorKg }) : null;
-      let cab = '';
-      if(fam !== famPrevia){
-        famPrevia = fam;
-        const pv = [...provs[fam]].filter(Boolean);
-        cab = `<tr style="background:var(--purple);"><td colspan="11" style="padding:7px 10px;color:#fff;font-size:0.9rem;">🧵 <b>${escaparHtml((t.nombre || 'Sin nombre').toUpperCase())}</b> <span style="opacity:.8;font-size:0.8rem;">· ${cuantos[fam]} tela${cuantos[fam] === 1 ? '' : 's'}${pv.length ? ' · ' + escaparHtml(pv.join(', ')) : ''}</span></td></tr>`;
-      }
-      return cab + `<tr onclick="editarTela('${escapeAttr(c)}')" style="border-top:1px solid var(--line);cursor:pointer;${tlSeleccion.has(c) ? 'background:#F3EEF7;' : ''}" title="Toque para editar">
-      <td style="padding:7px 8px;" onclick="event.stopPropagation();"><input type="checkbox" ${tlSeleccion.has(c) ? 'checked' : ''} onchange="toggleSeleccionTela('${escapeAttr(c)}', this.checked)"></td>
-      <td style="padding:7px 8px;"><b>${escaparHtml(c)}</b></td>
-      <td style="padding:7px 8px;">${escaparHtml(t.nombre || '')}</td>
-      <td style="padding:7px 8px;">${escaparHtml(t.color || '—')}</td>
-      <td style="padding:7px 8px;">${escaparHtml(t.composicion || '—')}</td>
-      <td style="padding:7px 8px;">${escaparHtml(t.proveedor || '—')}</td>
-      <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${t.ancho ? t.ancho + ' cm' : '—'}</td>
-      <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${t.hilos ? t.hilos + ' hilos' : '—'}</td>
-      <td style="padding:7px 8px;text-align:right;white-space:nowrap;${r && r.calculado ? 'color:#8A8072;font-style:italic;' : ''}" title="${r && r.calculado ? 'Calculado a partir del otro ancho de la misma tela' : ''}">${r ? (r.calculado ? '≈ ' : '') + fmtCm(r.mPorKg) + ' m/kg' : '—'}</td>
-      <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${g ? g + ' g/m²' : '—'}</td>
-      <td style="padding:7px 8px;">${(t.usos || []).map(u => `<span style="display:inline-block;background:var(--cream);border-radius:8px;padding:1px 7px;margin:1px;font-size:0.75rem;">${escaparHtml(u)}</span>`).join('')}</td></tr>`;
-    }).join('')}
-    </tbody></table></div>`;
+  // tarjetas agrupadas por nombre de tela
+  const grupos = new Map();
+  lista.forEach(([c, t]) => { const f = grupoNombreTela(t); (grupos.get(f) || grupos.set(f, []).get(f)).push([c, t]); });
+  cont.innerHTML = `<label style="display:inline-flex;gap:6px;align-items:center;font-size:0.8rem;color:#6B6258;margin-bottom:8px;cursor:pointer;"><input type="checkbox" onchange="seleccionarTodasTelas(this.checked)" ${lista.length && lista.every(([c]) => tlSeleccion.has(c)) ? 'checked' : ''}> Seleccionar todas para editar juntas</label>` +
+  [...grupos.values()].map(items => {
+    const t0 = items[0][1];
+    const pv = [...new Set(items.map(([, t]) => t.proveedor).filter(Boolean))];
+    return `<div class="tl-grupo">
+      <div class="tl-gcab"><b>🧵 ${escaparHtml((t0.nombre || 'Sin nombre').toUpperCase())}</b><span>${items.length} tela${items.length === 1 ? '' : 's'}${pv.length ? ' · ' + escaparHtml(pv.join(', ')) : ''}</span></div>
+      ${items.map(([c, t]) => {
+        const r = rendimientoTela(c), g = r ? gramaje({ ancho: t.ancho, mPorKg: r.mPorKg }) : null;
+        const tags = [t.color, t.composicion, t.hilos ? t.hilos + ' hilos' : '', t.proveedor].filter(Boolean).map(x => `<span class="tl-tag">${escaparHtml(String(x))}</span>`).join('') + (t.usos || []).map(u => `<span class="tl-tag uso">${escaparHtml(u)}</span>`).join('');
+        return `<div class="tl-fila${tlSeleccion.has(c) ? ' sel' : ''}" onclick="editarTela('${escapeAttr(c)}')" title="Toque para editar">
+          <input type="checkbox" ${tlSeleccion.has(c) ? 'checked' : ''} onclick="event.stopPropagation();" onchange="toggleSeleccionTela('${escapeAttr(c)}', this.checked)">
+          <div><div class="tl-cod">${escaparHtml(c)}</div><div class="tl-tags">${tags}</div></div>
+          <div class="tl-num"><b>${t.ancho ? t.ancho + ' cm' : '—'}</b><br>${r ? (r.calculado ? '<i>≈ ' + fmtCm(r.mPorKg) + ' m/kg</i>' : fmtCm(r.mPorKg) + ' m/kg') : '—'}${g ? ' · ' + g + ' g/m²' : ''}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
 }
 function editarTela(codigo, base){
   tlEditando = codigo || null;
@@ -14168,7 +14187,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v106';
+const APP_VERSION = '2026-10-02-v107';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
