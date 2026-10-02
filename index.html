@@ -1547,7 +1547,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v108</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v109</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1676,10 +1676,15 @@ a.grilla-celda{display:block;}
                 <div><input type="text" id="ac-et-desc" placeholder="Descripción" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Nombre del artículo (etiqueta)</div></div>
                 <div><input type="text" id="ac-et-medida" placeholder="50 X 85 CM (APROX)" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Medida (etiqueta)</div></div>
                 <div><input type="text" id="ac-confeccion" inputmode="decimal" placeholder="$ por unidad" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Confección ($ por unidad)</div></div>
-                <div><input type="text" id="ac-insumos" inputmode="decimal" placeholder="$ por unidad" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Insumos: bolsa, etiqueta, elástico… ($ por unidad)</div></div>
+                <div><input type="text" id="ac-insumos" inputmode="decimal" placeholder="$ por unidad" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Otros insumos: bolsa, etiqueta… ($ por unidad)</div></div>
                 <div><input type="text" id="ac-colchon" placeholder="90 × 190 × 30" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Colchón (para la ajustable, en cm)</div></div>
                 <div><input type="text" id="ac-sku" placeholder="Ej: KA181F" oninput="cambioEmpaqueAC(); infoTelaAC();" style="text-transform:uppercase;"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">SKU (se completa solo en la orden)</div></div>
                 <div style="grid-column:1 / -1;"><select id="ac-tela" onchange="cambiarTelaArticuloAC()" style="width:100%;padding:9px 8px;box-sizing:border-box;"></select><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Calidad de tela de este SKU (cualquier ancho)</div><div id="ac-tela-info" style="font-size:0.7rem;color:#6B6258;"></div></div>
+                <div style="grid-column:1 / -1;border-top:1px dashed var(--line);padding-top:8px;">
+                  <div style="font-size:0.78rem;color:#6B6258;margin-bottom:4px;">🧷 Avíos que lleva cada unidad (cierres, elástico, botones…):</div>
+                  <div id="ac-avios"></div>
+                  <button type="button" class="btn-mini" onclick="agregarAvioAC()">+ Agregar avío</button>
+                </div>
                 <div style="grid-column:1 / -1;border-top:1px dashed var(--line);padding-top:8px;">
                   <div style="font-size:0.78rem;color:#6B6258;margin-bottom:4px;">Otros SKU de este mismo artículo (en otra calidad o color de tela):</div>
                   <div id="ac-otros-sku"></div>
@@ -1830,6 +1835,7 @@ a.grilla-celda{display:block;}
     </div>
   </div>
   <datalist id="lista-telas"></datalist>
+  <datalist id="lista-avios"></datalist>
   <datalist id="lista-proveedores-tela"></datalist>
 
   <div class="step" id="step-productos-fabrico">
@@ -4961,7 +4967,7 @@ function bolsasDisponibles(){ return (tablaConsumo && Array.isArray(tablaConsumo
 function datosEmpaque(articulo, fichaSku){
   if(fichaSku && fichasArticulos && fichasArticulos.fichas[fichaSku]){ const f = fichasArticulos.fichas[fichaSku]; return { bolsa: f.bolsa || '', etDesc: f.etDesc || '', etMedida: f.etMedida || '', porBolsa: f.porBolsa || 1 }; }
   const d = (tablaConsumo && tablaConsumo.empaque && tablaConsumo.empaque[articulo]) || {};
-  return { bolsa: d.bolsa || '', etDesc: d.etDesc || '', etMedida: d.etMedida || '', sku: d.sku || '', porBolsa: d.porBolsa || 1 };
+  return { bolsa: d.bolsa || '', etDesc: d.etDesc || '', etMedida: d.etMedida || '', sku: d.sku || '', porBolsa: d.porBolsa || 1, avios: Array.isArray(d.avios) ? d.avios : [] };
 }
 function opcionesBolsa(sel){
   return `<option value="">Sin bolsa</option>` + bolsasDisponibles().map(b => `<option value="${escapeAttr(b)}" ${b === sel ? 'selected' : ''}>Bolsa ${escaparHtml(b)}</option>`).join('');
@@ -4985,6 +4991,8 @@ function cargarEmpaqueAC(){
     renderOtrosSkuAC();
   };
   if(telasDatos === null) cargarTelas().then(pintarCal); else pintarCal();
+  aviosPend = null;
+  if(aviosDatos === null) cargarAvios().then(renderAviosAC); else renderAviosAC();
   document.getElementById('ac-por-bolsa').value = d.porBolsa > 1 ? d.porBolsa : '';
   document.getElementById('ac-colchon').value = ((tablaConsumo.empaque || {})[acArticulo] || {}).colchon || '';
   { const e = (tablaConsumo.empaque || {})[acArticulo] || {}; document.getElementById('ac-confeccion').value = e.confeccion ? String(e.confeccion).replace('.', ',') : ''; document.getElementById('ac-insumos').value = e.insumos ? String(e.insumos).replace('.', ',') : ''; }
@@ -5016,7 +5024,7 @@ function marcarEmpaquePendiente(){
   if(m){ m.textContent = '● Cambios sin guardar'; m.style.color = '#A6432F'; }
 }
 function limpiarEmpaquePendiente(){
-  empaquePendiente = false; otrosSkuPend = null;
+  empaquePendiente = false; otrosSkuPend = null; aviosPend = null;
   const b = document.getElementById('ac-empaque-guardar'), m = document.getElementById('ac-empaque-ok');
   if(b){ b.disabled = true; b.style.opacity = '0.5'; }
   if(m){ m.textContent = ''; }
@@ -5027,6 +5035,7 @@ async function guardarEmpaqueAC(){
   const sku = String(emp.sku || '').toUpperCase();
   try{
     if(fabricacion === null) await cargarFabricacion();
+    await guardarAviosAC();
     await guardarTablaYConsumo();
     if(sku) fabricacion.vinculos[sku] = { ...(fabricacion.vinculos[sku] || {}), calidad: emp.calidad || '', tela: '', articulo: acArticulo };
     if(otrosSkuPend){
@@ -5054,8 +5063,13 @@ async function editarBolsasDisponibles(){
 function resumenBolsas(renglones){
   const porBolsa = new Map(); let etiquetas = 0;
   (renglones || []).forEach(r => { if(!r.bolsa) return; const n = Math.ceil((+r.cantidad || 0) / (r.porBolsa || 1)); porBolsa.set(r.bolsa, (porBolsa.get(r.bolsa) || 0) + n); etiquetas += n; });
-  if(!etiquetas) return '';
-  return `🛍️ Bolsas: ${[...porBolsa].map(([b, n]) => `${b} → ${n}`).join(' · ')} · Etiquetas: ${etiquetas}`;
+  // avios (cierres, elastico, botones…): cantidad por unidad x unidades
+  const av = new Map();
+  (renglones || []).forEach(r => (r.avios || []).forEach(a => { const k = a.nombre; const x = av.get(k) || { n: 0, u: a.unidad || 'unidad' }; x.n += (+a.cantidad || 0) * (+r.cantidad || 0); av.set(k, x); }));
+  const partes = [];
+  if(etiquetas) partes.push(`🛍️ Bolsas: ${[...porBolsa].map(([b, n]) => `${b} → ${n}`).join(' · ')} · Etiquetas: ${etiquetas}`);
+  if(av.size) partes.push(`🧷 Avíos: ${[...av].map(([nom, x]) => x.u === 'metro' ? `${fmtCm(Math.round(x.n * 100) / 100)} m de ${nom}` : `${Math.round(x.n * 100) / 100} × ${nom}`).join(' · ')}`);
+  return partes.join('\n');
 }
 // PDF de etiquetas 50 x 25 mm, una por pagina, tantas como unidades
 async function etiquetasOrden(o){
@@ -6787,7 +6801,7 @@ function costosDeSku(sku){
   const art = articuloDeSku(sku); if(!art) return null;
   const piezas = piezasDeArticuloAny(art); if(!piezas) return null;
   const emp = art.startsWith('ficha:') ? {} : ((tablaConsumo.empaque || {})[art] || {});
-  const conf = +emp.confeccion || 0, ins = +emp.insumos || 0;
+  const conf = +emp.confeccion || 0, ins = (+emp.insumos || 0) + (art.startsWith('ficha:') ? 0 : costoAviosArticulo(art));
   const cal = calidadDeSku(sku);
   const telas = cal ? Object.keys(telasDatos.telas).filter(c => telaCumpleCalidad(telasDatos.telas[c], cal)) : [];
   const res = telas.map(c => {
@@ -6805,7 +6819,70 @@ function textoCostoSku(sku){
   if(!ok.length) return c.confeccion || c.insumos ? `Confección $ ${formatoPesos(c.confeccion)}${c.insumos ? ' + insumos $ ' + formatoPesos(c.insumos) : ''} · falta el precio de la tela` : '';
   const x = ok[0];
   const rango = ok.length > 1 && ok[ok.length - 1].total - x.total > 1 ? ` (hasta $ ${formatoPesos(ok[ok.length - 1].total)} con ${ok[ok.length - 1].tela})` : '';
-  return `Costo ≈ $ ${formatoPesos(x.total)} con ${x.tela}: tela $ ${formatoPesos(x.costoTela)} (${fmtCm(x.metros)} m) + confección $ ${formatoPesos(x.confeccion)}${x.insumos ? ' + insumos $ ' + formatoPesos(x.insumos) : ''}${rango}`;
+  return `Costo ≈ $ ${formatoPesos(x.total)} con ${x.tela}: tela $ ${formatoPesos(x.costoTela)} (${fmtCm(x.metros)} m) + confección $ ${formatoPesos(x.confeccion)}${x.insumos ? ' + avíos e insumos $ ' + formatoPesos(x.insumos) : ''}${rango}`;
+}
+
+// ===== Avios (cierres, elastico, botones, cintas…) =====
+// Lista general con su unidad y precio (config/avios), y por articulo cuanto lleva de cada uno.
+let aviosDatos = null;
+async function cargarAvios(){
+  try{ const d = await db.collection('config').doc('avios').get(); aviosDatos = d.exists ? d.data() : {}; } catch(e){ aviosDatos = aviosDatos || {}; }
+  aviosDatos.lista = aviosDatos.lista || {};
+  const dl = document.getElementById('lista-avios');
+  if(dl) dl.innerHTML = Object.keys(aviosDatos.lista).sort().map(n => `<option value="${escapeAttr(n)}">`).join('');
+}
+async function guardarAvios(){ await db.collection('config').doc('avios').set(JSON.parse(JSON.stringify(aviosDatos))); }
+function unidadAvio(nombre){ const a = aviosDatos && aviosDatos.lista[nombre]; return a && a.unidad === 'metro' ? 'metro' : 'unidad'; }
+function precioAvio(nombre){ const a = aviosDatos && aviosDatos.lista[nombre]; return a && a.precio > 0 ? +a.precio : 0; }
+function costoAviosArticulo(art){
+  const e = ((tablaConsumo && tablaConsumo.empaque) || {})[art] || {};
+  return (e.avios || []).reduce((s, a) => s + (+a.cantidad || 0) * precioAvio(a.nombre), 0);
+}
+// filas de avios en el recuadro del articulo
+let aviosPend = null;
+function aviosActualesAC(){ return aviosPend || (((tablaConsumo.empaque || {})[acArticulo] || {}).avios || []).map(a => ({ ...a })); }
+function renderAviosAC(){
+  const cont = document.getElementById('ac-avios'); if(!cont) return;
+  const filas = aviosActualesAC();
+  cont.innerHTML = filas.map((a, i) => {
+    const reg = (aviosDatos && aviosDatos.lista[a.nombre]) || {};
+    return `<div style="display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,0.7fr) minmax(0,0.9fr) minmax(0,0.9fr) 26px;gap:6px;margin-bottom:6px;align-items:center;">
+      <input list="lista-avios" value="${escapeAttr(a.nombre || '')}" placeholder="Ej: Cierre 60 cm" onchange="cambiarAvioAC(${i}, 'nombre', this.value)">
+      <input type="text" inputmode="decimal" value="${a.cantidad ? String(a.cantidad).replace('.', ',') : ''}" placeholder="Cant." oninput="cambiarAvioAC(${i}, 'cantidad', this.value)">
+      <select onchange="cambiarAvioAC(${i}, 'unidad', this.value)"><option value="unidad" ${reg.unidad !== 'metro' ? 'selected' : ''}>unidades</option><option value="metro" ${reg.unidad === 'metro' ? 'selected' : ''}>metros</option></select>
+      <input type="text" inputmode="decimal" value="${reg.precio ? String(reg.precio).replace('.', ',') : ''}" placeholder="$ c/u o m" oninput="cambiarAvioAC(${i}, 'precio', this.value)">
+      <button type="button" onclick="quitarAvioAC(${i})" title="Quitar" style="border:none;background:none;cursor:pointer;color:#8A8072;">✕</button>
+    </div>`;
+  }).join('') + (filas.length ? '<div style="font-size:0.68rem;color:#8A8072;margin:-2px 0 4px;">Avío · cantidad por unidad · unidad · precio (es el mismo para todos los artículos que lo usan)</div>' : '');
+}
+function agregarAvioAC(){ aviosPend = [...aviosActualesAC(), { nombre: '', cantidad: 1 }]; renderAviosAC(); marcarEmpaquePendiente(); }
+function quitarAvioAC(i){ aviosPend = aviosActualesAC(); aviosPend.splice(i, 1); renderAviosAC(); marcarEmpaquePendiente(); }
+function cambiarAvioAC(i, campo, valor){
+  aviosPend = aviosActualesAC();
+  const a = aviosPend[i];
+  if(campo === 'nombre'){ a.nombre = valor.trim(); renderAviosAC(); }
+  else if(campo === 'cantidad') a.cantidad = parseFloat(String(valor).replace(',', '.')) || 0;
+  else { a['_' + campo] = valor; }
+  marcarEmpaquePendiente();
+}
+// al guardar el recuadro: avios del articulo + lista general (unidad y precio)
+async function guardarAviosAC(){
+  if(!aviosPend) return;
+  if(aviosDatos === null) await cargarAvios();
+  const limpios = [];
+  aviosPend.forEach(a => {
+    if(!a.nombre) return;
+    const reg = aviosDatos.lista[a.nombre] || { unidad: 'unidad', precio: 0 };
+    if(a._unidad) reg.unidad = a._unidad;
+    if(a._precio !== undefined) reg.precio = parseFloat(String(a._precio).replace(/\./g, '').replace(',', '.')) || 0;
+    aviosDatos.lista[a.nombre] = reg;
+    limpios.push({ nombre: a.nombre, cantidad: +a.cantidad || 0 });
+  });
+  tablaConsumo.empaque[acArticulo] = { ...(tablaConsumo.empaque[acArticulo] || {}), avios: limpios };
+  await guardarAvios();
+  aviosPend = null;
+  const dl = document.getElementById('lista-avios');
+  if(dl) dl.innerHTML = Object.keys(aviosDatos.lista).sort().map(n => `<option value="${escapeAttr(n)}">`).join('');
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -7106,6 +7183,7 @@ async function abrirOrdenTrabajo(modoEdicion){
   if(talleresLista === null) await cargarTalleres();
   if(telasDatos === null) await cargarTelas();
   if(fabricacion === null) await cargarFabricacion();
+  if(aviosDatos === null) await cargarAvios();
   try{ await Promise.all([cargarEnviosTela(), historialOT ? null : cargarHistorialOT()]); } catch(e){}
   poblarSelectTalleres();
   try{ prepararReparto(); } catch(e){ console.error(e); }
@@ -7271,7 +7349,7 @@ async function generarOrdenTrabajoCompleta(){
     renglones.push({ articulo, anchoIngresado: ancho, anchoUsado: resultado.anchoUsado, exacto: resultado.exacto, consumo: resultado.consumo, cantidad, metrosConsumidos, sku, nota, instruccion, tieneBosquejo, entregado: 0 });
   }
 
-  renglones.forEach(r => { if(r.personalizado) return; const d = datosEmpaque(r.articulo, r.fichaSku); if(d.bolsa){ r.bolsa = d.bolsa; r.etDesc = d.etDesc; r.etMedida = d.etMedida; r.porBolsa = d.porBolsa || 1; } });
+  renglones.forEach(r => { if(r.personalizado) return; const d = datosEmpaque(r.articulo, r.fichaSku); if(d.bolsa){ r.bolsa = d.bolsa; r.etDesc = d.etDesc; r.etMedida = d.etMedida; r.porBolsa = d.porBolsa || 1; } if(d.avios && d.avios.length) r.avios = d.avios.map(a => ({ nombre: a.nombre, cantidad: +a.cantidad || 0, unidad: unidadAvio(a.nombre) })); });
   let quedanSobras = [];
   try{ quedanSobras = aprovecharSobrasOrden(renglones); } catch(e){ console.error('aprovechar sobras', e); }
   const metrosConsumidosTotal = Math.round(renglones.reduce((s,r) => s + r.metrosConsumidos, 0) * 100) / 100;
@@ -7453,7 +7531,7 @@ async function generarPDFOrden(o){
   const usa = o.metrosConsumidosTotal != null ? o.metrosConsumidosTotal : renglones.reduce((s, r) => s + (+r.metrosConsumidos || 0), 0);
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
   doc.text(`Total a usar ~ ${numPDF(usa)} m · Sobran ~ ${numPDF((+o.metrosTotales || 0) - usa)} m`, M, y); y += 7;
-  if(resumenBolsas(renglones)){ doc.setFont('helvetica', 'normal'); doc.text(limpiarPDF(resumenBolsas(renglones)), M, y); y += 6; }
+  if(resumenBolsas(renglones)){ doc.setFont('helvetica', 'normal'); resumenBolsas(renglones).split('\n').forEach(l => { doc.text(limpiarPDF(l), M, y); y += 6; }); }
   if(o.notaGeneral){ doc.setFont('helvetica', 'normal'); const l = doc.splitTextToSize('Nota: ' + limpiarPDF(o.notaGeneral), W - 2*M); doc.text(l, M, y); y += l.length * 5; }
   // bosquejos: uno por pagina, lo mas grande posible
   for(const r of renglones){
@@ -14245,7 +14323,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v108';
+const APP_VERSION = '2026-10-02-v109';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
