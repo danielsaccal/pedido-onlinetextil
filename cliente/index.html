@@ -209,6 +209,7 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
   border:1px solid var(--line);background:var(--cream);
 }
 .desc-tit{font-weight:600;}
+.nota-medidas{font-size:0.72rem;color:#8A8072;font-style:italic;margin:6px 0 0;}
 .desc-det{display:block;font-size:0.8rem;color:#6B6258;line-height:1.45;margin-top:1px;}
 .producto-img-vacia{
   display:flex;align-items:center;justify-content:center;
@@ -696,6 +697,7 @@ function renderCatalogo(filtro){
           <p class="producto-nombre">${p.nombre}</p>
           <p class="producto-comp">${p.composicion || ''}</p>
           ${variantesHtml}
+          ${p.variantes.some(v => String(v.desc || '').includes(' — ')) ? '<p class="nota-medidas">Medidas de corte: el producto terminado queda unos centímetros más chico por las costuras.</p>' : ''}
         </div>
       `;
       body.appendChild(prodDiv);
