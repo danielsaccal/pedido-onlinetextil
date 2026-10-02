@@ -1541,7 +1541,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v84</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v85</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6050,19 +6050,28 @@ function claveComposicion(t){
 }
 function claveCalidad(t){ return [normBusqueda(t.nombre || '').replace(/\s+/g, ' ').trim(), parseInt(t.hilos, 10) || '', claveComposicion(t)].join('|'); }
 function etiquetaCalidad(t){ const c = composicionTexto(t); return `${String(t.nombre || '').trim().replace(/\s+/g, ' ').toUpperCase()}${t.hilos ? ' · ' + parseInt(t.hilos, 10) + ' hilos' : ''}${c ? ' · ' + c : ''}`; }
-// cada calidad aparece "en cualquier color" y, si tiene colores cargados, tambien por color
-// (ej: el juego en tela blanca es un SKU y en tela de color es otro)
+// cada calidad aparece una sola vez si todas sus telas son de un mismo color (ej: lienzo, solo crudo);
+// si viene en varios colores, aparece por color y ademas "cualquier color"
 function calidadesTela(){
   const m = new Map();
   Object.entries((telasDatos && telasDatos.telas) || {}).forEach(([c, t]) => {
     const k = claveCalidad(t);
-    const x = m.get(k) || { clave: k, etiqueta: etiquetaCalidad(t) + ' · cualquier color', codigos: [] }; x.codigos.push(c); m.set(k, x);
-    if(t.color){
-      const kc = k + '#' + normBusqueda(t.color);
-      const y = m.get(kc) || { clave: kc, etiqueta: etiquetaCalidad(t) + ' · ' + t.color.toLowerCase(), codigos: [] }; y.codigos.push(c); m.set(kc, y);
+    const x = m.get(k) || { clave: k, base: etiquetaCalidad(t), codigos: [], colores: new Map() };
+    x.codigos.push(c);
+    if(t.color){ const kc = normBusqueda(t.color); const y = x.colores.get(kc) || { color: t.color, codigos: [] }; y.codigos.push(c); x.colores.set(kc, y); }
+    m.set(k, x);
+  });
+  const lista = [];
+  m.forEach(x => {
+    if(x.colores.size <= 1){
+      const unico = [...x.colores.values()][0];
+      lista.push({ clave: x.clave, etiqueta: x.base + (unico ? ' · ' + unico.color.toLowerCase() : ''), codigos: x.codigos });
+    } else {
+      lista.push({ clave: x.clave, etiqueta: x.base + ' · cualquier color', codigos: x.codigos });
+      x.colores.forEach((y, kc) => lista.push({ clave: x.clave + '#' + kc, etiqueta: x.base + ' · ' + y.color.toLowerCase(), codigos: y.codigos }));
     }
   });
-  return [...m.values()].sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, 'es'));
+  return lista.sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, 'es'));
 }
 function telaCumpleCalidad(t, clave){
   if(!t || !clave) return false;
@@ -6090,7 +6099,9 @@ function calidadDeSku(sku){
   return null;
 }
 function opcionesCalidad(sel){
-  return '<option value="">— sin calidad —</option>' + calidadesTela().map(q => `<option value="${escapeAttr(q.clave)}" ${q.clave === sel ? 'selected' : ''}>${escaparHtml(q.etiqueta)} (${escaparHtml(q.codigos.join(', '))})</option>`).join('');
+  const lista = calidadesTela();
+  if(sel && !lista.some(q => q.clave === sel)){ const base = String(sel).split('#')[0]; const q = lista.find(x => x.clave === base); if(q) sel = base; }
+  return '<option value="">— sin calidad —</option>' + lista.map(q => `<option value="${escapeAttr(q.clave)}" ${q.clave === sel ? 'selected' : ''}>${escaparHtml(q.etiqueta)} (${escaparHtml(q.codigos.join(', '))})</option>`).join('');
 }
 // en la orden: con el articulo y la tela entregada, el SKU que corresponde
 function skuPorArticuloYTela(articuloValor, codTela){
@@ -13732,7 +13743,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v84';
+const APP_VERSION = '2026-10-01-v85';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
