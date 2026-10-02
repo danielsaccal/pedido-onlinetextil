@@ -1541,7 +1541,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v86</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v87</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -4150,6 +4150,7 @@ async function abrirArticulosCortes(){
   tablaConsumo.articulos = tablaConsumo.articulos || {};
   tablaConsumo.instrucciones = tablaConsumo.instrucciones || {};
   await completarPiezasDeJuegosGuardados();
+  if(!window.__limpiezaOfrecida){ window.__limpiezaOfrecida = true; setTimeout(() => limpiarPiezasRepetidas(true), 300); }
   document.getElementById('ac-buscar').value = '';
   acArticulo = null;
   renderListaAC();
@@ -4555,6 +4556,7 @@ function htmlGrupoDup(g){
     </div>`).join('')}</div>`;
 }
 function verDuplicadosAC(){
+  if(piezasSueltasRepetidas().length){ limpiarPiezasRepetidas(true); }
   const { iguales, parecidos } = gruposDuplicadosAC();
   const cont = document.getElementById('ac-duplicados');
   if(!iguales.length && !parecidos.length){ cont.innerHTML = '<p class="note" style="margin-top:8px;">No encontré artículos duplicados ni parecidos.</p>'; return; }
@@ -6344,6 +6346,49 @@ function renderProductosFabrico(){
     <p class="note" style="margin-top:6px;">Aparecen los productos del catálogo marcados como fabricación propia. Para completar lo que falta: Artículos y cortes (SKU y calidad) o Editar producto (🏭 Fabricación propia).</p>`;
 }
 
+// ----- piezas iguales: no repetir articulos que son lo mismo (ej: fundas de 1 1/2, 2 1/2, Queen y Twin) -----
+function piezaIgual(a, b){
+  const pa = a.partes || 1, pb = b.partes || 1;
+  const mismas = (Math.abs(a.ancho - b.ancho) < 0.6 && Math.abs(a.largo - b.largo) < 0.6) || (Math.abs(a.ancho - b.largo) < 0.6 && Math.abs(a.largo - b.ancho) < 0.6);
+  const primera = s => normBusqueda(String(s || '').trim().split(/\s+/)[0] || '');
+  return mismas && pa === pb && primera(a.nombre) === primera(b.nombre);
+}
+function piezaUnicaDe(art){
+  const g = Object.values((tablaConsumo.instrucciones || {})[art] || {}).find(x => piezasValidas(x));
+  return g && g.piezas.length === 1 && (g.piezas[0].cantidad || 1) === 1 ? g.piezas[0] : null;
+}
+function articuloConMismaPieza(pieza, excluir){
+  const cands = Object.keys(tablaConsumo.instrucciones || {}).filter(a => a !== excluir).filter(a => { const pz = piezaUnicaDe(a); return pz && piezaIgual(pz, pieza); });
+  // preferir el cargado a mano, despues el que dice 1 1/2, despues el primero
+  return cands.find(a => Object.values(tablaConsumo.instrucciones[a]).some(g => g && !g.auto)) || cands.find(a => /1\s*1\/2/.test(a)) || cands.sort()[0] || null;
+}
+// limpieza: piezas sueltas generadas automaticamente que son identicas a otra
+function piezasSueltasRepetidas(){
+  const auto = a => Object.values(tablaConsumo.instrucciones[a] || {}).every(g => !g || g.auto);
+  const grupos = [];
+  const usados = new Set();
+  Object.keys(tablaConsumo.instrucciones || {}).forEach(a => {
+    if(usados.has(a)) return;
+    const pz = piezaUnicaDe(a); if(!pz) return;
+    const iguales = Object.keys(tablaConsumo.instrucciones).filter(b => b !== a && !usados.has(b) && piezaUnicaDe(b) && piezaIgual(piezaUnicaDe(b), pz));
+    if(!iguales.length) return;
+    const todos = [a, ...iguales];
+    const queda = todos.find(x => !auto(x)) || todos.find(x => /1\s*1\/2/.test(x)) || todos.sort()[0];
+    const borrar = todos.filter(x => x !== queda && auto(x) && !((tablaConsumo.empaque || {})[x] && (tablaConsumo.empaque[x].sku || tablaConsumo.empaque[x].bolsa)));
+    todos.forEach(x => usados.add(x));
+    if(borrar.length) grupos.push({ queda, borrar });
+  });
+  return grupos;
+}
+async function limpiarPiezasRepetidas(silencioso){
+  const grupos = piezasSueltasRepetidas();
+  if(!grupos.length){ if(!silencioso) alert('No hay piezas sueltas repetidas.'); return; }
+  const txt = grupos.map(g => `• Se dejan de mostrar: ${g.borrar.join(', ')}\n   (son iguales a "${g.queda}")`).join('\n');
+  if(!confirm(`Encontré piezas sueltas que son exactamente iguales a otra:\n\n${txt}\n\n¿Quitarlas? En las órdenes se usa la que queda.`)) return;
+  grupos.forEach(g => g.borrar.forEach(a => { delete tablaConsumo.instrucciones[a]; delete tablaConsumo.articulos[a]; }));
+  try{ await guardarTablaYConsumo(); renderListaAC(); } catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -6380,6 +6425,8 @@ function cargarPiezasDelJuego(articulo, ancho, piezas){
     const suelta = [{ nombre: p.nombre.trim(), ancho: p.ancho, largo: p.largo, cantidad: 1, partes: p.partes || 1, girar: p.girar }];
     const previa = (tablaConsumo.instrucciones[nombre] || {})[ancho];
     if(previa && !previa.auto){ hechos.push(`${nombre}: ya tenía una instrucción cargada a mano en ${ancho} cm, no la toqué.`); return; }
+    // si ya existe otro articulo con exactamente la misma pieza (ej: la funda del 2 1/2 es igual a la del 1 1/2), no se crea aparte
+    if(!tablaConsumo.instrucciones[nombre]){ const igual = articuloConMismaPieza(suelta[0], nombre); if(igual) return; }
     const corte = calcularCorte(suelta, parseFloat(ancho));
     tablaConsumo.instrucciones[nombre] = { ...(tablaConsumo.instrucciones[nombre]||{}),
       [ancho]: { texto: textoCorte(nombre, suelta, parseFloat(ancho), ''), bosquejoBase64: '', piezas: suelta, nota: '', tipo: 'personalizado', consumo: corte.metros, auto: true, origen: articulo } };
@@ -13764,7 +13811,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v86';
+const APP_VERSION = '2026-10-01-v87';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
