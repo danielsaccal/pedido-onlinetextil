@@ -1541,7 +1541,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v89</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v90</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1915,6 +1915,8 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+// los campos vacios (undefined) se ignoran al guardar en vez de dar error
+try{ db.settings({ ignoreUndefinedProperties: true }); } catch(e){ console.warn('settings firestore', e); }
 
 async function guardarPedidoEnHistorial(orden){
   try{
@@ -2605,7 +2607,7 @@ function migrarTextosCorte(){
       if(g && piezasValidas(g)) g.texto = textoCorte(articulo, g.piezas, parseFloat(ancho), g.nota || '');
     }));
     tablaConsumo.formatoTexto = 2;
-    db.collection('config').doc('tabla_consumo_telas').set(tablaConsumo).catch(e => console.error('migrar textos', e));
+    db.collection('config').doc('tabla_consumo_telas').set(JSON.parse(JSON.stringify(tablaConsumo))).catch(e => console.error('migrar textos', e));
   } catch(e){ console.error('migrar textos', e); }
 }
 
@@ -2626,7 +2628,7 @@ function sembrarBatasMicrofibra(){
   // las batas son prendas: sus piezas no se achican ni se agrandan
   Object.keys(BATAS_MICROFIBRA).forEach(nombre => Object.values(tablaConsumo.instrucciones[nombre] || {}).forEach(g => (g.piezas || []).forEach(pz => pz.achicar = false)));
   tablaConsumo.batasFijas = true;
-  db.collection('config').doc('tabla_consumo_telas').set(tablaConsumo).catch(e => console.error('batas', e));
+  db.collection('config').doc('tabla_consumo_telas').set(JSON.parse(JSON.stringify(tablaConsumo))).catch(e => console.error('batas', e));
 }
 
 async function cargarTablaConsumo(){
@@ -3987,7 +3989,7 @@ function refrescarArticulosInstruccion(seleccionar){
   renderListaInstrucciones();
 }
 async function guardarTablaYConsumo(){
-  await db.collection('config').doc('tabla_consumo_telas').set(tablaConsumo);
+  await db.collection('config').doc('tabla_consumo_telas').set(JSON.parse(JSON.stringify(tablaConsumo)));
 }
 async function nuevoArticuloInstruccion(){
   const nombre = (prompt('Nombre del artículo nuevo (ej: Acolchado 2 1/2):') || '').trim();
@@ -5988,7 +5990,7 @@ async function cargarFabricacion(){
   fabricacion.vinculos = fabricacion.vinculos || {};
   fabricacion.propios = fabricacion.propios || {};
 }
-async function guardarFabricacion(){ await db.collection('config').doc('fabricacion').set(fabricacion); }
+async function guardarFabricacion(){ await db.collection('config').doc('fabricacion').set(JSON.parse(JSON.stringify(fabricacion))); }
 // articulo de corte de un SKU: el vinculado a mano, o el que tiene ese SKU cargado, o una ficha con ese SKU
 function articuloDeSku(sku){
   const S = String(sku || '').toUpperCase();
@@ -6490,7 +6492,7 @@ async function completarPiezasDeJuegosGuardados(){
     });
   });
   if(agregadas.length){
-    try{ await db.collection('config').doc('tabla_consumo_telas').set(tablaConsumo); }
+    try{ await db.collection('config').doc('tabla_consumo_telas').set(JSON.parse(JSON.stringify(tablaConsumo))); }
     catch(e){ console.error('No se pudieron guardar las piezas sueltas:', e); return []; }
   }
   return agregadas;
@@ -6530,7 +6532,7 @@ async function guardarInstruccionCorte(){
   if(enTablaAhora === undefined || enTablaAhora === null || enTablaAhora === '') tablaConsumo.articulos[articulo][ancho] = corte.metros;
   const derivadas = cargarPiezasDelJuego(articulo, ancho, piezas);
   try{
-    await db.collection('config').doc('tabla_consumo_telas').set(tablaConsumo);
+    await db.collection('config').doc('tabla_consumo_telas').set(JSON.parse(JSON.stringify(tablaConsumo)));
     document.getElementById('ic-btn-borrar').style.display = 'inline-block';
     renderListaInstrucciones();
     alert('Instrucción y bosquejo guardados.' + (derivadas.length ? '\n\nTambién quedaron cargadas las piezas sueltas:\n• ' + derivadas.join('\n• ') : ''));
@@ -6550,7 +6552,7 @@ async function borrarInstruccionCorte(){
   delete copia[ancho];
   tablaConsumo.instrucciones[articulo] = copia;
   try{
-    await db.collection('config').doc('tabla_consumo_telas').set(tablaConsumo);
+    await db.collection('config').doc('tabla_consumo_telas').set(JSON.parse(JSON.stringify(tablaConsumo)));
     limpiarFormularioInstruccion();
     renderListaInstrucciones();
   } catch(e){
@@ -13843,7 +13845,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v89';
+const APP_VERSION = '2026-10-02-v90';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
