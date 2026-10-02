@@ -1543,7 +1543,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v100</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v101</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -4399,6 +4399,7 @@ async function guardarAC(){
   try{
     await guardarTablaYConsumo();
     if(empaquePendiente) await guardarEmpaqueAC();
+    sincronizarDescripcionesCatalogo();
     renderListaAC();
     renderEditorAC();
     alert('Guardado.' + (derivadas.length ? '\n\nPiezas sueltas actualizadas:\n• ' + derivadas.join('\n• ') : ''));
@@ -5875,6 +5876,7 @@ async function guardarTela(){
     await cargarTelas();
     document.getElementById('tl-editor').style.display = 'none';
     renderTelas();
+    sincronizarDescripcionesCatalogo();
   } catch(e){ err.textContent = 'No se pudo guardar: ' + e.message; err.style.display = 'block'; }
 }
 async function borrarTela(codigo){
@@ -6581,6 +6583,19 @@ async function rearmarPiezasSueltas(){
   });
   tablaConsumo.piezasSueltasV2 = true;
   try{ await guardarTablaYConsumo(); } catch(e){ console.error('rearmar piezas', e); }
+}
+
+// revisa todos los SKU que se fabrican y actualiza en el catalogo los que no coinciden con fabricacion
+async function sincronizarDescripcionesCatalogo(){
+  try{
+    if(tablaConsumo === null) await cargarTablaConsumo();
+    if(telasDatos === null) await cargarTelas();
+    if(fabricacion === null) await cargarFabricacion();
+    if(fichasArticulos === null) await cargarFichasArticulos();
+    const skus = new Set(Object.keys(fabricacion.vinculos || {}));
+    Object.values(tablaConsumo.empaque || {}).forEach(e => { if(e && e.sku) skus.add(String(e.sku).toUpperCase()); });
+    await aplicarDescripcionAutomatica([...skus]);
+  } catch(e){ console.error('sincronizar descripciones', e); }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -14002,13 +14017,15 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
   return cargarProductosEditados();
 }).then(() => {
   renderCatalogo(document.getElementById('buscador').value);
+  // las descripciones de lo que se fabrica se mantienen solas al dia (sin tener que tocar ningun boton)
+  setTimeout(sincronizarDescripcionesCatalogo, 1500);
 });
 </script>
 <script>
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v100';
+const APP_VERSION = '2026-10-02-v101';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
