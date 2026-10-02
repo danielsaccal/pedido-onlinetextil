@@ -1541,7 +1541,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v85</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v86</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -4820,7 +4820,9 @@ function cargarEmpaqueAC(){
     if(fabricacion === null) await cargarFabricacion();
     const sku = String(((tablaConsumo.empaque || {})[acArticulo] || {}).sku || '').toUpperCase();
     const cal = (sku && calidadDeSku(sku)) || ((tablaConsumo.empaque || {})[acArticulo] || {}).calidad || '';
-    document.getElementById('ac-tela').innerHTML = opcionesCalidad(cal);
+    const selCal = document.getElementById('ac-tela');
+    selCal.innerHTML = opcionesCalidad(cal);
+    hacerSelectBuscable(selCal); if(selCal._sync) selCal._sync();
     infoTelaAC();
     renderOtrosSkuAC();
   };
@@ -6098,10 +6100,27 @@ function calidadDeSku(sku){
   if(v && v.tela && datosTela(v.tela)) return claveCalidad(datosTela(v.tela));
   return null;
 }
+function compCorta(t){
+  const pares = claveComposicion(t);
+  if(/\d/.test(pares)){
+    return pares.split('+').map(x => { const m = x.match(/^(\d+)(.*)$/); return m ? m[1] + '% ' + (m[2] === 'algodon' ? 'alg.' : m[2] === 'poliester' ? 'pol.' : m[2]) : x; }).sort((a, b) => parseInt(b) - parseInt(a)).join(' ');
+  }
+  return t.composicion === 'Algodón' ? '100% alg.' : t.composicion === 'Poliéster' ? '100% pol.' : t.composicion === 'Mezcla' ? 'alg./pol.' : '';
+}
 function opcionesCalidad(sel){
   const lista = calidadesTela();
-  if(sel && !lista.some(q => q.clave === sel)){ const base = String(sel).split('#')[0]; const q = lista.find(x => x.clave === base); if(q) sel = base; }
-  return '<option value="">— sin calidad —</option>' + lista.map(q => `<option value="${escapeAttr(q.clave)}" ${q.clave === sel ? 'selected' : ''}>${escaparHtml(q.etiqueta)} (${escaparHtml(q.codigos.join(', '))})</option>`).join('');
+  if(sel && !lista.some(q => q.clave === sel)){ const base = String(sel).split('#')[0]; if(lista.some(x => x.clave === base)) sel = base; }
+  // agrupadas por nombre de tela, con un texto corto: "200 hilos · 70% alg. 30% pol. · blanco"
+  const grupos = new Map();
+  lista.forEach(q => {
+    const t = telasDatos.telas[q.codigos[0]];
+    const g = String(t.nombre || 'Sin nombre').trim().toUpperCase();
+    const color = q.clave.includes('#') ? String(telasDatos.telas[q.codigos[0]].color || '').toLowerCase() : (q.etiqueta.endsWith('cualquier color') ? 'cualquier color' : String(t.color || '').toLowerCase());
+    const txt = [t.hilos ? parseInt(t.hilos, 10) + ' hilos' : '', compCorta(t), color].filter(Boolean).join(' · ') || g;
+    (grupos.get(g) || grupos.set(g, []).get(g)).push({ q, txt: g + ' ' + txt });
+  });
+  return '<option value="">— sin calidad —</option>' + [...grupos].sort((a, b) => a[0].localeCompare(b[0], 'es')).map(([g, xs]) =>
+    `<optgroup label="${escapeAttr(g)}">` + xs.map(({ q, txt }) => `<option value="${escapeAttr(q.clave)}" ${q.clave === sel ? 'selected' : ''} title="${escapeAttr(q.codigos.join(', '))}">${escaparHtml(txt)} (${q.codigos.length} tela${q.codigos.length === 1 ? '' : 's'})</option>`).join('') + '</optgroup>').join('');
 }
 // en la orden: con el articulo y la tela entregada, el SKU que corresponde
 function skuPorArticuloYTela(articuloValor, codTela){
@@ -6138,7 +6157,8 @@ async function renderFabProducto(){
       <button type="button" class="btn-mini" onclick="armarDescripcionProducto()">✨ Armar descripción desde fabricación</button>
       <span id="ep-fab-aviso" class="note" style="text-align:left;"></span>
     </div>`;
-  cont.querySelectorAll('select[data-sku]').forEach(sel => { sel.value = articuloDeSku(sel.dataset.sku) || ''; });
+  cont.querySelectorAll('select[data-sku]').forEach(sel => { sel.value = articuloDeSku(sel.dataset.sku) || ''; hacerSelectBuscable(sel); if(sel._sync) sel._sync(); });
+  const selCalP = document.getElementById('ep-fab-tela'); hacerSelectBuscable(selCalP); if(selCalP._sync) selCalP._sync();
   actualizarInfoFab();
 }
 function actualizarInfoFab(){
@@ -6207,9 +6227,10 @@ function renderOtrosSkuAC(){
   const cont = document.getElementById('ac-otros-sku'); if(!cont || !fabricacion) return;
   cont.innerHTML = otrosSkuActuales().map((o, i) => `<div style="display:grid;grid-template-columns:minmax(0,0.8fr) minmax(0,2fr) 30px;gap:6px;margin-bottom:6px;align-items:center;">
       <input value="${escapeAttr(o.sku)}" disabled style="font-weight:700;">
-      <select onchange="cambiarCalidadOtroSku(${i}, this.value)">${opcionesCalidad(o.calidad || '')}</select>
+      <select class="ac-otro-cal" onchange="cambiarCalidadOtroSku(${i}, this.value)">${opcionesCalidad(o.calidad || '')}</select>
       <button type="button" onclick="quitarOtroSkuAC(${i})" title="Quitar" style="border:none;background:none;cursor:pointer;color:#8A8072;">✕</button>
     </div>`).join('');
+  cont.querySelectorAll('.ac-otro-cal').forEach(s => { hacerSelectBuscable(s); if(s._sync) s._sync(); });
 }
 async function agregarOtroSkuAC(){
   const sku = (prompt('SKU del catálogo (ej: KA131JC):') || '').trim().toUpperCase();
@@ -13743,7 +13764,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v85';
+const APP_VERSION = '2026-10-01-v86';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
