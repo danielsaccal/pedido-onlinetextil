@@ -542,6 +542,7 @@ a.grilla-celda{display:block;}
     .otc-top{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
     .otc-top > div{flex:1;min-width:0;}
     .otc-top select{width:100%;}
+    .otc-top input[type=text]{width:100%;padding:9px 10px;font-size:0.95rem;border:1px solid var(--line);border-radius:8px;box-sizing:border-box;background:#fff;}
     .otc-x{border:none;background:none;font-size:1.1rem;color:#B0A698;cursor:pointer;padding:4px 6px;flex-shrink:0;}
     .otc-x:hover{color:#A6432F;}
     .otc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:6px;margin-bottom:6px;}
@@ -1438,6 +1439,8 @@ a.grilla-celda{display:block;}
         <select id="ot-taller" onchange="manejarCambioTallerOT()"></select>
       </div>
       <div class="field" id="ot-taller-nuevo-wrap" style="display:none;"><label>Nombre del taller nuevo</label><input type="text" id="ot-taller-nuevo" placeholder="Ej: Mendez"></div>
+      <div class="field" id="ot-tela-taller-wrap" style="display:none;"><label>Tela que ya está en el taller</label><select id="ot-tela-taller" onchange="elegirTelaDelTallerOT(this.value)"></select>
+        <p class="note" style="text-align:left;margin-top:3px;">Elija una tela que mandó y todavía no tiene orden, o "Tela nueva" si es otra.</p></div>
       <div class="field"><label>SKU de la tela entregada</label><input type="text" id="ot-sku-tela" placeholder="Ej: MAC315B" list="lista-telas" oninput="aplicarTelaEnOrden()" style="text-transform:uppercase;"><div id="ot-tela-info" class="note" style="margin-top:3px;text-align:left;"></div></div>
       <div class="field"><label>Comprobante de referencia (con qué le entregó la tela el proveedor)</label><input type="text" id="ot-comprobante" placeholder="Ej: Remito 0001-00023456"></div>
       <div class="field"><label>Metros totales entregados</label><input type="number" id="ot-metros-totales" min="0" step="0.01" placeholder="Ej: 600" oninput="calcularReparto()"></div>
@@ -1544,7 +1547,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v103</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v104</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -3003,6 +3006,32 @@ function manejarCambioTallerOT(){
   const sel = document.getElementById('ot-taller');
   const wrap = document.getElementById('ot-taller-nuevo-wrap');
   wrap.style.display = sel.value === '__nuevo__' ? 'block' : 'none';
+  pintarTelasDelTallerOT();
+}
+// telas enviadas a ese taller con metros todavia sin orden
+function pintarTelasDelTallerOT(){
+  const t = document.getElementById('ot-taller').value;
+  const wrap = document.getElementById('ot-tela-taller-wrap'), sel = document.getElementById('ot-tela-taller');
+  if(!wrap) return;
+  if(otEditando || !t || t === '__nuevo__' || !enviosTela){ wrap.style.display = 'none'; return; }
+  const libres = enviosTela.filter(e => e.taller === t && !e.cerrado).map(e => ({ e, resto: Math.round((e.metros - asignadoEnvio(e._id)) * 100) / 100 })).filter(x => x.resto > 0.5);
+  if(!libres.length){ wrap.style.display = 'none'; if(!otEnvioId) document.getElementById('ot-envio-banner').style.display = 'none'; return; }
+  sel.innerHTML = '<option value="">— Tela nueva (no está registrada) —</option>' + libres.map(({ e, resto }) => `<option value="${e._id}" ${otEnvioId === e._id ? 'selected' : ''}>${escaparHtml(e.skuTela)} · ${fmtCm(resto)} m sin orden · enviada ${new Date(String(e.fecha).slice(0, 10) + 'T12:00:00').toLocaleDateString('es-AR')}${e.comprobante ? ' · ' + escaparHtml(e.comprobante) : ''}</option>`).join('');
+  wrap.style.display = 'block';
+}
+function elegirTelaDelTallerOT(id){
+  const banner = document.getElementById('ot-envio-banner');
+  if(!id){ otEnvioId = null; banner.style.display = 'none'; return; }
+  const e = (enviosTela || []).find(x => x._id === id); if(!e) return;
+  const resto = Math.round((e.metros - asignadoEnvio(id)) * 100) / 100;
+  otEnvioId = id;
+  document.getElementById('ot-sku-tela').value = e.skuTela;
+  document.getElementById('ot-comprobante').value = e.comprobante || '';
+  document.getElementById('ot-metros-totales').value = resto;
+  banner.innerHTML = `<b>🚚 Tela del taller: ${escaparHtml(e.skuTela)}</b> — quedan ${fmtCm(resto)} m sin asignar. Puede usar menos y armar otra orden después con el resto.`;
+  banner.style.display = 'block';
+  try{ aplicarTelaEnOrden(); } catch(err){}
+  try{ calcularReparto(); } catch(err){}
 }
 
 // agrega el taller nuevo (si corresponde) a la lista guardada, y devuelve el nombre final a usar
@@ -5275,6 +5304,7 @@ async function armarOrdenDesdeEnvio(id){
   document.getElementById('ot-comprobante').value = e.comprobante || '';
   try{ aplicarTelaEnOrden(); } catch(err){}
   document.getElementById('ot-metros-totales').value = resto;
+  try{ pintarTelasDelTallerOT(); } catch(err){}
   const banner = document.getElementById('ot-envio-banner');
   banner.innerHTML = `<b>🚚 Orden para el envío ${escaparHtml(e.skuTela)} (${escaparHtml(e.taller)})</b> — quedan ${fmtCm(resto)} m sin asignar. Puede usar menos y armar otra orden después con el resto.`;
   banner.style.display = 'block';
@@ -6909,6 +6939,7 @@ async function abrirOrdenTrabajo(modoEdicion){
   if(talleresLista === null) await cargarTalleres();
   if(telasDatos === null) await cargarTelas();
   if(fabricacion === null) await cargarFabricacion();
+  try{ await Promise.all([cargarEnviosTela(), historialOT ? null : cargarHistorialOT()]); } catch(e){}
   poblarSelectTalleres();
   try{ prepararReparto(); } catch(e){ console.error(e); }
 
@@ -7154,6 +7185,14 @@ async function generarOrdenTrabajoCompleta(){
       cont.insertAdjacentHTML('afterbegin', `<p class="note" style="color:#3D7A3D;font-weight:700;margin-bottom:8px;">✓ Cambios guardados en ${escaparHtml(numeroFormateado)}.</p>`);
     } else {
       const fechaNueva = new Date().toISOString();
+      if(!otEnvioId && skuTela && metrosTotales > 0 && confirm(`La tela ${skuTela} no está registrada como ingreso al taller ${taller}.\n\n¿Registrar ahora el ingreso de ${fmtCm(metrosTotales)} m${comprobante ? ' (' + comprobante + ')' : ''}? Así queda en "Tela en talleres" y se controla lo que entrega.`)){
+        try{
+          const nuevo = { taller, skuTela, metros: metrosTotales, comprobante, fecha: fechaNueva.slice(0, 10), creado: fechaNueva };
+          const r = await db.collection('envios_tela').add(nuevo);
+          otEnvioId = r.id;
+          if(enviosTela) enviosTela.unshift({ _id: r.id, ...nuevo });
+        } catch(e){ console.error('ingreso de tela', e); }
+      }
       const envioUsado = otEnvioId;
       const ref = await db.collection('ordenes_trabajo').add({
         numero: numeroFormateado, taller, fecha: fechaNueva, skuTela, comprobante, metrosTotales, metrosConsumidosTotal, renglones, notaGeneral,
@@ -14038,7 +14077,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v103';
+const APP_VERSION = '2026-10-02-v104';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
