@@ -570,7 +570,7 @@ a.grilla-celda{display:block;}
       .ini-col{display:flex;flex-direction:column;gap:8px;}
       .ini-col button{text-align:left;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--cream);font-size:0.95rem;cursor:pointer;color:var(--purple);}
       .ini-col button:hover{background:var(--gold);}
-      @media (max-width:640px){.ini-cols{grid-template-columns:1fr;}}
+      @media (max-width:640px){.ini-cols{grid-template-columns:1fr !important;}}
     </style>
     <div class="search-wrap"><input type="text" id="inicio-buscar" placeholder="Buscar producto o SKU..." oninput="buscarDesdeInicio(this.value)"></div>
     <p class="ini-sec">PARA CLIENTES Y PÚBLICO</p>
@@ -1541,7 +1541,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v92</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v93</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5060,7 +5060,8 @@ const GRUPOS_INICIO = {
   e: { lado: 'int', titulo: 'Clientes', items: [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
   f: { lado: 'int', titulo: 'Productos y precios', items: [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📷 Actualizar foto', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
   g: { lado: 'int', titulo: 'Producción', columnas: [
-    [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()'], ['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🚚 Ingreso a los talleres', 'abrirEnviosTela()']],
+    [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()']],
+    [['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🚚 Ingreso a los talleres', 'abrirEnviosTela()']],
     [['🏭 Productos en producción', 'abrirEnProduccion()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📦 Historial de órdenes', 'abrirHistorialOT()']],
     [['📥 Entregas del taller', 'abrirIngresoTaller()']],
   ] },
@@ -5083,7 +5084,7 @@ function abrirGrupoInicio(k){
   const cont = document.getElementById('ini-sub-' + g.lado);
   const boton = ([t, f]) => `<button type="button" onclick="${f.replace(/"/g, '&quot;')}">${t}</button>`;
   cont.innerHTML = `<p style="margin:0 0 10px;font-weight:700;color:var(--purple);">${g.titulo}</p>` + (g.columnas
-    ? `<div class="ini-cols">${g.columnas.map(col => `<div class="ini-col">${col.map(boton).join('')}</div>`).join('')}</div>`
+    ? `<div class="ini-cols" style="grid-template-columns:repeat(${g.columnas.length},minmax(0,1fr));">${g.columnas.map(col => `<div class="ini-col">${col.map(boton).join('')}</div>`).join('')}</div>`
     : `<div class="ini-sub-btns">${g.items.map(boton).join('')}</div>`);
   cont.style.display = 'block';
   if(window.innerWidth < 700) cont.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -13852,7 +13853,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v92';
+const APP_VERSION = '2026-10-02-v93';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
