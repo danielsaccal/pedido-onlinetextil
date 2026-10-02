@@ -257,9 +257,11 @@ a.grilla-celda{display:block;}
 .producto{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;gap:14px;}
 .producto:last-child{border-bottom:none;}
 .producto-img{
-  width:76px;height:76px;border-radius:8px;object-fit:cover;flex-shrink:0;
+  width:150px;height:150px;border-radius:10px;object-fit:cover;flex-shrink:0;
   border:1px solid var(--line);background:var(--cream);
 }
+.desc-tit{font-weight:600;}
+.desc-det{display:block;font-size:0.8rem;color:#6B6258;line-height:1.45;margin-top:1px;}
 .producto-img-vacia{
   display:flex;align-items:center;justify-content:center;
   font-size:0.62rem;color:#9A9184;text-align:center;padding:4px;
@@ -273,7 +275,7 @@ a.grilla-celda{display:block;}
 }
 .producto-admin-links span:hover{opacity:1;color:var(--purple);text-decoration:underline;}
 @media (max-width:420px){
-  .producto-img{width:60px;height:60px;}
+  .producto-img{width:110px;height:110px;}
   .variante-fila{grid-template-columns:1fr auto;grid-template-rows:auto auto;row-gap:6px;}
   .variante-fila .precio{grid-column:2;grid-row:1;}
   .variante-fila .qty{grid-column:1/3;grid-row:2;justify-self:start;}
@@ -1541,7 +1543,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v93</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v94</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1669,6 +1671,7 @@ a.grilla-celda{display:block;}
                 <div><input type="number" id="ac-por-bolsa" min="1" step="1" placeholder="1" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Unidades por bolsa</div></div>
                 <div><input type="text" id="ac-et-desc" placeholder="Descripción" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Nombre del artículo (etiqueta)</div></div>
                 <div><input type="text" id="ac-et-medida" placeholder="50 X 85 CM (APROX)" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Medida (etiqueta)</div></div>
+                <div><input type="text" id="ac-colchon" placeholder="90 × 190 × 30" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Colchón (para la ajustable, en cm)</div></div>
                 <div><input type="text" id="ac-sku" placeholder="Ej: KA181F" oninput="cambioEmpaqueAC(); infoTelaAC();" style="text-transform:uppercase;"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">SKU (se completa solo en la orden)</div></div>
                 <div style="grid-column:1 / -1;"><select id="ac-tela" onchange="cambiarTelaArticuloAC()" style="width:100%;padding:9px 8px;box-sizing:border-box;"></select><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Calidad de tela de este SKU (cualquier ancho)</div><div id="ac-tela-info" style="font-size:0.7rem;color:#6B6258;"></div></div>
                 <div style="grid-column:1 / -1;border-top:1px dashed var(--line);padding-top:8px;">
@@ -2022,6 +2025,15 @@ const contCategorias = document.getElementById('categorias');
 
 function rowId(catIdx, prodIdx, varIdx){ return catIdx+'-'+prodIdx+'-'+varIdx; }
 
+// descripcion de una medida: si viene armada desde fabricacion ("Juego 1½ plaza — Ajustable … / Plana … · 1 funda …"),
+// se muestra el titulo y debajo el detalle en renglones
+function descVarianteHtml(desc){
+  const s = String(desc || '');
+  const i = s.indexOf(' — ');
+  if(i < 0) return s;
+  return `<span class="desc-tit">${s.slice(0, i)}</span><span class="desc-det">${s.slice(i + 3).split(' / ').join('<br>')}</span>`;
+}
+
 function renderCatalogo(filtro){
   filtro = (filtro||'').trim().toLowerCase();
   contCategorias.innerHTML = '';
@@ -2071,7 +2083,7 @@ function renderCatalogo(filtro){
         variantesHtml += `
           <div class="variante">
             <div class="variante-fila">
-              <div class="desc">${v.desc}<span class="sku">SKU ${v.sku}</span>${rolloNota}</div>
+              <div class="desc">${descVarianteHtml(v.desc)}<span class="sku">SKU ${v.sku}</span>${rolloNota}</div>
               <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioNum) + (p.metros ? ' /m' : '')}</div>
               ${precioNum===null ? '<div></div>' : `
               <div class="qty">
@@ -4833,6 +4845,7 @@ function cargarEmpaqueAC(){
   };
   if(telasDatos === null) cargarTelas().then(pintarCal); else pintarCal();
   document.getElementById('ac-por-bolsa').value = d.porBolsa > 1 ? d.porBolsa : '';
+  document.getElementById('ac-colchon').value = ((tablaConsumo.empaque || {})[acArticulo] || {}).colchon || '';
   document.getElementById('ac-et-desc').placeholder = String(acArticulo || '').toUpperCase();
 }
 function cambioEmpaqueAC(){
@@ -4845,6 +4858,7 @@ function cambioEmpaqueAC(){
     etMedida: document.getElementById('ac-et-medida').value.trim(),
     sku: document.getElementById('ac-sku').value.trim().toUpperCase(),
     porBolsa: Math.max(1, parseInt(document.getElementById('ac-por-bolsa').value, 10) || 1),
+    colchon: document.getElementById('ac-colchon').value.trim(),
   };
   marcarEmpaquePendiente();
 }
@@ -6266,25 +6280,60 @@ function descripcionAutomaticaProducto(producto, categoria){
   const clave = Object.keys(cuenta).sort((a, b) => cuenta[b] - cuenta[a])[0];
   return descripcionDesdeCalidad(clave, categoria);
 }
+// descripcion de cada SKU armada desde fabricacion: "Juego 1½ plaza — Ajustable para colchón 90 × 190 × 30 cm / Plana 150 × 250 cm · 1 funda 50 × 85 cm"
+function nombreLindoArticulo(n){
+  return String(n || '').replace(/\b1\s*1\/2\b/, '1½ plaza').replace(/\b2\s*1\/2\b/, '2½ plazas').replace(/^juego/i, 'Juego').trim();
+}
+function descripcionVarianteFab(sku){
+  const art = articuloDeSku(sku);
+  if(!art) return null;
+  const piezas = piezasDeArticuloAny(art);
+  if(!piezas || !piezas.length) return null;
+  const nombreArt = art.startsWith('ficha:') ? ((fichasArticulos.fichas[art.slice(6)] || {}).nombre || art.slice(6)) : art;
+  const titulo = nombreLindoArticulo(nombreArt);
+  const emp = art.startsWith('ficha:') ? {} : ((tablaConsumo.empaque || {})[art] || {});
+  const m = (a, l) => `${fmtCm(a)} × ${fmtCm(l)} cm`;
+  const esJuego = /juego/i.test(nombreArt) || piezas.some(p => /ajustable/i.test(p.nombre)) && piezas.some(p => /plana/i.test(p.nombre));
+  if(!esJuego){
+    if(piezas.length === 1) return `${titulo} — ${m(piezas[0].ancho, piezas[0].largo)}`;
+    return null; // prendas de varias piezas (ej: batas): se deja la descripcion que tenga
+  }
+  const ajus = piezas.find(p => /ajustable/i.test(p.nombre));
+  const linea1 = ajus ? (emp.colchon ? `Ajustable para colchón ${String(emp.colchon).replace(/\s*[x×]\s*/gi, ' × ').replace(/\s*cm$/i, '')} cm` : 'Ajustable') : '';
+  const resto = piezas.filter(p => p !== ajus).map(p => {
+    const n = p.cantidad || 1;
+    if(/funda/i.test(p.nombre)) return `${n} funda${n === 1 ? '' : 's'} ${m(p.ancho, p.largo)}`;
+    const nom = String(p.nombre).trim();
+    return `${n > 1 ? n + ' ' : ''}${nom.charAt(0).toUpperCase() + nom.slice(1).toLowerCase()} ${m(p.ancho, p.largo)}`;
+  });
+  return `${titulo} — ${[linea1, resto.join(' · ')].filter(Boolean).join(' / ')}`;
+}
+
 async function aplicarDescripcionAutomatica(skus){
   const hechos = new Set();
+  let cambiados = 0;
   for(const s of skus){
     const r = s ? buscarProductoPorSku(s) : null;
-    if(!r || hechos.has(r.producto)) continue;
+    if(!r || hechos.has(r.producto) || !Array.isArray(r.producto.variantes)) continue;
     hechos.add(r.producto);
     const p = r.producto;
     const d = descripcionAutomaticaProducto(p, r.categoria);
-    if(!d || normBusqueda(d) === normBusqueda(p.composicion || '')) continue;
+    let cambio = false;
+    if(d && normBusqueda(d) !== normBusqueda(p.composicion || '')){ p.composicion = d; cambio = true; }
+    const variantes = p.variantes.map(v => { const dv = descripcionVarianteFab(v.sku); if(dv && dv !== v.desc){ cambio = true; return { ...v, desc: dv }; } return v; });
+    if(!cambio) continue;
     try{
-      if(p._editKey && p._editKey.startsWith('nuevo-')) await db.collection('productos_nuevos').doc(p._docId).update({ composicion: d });
-      else if(p._editKey) await db.collection('productos_editados').doc(p._editKey).set({ nombre: p.nombre, composicion: d, variantes: p.variantes, metros: p.metros || null }, { merge: true });
+      const datos = { nombre: p.nombre, composicion: p.composicion || '', variantes, metros: p.metros || null };
+      if(p._editKey && p._editKey.startsWith('nuevo-')) await db.collection('productos_nuevos').doc(p._docId).update(datos);
+      else if(p._editKey) await db.collection('productos_editados').doc(p._editKey).set(datos, { merge: true });
       else continue;
-      p.composicion = d;
+      p.variantes = variantes;
+      cambiados++;
       if(fabricacion){ fabricacion.propios[p.nombre] = true; }
     } catch(e){ console.error('descripcion automatica', e); }
   }
-  if(hechos.size){ try{ await guardarFabricacion(); } catch(e){} try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){} }
-  return hechos.size;
+  if(cambiados){ try{ await guardarFabricacion(); } catch(e){} try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){} }
+  return cambiados;
 }
 
 let pfFiltro = 'todos';
@@ -13853,7 +13902,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v93';
+const APP_VERSION = '2026-10-02-v94';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
