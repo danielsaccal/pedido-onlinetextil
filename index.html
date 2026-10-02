@@ -6101,7 +6101,9 @@ function calidadDeSku(sku){
   if(v && v.calidad){
     const telas = Object.values((telasDatos && telasDatos.telas) || {});
     if(telas.some(t => telaCumpleCalidad(t, v.calidad))) return v.calidad;
-    const t = telas.find(t => claveCalidadVieja(t) === v.calidad || claveCalidad(t) === String(v.calidad).replace(/\|algodon(#|$)/, '|100algodon$1').replace(/\|poliester(#|$)/, '|100poliester$1'));
+    const nueva = String(v.calidad).replace(/\|algodon(#|$)/, '|100algodon$1').replace(/\|poliester(#|$)/, '|100poliester$1');
+    if(nueva !== v.calidad && telas.some(t => telaCumpleCalidad(t, nueva))){ v.calidad = nueva; return nueva; }
+    const t = telas.find(t => claveCalidadVieja(t) === v.calidad);
     if(t){ v.calidad = claveCalidad(t); return v.calidad; }
     return v.calidad;
   }
