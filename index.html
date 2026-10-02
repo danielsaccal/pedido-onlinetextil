@@ -261,6 +261,7 @@ a.grilla-celda{display:block;}
   border:1px solid var(--line);background:var(--cream);
 }
 .desc-tit{font-weight:600;}
+.nota-medidas{font-size:0.72rem;color:#8A8072;font-style:italic;margin:6px 0 0;}
 .desc-det{display:block;font-size:0.8rem;color:#6B6258;line-height:1.45;margin-top:1px;}
 .producto-img-vacia{
   display:flex;align-items:center;justify-content:center;
@@ -1543,7 +1544,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v101</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v102</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2123,6 +2124,7 @@ function renderCatalogo(filtro){
           <p class="producto-nombre">${p.nombre}</p>
           <p class="producto-comp">${p.composicion || ''}</p>
           ${variantesHtml}
+          ${p.variantes.some(v => String(v.desc || '').includes(' — ')) ? '<p class="nota-medidas">Medidas de corte: el producto terminado queda unos centímetros más chico por las costuras.</p>' : ''}
           <div class="producto-admin-links">
             <span onclick="irAFotoConSku('${escapeAttr(primerSku)}')">📷 Cambiar foto</span>
             <span onclick="irAFlyerConSku('${escapeAttr(primerSku)}')">🖼️ Generar flyer</span>
@@ -6380,8 +6382,19 @@ function descripcionVarianteFab(sku){
     return `${titulo} — ${colchonTxt ? 'Para colchón ' + colchonTxt : md(piezas[0])}`;
   }
   if(!esJuego){
-    if(piezas.length === 1) return `${titulo} — ${md(piezas[0])}`;
-    return null; // prendas de varias piezas (ej: batas): se deja la descripcion que tenga
+    // piezas iguales se cuentan juntas (ej: cortina = 2 paños de 150 × 225)
+    const grupos = [];
+    piezas.forEach(p => {
+      const txt = md(p);
+      const nom = /corte de tela|pa[ñn]o/i.test(p.nombre || '') || /cortina/i.test(nombreArt) ? 'paño' : String(p.nombre || 'pieza').trim().toLowerCase();
+      const g = grupos.find(x => x.txt === txt && x.nom === nom);
+      const n = (p.cantidad || 1) * ((p.partes || 1) > 1 && !/funda/i.test(p.nombre) ? p.partes : 1);
+      if(g) g.n += n; else grupos.push({ txt, nom, n });
+    });
+    if(grupos.length > 3) return null; // prendas de muchas piezas (ej: batas): se deja la descripcion que tenga
+    const pl = (n, s) => n === 1 ? s : (/[aeiou]$/i.test(s) ? s + 's' : s + 'es');
+    if(grupos.length === 1 && grupos[0].n === 1) return `${titulo} — ${grupos[0].txt}`;
+    return `${titulo} — ${grupos.map(g => `${g.n} ${pl(g.n, g.nom)} de ${g.txt}`).join(' · ')}`;
   }
   const ajus = piezas.find(p => /ajustable/i.test(p.nombre));
   const linea1 = ajus ? (colchonTxt ? `Ajustable para colchón ${colchonTxt}` : 'Ajustable') : '';
@@ -14025,7 +14038,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v101';
+const APP_VERSION = '2026-10-02-v102';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
