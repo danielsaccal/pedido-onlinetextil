@@ -1547,7 +1547,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v105</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v106</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1821,15 +1821,42 @@ a.grilla-celda{display:block;}
   </div>
 
   <div class="step" id="step-historial-entregas">
-    <div class="form-card" style="max-width:1000px;">
-      <h2>Historial de entregas del taller</h2>
-      <p class="note" style="margin-bottom:10px;">Todo lo que entregó cada taller, entrega por entrega.</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
-        <input type="text" id="he-buscar" placeholder="🔍 Buscar producto, SKU, orden o remito" oninput="renderHistorialEntregas()" style="flex:1;min-width:200px;">
-        <select id="he-taller" onchange="renderHistorialEntregas()" style="width:auto;"></select>
-        <select id="he-periodo" onchange="renderHistorialEntregas()" style="width:auto;"><option value="0">Todo</option><option value="7">Últimos 7 días</option><option value="30" selected>Últimos 30 días</option><option value="90">Últimos 90 días</option></select>
+    <style>
+      .he-top{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+      .he-top input{flex:1;min-width:200px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:0.92rem;background:#fff;}
+      .he-seg{display:inline-flex;background:var(--cream);border-radius:12px;padding:3px;gap:2px;}
+      .he-seg button{border:none;background:none;padding:7px 11px;border-radius:9px;font-size:0.8rem;color:#6B6258;cursor:pointer;}
+      .he-seg button.on{background:#fff;color:var(--purple);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.08);}
+      .he-talleres{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+      .he-talleres span{cursor:pointer;font-size:0.82rem;padding:5px 12px;border-radius:14px;border:1px solid var(--line);background:#fff;}
+      .he-talleres span.on{background:var(--purple);color:#fff;border-color:var(--purple);}
+      .he-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px;}
+      .he-kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;}
+      .he-kpi b{display:block;font-size:1.5rem;color:var(--purple);line-height:1.1;}
+      .he-kpi span{font-size:0.75rem;color:#8A8072;}
+      .he-dia{font-size:0.75rem;font-weight:700;letter-spacing:.05em;color:#8A8072;text-transform:uppercase;margin:16px 0 8px;}
+      .he-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:8px;display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:12px;align-items:start;}
+      .he-av{width:40px;height:40px;border-radius:50%;background:var(--purple);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;}
+      .he-tit{font-weight:700;font-size:0.95rem;}
+      .he-sub{font-size:0.78rem;color:#8A8072;margin-top:1px;}
+      .he-prods{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+      .he-prod{background:var(--cream);border-radius:10px;padding:4px 10px;font-size:0.8rem;}
+      .he-prod small{color:#8A8072;margin-left:4px;}
+      .he-prod .fall{color:#A6432F;font-weight:700;margin-left:4px;}
+      .he-tot{text-align:right;white-space:nowrap;}
+      .he-tot b{display:block;font-size:1.2rem;color:#2F7A47;}
+      .he-tot span{font-size:0.72rem;color:#8A8072;}
+      .he-tot .f{color:#A6432F;font-size:0.75rem;font-weight:700;}
+      @media (max-width:520px){ .he-card{grid-template-columns:34px minmax(0,1fr);} .he-tot{grid-column:2;text-align:left;} .he-tot b{display:inline;font-size:1rem;margin-right:6px;} }
+    </style>
+    <div class="form-card" style="max-width:900px;">
+      <h2>Historial de entregas</h2>
+      <div class="he-top">
+        <input type="text" id="he-buscar" placeholder="🔍 Producto, SKU, orden o remito" oninput="renderHistorialEntregas()">
+        <div class="he-seg" id="he-periodo-seg"></div>
       </div>
-      <div id="he-resumen" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;"></div>
+      <div class="he-talleres" id="he-talleres"></div>
+      <div class="he-kpis" id="he-resumen"></div>
       <div id="he-lista"><p class="empty-msg">Cargando...</p></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
@@ -6658,7 +6685,7 @@ async function sincronizarDescripcionesCatalogo(){
 }
 
 // ===== Historial de entregas del taller =====
-let entregasTaller = null;
+let entregasTaller = null, heTaller = '', hePeriodo = 30;
 async function abrirHistorialEntregas(){
   mostrarPaso('step-historial-entregas');
   document.getElementById('he-lista').innerHTML = '<p class="empty-msg">Cargando...</p>';
@@ -6666,38 +6693,40 @@ async function abrirHistorialEntregas(){
     const snap = await db.collection('ingresos_taller').get();
     entregasTaller = snap.docs.map(d => ({ _id: d.id, ...d.data() })).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
   } catch(e){ entregasTaller = []; document.getElementById('he-lista').innerHTML = '<p class="error">No se pudo cargar: ' + escaparHtml(e.message) + '</p>'; return; }
-  const talleres = [...new Set(entregasTaller.map(x => x.taller).filter(Boolean))].sort();
-  const sel = document.getElementById('he-taller'), act = sel.value;
-  sel.innerHTML = '<option value="">Todos los talleres</option>' + talleres.map(t => `<option value="${escapeAttr(t)}">${escaparHtml(t)}</option>`).join('');
-  if(talleres.includes(act)) sel.value = act;
   renderHistorialEntregas();
 }
 function renderHistorialEntregas(){
+  const talleres = [...new Set((entregasTaller || []).map(x => x.taller).filter(Boolean))].sort();
+  document.getElementById('he-talleres').innerHTML = [['', 'Todos'], ...talleres.map(t => [t, t])].map(([v, t]) => `<span class="${heTaller === v ? 'on' : ''}" onclick="heTaller='${escapeAttr(v)}'; renderHistorialEntregas();">${escaparHtml(t)}</span>`).join('');
+  document.getElementById('he-periodo-seg').innerHTML = [[7, '7 días'], [30, '30 días'], [90, '90 días'], [0, 'Todo']].map(([v, t]) => `<button type="button" class="${hePeriodo === v ? 'on' : ''}" onclick="hePeriodo=${v}; renderHistorialEntregas();">${t}</button>`).join('');
   const q = normBusqueda(document.getElementById('he-buscar').value);
-  const t = document.getElementById('he-taller').value;
-  const dias = parseInt(document.getElementById('he-periodo').value, 10) || 0;
-  const desde = dias ? Date.now() - dias * 86400000 : 0;
-  const lista = (entregasTaller || []).filter(x => (!t || x.taller === t) && (!desde || new Date(x.fecha).getTime() >= desde) &&
+  const desde = hePeriodo ? Date.now() - hePeriodo * 86400000 : 0;
+  const lista = (entregasTaller || []).filter(x => (!heTaller || x.taller === heTaller) && (!desde || new Date(x.fecha).getTime() >= desde) &&
     (!q || normBusqueda(`${x.taller} ${x.nota || ''} ${(x.detalle || []).map(d => `${d.articulo} ${d.sku} ${d.orden}`).join(' ')}`).includes(q)));
-  const tb = lista.reduce((s, x) => s + (x.detalle || []).reduce((a, d) => a + (+d.buenas || 0), 0), 0);
-  const tf = lista.reduce((s, x) => s + (x.detalle || []).reduce((a, d) => a + (+d.falladas || 0), 0), 0);
-  const chip = txt => `<span style="background:var(--cream);border-radius:10px;padding:6px 12px;font-size:0.85rem;">${txt}</span>`;
-  document.getElementById('he-resumen').innerHTML = chip(`<b>${lista.length}</b> entrega${lista.length === 1 ? '' : 's'}`) + chip(`<b>${tb}</b> unidades buenas`) + (tf ? chip(`<b style="color:#A6432F;">${tf}</b> falladas`) : '');
+  const sum = (x, k) => (x.detalle || []).reduce((a, d) => a + (+d[k] || 0), 0);
+  const tb = lista.reduce((s, x) => s + sum(x, 'buenas'), 0), tf = lista.reduce((s, x) => s + sum(x, 'falladas'), 0);
+  const kpi = (n, t, color) => `<div class="he-kpi"><b${color ? ` style="color:${color};"` : ''}>${n}</b><span>${t}</span></div>`;
+  document.getElementById('he-resumen').innerHTML = kpi(lista.length, lista.length === 1 ? 'entrega' : 'entregas') + kpi(tb, 'unidades buenas') + kpi(tf, 'falladas', tf ? '#A6432F' : '') + kpi(tb + tf ? (Math.round(tf / (tb + tf) * 1000) / 10).toString().replace('.', ',') + ' %' : '—', 'falladas sobre lo entregado');
   const cont = document.getElementById('he-lista');
-  if(!lista.length){ cont.innerHTML = '<p class="empty-msg">No hay entregas en ese período.</p>'; return; }
+  if(!lista.length){ cont.innerHTML = '<p class="empty-msg">No hay entregas en este período.</p>'; return; }
+  const hoy = new Date().toDateString(), ayer = new Date(Date.now() - 86400000).toDateString();
+  let diaPrev = '';
   cont.innerHTML = lista.map(x => {
-    const f = new Date(x.fecha);
-    const b = (x.detalle || []).reduce((a, d) => a + (+d.buenas || 0), 0), fa = (x.detalle || []).reduce((a, d) => a + (+d.falladas || 0), 0);
-    return `<div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;">
-      <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline;">
-        <b>${escaparHtml(x.taller || '')} · ${f.toLocaleDateString('es-AR')} ${f.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</b>
-        <span style="font-size:0.85rem;">${b} buenas${fa ? ` · <span style="color:#A6432F;">${fa} falladas</span>` : ''}</span>
+    const f = new Date(x.fecha), ds = f.toDateString();
+    const dia = ds === hoy ? 'Hoy' : ds === ayer ? 'Ayer' : f.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+    const cab = dia !== diaPrev ? `<div class="he-dia">${dia}</div>` : '';
+    diaPrev = dia;
+    const b = sum(x, 'buenas'), fa = sum(x, 'falladas');
+    const ordenes = [...new Set((x.detalle || []).map(d => d.orden).filter(Boolean))];
+    const prods = (x.detalle || []).map(d => `<span class="he-prod"><b>${+d.buenas || 0}</b> × ${escaparHtml(d.articulo || '')}${d.sku ? `<small>${escaparHtml(d.sku)}</small>` : ''}${d.falladas ? `<span class="fall">+${d.falladas} fall.</span>` : ''}</span>`).join('');
+    return cab + `<div class="he-card">
+      <div class="he-av">${escaparHtml(String(x.taller || '?').charAt(0).toUpperCase())}</div>
+      <div>
+        <div class="he-tit">${escaparHtml(x.taller || '')}</div>
+        <div class="he-sub">${f.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })} h${ordenes.length ? ' · ' + escaparHtml(ordenes.join(', ')) : ''}${x.nota && !/historial de órdenes/i.test(x.nota) ? ' · 📄 ' + escaparHtml(x.nota) : ''}</div>
+        <div class="he-prods">${prods}</div>
       </div>
-      ${x.nota ? `<div class="note" style="text-align:left;">📄 ${escaparHtml(x.nota)}</div>` : ''}
-      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-top:6px;">
-        <thead><tr style="color:#8A8072;font-size:0.75rem;"><th style="text-align:left;padding:3px 4px;">Producto</th><th style="text-align:left;padding:3px 4px;">SKU</th><th style="text-align:left;padding:3px 4px;">Orden</th><th style="text-align:right;padding:3px 4px;">Buenas</th><th style="text-align:right;padding:3px 4px;">Falladas</th></tr></thead>
-        <tbody>${(x.detalle || []).map(d => `<tr style="border-top:1px solid var(--line);"><td style="padding:4px;">${escaparHtml(d.articulo || '')}</td><td style="padding:4px;">${escaparHtml(d.sku || '—')}</td><td style="padding:4px;white-space:nowrap;">${escaparHtml(d.orden || '')}</td><td style="padding:4px;text-align:right;font-weight:700;">${+d.buenas || 0}</td><td style="padding:4px;text-align:right;${d.falladas ? 'color:#A6432F;' : ''}">${+d.falladas || 0}</td></tr>`).join('')}</tbody>
-      </table></div>
+      <div class="he-tot"><b>${b}</b><span>buenas</span>${fa ? `<div class="f">${fa} falladas</div>` : ''}</div>
     </div>`;
   }).join('');
 }
@@ -14139,7 +14168,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v105';
+const APP_VERSION = '2026-10-02-v106';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
