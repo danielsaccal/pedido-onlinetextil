@@ -1543,7 +1543,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v99</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v100</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6368,16 +6368,21 @@ function descripcionVarianteFab(sku){
   // medidas segun la tela de este SKU
   const adapt = medidasAdaptadas(piezas, anchosDeCalidadSku(sku));
   const md = p => { const i = piezas.indexOf(p); return i >= 0 ? m(adapt[i].a, adapt[i].l) : m(p.ancho, p.largo); };
+  // colchon: el cargado en el articulo o, si no, el que figuraba en la descripcion original del catalogo
+  let colchon = emp.colchon;
+  if(!colchon){ const mm = String(DESC_ORIGINAL_SKU[String(sku).toUpperCase()] || '').match(/(\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?(?:\s*[x×]\s*\d+(?:[.,]\d+)?)?)/i); if(mm) colchon = mm[1]; }
+  const colchonTxt = colchon ? `${String(colchon).replace(/\s*[x×]\s*/gi, ' × ').replace(/\s*cm$/i, '')} cm` : '';
   const esJuego = /juego/i.test(nombreArt) || piezas.some(p => /ajustable/i.test(p.nombre)) && piezas.some(p => /plana/i.test(p.nombre));
+  // una ajustable sola: lo que importa es para que colchon es
+  if(!esJuego && (/ajustable/i.test(nombreArt) || (piezas.length === 1 && /ajustable/i.test(piezas[0].nombre)))){
+    return `${titulo} — ${colchonTxt ? 'Para colchón ' + colchonTxt : md(piezas[0])}`;
+  }
   if(!esJuego){
     if(piezas.length === 1) return `${titulo} — ${md(piezas[0])}`;
     return null; // prendas de varias piezas (ej: batas): se deja la descripcion que tenga
   }
   const ajus = piezas.find(p => /ajustable/i.test(p.nombre));
-  // colchon: el cargado en el articulo o, si no, el que figuraba en la descripcion original del catalogo
-  let colchon = emp.colchon;
-  if(!colchon){ const mm = String(DESC_ORIGINAL_SKU[String(sku).toUpperCase()] || '').match(/(\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?(?:\s*[x×]\s*\d+(?:[.,]\d+)?)?)/i); if(mm) colchon = mm[1]; }
-  const linea1 = ajus ? (colchon ? `Ajustable para colchón ${String(colchon).replace(/\s*[x×]\s*/gi, ' × ').replace(/\s*cm$/i, '')} cm` : 'Ajustable') : '';
+  const linea1 = ajus ? (colchonTxt ? `Ajustable para colchón ${colchonTxt}` : 'Ajustable') : '';
   const resto = piezas.filter(p => p !== ajus).map(p => {
     const n = p.cantidad || 1;
     if(/funda/i.test(p.nombre)) return `${n} funda${n === 1 ? '' : 's'} ${md(p)}`;
@@ -14003,7 +14008,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v99';
+const APP_VERSION = '2026-10-02-v100';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
