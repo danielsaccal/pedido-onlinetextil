@@ -1543,7 +1543,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v97</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v98</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -4172,6 +4172,7 @@ async function abrirArticulosCortes(){
   tablaConsumo.articulos = tablaConsumo.articulos || {};
   tablaConsumo.instrucciones = tablaConsumo.instrucciones || {};
   await completarPiezasDeJuegosGuardados();
+  await rearmarPiezasSueltas();
   if(!window.__limpiezaOfrecida){ window.__limpiezaOfrecida = true; setTimeout(async () => { await normalizarFundas5085(); await limpiarPiezasRepetidas(true); }, 300); }
   document.getElementById('ac-buscar').value = '';
   acArticulo = null;
@@ -4281,7 +4282,7 @@ function renderEditorAC(){
   renderAnchosAC();
   document.getElementById('ac-titulo').textContent = acArticulo;
   const origen = origenAC(acArticulo);
-  document.getElementById('ac-origen').textContent = origen ? `Pieza del ${origen}: se actualiza sola cuando guarda el juego.`
+  document.getElementById('ac-origen').textContent = origen ? `Pieza del ${origen}. Si cambia la medida acá, se cambia en el juego y en todas sus piezas.`
     : (acDeducidaDe ? `ℹ️ Piezas deducidas de "${acDeducidaDe}" por el nombre. Revíselas y toque Guardar.` : '');
   const grupos = juegosDePiezasAC(acArticulo);
   document.getElementById('ac-variantes').innerHTML = grupos.length > 1
@@ -4337,6 +4338,36 @@ function verImagenGrandeAC(src){
   document.body.appendChild(o);
 }
 
+// pieza suelta generada desde un juego (ej: "Ajustable 1 1/2" del "Juego 1 1/2"): se edita el juego
+async function guardarPiezaDeJuegoAC(piezasNuevas){
+  const juego = origenAC(acArticulo);
+  const g = juegosDePiezasAC(juego)[0];
+  if(!g) return false;
+  const p = piezasNuevas[0];
+  const anterior = ((Object.values(tablaConsumo.instrucciones[acArticulo] || {}).find(x => x && x.auto) || {}).piezas || [])[0];
+  const nombreBuscado = normBusqueda((anterior && anterior.nombre) || p.nombre);
+  let cambiada = false;
+  const piezasJuego = g.piezas.map(x => {
+    if(!cambiada && normBusqueda(x.nombre) === nombreBuscado){ cambiada = true; return { ...x, nombre: p.nombre, ancho: p.ancho, largo: p.largo, partes: p.partes || x.partes || 1, girar: p.girar }; }
+    return x;
+  });
+  if(!cambiada) return false;
+  if(!confirm(`"${acArticulo}" es una pieza del "${juego}". El cambio se hace en el juego y se actualizan juntas todas sus piezas sueltas. ¿Seguir?`)) return true;
+  const W = Object.keys(tablaConsumo.instrucciones[juego]).find(k => { const x = tablaConsumo.instrucciones[juego][k]; return x && !x.auto && piezasValidas(x); }) || g.anchos[0];
+  const corte = calcularCorte(piezasJuego, parseFloat(W));
+  const otras = {};
+  Object.entries(tablaConsumo.instrucciones[juego]).forEach(([k, x]) => { if(x && x.auto) otras[k] = x; });
+  const previa = tablaConsumo.instrucciones[juego][W] || {};
+  tablaConsumo.instrucciones[juego] = { ...otras, [W]: { ...previa, texto: textoCorte(juego, piezasJuego, parseFloat(W), previa.nota || ''), bosquejoBase64: '', piezas: piezasJuego, tipo: 'personalizado', consumo: corte.metros, guardado: Date.now() } };
+  const hechos = cargarPiezasDelJuego(juego, String(W), piezasJuego);
+  try{
+    await guardarTablaYConsumo();
+    renderListaAC(); abrirArticuloAC(acArticulo);
+    alert(`Guardado en el ${juego}.` + (hechos.length ? '\n\nPiezas sueltas actualizadas:\n• ' + hechos.join('\n• ') : ''));
+  } catch(e){ alert('No se pudo guardar: ' + e.message); }
+  return true;
+}
+
 async function guardarAC(){
   const errorEl = document.getElementById('ac-error');
   errorEl.style.display = 'none';
@@ -4344,6 +4375,7 @@ async function guardarAC(){
   if(!piezas.length || piezas.some(p => !p.nombre || !(p.ancho > 0) || !(p.largo > 0))){
     errorEl.textContent = 'Complete nombre, ancho y largo de cada pieza.'; errorEl.style.display = 'block'; return;
   }
+  if(origenAC(acArticulo) && piezas.length === 1){ if(await guardarPiezaDeJuegoAC(piezas)) return; }
   const a = acArticulo;
   const W = acAnchoVista;
   if(!W){ errorEl.textContent = 'Estas piezas no entran en ninguno de sus anchos de tela.'; errorEl.style.display = 'block'; return; }
@@ -6518,6 +6550,27 @@ async function normalizarFundas5085(){
   await limpiarPiezasRepetidas(true);
 }
 
+async function rearmarPiezasSueltas(){
+  if(!tablaConsumo || tablaConsumo.piezasSueltasV2) return;
+  Object.keys(tablaConsumo.instrucciones || {}).forEach(j => {
+    if(!medidaDelJuego(j)) return;
+    const g = juegosDePiezasAC(j)[0];
+    if(!g) return;
+    const W = g.anchos[0];
+    // las piezas sueltas automaticas de este juego se rearman desde cero con sus medidas actuales
+    Object.keys(tablaConsumo.instrucciones).forEach(a => {
+      const por = tablaConsumo.instrucciones[a] || {};
+      if(Object.values(por).some(x => x && x.auto && x.origen === j)){
+        Object.keys(por).forEach(k => { if(por[k] && por[k].auto && por[k].origen === j) delete por[k]; });
+        if(!Object.keys(por).length) delete tablaConsumo.instrucciones[a];
+      }
+    });
+    cargarPiezasDelJuego(j, String(W), g.piezas);
+  });
+  tablaConsumo.piezasSueltasV2 = true;
+  try{ await guardarTablaYConsumo(); } catch(e){ console.error('rearmar piezas', e); }
+}
+
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -6557,7 +6610,9 @@ function cargarPiezasDelJuego(articulo, ancho, piezas){
     // si ya existe otro articulo con exactamente la misma pieza (ej: la funda del 2 1/2 es igual a la del 1 1/2), no se crea aparte
     if(!tablaConsumo.instrucciones[nombre]){ const igual = articuloConMismaPieza(suelta[0], nombre); if(igual) return; }
     const corte = calcularCorte(suelta, parseFloat(ancho));
-    tablaConsumo.instrucciones[nombre] = { ...(tablaConsumo.instrucciones[nombre]||{}),
+    const manuales = {};
+    Object.entries(tablaConsumo.instrucciones[nombre] || {}).forEach(([k, g]) => { if(g && !g.auto) manuales[k] = g; });
+    tablaConsumo.instrucciones[nombre] = { ...manuales,
       [ancho]: { texto: textoCorte(nombre, suelta, parseFloat(ancho), ''), bosquejoBase64: '', piezas: suelta, nota: '', tipo: 'personalizado', consumo: corte.metros, auto: true, origen: articulo } };
     tablaConsumo.articulos[nombre] = tablaConsumo.articulos[nombre] || {};
     const enTabla = tablaConsumo.articulos[nombre][ancho];
@@ -13941,7 +13996,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v97';
+const APP_VERSION = '2026-10-02-v98';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
