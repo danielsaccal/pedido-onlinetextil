@@ -1541,7 +1541,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v88</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v89</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1669,7 +1669,7 @@ a.grilla-celda{display:block;}
                 <div><input type="number" id="ac-por-bolsa" min="1" step="1" placeholder="1" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Unidades por bolsa</div></div>
                 <div><input type="text" id="ac-et-desc" placeholder="Descripción" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Nombre del artículo (etiqueta)</div></div>
                 <div><input type="text" id="ac-et-medida" placeholder="50 X 85 CM (APROX)" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Medida (etiqueta)</div></div>
-                <div><input type="text" id="ac-sku" placeholder="Ej: KA181F" oninput="cambioEmpaqueAC()" style="text-transform:uppercase;"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">SKU (se completa solo en la orden)</div></div>
+                <div><input type="text" id="ac-sku" placeholder="Ej: KA181F" oninput="cambioEmpaqueAC(); infoTelaAC();" style="text-transform:uppercase;"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">SKU (se completa solo en la orden)</div></div>
                 <div style="grid-column:1 / -1;"><select id="ac-tela" onchange="cambiarTelaArticuloAC()" style="width:100%;padding:9px 8px;box-sizing:border-box;"></select><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Calidad de tela de este SKU (cualquier ancho)</div><div id="ac-tela-info" style="font-size:0.7rem;color:#6B6258;"></div></div>
                 <div style="grid-column:1 / -1;border-top:1px dashed var(--line);padding-top:8px;">
                   <div style="font-size:0.78rem;color:#6B6258;margin-bottom:4px;">Otros SKU de este mismo artículo (en otra calidad o color de tela):</div>
@@ -4873,7 +4873,9 @@ async function guardarEmpaqueAC(){
     }
     await guardarFabricacion();
     limpiarEmpaquePendiente();
-    const n = await aplicarDescripcionAutomatica([sku, ...((otrosSkuPend || otrosSkuActuales()).map(o => o.sku))]);
+    let n = 0;
+    try{ n = await aplicarDescripcionAutomatica([sku, ...((otrosSkuPend || otrosSkuActuales()).map(o => o.sku))].filter(Boolean)); }
+    catch(err){ console.error('descripcion automatica', err); }
     const m = document.getElementById('ac-empaque-ok'); if(m){ m.textContent = '✓ Guardado' + (n ? ' · descripción del catálogo actualizada' : ''); m.style.color = '#2F7A47'; }
     renderOtrosSkuAC();
   } catch(e){ alert('No se pudo guardar: ' + e.message); }
@@ -6248,7 +6250,7 @@ function quitarOtroSkuAC(i){ otrosSkuPend = [...otrosSkuActuales()]; otrosSkuPen
 // ===== Descripcion del catalogo automatica + lista de productos que fabrico =====
 // Al vincular un SKU con su calidad de tela, el subtitulo del producto en el catalogo se actualiza solo.
 function descripcionAutomaticaProducto(producto, categoria){
-  const cals = producto.variantes.map(v => calidadDeSku(v.sku)).filter(Boolean);
+  const cals = (producto.variantes || []).map(v => calidadDeSku(v.sku)).filter(Boolean);
   if(!cals.length) return '';
   // si las variantes tienen calidades distintas, se usa la mas comun
   const cuenta = {}; cals.forEach(c => cuenta[c] = (cuenta[c] || 0) + 1);
@@ -6297,6 +6299,7 @@ function filasProductosFabrico(){
   const filas = [];
   const vistos = new Set();
   CATALOGO.forEach(cat => cat.productos.forEach(p => {
+    if(!Array.isArray(p.variantes)) return;
     const propio = fabricacion.propios[p.nombre] || p.variantes.some(v => articuloDeSku(v.sku) || calidadDeSku(v.sku));
     if(!propio) return;
     p.variantes.forEach(v => {
@@ -8865,9 +8868,9 @@ async function procesarBusquedaVisualIA(archivo){
 function buscarProductoPorSku(sku){
   const skuUpper = sku.trim().toUpperCase();
   for(let ci=0; ci<CATALOGO.length; ci++){
-    const productos = CATALOGO[ci].productos;
+    const productos = CATALOGO[ci].productos || [];
     for(let pi=0; pi<productos.length; pi++){
-      const v = productos[pi].variantes.find(v => v.sku.toUpperCase() === skuUpper);
+      const v = (productos[pi].variantes || []).find(v => String(v.sku || '').toUpperCase() === skuUpper);
       if(v) return {ci, pi, producto: productos[pi], categoria: CATALOGO[ci].categoria, variante: v};
     }
   }
@@ -13840,7 +13843,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v88';
+const APP_VERSION = '2026-10-02-v89';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
