@@ -1541,7 +1541,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v90</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v91</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6054,7 +6054,9 @@ function claveComposicion(t){
   const n = normBusqueda(String(t.notas || ''));
   const pares = [...n.matchAll(/(\d+)\s*%\s*(algodon|poliester|polyester|lino|viscosa|rayon|elastano|lycra|acrilico|microfibra|nylon|seda|lana)/g)].map(m => m[1] + (m[2] === 'polyester' ? 'poliester' : m[2]));
   if(pares.length) return pares.sort().join('+');
-  return normBusqueda(t.composicion || '');
+  // "Algodón" elegido en el desplegable es lo mismo que "100% algodón" escrito en las notas
+  const c = normBusqueda(t.composicion || '');
+  return c === 'algodon' ? '100algodon' : c === 'poliester' ? '100poliester' : c;
 }
 function claveCalidad(t){ return [normBusqueda(t.nombre || '').replace(/\s+/g, ' ').trim(), parseInt(t.hilos, 10) || '', claveComposicion(t)].join('|'); }
 function etiquetaCalidad(t){ const c = composicionTexto(t); return `${String(t.nombre || '').trim().replace(/\s+/g, ' ').toUpperCase()}${t.hilos ? ' · ' + parseInt(t.hilos, 10) + ' hilos' : ''}${c ? ' · ' + c : ''}`; }
@@ -6099,7 +6101,7 @@ function calidadDeSku(sku){
   if(v && v.calidad){
     const telas = Object.values((telasDatos && telasDatos.telas) || {});
     if(telas.some(t => telaCumpleCalidad(t, v.calidad))) return v.calidad;
-    const t = telas.find(t => claveCalidadVieja(t) === v.calidad);
+    const t = telas.find(t => claveCalidadVieja(t) === v.calidad || claveCalidad(t) === String(v.calidad).replace(/\|algodon(#|$)/, '|100algodon$1').replace(/\|poliester(#|$)/, '|100poliester$1'));
     if(t){ v.calidad = claveCalidad(t); return v.calidad; }
     return v.calidad;
   }
@@ -6125,8 +6127,9 @@ function opcionesCalidad(sel){
     const txt = [t.hilos ? parseInt(t.hilos, 10) + ' hilos' : '', compCorta(t), color].filter(Boolean).join(' · ') || g;
     (grupos.get(g) || grupos.set(g, []).get(g)).push({ q, txt: g + ' ' + txt });
   });
+  grupos.forEach(xs => xs.forEach(x => { if(xs.filter(y => y.txt === x.txt).length > 1) x.repetido = true; }));
   return '<option value="">— sin calidad —</option>' + [...grupos].sort((a, b) => a[0].localeCompare(b[0], 'es')).map(([g, xs]) =>
-    `<optgroup label="${escapeAttr(g)}">` + xs.map(({ q, txt }) => `<option value="${escapeAttr(q.clave)}" ${q.clave === sel ? 'selected' : ''} title="${escapeAttr(q.codigos.join(', '))}">${escaparHtml(txt)} (${q.codigos.length} tela${q.codigos.length === 1 ? '' : 's'})</option>`).join('') + '</optgroup>').join('');
+    `<optgroup label="${escapeAttr(g)}">` + xs.map(x => { const { q, txt } = x; return `<option value="${escapeAttr(q.clave)}" ${q.clave === sel ? 'selected' : ''} title="${escapeAttr(q.codigos.join(', '))}">${escaparHtml(txt)} (${x.repetido ? escaparHtml(q.codigos.join(', ')) : q.codigos.length + ' tela' + (q.codigos.length === 1 ? '' : 's')})</option>`; }).join('') + '</optgroup>').join('');
 }
 // en la orden: con el articulo y la tela entregada, el SKU que corresponde
 function skuPorArticuloYTela(articuloValor, codTela){
@@ -13845,7 +13848,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v90';
+const APP_VERSION = '2026-10-02-v91';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
