@@ -1541,7 +1541,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v82</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/10 v83</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1799,6 +1799,17 @@ a.grilla-celda{display:block;}
   </div>
   <datalist id="lista-telas"></datalist>
   <datalist id="lista-proveedores-tela"></datalist>
+
+  <div class="step" id="step-productos-fabrico">
+    <div class="form-card" style="max-width:1100px;">
+      <h2>Productos que fabrico</h2>
+      <p class="note" style="margin-bottom:10px;">Cada producto del catálogo con su forma de corte y su tela.</p>
+      <input type="text" id="pf-buscar" placeholder="🔍 Buscar producto o SKU" oninput="renderProductosFabrico()" style="margin-bottom:8px;">
+      <div id="pf-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
+      <div id="pf-lista"><p class="empty-msg">Cargando...</p></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
+    </div>
+  </div>
 
   <div class="step" id="step-datos-bancarios">
     <div class="form-card">
@@ -4857,7 +4868,8 @@ async function guardarEmpaqueAC(){
     }
     await guardarFabricacion();
     limpiarEmpaquePendiente();
-    const m = document.getElementById('ac-empaque-ok'); if(m){ m.textContent = '✓ Guardado'; m.style.color = '#2F7A47'; }
+    const n = await aplicarDescripcionAutomatica([sku, ...((otrosSkuPend || otrosSkuActuales()).map(o => o.sku))]);
+    const m = document.getElementById('ac-empaque-ok'); if(m){ m.textContent = '✓ Guardado' + (n ? ' · descripción del catálogo actualizada' : ''); m.style.color = '#2F7A47'; }
     renderOtrosSkuAC();
   } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
@@ -5038,7 +5050,7 @@ const GRUPOS_INICIO = {
   e: { lado: 'int', titulo: 'Clientes', items: [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
   f: { lado: 'int', titulo: 'Productos y precios', items: [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📷 Actualizar foto', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
   g: { lado: 'int', titulo: 'Producción', columnas: [
-    [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🚚 Ingreso a los talleres', 'abrirEnviosTela()']],
+    [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()'], ['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🚚 Ingreso a los talleres', 'abrirEnviosTela()']],
     [['🏭 Productos en producción', 'abrirEnProduccion()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📦 Historial de órdenes', 'abrirHistorialOT()']],
     [['📥 Entregas del taller', 'abrirIngresoTaller()']],
   ] },
@@ -6137,6 +6149,8 @@ function actualizarInfoFab(){
 async function cambiarTelaProducto(clave){
   productoEnEdicion.producto.variantes.forEach(v => { const s = String(v.sku).toUpperCase(); fabricacion.vinculos[s] = { ...(fabricacion.vinculos[s] || {}), calidad: clave, tela: '' }; });
   try{ await guardarFabricacion(); } catch(e){ alert('No se pudo guardar la tela: ' + e.message); }
+  const d = clave ? descripcionAutomaticaProducto(productoEnEdicion.producto, productoEnEdicion.categoria) : '';
+  if(d){ document.getElementById('ep-subtitulo').value = d; await aplicarDescripcionAutomatica([productoEnEdicion.producto.variantes[0].sku]); }
   actualizarInfoFab();
 }
 async function cambiarArticuloSku(sel){
@@ -6195,6 +6209,100 @@ async function agregarOtroSkuAC(){
 }
 function cambiarCalidadOtroSku(i, clave){ otrosSkuPend = [...otrosSkuActuales()]; otrosSkuPend[i] = { ...otrosSkuPend[i], calidad: clave }; marcarEmpaquePendiente(); }
 function quitarOtroSkuAC(i){ otrosSkuPend = [...otrosSkuActuales()]; otrosSkuPend.splice(i, 1); renderOtrosSkuAC(); marcarEmpaquePendiente(); }
+
+// ===== Descripcion del catalogo automatica + lista de productos que fabrico =====
+// Al vincular un SKU con su calidad de tela, el subtitulo del producto en el catalogo se actualiza solo.
+function descripcionAutomaticaProducto(producto, categoria){
+  const cals = producto.variantes.map(v => calidadDeSku(v.sku)).filter(Boolean);
+  if(!cals.length) return '';
+  // si las variantes tienen calidades distintas, se usa la mas comun
+  const cuenta = {}; cals.forEach(c => cuenta[c] = (cuenta[c] || 0) + 1);
+  const clave = Object.keys(cuenta).sort((a, b) => cuenta[b] - cuenta[a])[0];
+  return descripcionDesdeCalidad(clave, categoria);
+}
+async function aplicarDescripcionAutomatica(skus){
+  const hechos = new Set();
+  for(const s of skus){
+    const r = s ? buscarProductoPorSku(s) : null;
+    if(!r || hechos.has(r.producto)) continue;
+    hechos.add(r.producto);
+    const p = r.producto;
+    const d = descripcionAutomaticaProducto(p, r.categoria);
+    if(!d || normBusqueda(d) === normBusqueda(p.composicion || '')) continue;
+    try{
+      if(p._editKey && p._editKey.startsWith('nuevo-')) await db.collection('productos_nuevos').doc(p._docId).update({ composicion: d });
+      else if(p._editKey) await db.collection('productos_editados').doc(p._editKey).set({ composicion: d }, { merge: true });
+      else continue;
+      p.composicion = d;
+      if(fabricacion){ fabricacion.propios[p.nombre] = true; }
+    } catch(e){ console.error('descripcion automatica', e); }
+  }
+  if(hechos.size){ try{ await guardarFabricacion(); } catch(e){} try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){} }
+  return hechos.size;
+}
+
+let pfFiltro = 'todos';
+async function abrirProductosFabrico(){
+  mostrarPaso('step-productos-fabrico');
+  document.getElementById('pf-lista').innerHTML = '<p class="empty-msg">Cargando...</p>';
+  if(fabricacion === null) await cargarFabricacion();
+  if(telasDatos === null) await cargarTelas();
+  if(tablaConsumo === null) await cargarTablaConsumo();
+  if(fichasArticulos === null) await cargarFichasArticulos();
+  renderProductosFabrico();
+}
+function filasProductosFabrico(){
+  const filas = [];
+  const vistos = new Set();
+  CATALOGO.forEach(cat => cat.productos.forEach(p => {
+    const propio = fabricacion.propios[p.nombre] || p.variantes.some(v => articuloDeSku(v.sku) || calidadDeSku(v.sku));
+    if(!propio) return;
+    p.variantes.forEach(v => {
+      const s = String(v.sku).toUpperCase(); vistos.add(s);
+      const art = articuloDeSku(s), cal = calidadDeSku(s);
+      const q = cal ? calidadesTela().find(x => x.clave === cal) : null;
+      filas.push({ producto: p.nombre, categoria: cat.categoria, sku: s, desc: v.desc, articulo: art, calidad: q ? q.etiqueta : '', telas: q ? q.codigos : [], subtitulo: p.composicion || '' });
+    });
+  }));
+  // SKU vinculados que no estan en el catalogo
+  Object.keys(fabricacion.vinculos).forEach(s => {
+    if(vistos.has(s)) return;
+    const art = articuloDeSku(s), cal = calidadDeSku(s);
+    if(!art && !cal) return;
+    const q = cal ? calidadesTela().find(x => x.clave === cal) : null;
+    filas.push({ producto: '(no está en el catálogo)', categoria: '', sku: s, desc: '', articulo: art, calidad: q ? q.etiqueta : '', telas: q ? q.codigos : [], subtitulo: '', fuera: true });
+  });
+  return filas;
+}
+function renderProductosFabrico(){
+  const q = normBusqueda(document.getElementById('pf-buscar').value);
+  const todas = filasProductosFabrico();
+  const completo = f => f.articulo && f.calidad;
+  const chip = (v, t, n) => `<span onclick="pfFiltro='${v}'; renderProductosFabrico();" style="cursor:pointer;font-size:0.82rem;padding:5px 12px;border-radius:14px;border:1px solid var(--line);${pfFiltro === v ? 'background:var(--purple);color:#fff;border-color:var(--purple);' : ''}">${t} (${n})</span>`;
+  document.getElementById('pf-filtros').innerHTML = chip('todos', 'Todos', todas.length) + chip('completos', '✓ Completos', todas.filter(completo).length) + chip('faltan', '⚠️ Les falta algo', todas.filter(f => !completo(f)).length);
+  const filas = todas.filter(f => (pfFiltro === 'todos' || (pfFiltro === 'completos' ? completo(f) : !completo(f))) && (!q || normBusqueda(`${f.producto} ${f.sku} ${f.desc} ${f.articulo || ''} ${f.calidad}`).includes(q)));
+  const cont = document.getElementById('pf-lista');
+  if(!filas.length){ cont.innerHTML = `<p class="empty-msg">${todas.length ? 'No hay productos que coincidan.' : 'Todavía no vinculaste productos con fabricación. Se hace desde Artículos y cortes (SKU + calidad de tela) o desde Editar producto (🏭 Fabricación propia).'}</p>`; return; }
+  let prodPrev = null;
+  const nombreArt = a => a ? (a.startsWith('ficha:') ? nombreFicha(a.slice(6)) : a) : '';
+  cont.innerHTML = `<div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;"><table style="width:100%;border-collapse:collapse;font-size:0.86rem;">
+    <thead><tr style="background:var(--cream);"><th style="padding:7px 8px;text-align:left;">SKU</th><th style="padding:7px 8px;text-align:left;">Medida / variante</th><th style="padding:7px 8px;text-align:left;">Se corta como</th><th style="padding:7px 8px;text-align:left;">Calidad de tela</th><th style="padding:7px 8px;text-align:center;">Estado</th></tr></thead><tbody>
+    ${filas.map(f => {
+      let cab = '';
+      if(f.producto !== prodPrev){
+        prodPrev = f.producto;
+        cab = `<tr style="background:var(--purple);"><td colspan="5" style="padding:7px 10px;color:#fff;"><b>${escaparHtml(f.producto)}</b>${f.subtitulo ? `<br><span style="font-size:0.78rem;opacity:.85;">En el catálogo: ${escaparHtml(f.subtitulo)}</span>` : ''}</td></tr>`;
+      }
+      const ok = completo(f);
+      return cab + `<tr style="border-top:1px solid var(--line);">
+        <td style="padding:7px 8px;"><b>${escaparHtml(f.sku)}</b></td>
+        <td style="padding:7px 8px;font-size:0.8rem;">${escaparHtml(f.desc || '—')}</td>
+        <td style="padding:7px 8px;">${f.articulo ? `<a href="#" onclick="event.preventDefault(); abrirArticulosCortes().then(() => abrirArticuloAC('${escapeAttr(f.articulo)}'))">${escaparHtml(nombreArt(f.articulo))}</a>` : '<span style="color:#A6432F;">falta</span>'}</td>
+        <td style="padding:7px 8px;font-size:0.8rem;">${f.calidad ? escaparHtml(f.calidad) + `<br><span class="note" style="font-size:0.72rem;">${escaparHtml(f.telas.join(', '))}</span>` : '<span style="color:#A6432F;">falta</span>'}</td>
+        <td style="padding:7px 8px;text-align:center;">${ok ? '✅' : '⚠️'}</td></tr>`;
+    }).join('')}</tbody></table></div>
+    <p class="note" style="margin-top:6px;">Aparecen los productos del catálogo marcados como fabricación propia. Para completar lo que falta: Artículos y cortes (SKU y calidad) o Editar producto (🏭 Fabricación propia).</p>`;
+}
 
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
@@ -13616,7 +13724,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-01-v82';
+const APP_VERSION = '2026-10-01-v83';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
