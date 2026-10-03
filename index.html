@@ -1548,7 +1548,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v125</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v126</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6691,12 +6691,13 @@ function quitarOtroSkuAC(i){ otrosSkuPend = [...otrosSkuActuales()]; otrosSkuPen
 // ===== Descripcion del catalogo automatica + lista de productos que fabrico =====
 // Al vincular un SKU con su calidad de tela, el subtitulo del producto en el catalogo se actualiza solo.
 function descripcionAutomaticaProducto(producto, categoria){
-  const cals = (producto.variantes || []).map(v => calidadDeSku(v.sku)).filter(Boolean);
-  if(!cals.length) return '';
-  // si las variantes tienen calidades distintas, se usa la mas comun
-  const cuenta = {}; cals.forEach(c => cuenta[c] = (cuenta[c] || 0) + 1);
-  const clave = Object.keys(cuenta).sort((a, b) => cuenta[b] - cuenta[a])[0];
-  return descripcionDesdeCalidad(clave, categoria);
+  const vs = producto.variantes || [];
+  const cals = vs.map(v => calidadDeSku(v.sku));
+  // si alguna medida no tiene calidad cargada, o hay telas distintas, el subtitulo no se toca
+  if(!cals.length || cals.some(c => !c)) return '';
+  const bases = [...new Set(cals.map(c => String(c).split('#')[0]))];
+  if(bases.length > 1) return '';
+  return descripcionDesdeCalidad(cals[0], categoria);
 }
 // medida real de cada pieza segun la tela con que se hace: si la tela es mas angosta, la pieza se achica
 // (ej: plana de 260 en microfibra de 240 => 240). Nunca se muestra mas grande que la medida cargada.
@@ -7463,8 +7464,9 @@ function sugerenciasPublicar(sku){
   const buscar = cond => { for(const c of CATALOGO) for(const p of (c.productos || [])) if((p.variantes || []).some(v => { const s = String(v.sku).toUpperCase(); return s !== S && cond(s); })) return { p, c }; return null; };
   // 1) otra medida del mismo articulo (Mantel 200 / Mantel 250) con la misma calidad, 2) misma calidad, 3) mismo articulo
   const herm = art && !art.startsWith('ficha:') ? articulosHermanos(art) : [];
-  const r0 = herm.length ? (buscar(s => herm.includes(articuloDeSku(s)) && (!cal || calidadDeSku(s) === cal)) || buscar(s => herm.includes(articuloDeSku(s)))) : null;
-  const r1 = !r0 && cal ? buscar(s => calidadDeSku(s) === cal) : null;
+  const baseCal = c => String(c || '').split('#')[0];
+  const r0 = herm.length && cal ? buscar(s => herm.includes(articuloDeSku(s)) && baseCal(calidadDeSku(s)) === baseCal(cal)) : null;
+  const r1 = !r0 && cal ? (buscar(s => calidadDeSku(s) === cal) || buscar(s => baseCal(calidadDeSku(s)) === baseCal(cal))) : null;
   const r2 = !r0 && !r1 && art ? buscar(s => articuloDeSku(s) === art) : null;
   if(r0){ prod = r0.p; cat = r0.c.categoria; } else if(r1){ prod = r1.p; cat = r1.c.categoria; } else if(r2){ cat = r2.c.categoria; }
   if(!cat){
@@ -15254,7 +15256,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v125';
+const APP_VERSION = '2026-10-02-v126';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
