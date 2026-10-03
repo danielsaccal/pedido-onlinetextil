@@ -1547,7 +1547,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v113</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v114</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1925,6 +1925,38 @@ a.grilla-celda{display:block;}
       <input type="text" id="hs-buscar" class="hs-buscar" placeholder="🔍 Escriba un SKU o un producto (ej: KA183J, juego 2 1/2)" oninput="renderHistorialSku()">
       <div id="hs-resumen" class="note" style="text-align:left;margin-bottom:8px;"></div>
       <div id="hs-lista"><p class="empty-msg">Cargando...</p></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-stock">
+    <style>
+      .sk-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;}
+      .sk-kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 12px;cursor:pointer;}
+      .sk-kpi.on{outline:2px solid var(--purple);}
+      .sk-kpi b{display:block;font-size:1.4rem;line-height:1.1;}
+      .sk-kpi span{font-size:0.75rem;color:#8A8072;}
+      .sk-fila{background:#fff;border:1px solid var(--line);border-left:5px solid #ccc;border-radius:12px;padding:10px 12px;margin-bottom:8px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;}
+      .sk-sku{font-weight:700;}
+      .sk-art{font-size:0.78rem;color:#6B6258;}
+      .sk-est{font-size:0.75rem;font-weight:700;margin-top:3px;}
+      .sk-nums{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;justify-content:flex-end;}
+      .sk-nums label{display:flex;flex-direction:column;font-size:0.66rem;color:#8A8072;gap:2px;text-align:center;}
+      .sk-nums input{width:70px;padding:6px;border:1px solid var(--line);border-radius:8px;text-align:right;font-size:0.9rem;}
+      .sk-nums .ro{width:70px;padding:6px 0;font-size:0.95rem;font-weight:700;text-align:center;}
+      .sk-guardar{position:sticky;bottom:10px;display:none;margin:10px 0;z-index:5;}
+      .sk-guardar button{width:100%;padding:12px;border:none;border-radius:12px;background:#3D9A5B;color:#fff;font-weight:700;font-size:0.95rem;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.15);}
+    </style>
+    <div class="form-card" style="max-width:920px;">
+      <h2>Stock y prioridades</h2>
+      <p class="note" style="text-align:left;margin-bottom:10px;">Los SKU que fabricás, de lo más urgente a lo menos. Las entregas del taller suman al stock solas.</p>
+      <input type="text" id="sk-buscar" placeholder="🔍 Buscar SKU o producto" oninput="renderStock()" style="width:100%;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:12px;box-sizing:border-box;">
+      <div class="sk-kpis" id="sk-kpis"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <button type="button" class="btn-mini" onclick="ordenDesdeStock()">📋 Armar orden de trabajo con los urgentes</button>
+      </div>
+      <div id="sk-lista"><p class="empty-msg">Cargando...</p></div>
+      <div class="sk-guardar" id="sk-guardar"><button type="button" onclick="guardarStock()">💾 Guardar stock</button></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
@@ -5272,7 +5304,7 @@ const GRUPOS_INICIO = {
   g: { lado: 'int', titulo: 'Producción', columnas: [
     [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()']],
     [['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🚚 Ingreso a los talleres', 'abrirEnviosTela()']],
-    [['🏭 Productos en producción', 'abrirEnProduccion()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📦 Historial de órdenes', 'abrirHistorialOT()'], ['🔎 ¿Cuándo hice este SKU?', 'abrirHistorialSku()']],
+    [['📊 Stock y prioridades', 'abrirStock()'], ['🏭 Productos en producción', 'abrirEnProduccion()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📦 Historial de órdenes', 'abrirHistorialOT()'], ['🔎 ¿Cuándo hice este SKU?', 'abrirHistorialSku()']],
     [['📥 Entregas del taller', 'abrirIngresoTaller()'], ['🗂️ Historial de entregas', 'abrirHistorialEntregas()']],
   ] },
   h: { lado: 'int', titulo: 'Finanzas', items: [['💰 Ventas Mercado Libre', 'abrirVentasML()'], ['🧮 Calculadora de costos', 'abrirCalculadoraCostos()']] },
@@ -5514,6 +5546,7 @@ async function registrarIngresoTaller(){
       o.renglones = nuevos; o.entregas = entregas;
     }
     await db.collection('ingresos_taller').add({ taller: t, fecha: new Date().toISOString(), nota: document.getElementById('it-nota').value.trim(), detalle });
+    for(const d of detalle){ if(d.sku && d.buenas > 0){ try{ await moverStock(d.sku, d.buenas, 'entrega del taller', `${t} · ${d.orden}`); } catch(e){ console.error('stock', e); } } }
     const tb = detalle.reduce((s, d) => s + d.buenas, 0), tf = detalle.reduce((s, d) => s + d.falladas, 0);
     alert(`Entrega registrada: ${tb} buenas${tf ? ` y ${tf} falladas` : ''}.`);
     document.getElementById('it-nota').value = '';
@@ -7038,6 +7071,127 @@ function renderHistorialSku(){
   }).join('');
 }
 
+// ===== Stock de lo que se fabrica =====
+// config/stock = { skus: { SKU: { stock, minimo } } } ; movimientos en la coleccion stock_movs.
+// Entra: entregas del taller (buenas). Sale: ventas (mas adelante, desde todos los canales).
+let stockDatos = null, skFiltro = '';
+const stockPend = {};
+async function cargarStock(){
+  try{ const d = await db.collection('config').doc('stock').get(); stockDatos = d.exists ? d.data() : {}; } catch(e){ stockDatos = stockDatos || {}; }
+  stockDatos.skus = stockDatos.skus || {};
+}
+async function moverStock(sku, cantidad, tipo, ref){
+  if(!sku || !cantidad) return;
+  if(stockDatos === null) await cargarStock();
+  const S = String(sku).toUpperCase();
+  const x = stockDatos.skus[S] || { stock: 0, minimo: 0 };
+  x.stock = Math.round(((+x.stock || 0) + cantidad) * 100) / 100;
+  stockDatos.skus[S] = x;
+  await db.collection('config').doc('stock').set(JSON.parse(JSON.stringify(stockDatos)));
+  db.collection('stock_movs').add({ sku: S, cantidad, tipo, ref: ref || '', fecha: new Date().toISOString() }).catch(() => {});
+}
+function skusQueFabrico(){
+  const s = new Set();
+  Object.keys((fabricacion && fabricacion.vinculos) || {}).forEach(k => { const v = fabricacion.vinculos[k]; if(v && (v.articulo || v.calidad)) s.add(k); });
+  Object.values((tablaConsumo && tablaConsumo.empaque) || {}).forEach(e => { if(e && e.sku) s.add(String(e.sku).toUpperCase()); });
+  Object.keys((stockDatos && stockDatos.skus) || {}).forEach(k => s.add(k));
+  return [...s];
+}
+function enProduccionSku(sku){
+  const S = String(sku).toUpperCase();
+  return (historialOT || []).filter(o => !o.cerrada).reduce((s, o) => s + (o.renglones || []).filter(r => String(r.sku || '').toUpperCase() === S).reduce((a, r) => a + pendienteRenglon(r), 0), 0);
+}
+function filasStock(){
+  return skusQueFabrico().map(sku => {
+    const x = (stockDatos.skus[sku]) || {};
+    const p = stockPend[sku] || {};
+    const stock = p.stock !== undefined ? numAr(p.stock) || 0 : (+x.stock || 0);
+    const minimo = p.minimo !== undefined ? numAr(p.minimo) || 0 : (+x.minimo || 0);
+    const prod = enProduccionSku(sku);
+    const disp = stock + prod;
+    const r = buscarProductoPorSku(sku);
+    const art = articuloDeSku(sku);
+    let nivel, est;
+    if(stock <= 0 && prod <= 0){ nivel = 0; est = 'Sin stock y sin orden de producción'; }
+    else if(minimo > 0 && disp < minimo && prod <= 0){ nivel = 1; est = 'Debajo del mínimo, sin orden de producción'; }
+    else if(minimo > 0 && stock < minimo){ nivel = 2; est = 'Debajo del mínimo, ya en producción'; }
+    else { nivel = 3; est = minimo > 0 ? 'OK' : 'OK (sin mínimo cargado)'; }
+    return { sku, stock, minimo, prod, disp, nivel, est, nombre: r ? (r.variante && r.variante.desc ? String(r.variante.desc).split(' — ')[0] + ' · ' + r.producto.nombre : r.producto.nombre) : (art ? (art.startsWith('ficha:') ? art.slice(6) : art) : ''), articulo: art, sugerido: Math.max(0, Math.ceil((minimo > 0 ? minimo * 2 : 0) - disp)) };
+  }).sort((a, b) => a.nivel - b.nivel || (a.minimo ? a.disp / a.minimo : 9) - (b.minimo ? b.disp / b.minimo : 9) || a.sku.localeCompare(b.sku));
+}
+async function abrirStock(){
+  mostrarPaso('step-stock');
+  document.getElementById('sk-lista').innerHTML = '<p class="empty-msg">Cargando...</p>';
+  if(tablaConsumo === null) await cargarTablaConsumo();
+  if(fabricacion === null) await cargarFabricacion();
+  if(telasDatos === null) await cargarTelas();
+  if(fichasArticulos === null) await cargarFichasArticulos();
+  await cargarStock();
+  historialOT = null; await cargarHistorialOT();
+  renderStock();
+}
+const NIVELES_STOCK = [['#C9563F', '🔴 Hacer ya'], ['#D98A2B', '🟠 Debajo del mínimo'], ['#D9B53B', '🟡 En producción'], ['#3D9A5B', '🟢 OK']];
+function renderStock(){
+  const todas = filasStock();
+  const cuenta = [0, 1, 2, 3].map(n => todas.filter(f => f.nivel === n).length);
+  document.getElementById('sk-kpis').innerHTML = NIVELES_STOCK.map(([c, t], n) => `<div class="sk-kpi${skFiltro === String(n) ? ' on' : ''}" onclick="skFiltro = skFiltro === '${n}' ? '' : '${n}'; renderStock();"><b style="color:${c};">${cuenta[n]}</b><span>${t}</span></div>`).join('');
+  const q = normBusqueda(document.getElementById('sk-buscar').value);
+  const lista = todas.filter(f => (skFiltro === '' || String(f.nivel) === skFiltro) && (!q || normBusqueda(f.sku + ' ' + f.nombre).includes(q)));
+  const cont = document.getElementById('sk-lista');
+  if(!todas.length){ cont.innerHTML = '<p class="empty-msg">Todavía no hay SKU de fabricación propia. Se vinculan en Artículos y cortes.</p>'; return; }
+  if(!lista.length){ cont.innerHTML = '<p class="empty-msg">No hay SKU con ese filtro.</p>'; return; }
+  cont.innerHTML = lista.map(f => `<div class="sk-fila" style="border-left-color:${NIVELES_STOCK[f.nivel][0]};">
+      <div><div class="sk-sku">${escaparHtml(f.sku)}</div><div class="sk-art">${escaparHtml(f.nombre)}</div>
+        <div class="sk-est" style="color:${NIVELES_STOCK[f.nivel][0]};">${f.est}${f.sugerido && f.nivel < 2 ? ` · sugerido: hacer ${f.sugerido}` : ''}</div></div>
+      <div class="sk-nums">
+        <label>Stock<input type="text" inputmode="decimal" value="${escapeAttr(stockPend[f.sku] && stockPend[f.sku].stock !== undefined ? stockPend[f.sku].stock : f.stock)}" oninput="cambiarStockLista('${escapeAttr(f.sku)}', 'stock', this.value)"></label>
+        <label>En producción<span class="ro">${f.prod}</span></label>
+        <label>Mínimo<input type="text" inputmode="decimal" value="${escapeAttr(stockPend[f.sku] && stockPend[f.sku].minimo !== undefined ? stockPend[f.sku].minimo : (f.minimo || ''))}" placeholder="—" oninput="cambiarStockLista('${escapeAttr(f.sku)}', 'minimo', this.value)"></label>
+      </div>
+    </div>`).join('');
+}
+function cambiarStockLista(sku, campo, valor){
+  stockPend[sku] = { ...(stockPend[sku] || {}), [campo]: valor };
+  const n = Object.keys(stockPend).length;
+  const box = document.getElementById('sk-guardar'); box.style.display = 'block';
+  box.querySelector('button').textContent = `💾 Guardar stock (${n} SKU)`;
+}
+async function guardarStock(){
+  const movs = [];
+  Object.entries(stockPend).forEach(([sku, p]) => {
+    const x = stockDatos.skus[sku] || { stock: 0, minimo: 0 };
+    if(p.stock !== undefined){ const v = numAr(p.stock) || 0; if(v !== (+x.stock || 0)) movs.push({ sku, cantidad: Math.round((v - (+x.stock || 0)) * 100) / 100 }); x.stock = v; }
+    if(p.minimo !== undefined) x.minimo = numAr(p.minimo) || 0;
+    stockDatos.skus[sku] = x;
+  });
+  try{
+    await db.collection('config').doc('stock').set(JSON.parse(JSON.stringify(stockDatos)));
+    movs.forEach(m => db.collection('stock_movs').add({ ...m, tipo: 'ajuste (conteo)', fecha: new Date().toISOString() }).catch(() => {}));
+    Object.keys(stockPend).forEach(k => delete stockPend[k]);
+    document.getElementById('sk-guardar').style.display = 'none';
+    renderStock();
+  } catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+// arma una orden de trabajo con los SKU urgentes (rojos y naranjas) y la cantidad sugerida
+async function ordenDesdeStock(){
+  const urg = filasStock().filter(f => f.nivel <= 1 && f.articulo);
+  if(!urg.length){ alert('No hay SKU urgentes con artículo de corte vinculado.'); return; }
+  await abrirOrdenTrabajo();
+  const cont = document.getElementById('ot-renglones'); cont.innerHTML = '';
+  urg.forEach(f => {
+    agregarRenglonOrdenTrabajo();
+    const el = cont.lastElementChild, sel = el.querySelector('.ot-r-articulo');
+    const valor = f.articulo;
+    if([...sel.options].some(o => o.value === valor)) sel.value = valor;
+    if(sel._sync) sel._sync();
+    cambiarModoRenglonOT(sel);
+    el.querySelector('.ot-r-cantidad').value = f.sugerido || f.minimo || 1;
+    const skuEl = el.querySelector('.ot-r-sku'); skuEl.value = f.sku; skuEl.dataset.auto = '0';
+  });
+  document.getElementById('ot-envio-banner').innerHTML = '<b>📊 Orden armada desde Stock y prioridades.</b> Revise cantidades, elija taller y tela, y complete el ancho de cada producto.';
+  document.getElementById('ot-envio-banner').style.display = 'block';
+}
+
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -7973,6 +8127,7 @@ async function registrarEntregaRenglonOT(docId, renglonIdx){
     await db.collection('ordenes_trabajo').doc(docId).update({ renglones: nuevosRenglones, entregas });
     orden.renglones = nuevosRenglones; orden.entregas = entregas;
     db.collection('ingresos_taller').add({ taller: orden.taller, fecha: new Date().toISOString(), nota: 'Cargada desde el historial de órdenes', detalle: [{ orden: orden.numero, articulo: renglon.articulo, sku: renglon.sku || '', buenas: cantidadRecibida, falladas: 0 }] }).catch(e => console.error(e));
+    if(renglon.sku) moverStock(renglon.sku, cantidadRecibida, 'entrega del taller', `${orden.taller} · ${orden.numero}`).catch(e => console.error(e));
     renderHistorialOT(document.getElementById('hot-buscador').value);
   } catch(e){
     alert('No se pudo registrar la entrega: ' + e.message);
@@ -14476,7 +14631,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v113';
+const APP_VERSION = '2026-10-02-v114';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
