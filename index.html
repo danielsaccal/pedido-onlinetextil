@@ -1548,7 +1548,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v117</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v118</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1863,9 +1863,10 @@ a.grilla-celda{display:block;}
     <div class="form-card" style="max-width:1100px;">
       <h2>Productos que fabrico</h2>
       <p class="note" style="margin-bottom:10px;">Cada producto del catálogo con su forma de corte y su tela.</p>
-      <input type="text" id="pf-buscar" placeholder="🔍 Buscar producto o SKU" oninput="renderProductosFabrico()" style="margin-bottom:8px;">
+      <input type="text" id="pf-buscar" placeholder="🔍 Buscar producto o SKU" oninput="renderProductosFabrico()" style="margin-bottom:10px;width:100%;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:0.92rem;box-sizing:border-box;">
       <div id="pf-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
       <button type="button" class="btn-mini" style="margin-bottom:10px;" onclick="actualizarTodasDescripciones()">✨ Actualizar todas las descripciones del catálogo</button>
+      <div id="pf-masivo" style="display:none;"></div>
       <div id="pf-lista"><p class="empty-msg">Cargando...</p></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
@@ -6790,20 +6791,23 @@ function renderProductosFabrico(){
   const chip = (v, t, n) => `<span onclick="pfFiltro='${v}'; renderProductosFabrico();" style="cursor:pointer;font-size:0.82rem;padding:5px 12px;border-radius:14px;border:1px solid var(--line);${pfFiltro === v ? 'background:var(--purple);color:#fff;border-color:var(--purple);' : ''}">${t} (${n})</span>`;
   document.getElementById('pf-filtros').innerHTML = chip('todos', 'Todos', todas.length) + chip('completos', '✓ Completos', todas.filter(completo).length) + chip('faltan', '⚠️ Les falta algo', todas.filter(f => !completo(f)).length);
   const filas = todas.filter(f => (pfFiltro === 'todos' || (pfFiltro === 'completos' ? completo(f) : !completo(f))) && (!q || normBusqueda(`${f.producto} ${f.sku} ${f.desc} ${f.articulo || ''} ${f.calidad}`).includes(q)));
+  window.__pfVisibles = filas.map(f => f.sku);
+  renderPfMasivo();
   const cont = document.getElementById('pf-lista');
   if(!filas.length){ cont.innerHTML = `<p class="empty-msg">${todas.length ? 'No hay productos que coincidan.' : 'Todavía no vinculaste productos con fabricación. Se hace desde Artículos y cortes (SKU + calidad de tela) o desde Editar producto (🏭 Fabricación propia).'}</p>`; return; }
   let prodPrev = null;
   const nombreArt = a => a ? (a.startsWith('ficha:') ? nombreFicha(a.slice(6)) : a) : '';
   cont.innerHTML = `<div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;"><table style="width:100%;border-collapse:collapse;font-size:0.86rem;">
-    <thead><tr style="background:var(--cream);"><th style="padding:7px 8px;text-align:left;">SKU</th><th style="padding:7px 8px;text-align:left;">Medida / variante</th><th style="padding:7px 8px;text-align:left;">Se corta como</th><th style="padding:7px 8px;text-align:left;">Calidad de tela</th><th style="padding:7px 8px;text-align:right;">Costo</th><th style="padding:7px 8px;text-align:right;">Precio de lista</th><th style="padding:7px 8px;text-align:right;">Margen</th><th style="padding:7px 8px;text-align:center;">Estado</th></tr></thead><tbody>
+    <thead><tr style="background:var(--cream);"><th style="padding:7px 4px 7px 8px;width:24px;"><input type="checkbox" title="Seleccionar todos los de la lista" onchange="pfSeleccionarTodos(this.checked)" ${filas.length && filas.every(f => pfSel.has(f.sku)) ? 'checked' : ''}></th><th style="padding:7px 8px;text-align:left;">SKU</th><th style="padding:7px 8px;text-align:left;">Medida / variante</th><th style="padding:7px 8px;text-align:left;">Se corta como</th><th style="padding:7px 8px;text-align:left;">Calidad de tela</th><th style="padding:7px 8px;text-align:right;">Costo</th><th style="padding:7px 8px;text-align:right;">Precio de lista</th><th style="padding:7px 8px;text-align:right;">Margen</th><th style="padding:7px 8px;text-align:center;">Estado</th></tr></thead><tbody>
     ${filas.map(f => {
       let cab = '';
       if(f.producto !== prodPrev){
         prodPrev = f.producto;
-        cab = `<tr style="background:var(--purple);"><td colspan="8" style="padding:7px 10px;color:#fff;"><b>${escaparHtml(f.producto)}</b>${f.subtitulo ? `<br><span style="font-size:0.78rem;opacity:.85;">En el catálogo: ${escaparHtml(f.subtitulo)}</span>` : ''}</td></tr>`;
+        cab = `<tr style="background:var(--purple);"><td colspan="9" style="padding:7px 10px;color:#fff;"><b>${escaparHtml(f.producto)}</b>${f.subtitulo ? `<br><span style="font-size:0.78rem;opacity:.85;">En el catálogo: ${escaparHtml(f.subtitulo)}</span>` : ''}</td></tr>`;
       }
       const ok = completo(f);
-      return cab + `<tr style="border-top:1px solid var(--line);">
+      return cab + `<tr style="border-top:1px solid var(--line);${pfSel.has(f.sku) ? 'background:#F3EEF7;' : ''}">
+        <td style="padding:7px 4px 7px 8px;"><input type="checkbox" ${pfSel.has(f.sku) ? 'checked' : ''} onchange="pfToggle('${escapeAttr(f.sku)}', this.checked)"></td>
         <td style="padding:7px 8px;"><b>${escaparHtml(f.sku)}</b></td>
         <td style="padding:7px 8px;font-size:0.8rem;">${escaparHtml(f.desc || '—')}</td>
         <td style="padding:7px 8px;">${f.articulo ? `<a href="#" onclick="event.preventDefault(); abrirArticulosCortes().then(() => abrirArticuloAC('${escapeAttr(f.articulo)}'))">${escaparHtml(nombreArt(f.articulo))}</a>` : '<span style="color:#A6432F;">falta</span>'}</td>
@@ -7301,6 +7305,88 @@ async function quitarDeLista(id, i){
   if(!confirm(`¿Quitar "${lista[i]}" de la lista? Lo que ya esté cargado con ese valor no se borra.`)) return;
   lista.splice(i, 1);
   try{ await guardarLista(id, lista); renderListas(); } catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+
+// ----- editar varios SKU a la vez (Productos que fabrico) -----
+const pfSel = new Set();
+function pfToggle(sku, on){ if(on) pfSel.add(sku); else pfSel.delete(sku); renderProductosFabrico(); }
+function pfSeleccionarTodos(on){ (window.__pfVisibles || []).forEach(s => on ? pfSel.add(s) : pfSel.delete(s)); renderProductosFabrico(); }
+function renderPfMasivo(){
+  const cont = document.getElementById('pf-masivo');
+  if(!pfSel.size){ cont.style.display = 'none'; cont.innerHTML = ''; cont.dataset.n = ''; return; }
+  if(cont.style.display === 'block' && cont.dataset.n === String(pfSel.size)) return;
+  cont.dataset.n = String(pfSel.size);
+  cont.style.display = 'block';
+  const nc = '<option value="">— no cambiar —</option>';
+  const arts = articulosAC().sort((a, b) => a.localeCompare(b, 'es'));
+  cont.innerHTML = `<div style="background:#F3EEF7;border:1px solid #D9CCE6;border-radius:12px;padding:12px;margin-bottom:12px;">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:6px;">
+      <b>✏️ Editar ${pfSel.size} SKU a la vez</b>
+      <a href="#" onclick="event.preventDefault(); pfSel.clear(); renderProductosFabrico();" style="font-size:0.82rem;">Quitar selección</a>
+    </div>
+    <p class="note" style="margin:0 0 8px;text-align:left;">Complete solo lo que quiera cambiar. Confección, insumos y bolsa son del artículo de corte: se cambian para todos los SKU que usan ese artículo.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">
+      <div class="field" style="margin:0;"><label>Calidad de tela</label><select id="pm-cal">${opcionesCalidad('').replace('<option value="">— sin calidad —</option>', nc)}</select></div>
+      <div class="field" style="margin:0;"><label>Artículo de corte</label><select id="pm-art">${nc}${arts.map(a => `<option value="${escapeAttr(a)}">${escaparHtml(a)}</option>`).join('')}</select></div>
+      <div class="field" style="margin:0;"><label>Confección ($ por unidad)</label><input id="pm-conf" type="text" inputmode="decimal" placeholder="no cambiar"></div>
+      <div class="field" style="margin:0;"><label>Otros insumos ($ por unidad)</label><input id="pm-ins" type="text" inputmode="decimal" placeholder="no cambiar"></div>
+      <div class="field" style="margin:0;"><label>Bolsa</label><select id="pm-bolsa">${nc}<option value="__sin__">Sin bolsa</option>${bolsasDisponibles().map(b => `<option value="${escapeAttr(b)}">Bolsa ${escaparHtml(b)}</option>`).join('')}</select></div>
+      <div class="field" style="margin:0;"><label>Unidades por bolsa</label><input id="pm-porbolsa" type="number" min="1" placeholder="no cambiar"></div>
+      <div class="field" style="margin:0;"><label>Stock mínimo</label><input id="pm-min" type="text" inputmode="decimal" placeholder="no cambiar"></div>
+    </div>
+    <button class="btn btn-gold" style="width:auto;padding:10px 18px;margin-top:10px;" onclick="aplicarPfMasivo()">Aplicar a los ${pfSel.size} SKU</button>
+  </div>`;
+  ['pm-cal', 'pm-art'].forEach(id => { const s = document.getElementById(id); hacerSelectBuscable(s); if(s._sync) s._sync(); });
+}
+async function aplicarPfMasivo(){
+  const v = id => String(document.getElementById(id).value || '').trim();
+  const cal = v('pm-cal'), art = v('pm-art'), conf = v('pm-conf'), ins = v('pm-ins'), bolsa = v('pm-bolsa'), pb = v('pm-porbolsa'), min = v('pm-min');
+  const desc = [];
+  if(cal){ const q = calidadesTela().find(x => x.clave === cal); desc.push('Calidad de tela: ' + (q ? q.etiqueta : cal)); }
+  if(art) desc.push('Artículo de corte: ' + art);
+  if(conf) desc.push('Confección: $ ' + conf);
+  if(ins) desc.push('Otros insumos: $ ' + ins);
+  if(bolsa) desc.push('Bolsa: ' + (bolsa === '__sin__' ? 'sin bolsa' : bolsa));
+  if(pb) desc.push('Unidades por bolsa: ' + pb);
+  if(min) desc.push('Stock mínimo: ' + min);
+  if(!desc.length){ alert('No completó nada para cambiar.'); return; }
+  const skus = [...pfSel];
+  if(!confirm(`Aplicar a ${skus.length} SKU:\n\n• ${desc.join('\n• ')}\n\n¿Seguir?`)) return;
+  try{
+    // calidad y articulo: por SKU
+    skus.forEach(s => {
+      const x = { ...(fabricacion.vinculos[s] || {}) };
+      if(cal){ x.calidad = cal; x.tela = ''; }
+      if(art) x.articulo = art;
+      fabricacion.vinculos[s] = x;
+      if(cal || art) fabricacion.propios = fabricacion.propios || {};
+    });
+    await guardarFabricacion();
+    // confeccion, insumos y bolsa: por articulo de corte
+    if(conf || ins || bolsa || pb){
+      tablaConsumo.empaque = tablaConsumo.empaque || {};
+      const artsAfectados = [...new Set(skus.map(s => articuloDeSku(s)).filter(a => a && !a.startsWith('ficha:')))];
+      artsAfectados.forEach(a => {
+        const e = { ...(tablaConsumo.empaque[a] || {}) };
+        if(conf) e.confeccion = numAr(conf) || 0;
+        if(ins) e.insumos = numAr(ins) || 0;
+        if(bolsa) e.bolsa = bolsa === '__sin__' ? '' : bolsa;
+        if(pb) e.porBolsa = Math.max(1, parseInt(pb, 10) || 1);
+        tablaConsumo.empaque[a] = e;
+      });
+      await guardarTablaYConsumo();
+    }
+    // stock minimo: por SKU
+    if(min){
+      if(stockDatos === null) await cargarStock();
+      skus.forEach(s => { const x = stockDatos.skus[s] || { stock: 0, minimo: 0 }; x.minimo = numAr(min) || 0; stockDatos.skus[s] = x; });
+      await db.collection('config').doc('stock').set(JSON.parse(JSON.stringify(stockDatos)));
+    }
+    pfSel.clear();
+    document.getElementById('pf-masivo').dataset.n = '';
+    renderProductosFabrico();
+    sincronizarDescripcionesCatalogo();
+  } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -14742,7 +14828,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v117';
+const APP_VERSION = '2026-10-02-v118';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
