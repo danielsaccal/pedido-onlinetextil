@@ -1547,7 +1547,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v111</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v112</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1821,6 +1821,7 @@ a.grilla-celda{display:block;}
       .tl-num i{color:#A89E90;}
       .tl-precio{display:flex;gap:4px;align-items:center;justify-content:flex-end;margin:4px 0 2px;}
       .tl-precio span{font-size:0.85rem;color:#2F7A47;font-weight:700;}
+      .tl-precio input.usd{width:76px;}
       .tl-precio input{width:96px;padding:6px 8px;font-size:0.9rem;border:1px solid var(--line);border-radius:8px;text-align:right;background:#fff;}
       .tl-precio select{padding:5px 4px;font-size:0.8rem;border:1px solid var(--line);border-radius:8px;background:#fff;}
       .tl-guardar-precios{position:sticky;bottom:10px;z-index:5;display:none;margin:10px 0;}
@@ -1831,6 +1832,11 @@ a.grilla-celda{display:block;}
       <div class="tl-top">
         <input type="text" id="tl-buscar" placeholder="🔍 Código, nombre, color o proveedor" oninput="renderTelas()">
         <button type="button" onclick="editarTela()">+ Nueva tela</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#EEF3FB;border-radius:12px;padding:8px 12px;margin-bottom:12px;font-size:0.85rem;">
+        <span>💵 <b>Dólar para las telas en dólares:</b></span>
+        <span>$ <input type="text" id="tl-tc" inputmode="decimal" placeholder="1450" style="width:100px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;text-align:right;" oninput="cambiarTipoCambioTelas(this.value)"></span>
+        <span class="note" style="margin:0;">Lo fijan ustedes. Al cambiarlo se recalculan todas las telas con precio en US$.</span>
       </div>
       <div id="tl-usos-filtro"></div>
       <div id="tl-separar"></div>
@@ -5822,6 +5828,7 @@ function gramaje(t){ return t && t.mPorKg > 0 && t.ancho > 0 ? Math.round(1000 /
 async function abrirTelas(){
   mostrarPaso('step-telas');
   await cargarTelas();
+  document.getElementById('tl-tc').value = telasDatos.tipoCambio ? String(telasDatos.tipoCambio).replace('.', ',') : '';
   document.getElementById('tl-editor').style.display = 'none';
   renderTelas();
 }
@@ -5863,7 +5870,8 @@ function renderTelas(){
           <div><div class="tl-cod">${escaparHtml(c)}</div><div class="tl-tags">${tags}</div></div>
           <div class="tl-num"><b>${t.ancho ? t.ancho + ' cm' : '—'}</b>
             <div class="tl-precio" onclick="event.stopPropagation();">
-              <span>$</span><input type="text" inputmode="decimal" value="${escapeAttr(precioPendTela(c, 'precio'))}" placeholder="precio" oninput="cambiarPrecioListaTela('${escapeAttr(c)}', 'precio', this.value)">
+              <span>$</span><input type="text" inputmode="decimal" data-pesos="${escapeAttr(c)}" value="${escapeAttr(precioPendTela(c, 'precio'))}" placeholder="pesos" ${precioPendTela(c, 'usd') ? 'readonly style="background:#F4F2EE;color:#6B6258;" title="Calculado desde el precio en dólares"' : ''} oninput="cambiarPrecioListaTela('${escapeAttr(c)}', 'precio', this.value)">
+              <span style="color:#2E5A8C;">US$</span><input type="text" inputmode="decimal" class="usd" value="${escapeAttr(precioPendTela(c, 'usd'))}" placeholder="opcional" oninput="cambiarPrecioListaTela('${escapeAttr(c)}', 'usd', this.value)">
               <select onchange="cambiarPrecioListaTela('${escapeAttr(c)}', 'u', this.value)"><option value="m" ${precioPendTela(c, 'u') !== 'kg' ? 'selected' : ''}>/m</option><option value="kg" ${precioPendTela(c, 'u') === 'kg' ? 'selected' : ''}>/kg</option></select>
             </div>${r ? (r.calculado ? '<i>≈ ' + fmtCm(r.mPorKg) + ' m/kg</i>' : fmtCm(r.mPorKg) + ' m/kg') : '—'}${g ? ' · ' + g + ' g/m²' : ''}</div>
         </div>`;
@@ -5888,7 +5896,8 @@ function editarTela(codigo, base){
       ${f('tl-ancho', 'Ancho (cm)', t.ancho, 'type="number" step="0.1" placeholder="315" oninput="calcGramajeTela()"')}
       ${f('tl-hilos', 'Calidad (hilos)', t.hilos, 'type="number" placeholder="180"')}
       ${f('tl-mkg', 'Rendimiento (metros por kilo)', t.mPorKg, 'type="text" inputmode="decimal" placeholder="2,8" oninput="calcGramajeTela()"')}
-      <div class="field" style="margin:0;grid-column:span 2;"><label>Precio de la tela</label><div style="display:flex;gap:6px;"><input id="tl-precio" type="text" inputmode="decimal" value="${escapeAttr(t.precio == null ? '' : String(t.precio).replace('.', ','))}" placeholder="$ 2.500" style="flex:1;min-width:120px;font-size:1rem;"><select id="tl-precio-u" style="width:auto;flex:0 0 auto;"><option value="m" ${t.precioUnidad !== 'kg' ? 'selected' : ''}>por metro</option><option value="kg" ${t.precioUnidad === 'kg' ? 'selected' : ''}>por kilo</option></select></div></div>
+      <div class="field" style="margin:0;grid-column:span 2;"><label>Precio de la tela</label><div style="display:flex;gap:6px;"><input id="tl-precio" type="text" inputmode="decimal" value="${escapeAttr(t.precio == null ? '' : String(t.precio).replace('.', ','))}" placeholder="$ 2.500" style="flex:1;min-width:120px;font-size:1rem;"><select id="tl-precio-u" style="width:auto;flex:0 0 auto;"><option value="m" ${t.precioUnidad !== 'kg' ? 'selected' : ''}>por metro</option><option value="kg" ${t.precioUnidad === 'kg' ? 'selected' : ''}>por kilo</option></select></div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:4px;"><span style="font-size:0.8rem;color:#2E5A8C;font-weight:700;">US$</span><input id="tl-precio-usd" type="text" inputmode="decimal" value="${escapeAttr(t.precioUsd ? String(t.precioUsd).replace('.', ',') : '')}" placeholder="opcional, en dólares" style="flex:1;min-width:100px;"></div></div>
       <div class="field" style="margin:0;"><label>Gramaje (calculado)</label><div id="tl-gramaje" style="padding:10px 0;font-weight:700;"></div></div>
     </div>
     ${codigo && hermanasTela(codigo).length ? `<p class="note" style="margin:6px 0 0;text-align:left;">🧵 Misma tela en otros anchos: ${hermanasTela(codigo).map(c => `<b>${escaparHtml(c)}</b> (${telasDatos.telas[c].ancho || '?'} cm)`).join(', ')}${!t.mPorKg && rendimientoTela(codigo) ? ` · rendimiento calculado ≈ ${fmtCm(rendimientoTela(codigo).mPorKg)} m/kg` : ''}</p>` : ''}
@@ -5962,6 +5971,7 @@ async function guardarTela(){
     hilos: parseInt(document.getElementById('tl-hilos').value, 10) || null,
     mPorKg: parseFloat(String(document.getElementById('tl-mkg').value).replace(',', '.')) || null,
     precio: parseFloat(String(document.getElementById('tl-precio').value).replace(/\./g, '').replace(',', '.')) || null,
+    precioUsd: numAr(document.getElementById('tl-precio-usd').value) || null,
     precioUnidad: document.getElementById('tl-precio-u').value,
     usos: [...document.querySelectorAll('.tl-uso:checked')].map(x => x.value),
     notas: document.getElementById('tl-notas').value.trim(),
@@ -5969,6 +5979,7 @@ async function guardarTela(){
   if(!codigo){ err.textContent = 'Falta el código de la tela.'; err.style.display = 'block'; return; }
   if(!t.ancho){ err.textContent = 'Falta el ancho.'; err.style.display = 'block'; return; }
   if(codigo !== tlEditando && telasDatos.telas[codigo]){ err.textContent = 'Ya existe una tela con ese código.'; err.style.display = 'block'; return; }
+  if(t.precioUsd > 0 && tipoCambioTelas()) t.precio = Math.round(t.precioUsd * tipoCambioTelas() * 100) / 100;
   const extras = [...document.querySelectorAll('.tl-extra')].map(f => ({
     codigo: f.querySelector('.tl-x-cod').value.trim().toUpperCase(),
     ancho: parseFloat(f.querySelector('.tl-x-ancho').value) || null,
@@ -6068,25 +6079,50 @@ async function separarColorTelas(){
 
 // ----- precios editables desde la lista de telas (se guardan juntos con el boton verde) -----
 const preciosPend = {};
+// numeros escritos a la argentina ("2.500,50") o con punto decimal ("3.25")
+const numAr = v => { const s = String(v || '').trim(); if(s.includes(',')) return parseFloat(s.replace(/\./g, '').replace(',', '.')); if(/^\d+\.\d{1,2}$/.test(s)) return parseFloat(s); return parseFloat(s.replace(/\./g, '')); };
 function precioPendTela(c, campo){
   const p = preciosPend[c], t = telasDatos.telas[c] || {};
   if(campo === 'u') return p && p.u ? p.u : (t.precioUnidad || 'm');
+  if(campo === 'usd'){ if(p && p.usd !== undefined) return p.usd; return t.precioUsd ? String(t.precioUsd).replace('.', ',') : ''; }
+  // pesos: si hay precio en dolares, se muestra convertido
+  const usd = p && p.usd !== undefined ? numAr(p.usd) : t.precioUsd;
+  if(usd > 0 && tipoCambioTelas()) return formatoPesos(Math.round(usd * tipoCambioTelas()));
   if(p && p.precio !== undefined) return p.precio;
   return t.precio ? String(t.precio).replace('.', ',') : '';
 }
 function cambiarPrecioListaTela(c, campo, valor){
   preciosPend[c] = { ...(preciosPend[c] || {}), [campo]: valor };
+  if(campo === 'usd'){
+    const el = document.querySelector(`input[data-pesos="${CSS.escape(c)}"]`);
+    if(el){ const usd = numAr(valor); const tc = tipoCambioTelas();
+      if(usd > 0){ el.readOnly = true; el.style.background = '#F4F2EE'; el.value = tc ? formatoPesos(Math.round(usd * tc)) : 'falta el dólar'; }
+      else { el.readOnly = false; el.style.background = '#fff'; el.value = (telasDatos.telas[c] || {}).precio ? String(telasDatos.telas[c].precio).replace('.', ',') : ''; } }
+  }
   const n = Object.keys(preciosPend).length;
   const box = document.getElementById('tl-guardar-precios');
   box.style.display = 'block';
   box.querySelector('button').textContent = `💾 Guardar precios (${n} tela${n === 1 ? '' : 's'})`;
 }
+let tcPend = null;
+function cambiarTipoCambioTelas(v){
+  tcPend = numAr(v) || 0;
+  renderTelas();
+  const box = document.getElementById('tl-guardar-precios');
+  box.style.display = 'block';
+  box.querySelector('button').textContent = '💾 Guardar dólar y precios';
+}
 async function guardarPreciosTelas(){
+  if(tcPend !== null){ telasDatos.tipoCambio = tcPend; tcPend = null; }
   const nuevas = { ...telasDatos.telas };
+  // con el dolar nuevo, se recalculan en pesos todas las telas con precio en dolares
+  Object.keys(nuevas).forEach(c => { const t = nuevas[c]; if(t.precioUsd > 0 && tipoCambioTelas()) nuevas[c] = { ...t, precio: Math.round(t.precioUsd * tipoCambioTelas() * 100) / 100 }; });
   Object.entries(preciosPend).forEach(([c, p]) => {
     if(!nuevas[c]) return;
     const t = { ...nuevas[c] };
-    if(p.precio !== undefined){ const v = parseFloat(String(p.precio).replace(/\./g, '').replace(',', '.')); t.precio = v > 0 ? v : null; }
+    if(p.usd !== undefined){ const v = numAr(p.usd); t.precioUsd = v > 0 ? v : null; }
+    if(t.precioUsd > 0){ if(tipoCambioTelas()) t.precio = Math.round(t.precioUsd * tipoCambioTelas() * 100) / 100; }
+    else if(p.precio !== undefined){ const v = numAr(p.precio); t.precio = v > 0 ? v : null; }
     if(p.u) t.precioUnidad = p.u;
     nuevas[c] = t;
   });
@@ -6836,10 +6872,15 @@ function renderHistorialEntregas(){
 // costo por unidad = tela (consumo en el ancho de esa tela x precio por metro) + confeccion + insumos.
 // La confeccion es un precio por articulo (igual para todos los talleres).
 function formatoPesos(n){ return (Math.round(n * 100) / 100).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
+function tipoCambioTelas(){ const v = (typeof tcPend !== 'undefined' && tcPend !== null) ? tcPend : (telasDatos && telasDatos.tipoCambio); return v > 0 ? +v : 0; }
+function precioPesosTela(t){
+  if(t && t.precioUsd > 0 && tipoCambioTelas()) return t.precioUsd * tipoCambioTelas();
+  return t && t.precio > 0 ? +t.precio : null;
+}
 function precioMetroTela(cod){
-  const t = datosTela(cod); if(!t || !(t.precio > 0)) return null;
-  if(t.precioUnidad === 'kg'){ const r = rendimientoTela(String(cod).toUpperCase()); return r && r.mPorKg > 0 ? t.precio / r.mPorKg : null; }
-  return t.precio;
+  const t = datosTela(cod); const pp = precioPesosTela(t); if(!pp) return null;
+  if(t.precioUnidad === 'kg'){ const r = rendimientoTela(String(cod).toUpperCase()); return r && r.mPorKg > 0 ? pp / r.mPorKg : null; }
+  return pp;
 }
 // costos de un SKU con cada tela de su calidad (ordenados del mas barato al mas caro)
 function costosDeSku(sku){
@@ -14368,7 +14409,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v111';
+const APP_VERSION = '2026-10-02-v112';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
