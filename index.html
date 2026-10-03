@@ -1547,7 +1547,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v112</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v113</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1901,6 +1901,30 @@ a.grilla-celda{display:block;}
       <div class="he-talleres" id="he-talleres"></div>
       <div class="he-kpis" id="he-resumen"></div>
       <div id="he-lista"><p class="empty-msg">Cargando...</p></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-historial-sku">
+    <style>
+      .hs-buscar{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 12px;font-size:0.95rem;background:#fff;margin-bottom:12px;box-sizing:border-box;}
+      .hs-fila{background:#fff;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden;}
+      .hs-cab{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px 14px;cursor:pointer;align-items:center;}
+      .hs-cab:hover{background:#FBFAF7;}
+      .hs-sku{font-weight:700;font-size:0.95rem;}
+      .hs-art{font-size:0.8rem;color:#6B6258;}
+      .hs-ult{text-align:right;font-size:0.8rem;color:#6B6258;white-space:nowrap;}
+      .hs-ult b{display:block;color:var(--purple);font-size:0.9rem;}
+      .hs-det{display:none;border-top:1px solid var(--line);padding:6px 14px 10px;background:#FBFAF7;}
+      .hs-det.on{display:block;}
+      .hs-det div{display:grid;grid-template-columns:90px minmax(0,1fr) auto;gap:8px;font-size:0.8rem;padding:4px 0;border-bottom:1px dashed var(--line);}
+      .hs-det div:last-child{border-bottom:none;}
+    </style>
+    <div class="form-card" style="max-width:860px;">
+      <h2>¿Cuándo hice este SKU?</h2>
+      <input type="text" id="hs-buscar" class="hs-buscar" placeholder="🔍 Escriba un SKU o un producto (ej: KA183J, juego 2 1/2)" oninput="renderHistorialSku()">
+      <div id="hs-resumen" class="note" style="text-align:left;margin-bottom:8px;"></div>
+      <div id="hs-lista"><p class="empty-msg">Cargando...</p></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
@@ -5248,7 +5272,7 @@ const GRUPOS_INICIO = {
   g: { lado: 'int', titulo: 'Producción', columnas: [
     [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()']],
     [['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🚚 Ingreso a los talleres', 'abrirEnviosTela()']],
-    [['🏭 Productos en producción', 'abrirEnProduccion()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📦 Historial de órdenes', 'abrirHistorialOT()']],
+    [['🏭 Productos en producción', 'abrirEnProduccion()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📦 Historial de órdenes', 'abrirHistorialOT()'], ['🔎 ¿Cuándo hice este SKU?', 'abrirHistorialSku()']],
     [['📥 Entregas del taller', 'abrirIngresoTaller()'], ['🗂️ Historial de entregas', 'abrirHistorialEntregas()']],
   ] },
   h: { lado: 'int', titulo: 'Finanzas', items: [['💰 Ventas Mercado Libre', 'abrirVentasML()'], ['🧮 Calculadora de costos', 'abrirCalculadoraCostos()']] },
@@ -6969,6 +6993,49 @@ async function guardarAviosAC(){
   aviosPend = null;
   const dl = document.getElementById('lista-avios');
   if(dl) dl.innerHTML = Object.keys(aviosDatos.lista).sort().map(n => `<option value="${escapeAttr(n)}">`).join('');
+}
+
+// ===== Historial por SKU: cuando se hizo cada producto =====
+async function abrirHistorialSku(){
+  mostrarPaso('step-historial-sku');
+  document.getElementById('hs-lista').innerHTML = '<p class="empty-msg">Cargando...</p>';
+  historialOT = null;
+  await cargarHistorialOT();
+  renderHistorialSku();
+  setTimeout(() => document.getElementById('hs-buscar').focus(), 100);
+}
+function datosHistorialSku(){
+  const m = new Map();
+  (historialOT || []).forEach(o => (o.renglones || []).forEach(r => {
+    const clave = String(r.sku || '').trim().toUpperCase() || ('(sin SKU) ' + r.articulo);
+    const x = m.get(clave) || { sku: r.sku ? String(r.sku).toUpperCase() : '', articulo: r.articulo, veces: [], total: 0, entregado: 0 };
+    x.veces.push({ fecha: o.fecha, numero: o.numero, taller: o.taller, tela: o.skuTela, cantidad: +r.cantidad || 0, entregado: +r.entregado || 0 });
+    x.total += +r.cantidad || 0; x.entregado += +r.entregado || 0;
+    m.set(clave, x);
+  }));
+  const lista = [...m.values()];
+  lista.forEach(x => x.veces.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))));
+  return lista.sort((a, b) => String(b.veces[0].fecha).localeCompare(String(a.veces[0].fecha)));
+}
+function renderHistorialSku(){
+  const q = normBusqueda(document.getElementById('hs-buscar').value);
+  const todas = datosHistorialSku();
+  const lista = todas.filter(x => !q || q.split(/\s+/).every(w => normBusqueda(`${x.sku} ${x.articulo}`).includes(w)));
+  document.getElementById('hs-resumen').textContent = todas.length ? `${lista.length} de ${todas.length} productos · del más reciente al más viejo` : '';
+  const cont = document.getElementById('hs-lista');
+  if(!todas.length){ cont.innerHTML = '<p class="empty-msg">Todavía no hay órdenes de trabajo.</p>'; return; }
+  if(!lista.length){ cont.innerHTML = '<p class="empty-msg">Ese SKU no aparece en ninguna orden de trabajo.</p>'; return; }
+  const hace = f => { const d = Math.floor((Date.now() - new Date(f).getTime()) / 86400000); return d <= 0 ? 'hoy' : d === 1 ? 'ayer' : d < 60 ? `hace ${d} días` : `hace ${Math.round(d / 30)} meses`; };
+  cont.innerHTML = lista.map((x, i) => {
+    const u = x.veces[0];
+    return `<div class="hs-fila">
+      <div class="hs-cab" onclick="document.getElementById('hs-det-${i}').classList.toggle('on')">
+        <div><div class="hs-sku">${escaparHtml(x.sku || '(sin SKU)')}</div><div class="hs-art">${escaparHtml(x.articulo || '')} · ${x.veces.length} ${x.veces.length === 1 ? 'orden' : 'órdenes'} · ${x.total} unidades en total</div></div>
+        <div class="hs-ult"><b>${new Date(u.fecha).toLocaleDateString('es-AR')}</b>${hace(u.fecha)} · ${escaparHtml(u.taller || '')} · ${u.cantidad} u.</div>
+      </div>
+      <div class="hs-det" id="hs-det-${i}">${x.veces.map(v => `<div><span>${new Date(v.fecha).toLocaleDateString('es-AR')}</span><span>${escaparHtml(v.numero || '')} · ${escaparHtml(v.taller || '')}${v.tela ? ' · tela ' + escaparHtml(v.tela) : ''}</span><span><b>${v.cantidad}</b> u.${v.entregado ? ` (entregó ${v.entregado})` : ''}</span></div>`).join('')}</div>
+    </div>`;
+  }).join('');
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -14409,7 +14476,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v112';
+const APP_VERSION = '2026-10-02-v113';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
