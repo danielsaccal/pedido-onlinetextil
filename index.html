@@ -1548,7 +1548,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v119</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v120</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1646,6 +1646,7 @@ a.grilla-celda{display:block;}
             <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;">
               <strong id="ac-titulo" style="font-size:1.05rem;"></strong>
               <span style="display:flex;gap:6px;">
+                <button type="button" class="btn-mini" onclick="otraMedidaAC()" title="Crear el mismo artículo en otra medida">📐 Otra medida</button>
                 <button type="button" class="btn-mini" onclick="renombrarAC()" title="Renombrar">✏️</button>
                 <button type="button" class="btn-mini" onclick="unirArticuloAbiertoAC()" title="Unir con otro artículo">🔀</button>
                 <button type="button" class="btn-mini" onclick="borrarAC()" title="Borrar">🗑️</button>
@@ -7406,9 +7407,12 @@ function sugerenciasPublicar(sku){
   // producto donde ya estan otros SKU de la misma calidad (ej: otra medida de la misma sabana) o del mismo articulo
   let prod = null, cat = '';
   const buscar = cond => { for(const c of CATALOGO) for(const p of (c.productos || [])) if((p.variantes || []).some(v => { const s = String(v.sku).toUpperCase(); return s !== S && cond(s); })) return { p, c }; return null; };
-  const r1 = cal ? buscar(s => calidadDeSku(s) === cal) : null;
-  const r2 = !r1 && art ? buscar(s => articuloDeSku(s) === art) : null;
-  if(r1){ prod = r1.p; cat = r1.c.categoria; } else if(r2){ cat = r2.c.categoria; }
+  // 1) otra medida del mismo articulo (Mantel 200 / Mantel 250) con la misma calidad, 2) misma calidad, 3) mismo articulo
+  const herm = art && !art.startsWith('ficha:') ? articulosHermanos(art) : [];
+  const r0 = herm.length ? (buscar(s => herm.includes(articuloDeSku(s)) && (!cal || calidadDeSku(s) === cal)) || buscar(s => herm.includes(articuloDeSku(s)))) : null;
+  const r1 = !r0 && cal ? buscar(s => calidadDeSku(s) === cal) : null;
+  const r2 = !r0 && !r1 && art ? buscar(s => articuloDeSku(s) === art) : null;
+  if(r0){ prod = r0.p; cat = r0.c.categoria; } else if(r1){ prod = r1.p; cat = r1.c.categoria; } else if(r2){ cat = r2.c.categoria; }
   if(!cat){
     const pal = normBusqueda(String(art || '').split(' ')[0]);
     const c = CATALOGO.find(c => pal && normBusqueda(c.categoria).includes(pal.slice(0, 5)));
@@ -7422,6 +7426,11 @@ function sugerenciasPublicar(sku){
     const mg = mgs.length ? mgs.reduce((a, b) => a + b, 0) / mgs.length : 0.5;
     precio = Math.round(costo / (1 - mg) / 10) * 10;
     motivo = `costo $ ${formatoPesos(Math.round(costo))} con margen ${Math.round(mg * 100)} %${mgs.length ? ' (el promedio de ese producto)' : ''}`;
+  } else if(r0){
+    const v = r0.p.variantes.find(v => herm.includes(articuloDeSku(String(v.sku).toUpperCase())));
+    const pr = v && parsePrice(v.precio), artH = v && articuloDeSku(String(v.sku).toUpperCase());
+    const m = x => { const pz = piezasDeArticuloAny(x); return pz ? pz.reduce((s, p) => s + p.ancho * p.largo * (p.cantidad || 1) * (p.partes || 1), 0) : 0; };
+    if(pr && m(artH) > 0){ precio = Math.round(pr * m(art) / m(artH) / 10) * 10; motivo = `proporcional al tamaño de ${v.sku} ($ ${formatoPesos(pr)})`; }
   } else if(art){
     for(const cc of CATALOGO) for(const p of (cc.productos || [])) for(const v of (p.variantes || [])) if(!precio && articuloDeSku(String(v.sku).toUpperCase()) === art && String(v.sku).toUpperCase() !== S && parsePrice(v.precio)){ precio = parsePrice(v.precio); motivo = `igual que ${v.sku}, mismo artículo`; }
   }
@@ -7510,6 +7519,49 @@ function pintarBotonesPublicarAC(){
   const skus = [String(emp.sku || '').toUpperCase(), ...otrosSkuActuales().map(o => o.sku)].filter(Boolean);
   const faltan = skus.filter(s => !buscarProductoPorSku(s));
   cont.innerHTML = faltan.length ? `<div style="background:#FDF4E2;border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:0.82rem;">No están en el catálogo: ${faltan.map(s => `<button type="button" class="btn-mini" style="margin:2px;" onclick="abrirPublicar('${escapeAttr(s)}')">📸 Publicar ${escaparHtml(s)}</button>`).join('')}</div>` : '';
+}
+
+// ----- mismo articulo en otra medida (ej: Mantel 200 -> Mantel 250) -----
+// Si el nombre tiene un numero y alguna pieza mide eso, se cambia esa medida; se copian bolsa, confeccion,
+// avios y calidad de tela. El SKU queda vacio para cargar el nuevo.
+async function otraMedidaAC(){
+  const a = acArticulo; if(!a) return;
+  const g = juegosDePiezasAC(a)[0];
+  if(!g){ alert('Primero cargue las piezas de este artículo.'); return; }
+  const nums = (a.match(/\d+(?:[.,]\d+)?/g) || []);
+  const viejo = nums.length ? parseFloat(nums[nums.length - 1].replace(',', '.')) : null;
+  const r = prompt(viejo ? `"${a}" mide ${viejo}. ¿Qué medida nueva? (ej: 250)` : `Nombre del artículo en la otra medida (ej: ${a} 250):`, '');
+  if(!r) return;
+  let nombre, piezas;
+  if(viejo && /^\d+([.,]\d+)?$/.test(r.trim())){
+    const nuevo = parseFloat(r.trim().replace(',', '.'));
+    nombre = a.replace(new RegExp(nums[nums.length - 1].replace('.', '\\.') + '(?!.*\\d)'), String(nuevo));
+    let cambio = false;
+    piezas = g.piezas.map(p => { const q = { ...p }; if(Math.abs(q.largo - viejo) < 1){ q.largo = nuevo; cambio = true; } else if(Math.abs(q.ancho - viejo) < 1){ q.ancho = nuevo; cambio = true; } return q; });
+    if(!cambio && !confirm(`Ninguna pieza mide ${viejo}, así que se copian las mismas medidas para que las corrija. ¿Seguir?`)) return;
+  } else { nombre = r.trim(); piezas = g.piezas.map(p => ({ ...p })); }
+  if(tablaConsumo.instrucciones[nombre] || (tablaConsumo.articulos || {})[nombre]){ alert(`Ya existe "${nombre}".`); return; }
+  const W = g.anchos[0];
+  const corte = calcularCorte(piezas, parseFloat(W));
+  tablaConsumo.articulos = tablaConsumo.articulos || {};
+  tablaConsumo.articulos[nombre] = { [W]: corte.metros };
+  tablaConsumo.instrucciones[nombre] = { [W]: { texto: textoCorte(nombre, piezas, parseFloat(W), ''), bosquejoBase64: '', piezas, tipo: 'personalizado', consumo: corte.metros, guardado: Date.now() } };
+  const e = { ...((tablaConsumo.empaque || {})[a] || {}) };
+  delete e.sku; delete e.colchon;
+  if(e.etMedida) e.etMedida = '';
+  tablaConsumo.empaque = tablaConsumo.empaque || {};
+  tablaConsumo.empaque[nombre] = e;
+  try{
+    await guardarTablaYConsumo();
+    renderListaAC(); abrirArticuloAC(nombre);
+    alert(`Listo: se creó "${nombre}". Cargue su SKU en el recuadro de bolsa y etiqueta y toque el botón verde; ahí le ofrece publicarlo en el catálogo junto al de ${viejo || 'la otra medida'}.`);
+  } catch(err){ alert('No se pudo crear: ' + err.message); }
+}
+// articulos "hermanos": mismo nombre que solo cambia un numero (Mantel 200 / Mantel 250)
+function articulosHermanos(a){
+  const base = n => normBusqueda(String(n || '')).replace(/\d+(?:[.,]\d+)?/g, '#').replace(/\s+/g, ' ').trim();
+  const b = base(a); if(!/#/.test(b)) return [];
+  return Object.keys(tablaConsumo.instrucciones || {}).filter(x => x !== a && base(x) === b);
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -14951,7 +15003,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v119';
+const APP_VERSION = '2026-10-02-v120';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
