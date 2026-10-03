@@ -1548,7 +1548,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v122</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v123</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6627,8 +6627,38 @@ function renderOtrosSkuAC(){
     </div>`).join('');
   cont.querySelectorAll('.ac-otro-cal').forEach(s => { hacerSelectBuscable(s); if(s._sync) s._sync(); });
 }
-async function agregarOtroSkuAC(){
-  const sku = (prompt('SKU del catálogo (ej: KA131JC):') || '').trim().toUpperCase();
+function agregarOtroSkuAC(){
+  const cont = document.getElementById('ac-otros-sku');
+  const nums = (acArticulo.match(/\d+(?:[.,]\d+)?/g) || []);
+  let box = document.getElementById('ac-otro-sku-elegir');
+  if(box){ box.remove(); return; }
+  box = document.createElement('div'); box.id = 'ac-otro-sku-elegir';
+  box.style.cssText = 'background:#F3EEF7;border-radius:10px;padding:10px;margin:6px 0;font-size:0.85rem;';
+  box.innerHTML = `<b>¿Qué es el SKU nuevo?</b>
+    <div style="display:grid;gap:6px;margin-top:8px;">
+      <input id="aos-sku" placeholder="SKU nuevo (ej: DEG250)" style="text-transform:uppercase;padding:8px;border:1px solid var(--line);border-radius:8px;">
+      <button type="button" class="btn-mini" style="text-align:left;" onclick="aosElegir('misma')">🎨 El mismo <b>${escaparHtml(acArticulo)}</b>, en otra tela o color</button>
+      <div style="display:flex;gap:6px;align-items:center;"><button type="button" class="btn-mini" style="text-align:left;flex:1;" onclick="aosElegir('medida')">📐 Otra medida${nums.length ? ` (en vez de ${nums[nums.length - 1]})` : ''}:</button><input id="aos-medida" placeholder="${nums.length ? 'ej: 250' : 'nombre del artículo'}" style="width:130px;padding:7px;border:1px solid var(--line);border-radius:8px;"></div>
+    </div>`;
+  cont.after(box);
+  document.getElementById('aos-sku').focus();
+}
+async function aosElegir(tipo){
+  const sku = document.getElementById('aos-sku').value.trim().toUpperCase();
+  if(!sku){ alert('Escriba el SKU nuevo.'); return; }
+  if(tipo === 'medida'){
+    const med = document.getElementById('aos-medida').value.trim();
+    if(!med){ alert('Escriba la medida nueva.'); return; }
+    if(empaquePendiente && !confirm('Hay cambios sin guardar en este artículo. ¿Seguir igual? (se pierden)')) return;
+    document.getElementById('ac-otro-sku-elegir').remove();
+    empaquePendiente = false;
+    await otraMedidaAC(med, sku);
+    return;
+  }
+  document.getElementById('ac-otro-sku-elegir').remove();
+  await agregarOtroSkuMismo(sku);
+}
+async function agregarOtroSkuMismo(sku){
   if(!sku) return;
   if(fabricacion === null) await cargarFabricacion();
   otrosSkuPend = [...otrosSkuActuales()];
@@ -7531,13 +7561,13 @@ function pintarBotonesPublicarAC(){
 // ----- mismo articulo en otra medida (ej: Mantel 200 -> Mantel 250) -----
 // Si el nombre tiene un numero y alguna pieza mide eso, se cambia esa medida; se copian bolsa, confeccion,
 // avios y calidad de tela. El SKU queda vacio para cargar el nuevo.
-async function otraMedidaAC(){
+async function otraMedidaAC(medidaDada, skuDado){
   const a = acArticulo; if(!a) return;
   const g = juegosDePiezasAC(a)[0];
   if(!g){ alert('Primero cargue las piezas de este artículo.'); return; }
   const nums = (a.match(/\d+(?:[.,]\d+)?/g) || []);
   const viejo = nums.length ? parseFloat(nums[nums.length - 1].replace(',', '.')) : null;
-  const r = prompt(viejo ? `"${a}" mide ${viejo}. ¿Qué medida nueva? (ej: 250)` : `Nombre del artículo en la otra medida (ej: ${a} 250):`, '');
+  const r = medidaDada || prompt(viejo ? `"${a}" mide ${viejo}. ¿Qué medida nueva? (ej: 250)` : `Nombre del artículo en la otra medida (ej: ${a} 250):`, '');
   if(!r) return;
   let nombre, piezas;
   if(viejo && /^\d+([.,]\d+)?$/.test(r.trim())){
@@ -7555,11 +7585,21 @@ async function otraMedidaAC(){
   tablaConsumo.instrucciones[nombre] = { [W]: { texto: textoCorte(nombre, piezas, parseFloat(W), ''), bosquejoBase64: '', piezas, tipo: 'personalizado', consumo: corte.metros, guardado: Date.now() } };
   const e = { ...((tablaConsumo.empaque || {})[a] || {}) };
   delete e.sku; delete e.colchon;
+  if(skuDado) e.sku = String(skuDado).toUpperCase();
   if(e.etMedida) e.etMedida = '';
   tablaConsumo.empaque = tablaConsumo.empaque || {};
   tablaConsumo.empaque[nombre] = e;
   try{
     await guardarTablaYConsumo();
+    if(skuDado){
+      if(fabricacion === null) await cargarFabricacion();
+      const calOrig = calidadDeSku(String(((tablaConsumo.empaque || {})[a] || {}).sku || '').toUpperCase()) || ((tablaConsumo.empaque || {})[a] || {}).calidad || '';
+      fabricacion.vinculos[e.sku] = { ...(fabricacion.vinculos[e.sku] || {}), articulo: nombre, calidad: calOrig };
+      await guardarFabricacion();
+      renderListaAC(); abrirArticuloAC(nombre);
+      if(!buscarProductoPorSku(e.sku) && confirm(`Se creó "${nombre}" con el SKU ${e.sku}. ¿Publicarlo ahora en el catálogo junto a ${a}?`)) abrirPublicarVarios([e.sku, String(((tablaConsumo.empaque || {})[a] || {}).sku || '')].filter(Boolean));
+      return;
+    }
     renderListaAC(); abrirArticuloAC(nombre);
     alert(`Listo: se creó "${nombre}". Cargue su SKU en el recuadro de bolsa y etiqueta y toque el botón verde; ahí le ofrece publicarlo en el catálogo junto al de ${viejo || 'la otra medida'}.`);
   } catch(err){ alert('No se pudo crear: ' + err.message); }
@@ -15139,7 +15179,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v122';
+const APP_VERSION = '2026-10-02-v123';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
