@@ -1548,7 +1548,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v115</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v116</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1802,6 +1802,13 @@ a.grilla-celda{display:block;}
       .tl-top{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
       .tl-top input{flex:1;min-width:200px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:0.92rem;background:#fff;}
       .tl-top button{border:none;border-radius:12px;padding:10px 16px;background:var(--gold);color:var(--purple);font-weight:700;cursor:pointer;font-size:0.92rem;}
+      .tl-barra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+      .tl-selects{display:flex;gap:8px;flex:1;min-width:0;}
+      .tl-selects select{flex:1;min-width:0;padding:9px 10px;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:0.88rem;color:var(--purple);}
+      .tl-selects select.activo{border-color:var(--purple);background:#F3EEF7;font-weight:700;}
+      .tl-dolar{display:flex;align-items:center;gap:4px;background:#EEF3FB;border-radius:12px;padding:5px 10px;font-size:0.82rem;color:#2E5A8C;font-weight:700;white-space:nowrap;}
+      .tl-dolar input{width:78px;padding:5px 6px;border:1px solid var(--line);border-radius:8px;text-align:right;font-size:0.88rem;}
+      @media (max-width:560px){ .tl-selects{flex-basis:100%;} .tl-dolar{margin-left:auto;} }
       .tl-fil{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center;}
       .tl-fil .lbl{font-size:0.72rem;color:#8A8072;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-right:2px;}
       .tl-fil span.ch{cursor:pointer;font-size:0.8rem;padding:4px 11px;border-radius:14px;border:1px solid var(--line);background:#fff;}
@@ -1834,12 +1841,11 @@ a.grilla-celda{display:block;}
         <input type="text" id="tl-buscar" placeholder="🔍 Código, nombre, color o proveedor" oninput="renderTelas()">
         <button type="button" onclick="editarTela()">+ Nueva tela</button>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#EEF3FB;border-radius:12px;padding:8px 12px;margin-bottom:12px;font-size:0.85rem;">
-        <span>💵 <b>Dólar para las telas en dólares:</b></span>
-        <span>$ <input type="text" id="tl-tc" inputmode="decimal" placeholder="1450" style="width:100px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;text-align:right;" oninput="cambiarTipoCambioTelas(this.value)"></span>
-        <span class="note" style="margin:0;">Lo fijan ustedes. Al cambiarlo se recalculan todas las telas con precio en US$.</span>
+      <div class="tl-barra">
+        <div id="tl-usos-filtro" class="tl-selects"></div>
+        <label class="tl-dolar" title="Dólar que usan ustedes para las telas con precio en US$. Al cambiarlo se recalculan.">💵 US$ 1 = $ <input type="text" id="tl-tc" inputmode="decimal" placeholder="1450" oninput="cambiarTipoCambioTelas(this.value)"></label>
       </div>
-      <div id="tl-usos-filtro"></div>
+
       <div id="tl-separar"></div>
       <div id="tl-acciones" style="display:none;"></div>
       <div id="tl-editor" style="display:none;"></div>
@@ -5912,10 +5918,10 @@ function renderTelas(){
   const usos = telasDatos.usos;
   const chip = (v, t) => `<span onclick="tlFiltroUso='${escapeAttr(v)}'; renderTelas();" style="cursor:pointer;font-size:0.82rem;padding:5px 12px;border-radius:14px;border:1px solid var(--line);${tlFiltroUso === v ? 'background:var(--purple);color:#fff;border-color:var(--purple);' : ''}">${escaparHtml(t)}</span>`;
   const chipC = (v, t) => `<span onclick="tlFiltroComp='${escapeAttr(v)}'; renderTelas();" style="cursor:pointer;font-size:0.82rem;padding:5px 12px;border-radius:14px;border:1px solid var(--line);${tlFiltroComp === v ? 'background:#6B5A2E;color:#fff;border-color:#6B5A2E;' : ''}">${escaparHtml(t)}</span>`;
-  const ch = (on, fn, t) => `<span class="ch${on ? ' on' : ''}" onclick="${fn}; renderTelas();">${escaparHtml(t)}</span>`;
+  // filtros como desplegables (mas prolijo, sobre todo en el celular)
   document.getElementById('tl-usos-filtro').innerHTML =
-    `<div class="tl-fil"><span class="lbl">Uso</span>${ch(!tlFiltroUso, "tlFiltroUso=''", 'Todos')}${usos.map(u => ch(tlFiltroUso === u, `tlFiltroUso='${escapeAttr(u)}'`, u)).join('')}</div>` +
-    `<div class="tl-fil" style="margin-bottom:14px;"><span class="lbl">Composición</span>${ch(!tlFiltroComp, "tlFiltroComp=''", 'Todas')}${COMPOSICIONES_TELA.map(c => ch(tlFiltroComp === c, `tlFiltroComp='${c}'`, c)).join('')}</div>`;
+    `<select class="${tlFiltroUso ? 'activo' : ''}" onchange="tlFiltroUso=this.value; renderTelas();"><option value="">Uso (todos)</option>${usos.map(u => `<option value="${escapeAttr(u)}" ${tlFiltroUso === u ? 'selected' : ''}>${escaparHtml(u)}</option>`).join('')}</select>` +
+    `<select class="${tlFiltroComp ? 'activo' : ''}" onchange="tlFiltroComp=this.value; renderTelas();"><option value="">Composición</option>${COMPOSICIONES_TELA.map(c => `<option value="${c}" ${tlFiltroComp === c ? 'selected' : ''}>${c}</option>`).join('')}</select>`;
   const q = normBusqueda(document.getElementById('tl-buscar').value);
   const lista = Object.entries(telasDatos.telas)
     .filter(([c, t]) => (!tlFiltroUso || (t.usos || []).includes(tlFiltroUso)) && (!tlFiltroComp || t.composicion === tlFiltroComp) && (!q || normBusqueda(c + ' ' + (t.nombre || '') + ' ' + (t.color || '') + ' ' + (t.composicion || '') + ' ' + (t.proveedor || '')).includes(q)))
@@ -14650,7 +14656,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v115';
+const APP_VERSION = '2026-10-02-v116';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
