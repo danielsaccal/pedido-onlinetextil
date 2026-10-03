@@ -1547,7 +1547,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v109</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v110</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6607,7 +6607,7 @@ function renderProductosFabrico(){
   let prodPrev = null;
   const nombreArt = a => a ? (a.startsWith('ficha:') ? nombreFicha(a.slice(6)) : a) : '';
   cont.innerHTML = `<div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;"><table style="width:100%;border-collapse:collapse;font-size:0.86rem;">
-    <thead><tr style="background:var(--cream);"><th style="padding:7px 8px;text-align:left;">SKU</th><th style="padding:7px 8px;text-align:left;">Medida / variante</th><th style="padding:7px 8px;text-align:left;">Se corta como</th><th style="padding:7px 8px;text-align:left;">Calidad de tela</th><th style="padding:7px 8px;text-align:right;">Costo</th><th style="padding:7px 8px;text-align:right;">Precio</th><th style="padding:7px 8px;text-align:right;">Margen</th><th style="padding:7px 8px;text-align:center;">Estado</th></tr></thead><tbody>
+    <thead><tr style="background:var(--cream);"><th style="padding:7px 8px;text-align:left;">SKU</th><th style="padding:7px 8px;text-align:left;">Medida / variante</th><th style="padding:7px 8px;text-align:left;">Se corta como</th><th style="padding:7px 8px;text-align:left;">Calidad de tela</th><th style="padding:7px 8px;text-align:right;">Costo</th><th style="padding:7px 8px;text-align:right;">Precio de lista</th><th style="padding:7px 8px;text-align:right;">Margen</th><th style="padding:7px 8px;text-align:center;">Estado</th></tr></thead><tbody>
     ${filas.map(f => {
       let cab = '';
       if(f.producto !== prodPrev){
@@ -6631,7 +6631,7 @@ function renderProductosFabrico(){
         })()}
         <td style="padding:7px 8px;text-align:center;">${ok ? '✅' : '⚠️'}</td></tr>`;
     }).join('')}</tbody></table></div>
-    <p class="note" style="margin-top:6px;">Costo = tela (con la tela más barata de su calidad) + confección + insumos. Margen sobre el precio del catálogo: rojo menos de 20 %, amarillo menos de 40 %. Aparecen los productos del catálogo marcados como fabricación propia. Para completar lo que falta: Artículos y cortes (SKU y calidad) o Editar producto (🏭 Fabricación propia).</p>`;
+    <p class="note" style="margin-top:6px;">Costo = tela (con la tela más barata de su calidad) + confección + insumos. Margen sobre el precio de lista: rojo menos de 20 %, amarillo menos de 40 %. Aparecen los productos del catálogo marcados como fabricación propia. Para completar lo que falta: Artículos y cortes (SKU y calidad) o Editar producto (🏭 Fabricación propia).</p>`;
 }
 
 // ----- piezas iguales: no repetir articulos que son lo mismo (ej: fundas de 1 1/2, 2 1/2, Queen y Twin) -----
@@ -14323,7 +14323,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v109';
+const APP_VERSION = '2026-10-02-v110';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
