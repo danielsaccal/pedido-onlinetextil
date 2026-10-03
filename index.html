@@ -1548,7 +1548,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v123</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v124</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1646,7 +1646,6 @@ a.grilla-celda{display:block;}
             <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;">
               <strong id="ac-titulo" style="font-size:1.05rem;"></strong>
               <span style="display:flex;gap:6px;">
-                <button type="button" class="btn-mini" onclick="otraMedidaAC()" title="Crear el mismo artículo en otra medida">📐 Otra medida</button>
                 <button type="button" class="btn-mini" onclick="renombrarAC()" title="Renombrar">✏️</button>
                 <button type="button" class="btn-mini" onclick="unirArticuloAbiertoAC()" title="Unir con otro artículo">🔀</button>
                 <button type="button" class="btn-mini" onclick="borrarAC()" title="Borrar">🗑️</button>
@@ -4462,6 +4461,7 @@ function abrirArticuloAC(a, piezasForzadas){
   if(empaquePendiente && a !== acArticulo && !confirm('Hay cambios sin guardar en bolsa, etiqueta o SKU. ¿Descartarlos?')) return;
   if(a !== acArticulo){ if(empaquePendiente) cargarTablaConsumo(); limpiarEmpaquePendiente(); }
   acArticulo = a;
+  empaqueOriginalAC = JSON.parse(JSON.stringify(((tablaConsumo && tablaConsumo.empaque) || {})[a] || {}));
   acAnchoVista = null;
   renderListaAC();
   const grupos = juegosDePiezasAC(a);
@@ -4626,7 +4626,7 @@ async function guardarAC(){
   const derivadas = cargarPiezasDelJuego(a, String(W), piezas);
   try{
     await guardarTablaYConsumo();
-    if(empaquePendiente) await guardarEmpaqueAC();
+    if(empaquePendiente) await guardarEmpaqueAC(true);
     sincronizarDescripcionesCatalogo();
     renderListaAC();
     renderEditorAC();
@@ -5141,7 +5141,7 @@ function cambioEmpaqueAC(){
   marcarEmpaquePendiente();
 }
 // los datos del recuadro (bolsa, etiqueta, SKU, calidad y otros SKU) se guardan con su propio boton
-let empaquePendiente = false, otrosSkuPend = null;
+let empaquePendiente = false, otrosSkuPend = null, empaqueOriginalAC = null;
 function marcarEmpaquePendiente(){
   empaquePendiente = true;
   const b = document.getElementById('ac-empaque-guardar'), m = document.getElementById('ac-empaque-ok');
@@ -5154,10 +5154,26 @@ function limpiarEmpaquePendiente(){
   if(b){ b.disabled = true; b.style.opacity = '0.5'; }
   if(m){ m.textContent = ''; }
 }
-async function guardarEmpaqueAC(){
+async function guardarEmpaqueAC(sinConfirmar){
   if(!acArticulo) return;
   const emp = tablaConsumo.empaque[acArticulo] || {};
   const sku = String(emp.sku || '').toUpperCase();
+  // resumen de lo que se va a guardar
+  if(!sinConfirmar){
+    const antes = empaqueOriginalAC || {};
+    const etiquetas = { bolsa: 'Bolsa', porBolsa: 'Unidades por bolsa', etDesc: 'Nombre (etiqueta)', etMedida: 'Medida (etiqueta)', confeccion: 'Confección $', insumos: 'Otros insumos $', colchon: 'Colchón', sku: 'SKU' };
+    const norm = (k, v) => { if(k === 'porBolsa') return String(+v > 1 ? +v : 1); if(k === 'confeccion' || k === 'insumos') return String(+v || 0); return String(v ?? ''); };
+    const lineas = Object.keys(etiquetas).filter(k => norm(k, antes[k]) !== norm(k, emp[k])).map(k => `• ${etiquetas[k]}: ${emp[k] === '' || emp[k] == null ? '(vacío)' : emp[k]}`);
+    if(String(antes.calidad || '') !== String(emp.calidad || '')){ const q = calidadesTela().find(x => x.clave === emp.calidad); lineas.push(`• Calidad de tela: ${q ? q.etiqueta : '(sin calidad)'}`); }
+    if(aviosPend) lineas.push(`• Avíos: ${aviosPend.filter(a => a.nombre).map(a => `${a.cantidad} ${a.nombre}`).join(', ') || '(ninguno)'}`);
+    (otrosSkuPend || []).forEach(o => {
+      if(o.medida) lineas.push(`• SKU ${o.sku}: se crea el artículo "${nombreOtraMedida(acArticulo, o.medida)}" (otra medida), con la misma tela, bolsa y confección`);
+      else if(!(fabricacion && fabricacion.vinculos[o.sku] && fabricacion.vinculos[o.sku].articulo === acArticulo)) lineas.push(`• SKU ${o.sku}: mismo artículo en otra tela o color`);
+    });
+    const quitados = Object.keys((fabricacion && fabricacion.vinculos) || {}).filter(s => s !== sku && fabricacion.vinculos[s].articulo === acArticulo && otrosSkuPend && !otrosSkuPend.some(o => o.sku === s));
+    quitados.forEach(s => lineas.push(`• Se quita el SKU ${s} de este artículo`));
+    if(!confirm(`Se va a guardar en "${acArticulo}":\n\n${lineas.length ? lineas.join('\n') : '(sin cambios visibles)'}\n\n¿Confirmar?`)) return;
+  }
   try{
     if(fabricacion === null) await cargarFabricacion();
     await guardarAviosAC();
@@ -5165,7 +5181,13 @@ async function guardarEmpaqueAC(){
     if(sku) fabricacion.vinculos[sku] = { ...(fabricacion.vinculos[sku] || {}), calidad: emp.calidad || '', tela: '', articulo: acArticulo };
     if(otrosSkuPend){
       Object.keys(fabricacion.vinculos).forEach(s => { if(s !== sku && fabricacion.vinculos[s].articulo === acArticulo && !otrosSkuPend.some(o => o.sku === s)) delete fabricacion.vinculos[s].articulo; });
-      otrosSkuPend.forEach(o => { fabricacion.vinculos[o.sku] = { ...(fabricacion.vinculos[o.sku] || {}), calidad: o.calidad || '', tela: '', articulo: acArticulo }; });
+      otrosSkuPend.forEach(o => {
+        if(o.medida){
+          const nombre = crearArticuloOtraMedida(acArticulo, o.medida, o.sku, o.calidad || emp.calidad);
+          if(nombre) fabricacion.vinculos[o.sku] = { ...(fabricacion.vinculos[o.sku] || {}), calidad: o.calidad || emp.calidad || '', tela: '', articulo: nombre };
+        } else fabricacion.vinculos[o.sku] = { ...(fabricacion.vinculos[o.sku] || {}), calidad: o.calidad || '', tela: '', articulo: acArticulo };
+      });
+      if(otrosSkuPend.some(o => o.medida)) await guardarTablaYConsumo();
     }
     await guardarFabricacion();
     limpiarEmpaquePendiente();
@@ -5173,6 +5195,8 @@ async function guardarEmpaqueAC(){
     try{ n = await aplicarDescripcionAutomatica([sku, ...((otrosSkuPend || otrosSkuActuales()).map(o => o.sku))].filter(Boolean)); }
     catch(err){ console.error('descripcion automatica', err); }
     const m = document.getElementById('ac-empaque-ok'); if(m){ m.textContent = '✓ Guardado' + (n ? ' · descripción del catálogo actualizada' : ''); m.style.color = '#2F7A47'; }
+    empaqueOriginalAC = JSON.parse(JSON.stringify(tablaConsumo.empaque[acArticulo] || {}));
+    renderListaAC();
     pintarBotonesPublicarAC();
     { const herm = articulosHermanos(acArticulo).map(x => String(((tablaConsumo.empaque || {})[x] || {}).sku || '').toUpperCase());
       const nuevos = [...new Set([sku, ...otrosSkuActuales().map(o => o.sku), ...herm])].filter(s => s && !buscarProductoPorSku(s));
@@ -6621,7 +6645,7 @@ function otrosSkuActuales(){
 function renderOtrosSkuAC(){
   const cont = document.getElementById('ac-otros-sku'); if(!cont || !fabricacion) return;
   cont.innerHTML = otrosSkuActuales().map((o, i) => `<div style="display:grid;grid-template-columns:minmax(0,0.8fr) minmax(0,2fr) 30px;gap:6px;margin-bottom:6px;align-items:center;">
-      <input value="${escapeAttr(o.sku)}" disabled style="font-weight:700;">
+      <div><input value="${escapeAttr(o.sku)}" disabled style="font-weight:700;width:100%;box-sizing:border-box;">${o.medida ? `<div style="font-size:0.7rem;color:#8A6417;font-weight:700;">📐 nuevo: ${escaparHtml(nombreOtraMedida(acArticulo, o.medida))}</div>` : ''}</div>
       <select class="ac-otro-cal" onchange="cambiarCalidadOtroSku(${i}, this.value)">${opcionesCalidad(o.calidad || '')}</select>
       <button type="button" onclick="quitarOtroSkuAC(${i})" title="Quitar" style="border:none;background:none;cursor:pointer;color:#8A8072;">✕</button>
     </div>`).join('');
@@ -6629,34 +6653,30 @@ function renderOtrosSkuAC(){
 }
 function agregarOtroSkuAC(){
   const cont = document.getElementById('ac-otros-sku');
-  const nums = (acArticulo.match(/\d+(?:[.,]\d+)?/g) || []);
   let box = document.getElementById('ac-otro-sku-elegir');
   if(box){ box.remove(); return; }
+  const nums = (acArticulo.match(/\d+(?:[.,]\d+)?/g) || []);
   box = document.createElement('div'); box.id = 'ac-otro-sku-elegir';
   box.style.cssText = 'background:#F3EEF7;border-radius:10px;padding:10px;margin:6px 0;font-size:0.85rem;';
-  box.innerHTML = `<b>¿Qué es el SKU nuevo?</b>
-    <div style="display:grid;gap:6px;margin-top:8px;">
-      <input id="aos-sku" placeholder="SKU nuevo (ej: DEG250)" style="text-transform:uppercase;padding:8px;border:1px solid var(--line);border-radius:8px;">
-      <button type="button" class="btn-mini" style="text-align:left;" onclick="aosElegir('misma')">🎨 El mismo <b>${escaparHtml(acArticulo)}</b>, en otra tela o color</button>
-      <div style="display:flex;gap:6px;align-items:center;"><button type="button" class="btn-mini" style="text-align:left;flex:1;" onclick="aosElegir('medida')">📐 Otra medida${nums.length ? ` (en vez de ${nums[nums.length - 1]})` : ''}:</button><input id="aos-medida" placeholder="${nums.length ? 'ej: 250' : 'nombre del artículo'}" style="width:130px;padding:7px;border:1px solid var(--line);border-radius:8px;"></div>
-    </div>`;
+  box.innerHTML = `<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:6px;align-items:end;">
+      <label style="display:flex;flex-direction:column;gap:2px;font-size:0.72rem;color:#6B6258;">SKU nuevo<input id="aos-sku" placeholder="ej: DEG250E" style="text-transform:uppercase;padding:8px;border:1px solid var(--line);border-radius:8px;"></label>
+      <label style="display:flex;flex-direction:column;gap:2px;font-size:0.72rem;color:#6B6258;">Medida, solo si es otra${nums.length ? ` (este es ${nums[nums.length - 1]})` : ''}<input id="aos-medida" placeholder="${nums.length ? 'ej: 250' : 'nombre del otro artículo'}" style="padding:8px;border:1px solid var(--line);border-radius:8px;"></label>
+      <button type="button" class="btn-mini" style="padding:9px 12px;" onclick="aosAgregar()">Agregar</button>
+    </div>
+    <p class="note" style="text-align:left;margin:6px 0 0;">Sin medida: es este mismo artículo en otra tela o color. Con medida: se va a crear el artículo de esa medida. Nada se guarda hasta que toque el botón verde.</p>`;
   cont.after(box);
   document.getElementById('aos-sku').focus();
 }
-async function aosElegir(tipo){
+function aosAgregar(){
   const sku = document.getElementById('aos-sku').value.trim().toUpperCase();
+  const medida = document.getElementById('aos-medida').value.trim();
   if(!sku){ alert('Escriba el SKU nuevo.'); return; }
-  if(tipo === 'medida'){
-    const med = document.getElementById('aos-medida').value.trim();
-    if(!med){ alert('Escriba la medida nueva.'); return; }
-    if(empaquePendiente && !confirm('Hay cambios sin guardar en este artículo. ¿Seguir igual? (se pierden)')) return;
-    document.getElementById('ac-otro-sku-elegir').remove();
-    empaquePendiente = false;
-    await otraMedidaAC(med, sku);
-    return;
-  }
+  otrosSkuPend = [...otrosSkuActuales()];
+  if(otrosSkuPend.some(o => o.sku === sku) || String(((tablaConsumo.empaque || {})[acArticulo] || {}).sku || '').toUpperCase() === sku){ alert('Ese SKU ya está en este artículo.'); return; }
+  const calPrincipal = ((tablaConsumo.empaque || {})[acArticulo] || {}).calidad || '';
+  otrosSkuPend.push({ sku, calidad: medida ? calPrincipal : '', medida });
   document.getElementById('ac-otro-sku-elegir').remove();
-  await agregarOtroSkuMismo(sku);
+  renderOtrosSkuAC(); marcarEmpaquePendiente();
 }
 async function agregarOtroSkuMismo(sku){
   if(!sku) return;
@@ -7603,6 +7623,28 @@ async function otraMedidaAC(medidaDada, skuDado){
     renderListaAC(); abrirArticuloAC(nombre);
     alert(`Listo: se creó "${nombre}". Cargue su SKU en el recuadro de bolsa y etiqueta y toque el botón verde; ahí le ofrece publicarlo en el catálogo junto al de ${viejo || 'la otra medida'}.`);
   } catch(err){ alert('No se pudo crear: ' + err.message); }
+}
+function nombreOtraMedida(a, medida){
+  const nums = (a.match(/\d+(?:[.,]\d+)?/g) || []);
+  if(nums.length && /^\d+([.,]\d+)?$/.test(String(medida).trim())) return a.replace(new RegExp(nums[nums.length - 1].replace('.', '\\.') + '(?!.*\\d)'), String(parseFloat(String(medida).replace(',', '.'))));
+  return String(medida).trim();
+}
+function crearArticuloOtraMedida(a, medida, sku, calidad){
+  const g = juegosDePiezasAC(a)[0]; if(!g) return null;
+  const nombre = nombreOtraMedida(a, medida);
+  if(!nombre || tablaConsumo.instrucciones[nombre]) return nombre && tablaConsumo.instrucciones[nombre] ? nombre : null;
+  const nums = (a.match(/\d+(?:[.,]\d+)?/g) || []);
+  const viejo = nums.length ? parseFloat(nums[nums.length - 1].replace(',', '.')) : null;
+  const nuevo = parseFloat(String(medida).replace(',', '.'));
+  const piezas = g.piezas.map(p => { const q = { ...p }; if(viejo && nuevo > 0){ if(Math.abs(q.largo - viejo) < 1) q.largo = nuevo; else if(Math.abs(q.ancho - viejo) < 1) q.ancho = nuevo; } return q; });
+  const W = g.anchos[0], corte = calcularCorte(piezas, parseFloat(W));
+  tablaConsumo.articulos = tablaConsumo.articulos || {};
+  tablaConsumo.articulos[nombre] = { [W]: corte.metros };
+  tablaConsumo.instrucciones[nombre] = { [W]: { texto: textoCorte(nombre, piezas, parseFloat(W), ''), bosquejoBase64: '', piezas, tipo: 'personalizado', consumo: corte.metros, guardado: Date.now() } };
+  const e = { ...((tablaConsumo.empaque || {})[a] || {}) };
+  delete e.colchon; e.etMedida = ''; e.sku = sku; e.calidad = calidad || e.calidad || '';
+  tablaConsumo.empaque[nombre] = e;
+  return nombre;
 }
 // articulos "hermanos": mismo nombre que solo cambia un numero (Mantel 200 / Mantel 250)
 function articulosHermanos(a){
@@ -15179,7 +15221,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v123';
+const APP_VERSION = '2026-10-02-v124';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
