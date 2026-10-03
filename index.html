@@ -1548,7 +1548,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v120</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v121</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5174,7 +5174,9 @@ async function guardarEmpaqueAC(){
     catch(err){ console.error('descripcion automatica', err); }
     const m = document.getElementById('ac-empaque-ok'); if(m){ m.textContent = '✓ Guardado' + (n ? ' · descripción del catálogo actualizada' : ''); m.style.color = '#2F7A47'; }
     pintarBotonesPublicarAC();
-    { const nuevos = [sku, ...otrosSkuActuales().map(o => o.sku)].filter(s => s && !buscarProductoPorSku(s)); if(nuevos.length && confirm(`${nuevos.join(', ')} todavía no ${nuevos.length === 1 ? 'está' : 'están'} en el catálogo. ¿Publicar${nuevos.length === 1 ? 'lo' : ' el primero'} ahora con foto, categoría y precio?`)) abrirPublicar(nuevos[0]); }
+    { const herm = articulosHermanos(acArticulo).map(x => String(((tablaConsumo.empaque || {})[x] || {}).sku || '').toUpperCase());
+      const nuevos = [...new Set([sku, ...otrosSkuActuales().map(o => o.sku), ...herm])].filter(s => s && !buscarProductoPorSku(s));
+      if(nuevos.length && confirm(`${nuevos.join(', ')} todavía no ${nuevos.length === 1 ? 'está' : 'están'} en el catálogo. ¿Publicar${nuevos.length === 1 ? 'lo' : 'los juntos'} ahora con foto, categoría y precio?`)) abrirPublicarVarios(nuevos); }
     renderOtrosSkuAC();
   } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
@@ -7345,6 +7347,7 @@ function renderPfMasivo(){
       <div class="field" style="margin:0;"><label>Stock mínimo</label><input id="pm-min" type="text" inputmode="decimal" placeholder="no cambiar"></div>
     </div>
     <button class="btn btn-gold" style="width:auto;padding:10px 18px;margin-top:10px;" onclick="aplicarPfMasivo()">Aplicar a los ${pfSel.size} SKU</button>
+    ${[...pfSel].some(s => !buscarProductoPorSku(s)) ? `<button class="btn btn-ghost" style="width:auto;padding:10px 18px;margin-top:10px;margin-left:6px;" onclick="abrirPublicarVarios([...pfSel])">📸 Publicar en el catálogo los que no están</button>` : ''}
   </div>`;
   ['pm-cal', 'pm-art'].forEach(id => { const s = document.getElementById(id); hacerSelectBuscable(s); if(s._sync) s._sync(); });
 }
@@ -7516,9 +7519,12 @@ function pintarBotonesPublicarAC(){
   const ref = document.getElementById('ac-empaque-guardar'); if(!ref) return;
   if(!cont){ cont = document.createElement('div'); cont.id = 'ac-publicar'; ref.parentNode.insertBefore(cont, ref); }
   const emp = (tablaConsumo.empaque || {})[acArticulo] || {};
-  const skus = [String(emp.sku || '').toUpperCase(), ...otrosSkuActuales().map(o => o.sku)].filter(Boolean);
-  const faltan = skus.filter(s => !buscarProductoPorSku(s));
-  cont.innerHTML = faltan.length ? `<div style="background:#FDF4E2;border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:0.82rem;">No están en el catálogo: ${faltan.map(s => `<button type="button" class="btn-mini" style="margin:2px;" onclick="abrirPublicar('${escapeAttr(s)}')">📸 Publicar ${escaparHtml(s)}</button>`).join('')}</div>` : '';
+  const herm = articulosHermanos(acArticulo).map(x => String(((tablaConsumo.empaque || {})[x] || {}).sku || '').toUpperCase());
+  const skus = [String(emp.sku || '').toUpperCase(), ...otrosSkuActuales().map(o => o.sku), ...herm].filter(Boolean);
+  const faltan = [...new Set(skus)].filter(s => !buscarProductoPorSku(s));
+  cont.innerHTML = faltan.length ? `<div style="background:#FDF4E2;border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:0.82rem;">No están en el catálogo: <b>${faltan.map(escaparHtml).join(', ')}</b><br>
+    ${faltan.length > 1 ? `<button type="button" class="btn-mini" style="margin:4px 4px 0 0;" onclick="abrirPublicarVarios(${escapeAttr(JSON.stringify(faltan))})">📸 Publicar los ${faltan.length} juntos</button>` : ''}
+    ${faltan.map(s => `<button type="button" class="btn-mini" style="margin:4px 4px 0 0;" onclick="abrirPublicar('${escapeAttr(s)}')">📸 ${escaparHtml(s)}</button>`).join('')}</div>` : '';
 }
 
 // ----- mismo articulo en otra medida (ej: Mantel 200 -> Mantel 250) -----
@@ -7562,6 +7568,87 @@ function articulosHermanos(a){
   const base = n => normBusqueda(String(n || '')).replace(/\d+(?:[.,]\d+)?/g, '#').replace(/\s+/g, ' ').trim();
   const b = base(a); if(!/#/.test(b)) return [];
   return Object.keys(tablaConsumo.instrucciones || {}).filter(x => x !== a && base(x) === b);
+}
+
+// ----- publicar varios SKU juntos en un mismo producto (ej: Mantel 200 y Mantel 250) -----
+function areaArticulo(art){ const pz = piezasDeArticuloAny(art); return pz ? pz.reduce((s, p) => s + p.ancho * p.largo * (p.cantidad || 1) * (p.partes || 1), 0) : 0; }
+function abrirPublicarVarios(skus){
+  skus = [...new Set(skus.map(s => String(s).toUpperCase()))].filter(s => !buscarProductoPorSku(s));
+  if(!skus.length){ alert('Esos SKU ya están en el catálogo.'); return; }
+  if(skus.length === 1){ abrirPublicar(skus[0]); return; }
+  const s0 = sugerenciasPublicar(skus[0]);
+  const cats = CATALOGO.map(c => c.categoria);
+  window.__pubProds = c => ((CATALOGO.find(x => x.categoria === c) || {}).productos || []).filter(p => Array.isArray(p.variantes));
+  window.__pubProdSug = s0.prod;
+  window.__pubVarios = skus.map(s => { const sg = sugerenciasPublicar(s); return { sku: s, desc: sg.desc, precio: sg.precio, area: areaArticulo(articuloDeSku(s)) }; });
+  const art0 = articuloDeSku(skus[0]) || '';
+  document.getElementById('pub-cont').innerHTML = `
+    <p class="note" style="text-align:left;margin:0 0 10px;">Se publican <b>${skus.length} SKU juntos</b>, en el mismo producto, cada uno con su descripción y precio.</p>
+    <div class="field"><label>Categoría</label><select id="pub-cat" onchange="pintarProductosPublicar()">${cats.map(c => `<option ${c === s0.cat ? 'selected' : ''}>${escaparHtml(c)}</option>`).join('')}</select></div>
+    <div class="field"><label>Producto</label><select id="pub-prod" onchange="cambioProductoPublicar()"></select></div>
+    <div id="pub-nuevo" style="display:none;">
+      <div class="field"><label>Nombre del producto nuevo</label><input id="pub-nombre" value="${escapeAttr(nombreLindoArticulo(art0.replace(/\s*\d+(?:[.,]\d+)?\s*$/, '')))}" placeholder="Ej: Mantel Gabardina"></div>
+      <div class="field"><label>Subtítulo</label><input id="pub-sub" value="${escapeAttr(s0.sub)}"></div>
+    </div>
+    <div style="border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:10px;">
+      ${window.__pubVarios.map((v, i) => `<div style="display:grid;grid-template-columns:80px minmax(0,1fr) 110px;gap:6px;align-items:center;margin-bottom:6px;">
+        <b style="font-size:0.85rem;">${escaparHtml(v.sku)}</b>
+        <input id="pubv-desc-${i}" value="${escapeAttr(v.desc)}" style="min-width:0;font-size:0.82rem;">
+        <input id="pubv-precio-${i}" type="text" inputmode="decimal" value="${v.precio ? formatoPesos(v.precio) : ''}" placeholder="$ precio" oninput="precioVarioEditado(${i})" style="text-align:right;">
+      </div>`).join('')}
+      <p class="note" style="text-align:left;margin:2px 0 0;">Si carga el precio de uno, los que estén vacíos se completan proporcionales a su tamaño. Todos se pueden cambiar.</p>
+    </div>
+    <div class="field"><label id="pub-foto-lbl">Foto</label><input type="file" id="pub-foto" accept="image/*"></div>
+    <p class="error" id="pub-error" style="display:none;"></p>
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="confirmarPublicarVarios()">Publicar los ${skus.length}</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Ahora no</button></div>`;
+  pintarProductosPublicar();
+  document.getElementById('pub-modal').style.display = 'block';
+}
+function precioVarioEditado(i){
+  const vs = window.__pubVarios; vs[i].manual = true;
+  const pr = numAr(document.getElementById('pubv-precio-' + i).value);
+  if(!(pr > 0) || !(vs[i].area > 0)) return;
+  vs.forEach((v, j) => { if(j === i || v.manual || !(v.area > 0)) return; document.getElementById('pubv-precio-' + j).value = formatoPesos(Math.round(pr * v.area / vs[i].area / 10) * 10); });
+}
+async function confirmarPublicarVarios(){
+  const err = document.getElementById('pub-error'); err.style.display = 'none';
+  const cat = document.getElementById('pub-cat').value, sel = document.getElementById('pub-prod').value;
+  const variantesNuevas = [];
+  for(let i = 0; i < window.__pubVarios.length; i++){
+    const v = window.__pubVarios[i];
+    const desc = document.getElementById('pubv-desc-' + i).value.trim(), pr = numAr(document.getElementById('pubv-precio-' + i).value);
+    if(!desc || !(pr > 0)){ err.textContent = `Falta la descripción o el precio de ${v.sku}.`; err.style.display = 'block'; return; }
+    variantesNuevas.push({ sku: v.sku, desc, precio: pr.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+  }
+  const archivo = document.getElementById('pub-foto').files[0];
+  let foto = null;
+  if(archivo){ try{ foto = await comprimirImagenAFotoBase64(archivo); } catch(e){ err.textContent = 'No se pudo procesar la foto.'; err.style.display = 'block'; return; } }
+  try{
+    if(sel === '__nuevo__'){
+      const nombre = document.getElementById('pub-nombre').value.trim(), sub = document.getElementById('pub-sub').value.trim();
+      if(!nombre){ err.textContent = 'Falta el nombre del producto nuevo.'; err.style.display = 'block'; return; }
+      const ref = await db.collection('productos_nuevos').add({ categoria: cat, nombre, composicion: sub, variantes: variantesNuevas, imagenBase64: foto, metros: null, creado: new Date().toISOString() });
+      const c = CATALOGO.find(x => x.categoria === cat);
+      if(c) c.productos.push({ nombre, composicion: sub, variantes: variantesNuevas, imagen: foto, _editKey: 'nuevo-' + ref.id, _docId: ref.id });
+      if(fabricacion) fabricacion.propios[nombre] = true;
+    } else {
+      const p = window.__pubProds(cat)[+sel];
+      const variantes = [...p.variantes, ...variantesNuevas];
+      const datos = { nombre: p.nombre, composicion: p.composicion || '', variantes, metros: p.metros || null };
+      if(foto) datos.imagenBase64 = foto;
+      if(p._editKey && p._editKey.startsWith('nuevo-')) await db.collection('productos_nuevos').doc(p._docId).update(datos);
+      else await db.collection('productos_editados').doc(p._editKey).set(datos, { merge: true });
+      p.variantes = variantes; if(foto) p.imagen = foto;
+      if(fabricacion) fabricacion.propios[p.nombre] = true;
+    }
+    if(fabricacion) await guardarFabricacion();
+    cerrarPublicar();
+    try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+    sincronizarDescripcionesCatalogo();
+    alert(`Publicados: ${variantesNuevas.map(v => v.sku).join(', ')}.`);
+    if(document.getElementById('step-articulos-cortes').classList.contains('active')) pintarBotonesPublicarAC();
+    if(document.getElementById('step-productos-fabrico').classList.contains('active')){ pfSel.clear(); renderProductosFabrico(); }
+  } catch(e){ err.textContent = 'No se pudo publicar: ' + e.message; err.style.display = 'block'; }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -15003,7 +15090,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v120';
+const APP_VERSION = '2026-10-02-v121';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
