@@ -1548,7 +1548,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v118</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v119</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1853,6 +1853,12 @@ a.grilla-celda{display:block;}
       <div id="tl-lista"><p class="empty-msg">Cargando...</p></div>
       <div class="tl-guardar-precios" id="tl-guardar-precios"><button type="button" onclick="guardarPreciosTelas()">💾 Guardar precios</button></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
+    </div>
+  </div>
+  <div id="pub-modal" style="display:none;position:fixed;inset:0;background:rgba(30,20,40,.45);z-index:9999;overflow-y:auto;padding:20px 10px;">
+    <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;padding:16px 18px;box-shadow:0 10px 40px rgba(0,0,0,.25);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><b style="font-size:1.1rem;color:var(--purple);">📸 Publicar en el catálogo</b><button type="button" onclick="cerrarPublicar()" style="border:none;background:none;font-size:1.3rem;cursor:pointer;color:#8A8072;">✕</button></div>
+      <div id="pub-cont"></div>
     </div>
   </div>
   <datalist id="lista-telas"></datalist>
@@ -5106,6 +5112,7 @@ function cargarEmpaqueAC(){
     hacerSelectBuscable(selCal); if(selCal._sync) selCal._sync();
     infoTelaAC();
     renderOtrosSkuAC();
+    pintarBotonesPublicarAC();
   };
   if(telasDatos === null) cargarTelas().then(pintarCal); else pintarCal();
   aviosPend = null;
@@ -5165,6 +5172,8 @@ async function guardarEmpaqueAC(){
     try{ n = await aplicarDescripcionAutomatica([sku, ...((otrosSkuPend || otrosSkuActuales()).map(o => o.sku))].filter(Boolean)); }
     catch(err){ console.error('descripcion automatica', err); }
     const m = document.getElementById('ac-empaque-ok'); if(m){ m.textContent = '✓ Guardado' + (n ? ' · descripción del catálogo actualizada' : ''); m.style.color = '#2F7A47'; }
+    pintarBotonesPublicarAC();
+    { const nuevos = [sku, ...otrosSkuActuales().map(o => o.sku)].filter(s => s && !buscarProductoPorSku(s)); if(nuevos.length && confirm(`${nuevos.join(', ')} todavía no ${nuevos.length === 1 ? 'está' : 'están'} en el catálogo. ¿Publicar${nuevos.length === 1 ? 'lo' : ' el primero'} ahora con foto, categoría y precio?`)) abrirPublicar(nuevos[0]); }
     renderOtrosSkuAC();
   } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
@@ -7387,6 +7396,120 @@ async function aplicarPfMasivo(){
     renderProductosFabrico();
     sincronizarDescripcionesCatalogo();
   } catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+
+// ===== Publicar en el catalogo un SKU nuevo (desde Articulos y cortes) =====
+let pubSku = null;
+function sugerenciasPublicar(sku){
+  const S = String(sku).toUpperCase();
+  const art = articuloDeSku(S), cal = calidadDeSku(S);
+  // producto donde ya estan otros SKU de la misma calidad (ej: otra medida de la misma sabana) o del mismo articulo
+  let prod = null, cat = '';
+  const buscar = cond => { for(const c of CATALOGO) for(const p of (c.productos || [])) if((p.variantes || []).some(v => { const s = String(v.sku).toUpperCase(); return s !== S && cond(s); })) return { p, c }; return null; };
+  const r1 = cal ? buscar(s => calidadDeSku(s) === cal) : null;
+  const r2 = !r1 && art ? buscar(s => articuloDeSku(s) === art) : null;
+  if(r1){ prod = r1.p; cat = r1.c.categoria; } else if(r2){ cat = r2.c.categoria; }
+  if(!cat){
+    const pal = normBusqueda(String(art || '').split(' ')[0]);
+    const c = CATALOGO.find(c => pal && normBusqueda(c.categoria).includes(pal.slice(0, 5)));
+    cat = c ? c.categoria : (CATALOGO[0] || {}).categoria || '';
+  }
+  // precio sugerido: con el margen promedio de ese producto (o 50 %) sobre el costo; si no hay costo, el de otro SKU del mismo articulo
+  let precio = null, motivo = '';
+  const c = costosDeSku(S), costo = c && c.porTela.find(x => x.total != null) ? c.porTela.find(x => x.total != null).total : null;
+  if(costo){
+    const mgs = prod ? prod.variantes.map(v => { const cc = costosDeSku(String(v.sku).toUpperCase()), x = cc && cc.porTela.find(y => y.total != null), pr = parsePrice(v.precio); return x && pr ? (pr - x.total) / pr : null; }).filter(x => x != null && x > 0 && x < 0.9) : [];
+    const mg = mgs.length ? mgs.reduce((a, b) => a + b, 0) / mgs.length : 0.5;
+    precio = Math.round(costo / (1 - mg) / 10) * 10;
+    motivo = `costo $ ${formatoPesos(Math.round(costo))} con margen ${Math.round(mg * 100)} %${mgs.length ? ' (el promedio de ese producto)' : ''}`;
+  } else if(art){
+    for(const cc of CATALOGO) for(const p of (cc.productos || [])) for(const v of (p.variantes || [])) if(!precio && articuloDeSku(String(v.sku).toUpperCase()) === art && String(v.sku).toUpperCase() !== S && parsePrice(v.precio)){ precio = parsePrice(v.precio); motivo = `igual que ${v.sku}, mismo artículo`; }
+  }
+  return { prod, cat, precio, motivo, desc: descripcionVarianteFab(S) || (art ? nombreLindoArticulo(art) : ''), sub: cal ? descripcionDesdeCalidad(cal, cat) : '' };
+}
+function abrirPublicar(sku){
+  pubSku = String(sku).toUpperCase();
+  if(buscarProductoPorSku(pubSku)){ alert(`${pubSku} ya está en el catálogo.`); return; }
+  const s = sugerenciasPublicar(pubSku);
+  const cats = CATALOGO.map(c => c.categoria);
+  const prods = c => ((CATALOGO.find(x => x.categoria === c) || {}).productos || []).filter(p => Array.isArray(p.variantes));
+  document.getElementById('pub-cont').innerHTML = `
+    <p class="note" style="text-align:left;margin:0 0 10px;">SKU <b>${escaparHtml(pubSku)}</b> todavía no está en el catálogo. Revise lo sugerido y publíquelo.</p>
+    <div class="field"><label>Categoría</label><select id="pub-cat" onchange="pintarProductosPublicar()">${cats.map(c => `<option ${c === s.cat ? 'selected' : ''}>${escaparHtml(c)}</option>`).join('')}</select></div>
+    <div class="field"><label>Producto</label><select id="pub-prod" onchange="cambioProductoPublicar()"></select></div>
+    <div id="pub-nuevo" style="display:none;">
+      <div class="field"><label>Nombre del producto nuevo</label><input id="pub-nombre" placeholder="Ej: Sábana Percal Hotel 200 hilos"></div>
+      <div class="field"><label>Subtítulo</label><input id="pub-sub" value="${escapeAttr(s.sub)}"></div>
+    </div>
+    <div class="field"><label>Descripción de esta medida</label><input id="pub-desc" value="${escapeAttr(s.desc)}"></div>
+    <div class="field"><label>Precio de lista</label><input id="pub-precio" type="text" inputmode="decimal" value="${s.precio ? formatoPesos(s.precio) : ''}" placeholder="$">
+      ${s.motivo ? `<p class="note" style="text-align:left;margin:3px 0 0;">Sugerido: ${escaparHtml(s.motivo)}. Puede cambiarlo.</p>` : ''}</div>
+    <div class="field"><label id="pub-foto-lbl">Foto</label><input type="file" id="pub-foto" accept="image/*"></div>
+    <p class="error" id="pub-error" style="display:none;"></p>
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="confirmarPublicar()">Publicar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Ahora no</button></div>`;
+  window.__pubProds = prods; window.__pubProdSug = s.prod;
+  pintarProductosPublicar();
+  document.getElementById('pub-modal').style.display = 'block';
+}
+function pintarProductosPublicar(){
+  const cat = document.getElementById('pub-cat').value;
+  const ps = window.__pubProds(cat);
+  const sug = window.__pubProdSug;
+  document.getElementById('pub-prod').innerHTML = `<option value="__nuevo__">➕ Producto nuevo</option>` + ps.map((p, i) => `<option value="${i}" ${p === sug ? 'selected' : ''}>${escaparHtml(p.nombre)}</option>`).join('');
+  cambioProductoPublicar();
+}
+function cambioProductoPublicar(){
+  const nuevo = document.getElementById('pub-prod').value === '__nuevo__';
+  document.getElementById('pub-nuevo').style.display = nuevo ? 'block' : 'none';
+  document.getElementById('pub-foto-lbl').textContent = nuevo ? 'Foto del producto' : 'Foto (opcional: reemplaza la del producto)';
+}
+function cerrarPublicar(){ document.getElementById('pub-modal').style.display = 'none'; pubSku = null; }
+async function confirmarPublicar(){
+  const err = document.getElementById('pub-error'); err.style.display = 'none';
+  const cat = document.getElementById('pub-cat').value, sel = document.getElementById('pub-prod').value;
+  const desc = document.getElementById('pub-desc').value.trim(), precioN = numAr(document.getElementById('pub-precio').value);
+  if(!desc){ err.textContent = 'Falta la descripción.'; err.style.display = 'block'; return; }
+  if(!(precioN > 0)){ err.textContent = 'Falta el precio.'; err.style.display = 'block'; return; }
+  const precio = precioN.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const archivo = document.getElementById('pub-foto').files[0];
+  let foto = null;
+  if(archivo){ try{ foto = await comprimirImagenAFotoBase64(archivo); } catch(e){ err.textContent = 'No se pudo procesar la foto.'; err.style.display = 'block'; return; } }
+  const variante = { sku: pubSku, desc, precio };
+  try{
+    if(sel === '__nuevo__'){
+      const nombre = document.getElementById('pub-nombre').value.trim(), sub = document.getElementById('pub-sub').value.trim();
+      if(!nombre){ err.textContent = 'Falta el nombre del producto nuevo.'; err.style.display = 'block'; return; }
+      const ref = await db.collection('productos_nuevos').add({ categoria: cat, nombre, composicion: sub, variantes: [variante], imagenBase64: foto, metros: null, creado: new Date().toISOString() });
+      const c = CATALOGO.find(x => x.categoria === cat);
+      if(c) c.productos.push({ nombre, composicion: sub, variantes: [variante], imagen: foto, _editKey: 'nuevo-' + ref.id, _docId: ref.id });
+      if(fabricacion){ fabricacion.propios[nombre] = true; }
+    } else {
+      const p = window.__pubProds(cat)[+sel];
+      const variantes = [...p.variantes, variante];
+      const datos = { nombre: p.nombre, composicion: p.composicion || '', variantes, metros: p.metros || null };
+      if(foto) datos.imagenBase64 = foto;
+      if(p._editKey && p._editKey.startsWith('nuevo-')) await db.collection('productos_nuevos').doc(p._docId).update(datos);
+      else await db.collection('productos_editados').doc(p._editKey).set(datos, { merge: true });
+      p.variantes = variantes; if(foto) p.imagen = foto;
+      if(fabricacion){ fabricacion.propios[p.nombre] = true; }
+    }
+    if(fabricacion) await guardarFabricacion();
+    cerrarPublicar();
+    try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+    sincronizarDescripcionesCatalogo();
+    alert(`${variante.sku} publicado en el catálogo.`);
+    if(document.getElementById('step-articulos-cortes').classList.contains('active')) pintarBotonesPublicarAC();
+  } catch(e){ err.textContent = 'No se pudo publicar: ' + e.message; err.style.display = 'block'; }
+}
+// en el recuadro del articulo: aviso con boton para los SKU que no estan en el catalogo
+function pintarBotonesPublicarAC(){
+  let cont = document.getElementById('ac-publicar');
+  const ref = document.getElementById('ac-empaque-guardar'); if(!ref) return;
+  if(!cont){ cont = document.createElement('div'); cont.id = 'ac-publicar'; ref.parentNode.insertBefore(cont, ref); }
+  const emp = (tablaConsumo.empaque || {})[acArticulo] || {};
+  const skus = [String(emp.sku || '').toUpperCase(), ...otrosSkuActuales().map(o => o.sku)].filter(Boolean);
+  const faltan = skus.filter(s => !buscarProductoPorSku(s));
+  cont.innerHTML = faltan.length ? `<div style="background:#FDF4E2;border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:0.82rem;">No están en el catálogo: ${faltan.map(s => `<button type="button" class="btn-mini" style="margin:2px;" onclick="abrirPublicar('${escapeAttr(s)}')">📸 Publicar ${escaparHtml(s)}</button>`).join('')}</div>` : '';
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -14828,7 +14951,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v118';
+const APP_VERSION = '2026-10-02-v119';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
