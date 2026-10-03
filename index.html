@@ -1548,7 +1548,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v126</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v127</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1871,7 +1871,10 @@ a.grilla-celda{display:block;}
       <p class="note" style="margin-bottom:10px;">Cada producto del catálogo con su forma de corte y su tela.</p>
       <input type="text" id="pf-buscar" placeholder="🔍 Buscar producto o SKU" oninput="renderProductosFabrico()" style="margin-bottom:10px;width:100%;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:0.92rem;box-sizing:border-box;">
       <div id="pf-filtros" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
-      <button type="button" class="btn-mini" style="margin-bottom:10px;" onclick="actualizarTodasDescripciones()">✨ Actualizar todas las descripciones del catálogo</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="abrirNuevoProductoFab()">➕ Nuevo producto</button>
+        <button type="button" class="btn-mini" onclick="actualizarTodasDescripciones()">✨ Actualizar todas las descripciones del catálogo</button>
+      </div>
       <div id="pf-masivo" style="display:none;"></div>
       <div id="pf-lista"><p class="empty-msg">Cargando...</p></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
@@ -7815,6 +7818,107 @@ async function borrarSkusPf(){
     renderProductosFabrico();
     alert('Listo.');
   } catch(e){ alert('No se pudo borrar: ' + e.message); }
+}
+
+// ===== Nuevo producto desde cero (Productos que fabrico) =====
+// Un producto del catalogo con sus medidas: cada medida = SKU + articulo de corte; calidad de tela comun.
+let npfFilas = [];
+function abrirNuevoProductoFab(){
+  npfFilas = [{ sku: '', articulo: '', desc: '', precio: '', descManual: false, precioManual: false }];
+  const cats = CATALOGO.map(c => c.categoria);
+  document.getElementById('pub-cont').innerHTML = `
+    <p class="note" style="text-align:left;margin:0 0 10px;">Un producto nuevo del catálogo con todas sus medidas. Cada medida es un SKU con su artículo de corte.</p>
+    <div class="field"><label>Nombre del producto</label><input id="npf-nombre" placeholder="Ej: Mantel Lisboa estampado"></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;">
+      <div class="field" style="margin:0;"><label>Categoría</label><select id="npf-cat">${cats.map(c => `<option>${escaparHtml(c)}</option>`).join('')}</select></div>
+      <div class="field" style="margin:0;"><label>Calidad de tela</label><select id="npf-cal" onchange="npfRecalcular()">${opcionesCalidad('')}</select></div>
+    </div>
+    <div class="field" style="margin-top:8px;"><label>Subtítulo (se arma con la tela)</label><input id="npf-sub" placeholder="Ej: Lisboa · 100% poliéster"></div>
+    <label style="font-size:0.8rem;font-weight:700;color:#8A6B3F;">Medidas</label>
+    <div id="npf-filas" style="border:1px solid var(--line);border-radius:10px;padding:8px;margin:4px 0 6px;"></div>
+    <button type="button" class="btn-mini" onclick="npfAgregarFila()">+ Agregar medida</button>
+    <div class="field" style="margin-top:10px;"><label>Fotos</label><input type="file" id="pub-foto" accept="image/*" multiple><p class="note" style="text-align:left;margin:3px 0 0;">La primera queda como principal.</p></div>
+    <p class="error" id="pub-error" style="display:none;"></p>
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="npfGuardar()">Crear y publicar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`;
+  ['npf-cal'].forEach(id => { const s = document.getElementById(id); hacerSelectBuscable(s); if(s._sync) s._sync(); });
+  npfPintar();
+  document.getElementById('pub-modal').style.display = 'block';
+}
+function npfPintar(){
+  const arts = articulosAC().sort((a, b) => a.localeCompare(b, 'es'));
+  document.getElementById('npf-filas').innerHTML = npfFilas.map((f, i) => `<div style="display:grid;grid-template-columns:minmax(0,0.8fr) minmax(0,1.3fr) 24px;gap:6px;margin-bottom:4px;align-items:center;">
+      <input value="${escapeAttr(f.sku)}" placeholder="SKU" style="text-transform:uppercase;" oninput="npfFilas[${i}].sku=this.value.trim().toUpperCase(); npfRecalcular(${i})">
+      <select class="npf-art" data-i="${i}" onchange="npfFilas[${i}].articulo=this.value; npfRecalcular(${i})"><option value="">Artículo de corte…</option>${arts.map(a => `<option value="${escapeAttr(a)}" ${a === f.articulo ? 'selected' : ''}>${escaparHtml(a)}</option>`).join('')}</select>
+      <button type="button" onclick="npfFilas.splice(${i},1); npfPintar();" style="border:none;background:none;cursor:pointer;color:#8A8072;" title="Quitar">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 110px 24px;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed var(--line);">
+      <input id="npf-desc-${i}" value="${escapeAttr(f.desc)}" placeholder="Descripción de la medida" style="font-size:0.82rem;" oninput="npfFilas[${i}].desc=this.value; npfFilas[${i}].descManual=true;">
+      <input id="npf-precio-${i}" value="${escapeAttr(f.precio)}" placeholder="$ precio" inputmode="decimal" style="text-align:right;" oninput="npfFilas[${i}].precio=this.value; npfFilas[${i}].precioManual=true; npfProporcional(${i})">
+      <span></span>
+    </div>`).join('');
+  document.querySelectorAll('.npf-art').forEach(s => { hacerSelectBuscable(s); if(s._sync) s._sync(); });
+}
+function npfAgregarFila(){ npfFilas.push({ sku: '', articulo: npfFilas.length ? npfFilas[npfFilas.length - 1].articulo : '', desc: '', precio: '', descManual: false, precioManual: false }); npfPintar(); }
+// arma descripcion y precio sugeridos con lo que hay cargado (sin guardar nada todavia)
+function npfRecalcular(soloFila){
+  const cal = document.getElementById('npf-cal').value;
+  if(cal && !document.getElementById('npf-sub').dataset.manual) document.getElementById('npf-sub').value = descripcionDesdeCalidad(cal, document.getElementById('npf-cat').value) || '';
+  npfFilas.forEach((f, i) => {
+    if(soloFila !== undefined && soloFila !== i && !(soloFila === undefined)) return;
+    if(!f.sku || !f.articulo) return;
+    const prev = fabricacion.vinculos[f.sku];
+    fabricacion.vinculos[f.sku] = { articulo: f.articulo, calidad: cal };
+    if(!f.descManual){ f.desc = descripcionVarianteFab(f.sku) || nombreLindoArticulo(f.articulo); const el = document.getElementById('npf-desc-' + i); if(el) el.value = f.desc; }
+    if(!f.precioManual){
+      const c = costosDeSku(f.sku), x = c && c.porTela.find(y => y.total != null);
+      if(x){ f.precio = formatoPesos(Math.round(x.total / 0.5 / 10) * 10); const el = document.getElementById('npf-precio-' + i); if(el){ el.value = f.precio; el.title = `Sugerido: costo $ ${formatoPesos(Math.round(x.total))} con margen 50 %`; } }
+    }
+    if(prev) fabricacion.vinculos[f.sku] = prev; else delete fabricacion.vinculos[f.sku];
+  });
+}
+function npfProporcional(i){
+  const pr = numAr(npfFilas[i].precio), a0 = areaArticulo(npfFilas[i].articulo);
+  if(!(pr > 0) || !(a0 > 0)) return;
+  npfFilas.forEach((f, j) => { if(j === i || f.precioManual || !f.articulo) return; const a = areaArticulo(f.articulo); if(a > 0){ f.precio = formatoPesos(Math.round(pr * a / a0 / 10) * 10); const el = document.getElementById('npf-precio-' + j); if(el) el.value = f.precio; } });
+}
+async function npfGuardar(){
+  const err = document.getElementById('pub-error'); err.style.display = 'none';
+  const nombre = document.getElementById('npf-nombre').value.trim(), cat = document.getElementById('npf-cat').value;
+  const cal = document.getElementById('npf-cal').value, sub = document.getElementById('npf-sub').value.trim();
+  const filas = npfFilas.filter(f => f.sku || f.articulo);
+  if(!nombre){ err.textContent = 'Falta el nombre del producto.'; err.style.display = 'block'; return; }
+  if(!filas.length){ err.textContent = 'Cargue al menos una medida.'; err.style.display = 'block'; return; }
+  const vistos = new Set();
+  for(const f of filas){
+    if(!f.sku || !f.articulo){ err.textContent = 'Cada medida necesita SKU y artículo de corte.'; err.style.display = 'block'; return; }
+    if(vistos.has(f.sku) || buscarProductoPorSku(f.sku)){ err.textContent = `El SKU ${f.sku} está repetido o ya existe en el catálogo.`; err.style.display = 'block'; return; }
+    vistos.add(f.sku);
+    if(!String(f.desc || '').trim() || !(numAr(f.precio) > 0)){ err.textContent = `Falta la descripción o el precio de ${f.sku}.`; err.style.display = 'block'; return; }
+  }
+  const resumen = filas.map(f => `• ${f.sku}: ${f.articulo} · $ ${f.precio}`).join('\n');
+  if(!confirm(`Se va a crear "${nombre}" en ${cat}${cal ? ' (tela: ' + (calidadesTela().find(q => q.clave === cal) || {}).etiqueta + ')' : ''}:\n\n${resumen}\n\n¿Confirmar?`)) return;
+  let fotos = [];
+  try{ fotos = await leerFotosPublicar(); } catch(e){ err.textContent = 'No se pudo procesar alguna foto.'; err.style.display = 'block'; return; }
+  const variantes = filas.map(f => ({ sku: f.sku, desc: String(f.desc).trim(), precio: numAr(f.precio).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }));
+  try{
+    // fabricacion: cada SKU con su articulo y la calidad
+    filas.forEach(f => { fabricacion.vinculos[f.sku] = { ...(fabricacion.vinculos[f.sku] || {}), articulo: f.articulo, calidad: cal, tela: '' }; });
+    fabricacion.propios[nombre] = true;
+    await guardarFabricacion();
+    // si el articulo no tenia SKU principal, queda este
+    let cambioEmp = false;
+    filas.forEach(f => { tablaConsumo.empaque = tablaConsumo.empaque || {}; const e = tablaConsumo.empaque[f.articulo] || {}; if(!e.sku){ tablaConsumo.empaque[f.articulo] = { ...e, sku: f.sku, calidad: e.calidad || cal }; cambioEmp = true; } });
+    if(cambioEmp) await guardarTablaYConsumo();
+    // catalogo
+    const ref = await db.collection('productos_nuevos').add({ categoria: cat, nombre, composicion: sub, variantes, imagenBase64: fotos[0] || null, metros: null, creado: new Date().toISOString() });
+    const c = CATALOGO.find(x => x.categoria === cat);
+    const np = { nombre, composicion: sub, variantes, imagen: fotos[0] || null, _editKey: 'nuevo-' + ref.id, _docId: ref.id };
+    if(c){ c.productos.push(np); await guardarGaleriaProducto(np, fotos); }
+    cerrarPublicar();
+    try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+    renderProductosFabrico();
+    alert(`Listo: "${nombre}" creado con ${variantes.length} medida${variantes.length === 1 ? '' : 's'}.`);
+  } catch(e){ err.textContent = 'No se pudo crear: ' + e.message; err.style.display = 'block'; }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -15256,7 +15360,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v126';
+const APP_VERSION = '2026-10-02-v127';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
