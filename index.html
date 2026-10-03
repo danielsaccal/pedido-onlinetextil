@@ -1548,7 +1548,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v121</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v122</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -7348,6 +7348,7 @@ function renderPfMasivo(){
     </div>
     <button class="btn btn-gold" style="width:auto;padding:10px 18px;margin-top:10px;" onclick="aplicarPfMasivo()">Aplicar a los ${pfSel.size} SKU</button>
     ${[...pfSel].some(s => !buscarProductoPorSku(s)) ? `<button class="btn btn-ghost" style="width:auto;padding:10px 18px;margin-top:10px;margin-left:6px;" onclick="abrirPublicarVarios([...pfSel])">📸 Publicar en el catálogo los que no están</button>` : ''}
+    <button class="btn btn-ghost" style="width:auto;padding:10px 18px;margin-top:10px;margin-left:6px;color:#A6432F;border-color:#E3B8AE;" onclick="borrarSkusPf()">🗑️ Borrar</button>
   </div>`;
   ['pm-cal', 'pm-art'].forEach(id => { const s = document.getElementById(id); hacerSelectBuscable(s); if(s._sync) s._sync(); });
 }
@@ -7649,6 +7650,54 @@ async function confirmarPublicarVarios(){
     if(document.getElementById('step-articulos-cortes').classList.contains('active')) pintarBotonesPublicarAC();
     if(document.getElementById('step-productos-fabrico').classList.contains('active')){ pfSel.clear(); renderProductosFabrico(); }
   } catch(e){ err.textContent = 'No se pudo publicar: ' + e.message; err.style.display = 'block'; }
+}
+
+// ----- borrar SKU seleccionados (de fabricacion y, si se elige, tambien del catalogo) -----
+async function borrarSkusPf(){
+  const skus = [...pfSel];
+  const enCat = skus.filter(s => buscarProductoPorSku(s));
+  let delCatalogo = false;
+  if(enCat.length){
+    const r = prompt(`Borrar ${skus.length} SKU: ${skus.join(', ')}\n\n${enCat.length} ${enCat.length === 1 ? 'está' : 'están'} en el catálogo (${enCat.join(', ')}).\n\nEscriba:\n  1 = quitarlos solo de fabricación (siguen en el catálogo)\n  2 = borrarlos de fabricación Y del catálogo`, '1');
+    if(r === null) return;
+    if(r.trim() === '2') delCatalogo = true;
+    else if(r.trim() !== '1') return;
+  }
+  if(!confirm(`${delCatalogo ? 'Se borran de fabricación y del catálogo' : 'Se quitan de fabricación'}: ${skus.join(', ')}.\nNo se puede deshacer. ¿Seguir?`)) return;
+  try{
+    // fabricacion: vinculos, SKU del articulo y stock
+    skus.forEach(s => {
+      delete fabricacion.vinculos[s];
+      Object.values(tablaConsumo.empaque || {}).forEach(e => { if(e && String(e.sku || '').toUpperCase() === s) e.sku = ''; });
+      if(stockDatos && stockDatos.skus) delete stockDatos.skus[s];
+    });
+    await guardarFabricacion();
+    await guardarTablaYConsumo();
+    if(stockDatos) await db.collection('config').doc('stock').set(JSON.parse(JSON.stringify(stockDatos)));
+    // catalogo
+    if(delCatalogo){
+      for(const s of enCat){
+        const m = buscarProductoPorSku(s); if(!m) continue;
+        const p = m.producto;
+        const resto = p.variantes.filter(v => String(v.sku).toUpperCase() !== s);
+        if(!resto.length){
+          if(p._editKey.startsWith('nuevo-')) await db.collection('productos_nuevos').doc(p._docId).delete();
+          else await db.collection('productos_eliminados').doc(p._editKey).set({ eliminado: true, fecha: new Date().toISOString() });
+          const cat = CATALOGO.find(c => c.productos.includes(p)); if(cat) cat.productos = cat.productos.filter(x => x !== p);
+          if(fabricacion.propios) delete fabricacion.propios[p.nombre];
+        } else {
+          if(p._editKey.startsWith('nuevo-')) await db.collection('productos_nuevos').doc(p._docId).update({ variantes: resto });
+          else await db.collection('productos_editados').doc(p._editKey).set({ nombre: p.nombre, composicion: p.composicion || '', variantes: resto, metros: p.metros || null }, { merge: true });
+          p.variantes = resto;
+        }
+      }
+      await guardarFabricacion();
+      try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+    }
+    pfSel.clear();
+    renderProductosFabrico();
+    alert('Listo.');
+  } catch(e){ alert('No se pudo borrar: ' + e.message); }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -15090,7 +15139,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v121';
+const APP_VERSION = '2026-10-02-v122';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
