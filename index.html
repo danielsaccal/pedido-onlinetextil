@@ -1548,7 +1548,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v116</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v117</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1840,6 +1840,7 @@ a.grilla-celda{display:block;}
       <div class="tl-top">
         <input type="text" id="tl-buscar" placeholder="🔍 Código, nombre, color o proveedor" oninput="renderTelas()">
         <button type="button" onclick="editarTela()">+ Nueva tela</button>
+        <button type="button" onclick="abrirListas()" title="Colores, composiciones, usos y demás opciones" style="background:var(--cream);">📝 Listas</button>
       </div>
       <div class="tl-barra">
         <div id="tl-usos-filtro" class="tl-selects"></div>
@@ -1964,6 +1965,27 @@ a.grilla-celda{display:block;}
       </div>
       <div id="sk-lista"><p class="empty-msg">Cargando...</p></div>
       <div class="sk-guardar" id="sk-guardar"><button type="button" onclick="guardarStock()">💾 Guardar stock</button></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-listas">
+    <style>
+      .ls-sec{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:12px;}
+      .ls-sec h3{margin:0 0 2px;font-size:1rem;color:var(--purple);}
+      .ls-sec p{margin:0 0 8px;font-size:0.78rem;color:#8A8072;}
+      .ls-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+      .ls-chip{display:inline-flex;align-items:center;gap:4px;background:var(--cream);border-radius:14px;padding:4px 6px 4px 11px;font-size:0.85rem;}
+      .ls-chip button{border:none;background:none;cursor:pointer;color:#8A8072;font-size:0.85rem;padding:0 3px;}
+      .ls-chip button:hover{color:#A6432F;}
+      .ls-add{display:flex;gap:6px;}
+      .ls-add input{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:10px;font-size:0.9rem;}
+      .ls-add button{border:none;border-radius:10px;padding:8px 14px;background:var(--purple);color:#fff;font-weight:700;cursor:pointer;}
+    </style>
+    <div class="form-card" style="max-width:760px;">
+      <h2>Listas y opciones</h2>
+      <p class="note" style="text-align:left;margin-bottom:12px;">Las opciones de los desplegables de toda la app. Lo que agregues acá aparece en todos lados.</p>
+      <div id="ls-cont"><p class="empty-msg">Cargando...</p></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
   </div>
@@ -5333,7 +5355,7 @@ const GRUPOS_INICIO = {
     [['📥 Entregas del taller', 'abrirIngresoTaller()'], ['🗂️ Historial de entregas', 'abrirHistorialEntregas()']],
   ] },
   h: { lado: 'int', titulo: 'Finanzas', items: [['💰 Ventas Mercado Libre', 'abrirVentasML()'], ['🧮 Calculadora de costos', 'abrirCalculadoraCostos()']] },
-  i: { lado: 'int', titulo: 'Configuración', items: [['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['🔔 Avisos push', 'abrirConfigPush()'], ['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']] },
+  i: { lado: 'int', titulo: 'Configuración', items: [['📝 Listas y opciones', 'abrirListas()'], ['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['🔔 Avisos push', 'abrirConfigPush()'], ['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']] },
 };
 let grupoInicioAbierto = null;
 function irInicio(){
@@ -5884,8 +5906,11 @@ function renderEnProduccion(){
 // El gramaje (g/m2) se calcula solo: 1000 / (metros por kilo x ancho en metros).
 // Vive en config/telas = { telas: { CODIGO: {...} }, usos: [...] }
 const USOS_TELA_DEF = ['Sábanas', 'Toallas', 'Manteles', 'Cortinas', 'Acolchados', 'Batas'];
-const COLORES_TELA = ['Blanco', 'Color', 'Crudo'];
-const COMPOSICIONES_TELA = ['Algodón', 'Poliéster', 'Mezcla'];
+const COLORES_TELA_DEF = ['Blanco', 'Color', 'Crudo'];
+const COMPOSICIONES_TELA_DEF = ['Algodón', 'Poliéster', 'Mezcla'];
+// las listas se pueden ampliar desde Configuración → Listas y opciones
+const COLORES_TELA = new Proxy([], { get: (t, k) => { const l = (telasDatos && Array.isArray(telasDatos.colores) && telasDatos.colores.length) ? telasDatos.colores : COLORES_TELA_DEF; const v = l[k]; return typeof v === 'function' ? v.bind(l) : v; } });
+const COMPOSICIONES_TELA = new Proxy([], { get: (t, k) => { const l = (telasDatos && Array.isArray(telasDatos.composiciones) && telasDatos.composiciones.length) ? telasDatos.composiciones : COMPOSICIONES_TELA_DEF; const v = l[k]; return typeof v === 'function' ? v.bind(l) : v; } });
 let tlFiltroComp = '';
 // si no se eligio la composicion pero las notas la dicen (ej: "65% algodon - 35% poliester"), se deduce
 function composicionDeNotas(notas){
@@ -7215,6 +7240,67 @@ async function ordenDesdeStock(){
   });
   document.getElementById('ot-envio-banner').innerHTML = '<b>📊 Orden armada desde Stock y prioridades.</b> Revise cantidades, elija taller y tela, y complete el ancho de cada producto.';
   document.getElementById('ot-envio-banner').style.display = 'block';
+}
+
+// ===== Listas y opciones (desplegables de toda la app) =====
+const LISTAS_DEF = [
+  { id: 'colores', titulo: '🎨 Colores de tela', ayuda: 'Desplegable "Color" en Telas (ej: Blanco, Color, Crudo, Estampado).' },
+  { id: 'composiciones', titulo: '🧶 Composiciones', ayuda: 'Desplegable "Composición" en Telas (ej: Algodón, Poliéster, Mezcla, Lino).' },
+  { id: 'usos', titulo: '🏷️ Usos de tela', ayuda: 'Para qué se usa cada tela (Sábanas, Toallas, Manteles…).' },
+  { id: 'talleres', titulo: '🏭 Talleres', ayuda: 'Talleres a los que mandás tela y órdenes de trabajo.' },
+  { id: 'bolsas', titulo: '🛍️ Medidas de bolsa', ayuda: 'Bolsas para el empaque (ej: 25 × 42).' },
+  { id: 'anchos', titulo: '📏 Anchos de tela (cm)', ayuda: 'Anchos con los que se calculan cortes y consumos.' },
+];
+function valoresLista(id){
+  if(id === 'colores') return [...COLORES_TELA];
+  if(id === 'composiciones') return [...COMPOSICIONES_TELA];
+  if(id === 'usos') return [...((telasDatos && telasDatos.usos) || USOS_TELA_DEF)];
+  if(id === 'talleres') return [...(talleresLista || [])];
+  if(id === 'bolsas') return [...bolsasDisponibles()];
+  if(id === 'anchos') return anchosConocidos().map(String);
+  return [];
+}
+async function guardarLista(id, valores){
+  if(id === 'colores' || id === 'composiciones' || id === 'usos'){
+    telasDatos[id] = valores;
+    await db.collection('config').doc('telas').set(JSON.parse(JSON.stringify(telasDatos)));
+  } else if(id === 'talleres'){
+    talleresLista = valores;
+    await db.collection('config').doc('talleres').set({ nombres: talleresLista });
+  } else if(id === 'bolsas'){
+    tablaConsumo.bolsas = valores; await guardarTablaYConsumo();
+  } else if(id === 'anchos'){
+    tablaConsumo.anchosTela = valores.map(v => parseFloat(String(v).replace(',', '.'))).filter(v => v > 0).sort((a, b) => a - b); await guardarTablaYConsumo();
+  }
+}
+async function abrirListas(){
+  mostrarPaso('step-listas');
+  if(telasDatos === null) await cargarTelas();
+  if(talleresLista === null) await cargarTalleres();
+  if(tablaConsumo === null) await cargarTablaConsumo();
+  renderListas();
+}
+function renderListas(){
+  document.getElementById('ls-cont').innerHTML = LISTAS_DEF.map(l => `<div class="ls-sec">
+      <h3>${l.titulo}</h3><p>${l.ayuda}</p>
+      <div class="ls-chips">${valoresLista(l.id).map((v, i) => `<span class="ls-chip">${escaparHtml(v)}<button type="button" title="Quitar" onclick="quitarDeLista('${l.id}', ${i})">✕</button></span>`).join('') || '<span class="note">Vacía</span>'}</div>
+      <div class="ls-add"><input type="text" id="ls-in-${l.id}" placeholder="Agregar…" onkeydown="if(event.key==='Enter') agregarALista('${l.id}')"><button type="button" onclick="agregarALista('${l.id}')">+ Agregar</button></div>
+    </div>`).join('');
+}
+async function agregarALista(id){
+  const el = document.getElementById('ls-in-' + id);
+  const v = el.value.trim(); if(!v) return;
+  const lista = valoresLista(id);
+  if(lista.some(x => normBusqueda(x) === normBusqueda(v))){ alert('Ya está en la lista.'); return; }
+  lista.push(id === 'anchos' ? String(parseFloat(v.replace(',', '.'))) : v);
+  try{ await guardarLista(id, lista); renderListas(); setTimeout(() => { const e = document.getElementById('ls-in-' + id); if(e) e.focus(); }, 50); }
+  catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+async function quitarDeLista(id, i){
+  const lista = valoresLista(id);
+  if(!confirm(`¿Quitar "${lista[i]}" de la lista? Lo que ya esté cargado con ese valor no se borra.`)) return;
+  lista.splice(i, 1);
+  try{ await guardarLista(id, lista); renderListas(); } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -14656,7 +14742,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v116';
+const APP_VERSION = '2026-10-02-v117';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
