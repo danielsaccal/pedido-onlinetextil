@@ -1548,7 +1548,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v124</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v125</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -7490,9 +7490,16 @@ function sugerenciasPublicar(sku){
   }
   return { prod, cat, precio, motivo, desc: descripcionVarianteFab(S) || (art ? nombreLindoArticulo(art) : ''), sub: cal ? descripcionDesdeCalidad(cal, cat) : '' };
 }
-function abrirPublicar(sku){
+function abrirPublicar(sku, solo){
   pubSku = String(sku).toUpperCase();
   if(buscarProductoPorSku(pubSku)){ alert(`${pubSku} ya está en el catálogo.`); return; }
+  // otras medidas del mismo articulo sin publicar (ej: Mantel 250 al publicar el 200): se proponen juntas
+  if(!solo){
+    const art = articuloDeSku(pubSku);
+    const herm = art && !art.startsWith('ficha:') ? articulosHermanos(art) : [];
+    const otros = herm.map(x => String(((tablaConsumo.empaque || {})[x] || {}).sku || '').toUpperCase()).concat(Object.keys((fabricacion && fabricacion.vinculos) || {}).filter(s => herm.includes(fabricacion.vinculos[s].articulo))).filter(s => s && s !== pubSku && !buscarProductoPorSku(s));
+    if(otros.length){ abrirPublicarVarios([pubSku, ...otros]); return; }
+  }
   const s = sugerenciasPublicar(pubSku);
   const cats = CATALOGO.map(c => c.categoria);
   const prods = c => ((CATALOGO.find(x => x.categoria === c) || {}).productos || []).filter(p => Array.isArray(p.variantes));
@@ -7507,7 +7514,7 @@ function abrirPublicar(sku){
     <div class="field"><label>Descripción de esta medida</label><input id="pub-desc" value="${escapeAttr(s.desc)}"></div>
     <div class="field"><label>Precio de lista</label><input id="pub-precio" type="text" inputmode="decimal" value="${s.precio ? formatoPesos(s.precio) : ''}" placeholder="$">
       ${s.motivo ? `<p class="note" style="text-align:left;margin:3px 0 0;">Sugerido: ${escaparHtml(s.motivo)}. Puede cambiarlo.</p>` : ''}</div>
-    <div class="field"><label id="pub-foto-lbl">Foto</label><input type="file" id="pub-foto" accept="image/*"></div>
+    <div class="field"><label id="pub-foto-lbl">Foto</label><input type="file" id="pub-foto" accept="image/*" multiple><p class="note" style="text-align:left;margin:3px 0 0;">Puede elegir varias fotos: la primera queda como principal.</p></div>
     <p class="error" id="pub-error" style="display:none;"></p>
     <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="confirmarPublicar()">Publicar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Ahora no</button></div>`;
   window.__pubProds = prods; window.__pubProdSug = s.prod;
@@ -7534,9 +7541,9 @@ async function confirmarPublicar(){
   if(!desc){ err.textContent = 'Falta la descripción.'; err.style.display = 'block'; return; }
   if(!(precioN > 0)){ err.textContent = 'Falta el precio.'; err.style.display = 'block'; return; }
   const precio = precioN.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const archivo = document.getElementById('pub-foto').files[0];
-  let foto = null;
-  if(archivo){ try{ foto = await comprimirImagenAFotoBase64(archivo); } catch(e){ err.textContent = 'No se pudo procesar la foto.'; err.style.display = 'block'; return; } }
+  let fotos = [];
+  try{ fotos = await leerFotosPublicar(); } catch(e){ err.textContent = 'No se pudo procesar alguna foto.'; err.style.display = 'block'; return; }
+  const foto = fotos[0] || null;
   const variante = { sku: pubSku, desc, precio };
   try{
     if(sel === '__nuevo__'){
@@ -7544,7 +7551,8 @@ async function confirmarPublicar(){
       if(!nombre){ err.textContent = 'Falta el nombre del producto nuevo.'; err.style.display = 'block'; return; }
       const ref = await db.collection('productos_nuevos').add({ categoria: cat, nombre, composicion: sub, variantes: [variante], imagenBase64: foto, metros: null, creado: new Date().toISOString() });
       const c = CATALOGO.find(x => x.categoria === cat);
-      if(c) c.productos.push({ nombre, composicion: sub, variantes: [variante], imagen: foto, _editKey: 'nuevo-' + ref.id, _docId: ref.id });
+      const np = { nombre, composicion: sub, variantes: [variante], imagen: foto, _editKey: 'nuevo-' + ref.id, _docId: ref.id };
+      if(c){ c.productos.push(np); await guardarGaleriaProducto(np, fotos); }
       if(fabricacion){ fabricacion.propios[nombre] = true; }
     } else {
       const p = window.__pubProds(cat)[+sel];
@@ -7554,6 +7562,7 @@ async function confirmarPublicar(){
       if(p._editKey && p._editKey.startsWith('nuevo-')) await db.collection('productos_nuevos').doc(p._docId).update(datos);
       else await db.collection('productos_editados').doc(p._editKey).set(datos, { merge: true });
       p.variantes = variantes; if(foto) p.imagen = foto;
+      await guardarGaleriaProducto(p, fotos);
       if(fabricacion){ fabricacion.propios[p.nombre] = true; }
     }
     if(fabricacion) await guardarFabricacion();
@@ -7653,12 +7662,31 @@ function articulosHermanos(a){
   return Object.keys(tablaConsumo.instrucciones || {}).filter(x => x !== a && base(x) === b);
 }
 
+// fotos de la ventana de publicar: varias; la primera es la principal y todas quedan en la galeria del producto
+async function leerFotosPublicar(){
+  const files = [...(document.getElementById('pub-foto').files || [])];
+  const out = [];
+  for(const f of files) out.push(await comprimirImagenAFotoBase64(f));
+  return out;
+}
+async function guardarGaleriaProducto(p, fotos){
+  if(!fotos || fotos.length < 2) return;
+  let ci = -1, pi = -1;
+  CATALOGO.forEach((c, i) => { const j = c.productos.indexOf(p); if(j >= 0){ ci = i; pi = j; } });
+  if(ci < 0) return;
+  const key = `${ci}-${pi}`;
+  try{
+    await db.collection('fotos').doc(key).set({ imagenesBase64: fotos, sku: (p.variantes[0] || {}).sku || '', nombreProducto: p.nombre, actualizado: new Date().toISOString() });
+    fotosOverride[key] = fotos;
+  } catch(e){ console.error('galeria', e); }
+}
+
 // ----- publicar varios SKU juntos en un mismo producto (ej: Mantel 200 y Mantel 250) -----
 function areaArticulo(art){ const pz = piezasDeArticuloAny(art); return pz ? pz.reduce((s, p) => s + p.ancho * p.largo * (p.cantidad || 1) * (p.partes || 1), 0) : 0; }
 function abrirPublicarVarios(skus){
   skus = [...new Set(skus.map(s => String(s).toUpperCase()))].filter(s => !buscarProductoPorSku(s));
   if(!skus.length){ alert('Esos SKU ya están en el catálogo.'); return; }
-  if(skus.length === 1){ abrirPublicar(skus[0]); return; }
+  if(skus.length === 1){ abrirPublicar(skus[0], true); return; }
   const s0 = sugerenciasPublicar(skus[0]);
   const cats = CATALOGO.map(c => c.categoria);
   window.__pubProds = c => ((CATALOGO.find(x => x.categoria === c) || {}).productos || []).filter(p => Array.isArray(p.variantes));
@@ -7674,16 +7702,17 @@ function abrirPublicarVarios(skus){
       <div class="field"><label>Subtítulo</label><input id="pub-sub" value="${escapeAttr(s0.sub)}"></div>
     </div>
     <div style="border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:10px;">
-      ${window.__pubVarios.map((v, i) => `<div style="display:grid;grid-template-columns:80px minmax(0,1fr) 110px;gap:6px;align-items:center;margin-bottom:6px;">
+      ${window.__pubVarios.map((v, i) => `<div style="display:grid;grid-template-columns:22px 80px minmax(0,1fr) 110px;gap:6px;align-items:center;margin-bottom:6px;">
+        <input type="checkbox" id="pubv-on-${i}" checked title="Publicar este SKU">
         <b style="font-size:0.85rem;">${escaparHtml(v.sku)}</b>
         <input id="pubv-desc-${i}" value="${escapeAttr(v.desc)}" style="min-width:0;font-size:0.82rem;">
         <input id="pubv-precio-${i}" type="text" inputmode="decimal" value="${v.precio ? formatoPesos(v.precio) : ''}" placeholder="$ precio" oninput="precioVarioEditado(${i})" style="text-align:right;">
       </div>`).join('')}
-      <p class="note" style="text-align:left;margin:2px 0 0;">Si carga el precio de uno, los que estén vacíos se completan proporcionales a su tamaño. Todos se pueden cambiar.</p>
+      <p class="note" style="text-align:left;margin:2px 0 0;">Destilde los que no quiera publicar ahora. Si carga el precio de uno, los vacíos se completan proporcionales a su tamaño.</p>
     </div>
-    <div class="field"><label id="pub-foto-lbl">Foto</label><input type="file" id="pub-foto" accept="image/*"></div>
+    <div class="field"><label id="pub-foto-lbl">Foto</label><input type="file" id="pub-foto" accept="image/*" multiple><p class="note" style="text-align:left;margin:3px 0 0;">Puede elegir varias fotos: la primera queda como principal.</p></div>
     <p class="error" id="pub-error" style="display:none;"></p>
-    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="confirmarPublicarVarios()">Publicar los ${skus.length}</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Ahora no</button></div>`;
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="confirmarPublicarVarios()">Publicar los marcados</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Ahora no</button></div>`;
   pintarProductosPublicar();
   document.getElementById('pub-modal').style.display = 'block';
 }
@@ -7699,20 +7728,23 @@ async function confirmarPublicarVarios(){
   const variantesNuevas = [];
   for(let i = 0; i < window.__pubVarios.length; i++){
     const v = window.__pubVarios[i];
+    if(!document.getElementById('pubv-on-' + i).checked) continue;
     const desc = document.getElementById('pubv-desc-' + i).value.trim(), pr = numAr(document.getElementById('pubv-precio-' + i).value);
     if(!desc || !(pr > 0)){ err.textContent = `Falta la descripción o el precio de ${v.sku}.`; err.style.display = 'block'; return; }
     variantesNuevas.push({ sku: v.sku, desc, precio: pr.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
   }
-  const archivo = document.getElementById('pub-foto').files[0];
-  let foto = null;
-  if(archivo){ try{ foto = await comprimirImagenAFotoBase64(archivo); } catch(e){ err.textContent = 'No se pudo procesar la foto.'; err.style.display = 'block'; return; } }
+  let fotos = [];
+  try{ fotos = await leerFotosPublicar(); } catch(e){ err.textContent = 'No se pudo procesar alguna foto.'; err.style.display = 'block'; return; }
+  const foto = fotos[0] || null;
+  if(!variantesNuevas.length){ err.textContent = 'No hay ningún SKU marcado para publicar.'; err.style.display = 'block'; return; }
   try{
     if(sel === '__nuevo__'){
       const nombre = document.getElementById('pub-nombre').value.trim(), sub = document.getElementById('pub-sub').value.trim();
       if(!nombre){ err.textContent = 'Falta el nombre del producto nuevo.'; err.style.display = 'block'; return; }
       const ref = await db.collection('productos_nuevos').add({ categoria: cat, nombre, composicion: sub, variantes: variantesNuevas, imagenBase64: foto, metros: null, creado: new Date().toISOString() });
       const c = CATALOGO.find(x => x.categoria === cat);
-      if(c) c.productos.push({ nombre, composicion: sub, variantes: variantesNuevas, imagen: foto, _editKey: 'nuevo-' + ref.id, _docId: ref.id });
+      const np = { nombre, composicion: sub, variantes: variantesNuevas, imagen: foto, _editKey: 'nuevo-' + ref.id, _docId: ref.id };
+      if(c){ c.productos.push(np); await guardarGaleriaProducto(np, fotos); }
       if(fabricacion) fabricacion.propios[nombre] = true;
     } else {
       const p = window.__pubProds(cat)[+sel];
@@ -7722,6 +7754,7 @@ async function confirmarPublicarVarios(){
       if(p._editKey && p._editKey.startsWith('nuevo-')) await db.collection('productos_nuevos').doc(p._docId).update(datos);
       else await db.collection('productos_editados').doc(p._editKey).set(datos, { merge: true });
       p.variantes = variantes; if(foto) p.imagen = foto;
+      await guardarGaleriaProducto(p, fotos);
       if(fabricacion) fabricacion.propios[p.nombre] = true;
     }
     if(fabricacion) await guardarFabricacion();
@@ -15221,7 +15254,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v124';
+const APP_VERSION = '2026-10-02-v125';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
