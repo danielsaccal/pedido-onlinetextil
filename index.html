@@ -1548,7 +1548,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v127</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v128</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5170,7 +5170,8 @@ async function guardarEmpaqueAC(sinConfirmar){
     if(String(antes.calidad || '') !== String(emp.calidad || '')){ const q = calidadesTela().find(x => x.clave === emp.calidad); lineas.push(`• Calidad de tela: ${q ? q.etiqueta : '(sin calidad)'}`); }
     if(aviosPend) lineas.push(`• Avíos: ${aviosPend.filter(a => a.nombre).map(a => `${a.cantidad} ${a.nombre}`).join(', ') || '(ninguno)'}`);
     (otrosSkuPend || []).forEach(o => {
-      if(o.medida) lineas.push(`• SKU ${o.sku}: se crea el artículo "${nombreOtraMedida(acArticulo, o.medida)}" (otra medida), con la misma tela, bolsa y confección`);
+      if(o.destino) lineas.push(`• SKU ${o.sku}: se vincula a "${o.destino}" (medida ${o.medidaPedida}, se corta como ${o.destino})`);
+      else if(o.medida) lineas.push(`• SKU ${o.sku}: se crea el artículo "${nombreOtraMedida(acArticulo, o.medida)}" (otra medida), con la misma tela, bolsa y confección`);
       else if(!(fabricacion && fabricacion.vinculos[o.sku] && fabricacion.vinculos[o.sku].articulo === acArticulo)) lineas.push(`• SKU ${o.sku}: mismo artículo en otra tela o color`);
     });
     const quitados = Object.keys((fabricacion && fabricacion.vinculos) || {}).filter(s => s !== sku && fabricacion.vinculos[s].articulo === acArticulo && otrosSkuPend && !otrosSkuPend.some(o => o.sku === s));
@@ -5183,9 +5184,11 @@ async function guardarEmpaqueAC(sinConfirmar){
     await guardarTablaYConsumo();
     if(sku) fabricacion.vinculos[sku] = { ...(fabricacion.vinculos[sku] || {}), calidad: emp.calidad || '', tela: '', articulo: acArticulo };
     if(otrosSkuPend){
-      Object.keys(fabricacion.vinculos).forEach(s => { if(s !== sku && fabricacion.vinculos[s].articulo === acArticulo && !otrosSkuPend.some(o => o.sku === s)) delete fabricacion.vinculos[s].articulo; });
+      Object.keys(fabricacion.vinculos).forEach(s => { if(s !== sku && fabricacion.vinculos[s].articulo === acArticulo && !otrosSkuPend.some(o => o.sku === s && !o.destino && !o.medida)) delete fabricacion.vinculos[s].articulo; });
       otrosSkuPend.forEach(o => {
-        if(o.medida){
+        if(o.destino){
+          fabricacion.vinculos[o.sku] = { ...(fabricacion.vinculos[o.sku] || {}), calidad: o.calidad || emp.calidad || '', tela: '', articulo: o.destino };
+        } else if(o.medida){
           const nombre = crearArticuloOtraMedida(acArticulo, o.medida, o.sku, o.calidad || emp.calidad);
           if(nombre) fabricacion.vinculos[o.sku] = { ...(fabricacion.vinculos[o.sku] || {}), calidad: o.calidad || emp.calidad || '', tela: '', articulo: nombre };
         } else fabricacion.vinculos[o.sku] = { ...(fabricacion.vinculos[o.sku] || {}), calidad: o.calidad || '', tela: '', articulo: acArticulo };
@@ -6648,7 +6651,7 @@ function otrosSkuActuales(){
 function renderOtrosSkuAC(){
   const cont = document.getElementById('ac-otros-sku'); if(!cont || !fabricacion) return;
   cont.innerHTML = otrosSkuActuales().map((o, i) => `<div style="display:grid;grid-template-columns:minmax(0,0.8fr) minmax(0,2fr) 30px;gap:6px;margin-bottom:6px;align-items:center;">
-      <div><input value="${escapeAttr(o.sku)}" disabled style="font-weight:700;width:100%;box-sizing:border-box;">${o.medida ? `<div style="font-size:0.7rem;color:#8A6417;font-weight:700;">📐 nuevo: ${escaparHtml(nombreOtraMedida(acArticulo, o.medida))}</div>` : ''}</div>
+      <div><input value="${escapeAttr(o.sku)}" disabled style="font-weight:700;width:100%;box-sizing:border-box;">${o.medida ? `<div style="font-size:0.7rem;color:#8A6417;font-weight:700;">📐 nuevo: ${escaparHtml(nombreOtraMedida(acArticulo, o.medida))}</div>` : ''}${o.destino ? `<div style="font-size:0.7rem;color:#2F7A47;font-weight:700;">📐 va con: ${escaparHtml(o.destino)}</div>` : ''}</div>
       <select class="ac-otro-cal" onchange="cambiarCalidadOtroSku(${i}, this.value)">${opcionesCalidad(o.calidad || '')}</select>
       <button type="button" onclick="quitarOtroSkuAC(${i})" title="Quitar" style="border:none;background:none;cursor:pointer;color:#8A8072;">✕</button>
     </div>`).join('');
@@ -6670,14 +6673,32 @@ function agregarOtroSkuAC(){
   cont.after(box);
   document.getElementById('aos-sku').focus();
 }
+// la medida pedida se asigna al articulo existente mas cercano (ej: un mantel de 240 se hace con el Mantel 250)
+function articuloCercanoPorMedida(a, medida){
+  const m = parseFloat(String(medida).replace(',', '.'));
+  if(!(m > 0)) return null;
+  const numDe = n => { const xs = String(n).match(/\d+(?:[.,]\d+)?/g); return xs ? parseFloat(xs[xs.length - 1].replace(',', '.')) : null; };
+  const cands = [a, ...articulosHermanos(a)].map(x => ({ x, n: numDe(x) })).filter(o => o.n > 0);
+  if(!cands.length) return null;
+  cands.sort((p, q) => Math.abs(p.n - m) - Math.abs(q.n - m));
+  const mejor = cands[0];
+  const tol = Math.max(15, mejor.n * 0.08);
+  return Math.abs(mejor.n - m) <= tol ? mejor.x : null;
+}
+
 function aosAgregar(){
   const sku = document.getElementById('aos-sku').value.trim().toUpperCase();
   const medida = document.getElementById('aos-medida').value.trim();
   if(!sku){ alert('Escriba el SKU nuevo.'); return; }
   otrosSkuPend = [...otrosSkuActuales()];
   if(otrosSkuPend.some(o => o.sku === sku) || String(((tablaConsumo.empaque || {})[acArticulo] || {}).sku || '').toUpperCase() === sku){ alert('Ese SKU ya está en este artículo.'); return; }
+  if(fabricacion && fabricacion.vinculos[sku] && fabricacion.vinculos[sku].articulo && fabricacion.vinculos[sku].articulo !== acArticulo && !confirm(`${sku} ya está vinculado a "${fabricacion.vinculos[sku].articulo}". ¿Moverlo?`)) return;
   const calPrincipal = ((tablaConsumo.empaque || {})[acArticulo] || {}).calidad || '';
-  otrosSkuPend.push({ sku, calidad: medida ? calPrincipal : '', medida });
+  // si ya hay un articulo de esa medida (o muy parecida), se usa ese en vez de crear otro
+  const cercano = medida ? articuloCercanoPorMedida(acArticulo, medida) : null;
+  if(cercano && cercano !== acArticulo) otrosSkuPend.push({ sku, calidad: calPrincipal, destino: cercano, medidaPedida: medida });
+  else if(cercano === acArticulo) otrosSkuPend.push({ sku, calidad: '' });
+  else otrosSkuPend.push({ sku, calidad: medida ? calPrincipal : '', medida });
   document.getElementById('ac-otro-sku-elegir').remove();
   renderOtrosSkuAC(); marcarEmpaquePendiente();
 }
@@ -15360,7 +15381,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v127';
+const APP_VERSION = '2026-10-02-v128';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
