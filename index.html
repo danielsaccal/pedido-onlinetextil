@@ -1548,7 +1548,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v128</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v129</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1666,9 +1666,10 @@ a.grilla-celda{display:block;}
             <div id="ac-consumos" style="margin-bottom:8px;"></div>
             <div id="ac-corte" style="margin-bottom:10px;"></div>
             <input type="text" id="ac-nota" placeholder="Nota para el taller (opcional)" oninput="calcularAC()" style="margin-bottom:10px;">
+            <div id="ac-productos" style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;background:#fff;"></div>
             <div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                <span style="font-size:0.8rem;color:#8A8072;">🛍️ Bolsa y etiqueta (para stock) <span id="ac-empaque-ok" style="color:#3D7A3D;"></span></span>
+                <span style="font-size:0.85rem;color:var(--purple);font-weight:700;">🧵 Confección y empaque <span style="font-weight:400;color:#8A8072;font-size:0.75rem;">(vale para todos los productos de este artículo)</span> <span id="ac-empaque-ok" style="color:#3D7A3D;"></span></span>
                 <a href="#" onclick="event.preventDefault(); editarBolsasDisponibles()" style="font-size:0.75rem;">medidas de bolsa</a>
               </div>
               <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;">
@@ -1679,20 +1680,20 @@ a.grilla-celda{display:block;}
                 <div><input type="text" id="ac-confeccion" inputmode="decimal" placeholder="$ por unidad" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Confección ($ por unidad)</div></div>
                 <div><input type="text" id="ac-insumos" inputmode="decimal" placeholder="$ por unidad" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Otros insumos: bolsa, etiqueta… ($ por unidad)</div></div>
                 <div><input type="text" id="ac-colchon" placeholder="90 × 190 × 30" oninput="cambioEmpaqueAC()"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Colchón (para la ajustable, en cm)</div></div>
-                <div><input type="text" id="ac-sku" placeholder="Ej: KA181F" oninput="cambioEmpaqueAC(); infoTelaAC();" style="text-transform:uppercase;"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">SKU (se completa solo en la orden)</div></div>
-                <div style="grid-column:1 / -1;"><select id="ac-tela" onchange="cambiarTelaArticuloAC()" style="width:100%;padding:9px 8px;box-sizing:border-box;"></select><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Calidad de tela de este SKU (cualquier ancho)</div><div id="ac-tela-info" style="font-size:0.7rem;color:#6B6258;"></div></div>
+                <div style="display:none;"><input type="text" id="ac-sku" placeholder="Ej: KA181F" oninput="cambioEmpaqueAC(); infoTelaAC();" style="text-transform:uppercase;"><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">SKU (se completa solo en la orden)</div></div>
+                <div style="grid-column:1 / -1;display:none;"><select id="ac-tela" onchange="cambiarTelaArticuloAC()" style="width:100%;padding:9px 8px;box-sizing:border-box;"></select><div style="font-size:0.7rem;color:#8A8072;margin-top:2px;">Calidad de tela de este SKU (cualquier ancho)</div><div id="ac-tela-info" style="font-size:0.7rem;color:#6B6258;"></div></div>
                 <div style="grid-column:1 / -1;border-top:1px dashed var(--line);padding-top:8px;">
                   <div style="font-size:0.78rem;color:#6B6258;margin-bottom:4px;">🧷 Avíos que lleva cada unidad (cierres, elástico, botones…):</div>
                   <div id="ac-avios"></div>
                   <button type="button" class="btn-mini" onclick="agregarAvioAC()">+ Agregar avío</button>
                 </div>
-                <div style="grid-column:1 / -1;border-top:1px dashed var(--line);padding-top:8px;">
+                <div style="grid-column:1 / -1;border-top:1px dashed var(--line);padding-top:8px;display:none;">
                   <div style="font-size:0.78rem;color:#6B6258;margin-bottom:4px;">Otros SKU de este mismo artículo (en otra calidad o color de tela):</div>
                   <div id="ac-otros-sku"></div>
                   <button type="button" class="btn-mini" onclick="agregarOtroSkuAC()">+ Agregar otro SKU</button>
                 </div>
                 <div style="grid-column:1 / -1;">
-                  <button type="button" id="ac-empaque-guardar" onclick="guardarEmpaqueAC()" disabled style="width:100%;padding:11px;border:none;border-radius:10px;background:#3D9A5B;color:#fff;font-weight:700;font-size:0.95rem;cursor:pointer;opacity:0.5;">💾 Guardar bolsa, etiqueta y SKU</button>
+                  <button type="button" id="ac-empaque-guardar" onclick="guardarEmpaqueAC()" disabled style="width:100%;padding:11px;border:none;border-radius:10px;background:#3D9A5B;color:#fff;font-weight:700;font-size:0.95rem;cursor:pointer;opacity:0.5;">💾 Guardar confección y empaque</button>
                 </div>
               </div>
             </div>
@@ -7601,6 +7602,8 @@ async function confirmarPublicar(){
 }
 // en el recuadro del articulo: aviso con boton para los SKU que no estan en el catalogo
 function pintarBotonesPublicarAC(){
+  renderProductosAC();
+  return;
   let cont = document.getElementById('ac-publicar');
   const ref = document.getElementById('ac-empaque-guardar'); if(!ref) return;
   if(!cont){ cont = document.createElement('div'); cont.id = 'ac-publicar'; ref.parentNode.insertBefore(cont, ref); }
@@ -7940,6 +7943,177 @@ async function npfGuardar(){
     renderProductosFabrico();
     alert(`Listo: "${nombre}" creado con ${variantes.length} medida${variantes.length === 1 ? '' : 's'}.`);
   } catch(e){ err.textContent = 'No se pudo crear: ' + e.message; err.style.display = 'block'; }
+}
+
+// ===== Articulos y cortes: productos que se hacen con el articulo (uno por SKU / tela) =====
+function skusDelArticulo(a){
+  const s = new Set();
+  const e = ((tablaConsumo && tablaConsumo.empaque) || {})[a] || {};
+  if(e.sku) s.add(String(e.sku).toUpperCase());
+  Object.keys((fabricacion && fabricacion.vinculos) || {}).forEach(k => { if(fabricacion.vinculos[k].articulo === a) s.add(k); });
+  return [...s];
+}
+async function renderProductosAC(){
+  const cont = document.getElementById('ac-productos'); if(!cont || !acArticulo) return;
+  if(fabricacion === null) await cargarFabricacion();
+  if(telasDatos === null) await cargarTelas();
+  const skus = skusDelArticulo(acArticulo);
+  const tarjeta = s => {
+    const cal = calidadDeSku(s) || (String(((tablaConsumo.empaque || {})[acArticulo] || {}).sku || '').toUpperCase() === s ? ((tablaConsumo.empaque || {})[acArticulo] || {}).calidad : '');
+    const q = cal ? calidadesTela().find(x => x.clave === cal) : null;
+    const r = buscarProductoPorSku(s), pr = r && r.variante ? parsePrice(r.variante.precio) : null;
+    const c = costosDeSku(s), x = c && c.porTela.find(y => y.total != null);
+    const mg = x && pr ? Math.round((pr - x.total) / pr * 100) : null;
+    return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;">
+      <div><div style="font-weight:700;">${escaparHtml(s)}</div>
+        <div style="font-size:0.8rem;color:#6B6258;">${q ? escaparHtml(q.etiqueta) : '<span style="color:#A6432F;">sin tela elegida</span>'}</div>
+        <div style="margin-top:4px;">${r ? `<span style="font-size:0.72rem;padding:2px 8px;border-radius:8px;background:#EAF6EE;color:#2F7A47;">✓ En catálogo: ${escaparHtml(r.producto.nombre)}</span>` : `<span style="font-size:0.72rem;padding:2px 8px;border-radius:8px;background:#FDF4E2;color:#8A6417;">Sin publicar</span>`}</div></div>
+      <div style="text-align:right;font-size:0.78rem;color:#6B6258;">
+        ${pr ? `<b style="display:block;font-size:0.95rem;color:var(--purple);">$ ${formatoPesos(Math.round(pr))}</b>` : ''}
+        ${x ? `costo $ ${formatoPesos(Math.round(x.total))}${mg != null ? ` · margen ${mg} %` : ''}` : ''}
+        <div style="margin-top:4px;display:flex;gap:4px;justify-content:flex-end;">
+          ${r ? '' : `<button type="button" class="btn-mini" onclick="abrirPublicar('${escapeAttr(s)}')">📸 Publicar</button>`}
+          <button type="button" class="btn-mini" title="Cambiar la tela" onclick="cambiarTelaProductoAC('${escapeAttr(s)}')">✏️</button>
+          <button type="button" class="btn-mini" title="Quitar de este artículo" onclick="quitarProductoAC('${escapeAttr(s)}')">🗑️</button>
+        </div></div></div>`;
+  };
+  cont.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px;">
+      <b style="color:var(--purple);">🏷️ Productos que se hacen con este artículo</b><span class="note" style="margin:0;">uno por cada tela</span></div>
+    ${skus.length ? skus.map(tarjeta).join('') : '<p class="note" style="text-align:left;">Todavía no hay productos con este artículo.</p>'}
+    <div id="ac-np-form"></div>
+    <button type="button" id="ac-np-btn" onclick="formNuevoProductoAC()" style="width:100%;padding:10px;border-radius:10px;border:1.5px dashed #B9AFC6;background:transparent;font-size:0.92rem;cursor:pointer;color:var(--purple);">➕ Nuevo producto con este artículo</button>`;
+}
+async function cambiarTelaProductoAC(s){
+  const opciones = calidadesTela();
+  const actual = calidadDeSku(s);
+  const lista = opciones.map((q, i) => `${i + 1}. ${q.etiqueta}${q.clave === actual ? '  (actual)' : ''}`).join('\n');
+  const r = prompt(`Tela de ${s}. Escriba el número:\n\n${lista}`, '');
+  if(r === null) return;
+  const q = opciones[parseInt(r, 10) - 1]; if(!q){ alert('Número no válido.'); return; }
+  fabricacion.vinculos[s] = { ...(fabricacion.vinculos[s] || {}), calidad: q.clave, tela: '', articulo: acArticulo };
+  const e = tablaConsumo.empaque[acArticulo] || {};
+  try{
+    await guardarFabricacion();
+    if(String(e.sku || '').toUpperCase() === s){ e.calidad = q.clave; tablaConsumo.empaque[acArticulo] = e; await guardarTablaYConsumo(); }
+    renderProductosAC(); sincronizarDescripcionesCatalogo();
+  } catch(err){ alert('No se pudo guardar: ' + err.message); }
+}
+async function quitarProductoAC(s){
+  if(!confirm(`¿Quitar ${s} de "${acArticulo}"? Si está en el catálogo, sigue publicado (se borra desde Editar producto).`)) return;
+  if(fabricacion.vinculos[s]) delete fabricacion.vinculos[s].articulo;
+  const e = tablaConsumo.empaque[acArticulo] || {};
+  try{
+    await guardarFabricacion();
+    if(String(e.sku || '').toUpperCase() === s){ e.sku = ''; await guardarTablaYConsumo(); document.getElementById('ac-sku').value = ''; }
+    renderProductosAC();
+  } catch(err){ alert('No se pudo guardar: ' + err.message); }
+}
+// formulario en blanco: SKU, tela, producto del catalogo, precio, fotos -> un solo guardar
+function formNuevoProductoAC(){
+  const f = document.getElementById('ac-np-form');
+  if(f.innerHTML){ f.innerHTML = ''; document.getElementById('ac-np-btn').style.display = 'block'; return; }
+  document.getElementById('ac-np-btn').style.display = 'none';
+  const cats = CATALOGO.map(c => c.categoria);
+  f.innerHTML = `<div style="border:2px solid var(--purple);border-radius:12px;padding:12px;margin-bottom:8px;">
+    <b style="color:var(--purple);">➕ Nuevo producto con "${escaparHtml(acArticulo)}"</b>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:8px;">
+      <div class="field" style="margin:0;"><label>SKU</label><input id="anp-sku" placeholder="ej: MAG200" style="text-transform:uppercase;" oninput="anpSugerir()"></div>
+      <div class="field" style="margin:0;"><label>Tela</label><select id="anp-cal" onchange="anpSugerir()">${opcionesCalidad('')}</select></div>
+      <div class="field" style="margin:0;"><label>Categoría</label><select id="anp-cat" onchange="anpProductos()">${cats.map(c => `<option>${escaparHtml(c)}</option>`).join('')}</select></div>
+      <div class="field" style="margin:0;"><label>Producto del catálogo</label><select id="anp-prod" onchange="anpCambioProd()"></select></div>
+    </div>
+    <div id="anp-nuevo" class="field" style="margin:8px 0 0;"><label>Nombre del producto nuevo</label><input id="anp-nombre" placeholder="Ej: Mantel Tropical liso"></div>
+    <div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:8px;margin-top:8px;">
+      <div class="field" style="margin:0;"><label>Descripción en el catálogo</label><input id="anp-desc" oninput="this.dataset.manual='1'"></div>
+      <div class="field" style="margin:0;"><label>Precio de lista</label><input id="anp-precio" inputmode="decimal" oninput="this.dataset.manual='1'"></div>
+    </div>
+    <p id="anp-motivo" class="note" style="text-align:left;margin:3px 0 0;"></p>
+    <div class="field" style="margin:8px 0 0;"><label>Fotos (opcional)</label><input type="file" id="anp-fotos" accept="image/*" multiple></div>
+    <p class="error" id="anp-error" style="display:none;"></p>
+    <div style="display:flex;gap:8px;margin-top:10px;"><button type="button" class="btn btn-gold" style="flex:1;" onclick="anpGuardar()">💾 Guardar producto</button><button type="button" class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="formNuevoProductoAC()">Cancelar</button></div>
+  </div>`;
+  const sc = document.getElementById('anp-cal'); hacerSelectBuscable(sc); if(sc._sync) sc._sync();
+  anpProductos();
+  document.getElementById('anp-sku').focus();
+}
+function anpProductos(sugerido){
+  const cat = document.getElementById('anp-cat').value;
+  const ps = ((CATALOGO.find(x => x.categoria === cat) || {}).productos || []).filter(p => Array.isArray(p.variantes));
+  window.__anpProds = ps;
+  document.getElementById('anp-prod').innerHTML = `<option value="__nuevo__">➕ Producto nuevo</option><option value="__solo__">Solo fabricación (no publicar todavía)</option>` + ps.map((p, i) => `<option value="${i}" ${p === sugerido ? 'selected' : ''}>${escaparHtml(p.nombre)}</option>`).join('');
+  anpCambioProd();
+}
+function anpCambioProd(){ const v = document.getElementById('anp-prod').value; document.getElementById('anp-nuevo').style.display = v === '__nuevo__' ? 'block' : 'none'; }
+function anpSugerir(){
+  const sku = document.getElementById('anp-sku').value.trim().toUpperCase(), cal = document.getElementById('anp-cal').value;
+  if(!sku) return;
+  const prev = fabricacion.vinculos[sku];
+  fabricacion.vinculos[sku] = { articulo: acArticulo, calidad: cal };
+  try{
+    const s = sugerenciasPublicar(sku);
+    const d = document.getElementById('anp-desc'), p = document.getElementById('anp-precio');
+    if(!d.dataset.manual) d.value = s.desc || '';
+    if(!p.dataset.manual) p.value = s.precio ? formatoPesos(s.precio) : '';
+    document.getElementById('anp-motivo').textContent = s.motivo ? 'Precio sugerido: ' + s.motivo + '.' : '';
+    if(s.cat && document.getElementById('anp-cat').value !== s.cat){ document.getElementById('anp-cat').value = s.cat; }
+    anpProductos(s.prod);
+    if(!s.prod) document.getElementById('anp-prod').value = '__nuevo__', anpCambioProd();
+  } finally { if(prev) fabricacion.vinculos[sku] = prev; else delete fabricacion.vinculos[sku]; }
+}
+async function anpGuardar(){
+  const err = document.getElementById('anp-error'); err.style.display = 'none';
+  const sku = document.getElementById('anp-sku').value.trim().toUpperCase(), cal = document.getElementById('anp-cal').value;
+  const sel = document.getElementById('anp-prod').value, cat = document.getElementById('anp-cat').value;
+  const desc = document.getElementById('anp-desc').value.trim(), pr = numAr(document.getElementById('anp-precio').value);
+  const yaEnCat = sku ? buscarProductoPorSku(sku) : null;
+  if(!sku){ err.textContent = 'Falta el SKU.'; err.style.display = 'block'; return; }
+  if(!cal){ err.textContent = 'Elija la tela.'; err.style.display = 'block'; return; }
+  const otroArt = fabricacion.vinculos[sku] && fabricacion.vinculos[sku].articulo;
+  const publicar = sel !== '__solo__' && !yaEnCat;
+  if(publicar && (!desc || !(pr > 0))){ err.textContent = 'Para publicar, complete descripción y precio (o elija "Solo fabricación").'; err.style.display = 'block'; return; }
+  const nombreNuevo = document.getElementById('anp-nombre').value.trim();
+  if(publicar && sel === '__nuevo__' && !nombreNuevo){ err.textContent = 'Falta el nombre del producto nuevo.'; err.style.display = 'block'; return; }
+  const q = calidadesTela().find(x => x.clave === cal);
+  const prod = publicar && sel !== '__nuevo__' ? window.__anpProds[+sel] : null;
+  const lineas = [`• SKU ${sku} con la tela ${q ? q.etiqueta : ''}`, `• Se hace con el artículo "${acArticulo}"`];
+  if(otroArt && otroArt !== acArticulo) lineas.push(`• Estaba en "${otroArt}": se pasa a este artículo`);
+  if(yaEnCat) lineas.push(`• Ya está en el catálogo (${yaEnCat.producto.nombre}): no se publica de nuevo`);
+  else if(publicar) lineas.push(`• Se publica en ${cat} → ${sel === '__nuevo__' ? 'producto nuevo "' + nombreNuevo + '"' : '"' + prod.nombre + '"'} · $ ${formatoPesos(pr)}`);
+  else lineas.push('• No se publica todavía');
+  if(!confirm(`Se va a guardar:\n\n${lineas.join('\n')}\n\n¿Confirmar?`)) return;
+  let fotos = [];
+  try{ const files = [...document.getElementById('anp-fotos').files]; for(const f of files) fotos.push(await comprimirImagenAFotoBase64(f)); } catch(e){ err.textContent = 'No se pudo procesar alguna foto.'; err.style.display = 'block'; return; }
+  try{
+    fabricacion.vinculos[sku] = { ...(fabricacion.vinculos[sku] || {}), articulo: acArticulo, calidad: cal, tela: '' };
+    const e = tablaConsumo.empaque[acArticulo] || {};
+    if(!e.sku){ e.sku = sku; e.calidad = cal; tablaConsumo.empaque[acArticulo] = e; await guardarTablaYConsumo(); document.getElementById('ac-sku').value = sku; empaqueOriginalAC = JSON.parse(JSON.stringify(e)); }
+    if(publicar){
+      const variante = { sku, desc, precio: pr.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) };
+      if(sel === '__nuevo__'){
+        const sub = descripcionDesdeCalidad(cal, cat) || '';
+        const ref = await db.collection('productos_nuevos').add({ categoria: cat, nombre: nombreNuevo, composicion: sub, variantes: [variante], imagenBase64: fotos[0] || null, metros: null, creado: new Date().toISOString() });
+        const c = CATALOGO.find(x => x.categoria === cat);
+        const np = { nombre: nombreNuevo, composicion: sub, variantes: [variante], imagen: fotos[0] || null, _editKey: 'nuevo-' + ref.id, _docId: ref.id };
+        if(c){ c.productos.push(np); await guardarGaleriaProducto(np, fotos); }
+        fabricacion.propios[nombreNuevo] = true;
+      } else {
+        const variantes = [...prod.variantes, variante];
+        const datos = { nombre: prod.nombre, composicion: prod.composicion || '', variantes, metros: prod.metros || null };
+        if(fotos[0]) datos.imagenBase64 = fotos[0];
+        if(prod._editKey && prod._editKey.startsWith('nuevo-')) await db.collection('productos_nuevos').doc(prod._docId).update(datos);
+        else await db.collection('productos_editados').doc(prod._editKey).set(datos, { merge: true });
+        prod.variantes = variantes; if(fotos[0]) prod.imagen = fotos[0];
+        await guardarGaleriaProducto(prod, fotos);
+        fabricacion.propios[prod.nombre] = true;
+      }
+      try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+    }
+    await guardarFabricacion();
+    sincronizarDescripcionesCatalogo();
+    document.getElementById('ac-np-form').innerHTML = '';
+    renderProductosAC();
+    renderListaAC();
+  } catch(e){ err.textContent = 'No se pudo guardar: ' + e.message; err.style.display = 'block'; }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -15381,7 +15555,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v128';
+const APP_VERSION = '2026-10-02-v129';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
