@@ -1547,7 +1547,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v110</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v111</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1819,6 +1819,12 @@ a.grilla-celda{display:block;}
       .tl-num{text-align:right;font-size:0.8rem;color:#6B6258;white-space:nowrap;line-height:1.4;}
       .tl-num b{color:var(--purple);font-size:0.95rem;}
       .tl-num i{color:#A89E90;}
+      .tl-precio{display:flex;gap:4px;align-items:center;justify-content:flex-end;margin:4px 0 2px;}
+      .tl-precio span{font-size:0.85rem;color:#2F7A47;font-weight:700;}
+      .tl-precio input{width:96px;padding:6px 8px;font-size:0.9rem;border:1px solid var(--line);border-radius:8px;text-align:right;background:#fff;}
+      .tl-precio select{padding:5px 4px;font-size:0.8rem;border:1px solid var(--line);border-radius:8px;background:#fff;}
+      .tl-guardar-precios{position:sticky;bottom:10px;z-index:5;display:none;margin:10px 0;}
+      .tl-guardar-precios button{width:100%;padding:12px;border:none;border-radius:12px;background:#3D9A5B;color:#fff;font-weight:700;font-size:0.95rem;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.15);}
     </style>
     <div class="form-card" style="max-width:900px;">
       <h2>Telas</h2>
@@ -1831,6 +1837,7 @@ a.grilla-celda{display:block;}
       <div id="tl-acciones" style="display:none;"></div>
       <div id="tl-editor" style="display:none;"></div>
       <div id="tl-lista"><p class="empty-msg">Cargando...</p></div>
+      <div class="tl-guardar-precios" id="tl-guardar-precios"><button type="button" onclick="guardarPreciosTelas()">💾 Guardar precios</button></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irInicio()">🏠 Volver al inicio</button>
     </div>
   </div>
@@ -5854,7 +5861,11 @@ function renderTelas(){
         return `<div class="tl-fila${tlSeleccion.has(c) ? ' sel' : ''}" onclick="editarTela('${escapeAttr(c)}')" title="Toque para editar">
           <input type="checkbox" ${tlSeleccion.has(c) ? 'checked' : ''} onclick="event.stopPropagation();" onchange="toggleSeleccionTela('${escapeAttr(c)}', this.checked)">
           <div><div class="tl-cod">${escaparHtml(c)}</div><div class="tl-tags">${tags}</div></div>
-          <div class="tl-num"><b>${t.ancho ? t.ancho + ' cm' : '—'}</b>${t.precio ? `<br><span style="color:#2F7A47;font-weight:700;">$ ${formatoPesos(t.precio)}/${t.precioUnidad === 'kg' ? 'kg' : 'm'}</span>` : ''}<br>${r ? (r.calculado ? '<i>≈ ' + fmtCm(r.mPorKg) + ' m/kg</i>' : fmtCm(r.mPorKg) + ' m/kg') : '—'}${g ? ' · ' + g + ' g/m²' : ''}</div>
+          <div class="tl-num"><b>${t.ancho ? t.ancho + ' cm' : '—'}</b>
+            <div class="tl-precio" onclick="event.stopPropagation();">
+              <span>$</span><input type="text" inputmode="decimal" value="${escapeAttr(precioPendTela(c, 'precio'))}" placeholder="precio" oninput="cambiarPrecioListaTela('${escapeAttr(c)}', 'precio', this.value)">
+              <select onchange="cambiarPrecioListaTela('${escapeAttr(c)}', 'u', this.value)"><option value="m" ${precioPendTela(c, 'u') !== 'kg' ? 'selected' : ''}>/m</option><option value="kg" ${precioPendTela(c, 'u') === 'kg' ? 'selected' : ''}>/kg</option></select>
+            </div>${r ? (r.calculado ? '<i>≈ ' + fmtCm(r.mPorKg) + ' m/kg</i>' : fmtCm(r.mPorKg) + ' m/kg') : '—'}${g ? ' · ' + g + ' g/m²' : ''}</div>
         </div>`;
       }).join('')}
     </div>`;
@@ -5877,7 +5888,7 @@ function editarTela(codigo, base){
       ${f('tl-ancho', 'Ancho (cm)', t.ancho, 'type="number" step="0.1" placeholder="315" oninput="calcGramajeTela()"')}
       ${f('tl-hilos', 'Calidad (hilos)', t.hilos, 'type="number" placeholder="180"')}
       ${f('tl-mkg', 'Rendimiento (metros por kilo)', t.mPorKg, 'type="text" inputmode="decimal" placeholder="2,8" oninput="calcGramajeTela()"')}
-      <div class="field" style="margin:0;"><label>Precio de la tela</label><div style="display:flex;gap:4px;"><input id="tl-precio" type="text" inputmode="decimal" value="${escapeAttr(t.precio == null ? '' : String(t.precio).replace('.', ','))}" placeholder="2500" style="min-width:0;"><select id="tl-precio-u" style="width:auto;"><option value="m" ${t.precioUnidad !== 'kg' ? 'selected' : ''}>por metro</option><option value="kg" ${t.precioUnidad === 'kg' ? 'selected' : ''}>por kilo</option></select></div></div>
+      <div class="field" style="margin:0;grid-column:span 2;"><label>Precio de la tela</label><div style="display:flex;gap:6px;"><input id="tl-precio" type="text" inputmode="decimal" value="${escapeAttr(t.precio == null ? '' : String(t.precio).replace('.', ','))}" placeholder="$ 2.500" style="flex:1;min-width:120px;font-size:1rem;"><select id="tl-precio-u" style="width:auto;flex:0 0 auto;"><option value="m" ${t.precioUnidad !== 'kg' ? 'selected' : ''}>por metro</option><option value="kg" ${t.precioUnidad === 'kg' ? 'selected' : ''}>por kilo</option></select></div></div>
       <div class="field" style="margin:0;"><label>Gramaje (calculado)</label><div id="tl-gramaje" style="padding:10px 0;font-weight:700;"></div></div>
     </div>
     ${codigo && hermanasTela(codigo).length ? `<p class="note" style="margin:6px 0 0;text-align:left;">🧵 Misma tela en otros anchos: ${hermanasTela(codigo).map(c => `<b>${escaparHtml(c)}</b> (${telasDatos.telas[c].ancho || '?'} cm)`).join(', ')}${!t.mPorKg && rendimientoTela(codigo) ? ` · rendimiento calculado ≈ ${fmtCm(rendimientoTela(codigo).mPorKg)} m/kg` : ''}</p>` : ''}
@@ -6053,6 +6064,40 @@ async function separarColorTelas(){
   cambios.forEach(([c, t]) => { const s = colorEnNombre(t.nombre); nuevas[c] = { ...t, nombre: s.nombre, color: s.color }; });
   try{ await db.collection('config').doc('telas').set({ ...telasDatos, telas: nuevas }); telasDatos.telas = nuevas; await cargarTelas(); renderTelas(); }
   catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+
+// ----- precios editables desde la lista de telas (se guardan juntos con el boton verde) -----
+const preciosPend = {};
+function precioPendTela(c, campo){
+  const p = preciosPend[c], t = telasDatos.telas[c] || {};
+  if(campo === 'u') return p && p.u ? p.u : (t.precioUnidad || 'm');
+  if(p && p.precio !== undefined) return p.precio;
+  return t.precio ? String(t.precio).replace('.', ',') : '';
+}
+function cambiarPrecioListaTela(c, campo, valor){
+  preciosPend[c] = { ...(preciosPend[c] || {}), [campo]: valor };
+  const n = Object.keys(preciosPend).length;
+  const box = document.getElementById('tl-guardar-precios');
+  box.style.display = 'block';
+  box.querySelector('button').textContent = `💾 Guardar precios (${n} tela${n === 1 ? '' : 's'})`;
+}
+async function guardarPreciosTelas(){
+  const nuevas = { ...telasDatos.telas };
+  Object.entries(preciosPend).forEach(([c, p]) => {
+    if(!nuevas[c]) return;
+    const t = { ...nuevas[c] };
+    if(p.precio !== undefined){ const v = parseFloat(String(p.precio).replace(/\./g, '').replace(',', '.')); t.precio = v > 0 ? v : null; }
+    if(p.u) t.precioUnidad = p.u;
+    nuevas[c] = t;
+  });
+  try{
+    await db.collection('config').doc('telas').set(JSON.parse(JSON.stringify({ ...telasDatos, telas: nuevas })));
+    telasDatos.telas = nuevas;
+    Object.keys(preciosPend).forEach(k => delete preciosPend[k]);
+    document.getElementById('tl-guardar-precios').style.display = 'none';
+    renderTelas();
+    sincronizarDescripcionesCatalogo();
+  } catch(e){ alert('No se pudieron guardar los precios: ' + e.message); }
 }
 
 // ----- cambiar usos de varias telas a la vez -----
@@ -14323,7 +14368,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v110';
+const APP_VERSION = '2026-10-02-v111';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
