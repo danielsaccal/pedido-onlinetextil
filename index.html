@@ -1560,7 +1560,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v131</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v132</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2009,6 +2009,45 @@ a.grilla-celda{display:block;}
       <h2>Listas y opciones</h2>
       <p class="note" style="text-align:left;margin-bottom:12px;">Las opciones de los desplegables de toda la app. Lo que agregues acá aparece en todos lados.</p>
       <div id="ls-cont"><p class="empty-msg">Cargando...</p></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-reventa">
+    <style>
+      .rv-top{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+      .rv-top input,.rv-top select{border:1px solid var(--line);border-radius:12px;padding:9px 11px;font-size:0.9rem;background:#fff;}
+      .rv-top input{flex:1;min-width:200px;}
+      .rv-card{background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:12px;overflow:hidden;}
+      .rv-card.sel{outline:2px solid var(--purple);}
+      .rv-cab{display:grid;grid-template-columns:24px 64px minmax(0,1fr);gap:10px;align-items:center;padding:10px 12px;background:var(--cream);}
+      .rv-cab img{width:64px;height:64px;object-fit:cover;border-radius:8px;background:#fff;}
+      .rv-nom{font-weight:700;color:var(--purple);}
+      .rv-cat{font-size:0.72rem;color:#8A8072;}
+      .rv-campos{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;padding:8px 12px;}
+      .rv-campos label{display:flex;flex-direction:column;font-size:0.68rem;color:#8A8072;gap:2px;}
+      .rv-campos input{padding:7px 8px;border:1px solid var(--line);border-radius:8px;font-size:0.86rem;}
+      .rv-var{display:grid;grid-template-columns:80px minmax(0,1fr) minmax(0,1fr) minmax(0,1.3fr);gap:6px;padding:6px 12px;border-top:1px dashed var(--line);align-items:end;}
+      .rv-var label{display:flex;flex-direction:column;font-size:0.66rem;color:#8A8072;gap:2px;}
+      .rv-var input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:0.84rem;min-width:0;}
+      .rv-var .sku{font-weight:700;font-size:0.82rem;padding-bottom:7px;}
+      .rv-prev{grid-column:2 / -1;font-size:0.76rem;color:#2F7A47;margin-top:-2px;}
+      .rv-prev.sub{padding:0 12px 8px;}
+      .rv-guardar{position:sticky;bottom:10px;display:none;margin:10px 0;z-index:5;}
+      .rv-guardar button{width:100%;padding:12px;border:none;border-radius:12px;background:#3D9A5B;color:#fff;font-weight:700;font-size:0.95rem;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.15);}
+      @media (max-width:560px){ .rv-var{grid-template-columns:1fr 1fr;} .rv-var .sku{grid-column:1 / -1;padding:0;} .rv-prev{grid-column:1 / -1;} }
+    </style>
+    <div class="form-card" style="max-width:980px;">
+      <h2>Descripciones de reventa</h2>
+      <p class="note" style="text-align:left;margin-bottom:10px;">Los productos del catálogo que no fabricás. Cargá datos cortos y la descripción se arma sola, con el mismo formato que lo que fabricás. Lo que dejes vacío no se toca.</p>
+      <div class="rv-top">
+        <input type="text" id="rv-buscar" placeholder="🔍 Buscar producto o SKU" oninput="rvPagina=1; renderReventa()">
+        <select id="rv-cat" onchange="rvPagina=1; renderReventa()"></select>
+      </div>
+      <button type="button" class="btn-mini" style="margin-bottom:10px;" onclick="rvCompletarDesdeCatalogo()">✨ Completar los campos vacíos con lo que ya dice el catálogo</button>
+      <div id="rv-masivo" style="display:none;"></div>
+      <div id="rv-lista"><p class="empty-msg">Cargando...</p></div>
+      <div class="rv-guardar" id="rv-guardar"><button type="button" onclick="guardarReventa()">💾 Guardar descripciones</button></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
   </div>
@@ -5402,7 +5441,7 @@ const GRUPOS_INICIO = {
   a: { lado: 'ext', titulo: 'Armar pedido', items: [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['📷 Escanear etiqueta (SKU)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto').click()"], ['🤖 Buscar por foto (IA)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto-producto').click()"]] },
   c: { lado: 'ext', titulo: 'Difusión', items: [['🔗 Compartir por rubro', 'abrirCompartirRubro()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()'], ['🖼️ Nuevo ingreso (flyers, video)', 'abrirNuevoIngreso()'], ['📱 Vista previa grilla IG', 'abrirGrilla()'], ['📣 Anuncios y promociones', 'abrirAnuncio()'], ['🎬 Compartir video de producto', 'abrirCompartirVideoProducto()']] },
   d: { lado: 'int', titulo: 'Ventas', items: [['📋 Historial de pedidos', 'abrirHistorial()'], ['🤖 Pedido con IA (texto libre)', 'abrirPedidoIA()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()'], ['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
-  f: { lado: 'int', titulo: 'Catálogo', items: [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📷 Actualizar foto', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
+  f: { lado: 'int', titulo: 'Catálogo', items: [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['📷 Actualizar foto', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
   g: { lado: 'int', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas'], columnas: [
     [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()']],
     [['📊 Stock y prioridades', 'abrirStock()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()']],
@@ -8148,6 +8187,154 @@ function pintarRecientesInicio(){
   wrap.style.display = 'block';
   window.__iniItems = window.__iniItems || [];
   document.getElementById('ini-recientes').innerHTML = l.map(x => { window.__iniItems.push([x.t, x.f]); return `<button type="button" onclick="usarItemInicio(${window.__iniItems.length - 1})">${escaparHtml(x.t)}</button>`; }).join('');
+}
+
+// ===== Descripciones de reventa (productos que se compran hechos) =====
+// Por producto: material/composicion y marca -> subtitulo. Por medida: nombre corto, medida y contenido ->
+// "Nombre — medida / contenido" (mismo formato que lo fabricado). config/reventa guarda esos datos.
+let reventaDatos = null, rvPagina = 1;
+const rvPend = {}, rvSel = new Set();
+async function cargarReventa(){
+  try{ const d = await db.collection('config').doc('reventa').get(); reventaDatos = d.exists ? d.data() : {}; } catch(e){ reventaDatos = reventaDatos || {}; }
+  reventaDatos.productos = reventaDatos.productos || {}; reventaDatos.variantes = reventaDatos.variantes || {};
+}
+function esFabricado(p){ return (fabricacion && fabricacion.propios && fabricacion.propios[p.nombre]) || (p.variantes || []).some(v => { const s = String(v.sku).toUpperCase(); return articuloDeSku(s) || calidadDeSku(s); }); }
+function productosReventa(){
+  const out = [];
+  CATALOGO.forEach(c => (c.productos || []).forEach(p => { if(Array.isArray(p.variantes) && p.variantes.length && !esFabricado(p)) out.push({ p, cat: c.categoria }); }));
+  return out;
+}
+function rvDatoP(p, campo){ const k = p._editKey; const pe = rvPend['p:' + k]; if(pe && pe[campo] !== undefined) return pe[campo]; return ((reventaDatos.productos[k] || {})[campo]) || ''; }
+function rvDatoV(sku, campo){ const pe = rvPend['v:' + sku]; if(pe && pe[campo] !== undefined) return pe[campo]; return ((reventaDatos.variantes[sku] || {})[campo]) || ''; }
+function rvSubtitulo(p){ const partes = [rvDatoP(p, 'material'), rvDatoP(p, 'marca')].map(s => String(s).trim()).filter(Boolean); return partes.join(' · '); }
+function rvDesc(sku){
+  const n = String(rvDatoV(sku, 'nombre')).trim(), m = String(rvDatoV(sku, 'medida')).trim(), c = String(rvDatoV(sku, 'contenido')).trim();
+  if(!n && !m && !c) return '';
+  const med = m ? (/cm$/i.test(m) ? m : m + ' cm').replace(/\s*[x×]\s*/gi, ' × ') : '';
+  const det = [med, c].filter(Boolean).join(' / ');
+  if(!n) return det;
+  return det ? `${n} — ${det}` : n;
+}
+async function abrirReventa(){
+  mostrarPaso('step-reventa');
+  document.getElementById('rv-lista').innerHTML = '<p class="empty-msg">Cargando...</p>';
+  if(tablaConsumo === null) await cargarTablaConsumo();
+  if(fabricacion === null) await cargarFabricacion();
+  if(telasDatos === null) await cargarTelas();
+  if(fichasArticulos === null) await cargarFichasArticulos();
+  await cargarReventa();
+  const cats = [...new Set(productosReventa().map(x => x.cat))];
+  document.getElementById('rv-cat').innerHTML = '<option value="">Todas las categorías</option>' + cats.map(c => `<option>${escaparHtml(c)}</option>`).join('');
+  renderReventa();
+}
+function renderReventa(){
+  const q = normBusqueda(document.getElementById('rv-buscar').value), cat = document.getElementById('rv-cat').value;
+  const todas = productosReventa().filter(x => (!cat || x.cat === cat) && (!q || normBusqueda(x.p.nombre + ' ' + x.p.variantes.map(v => v.sku + ' ' + v.desc).join(' ')).includes(q)));
+  const porPag = 20, lista = todas.slice(0, rvPagina * porPag);
+  window.__rvVisibles = todas.map(x => x.p._editKey);
+  renderReventaMasivo();
+  const cont = document.getElementById('rv-lista');
+  if(!todas.length){ cont.innerHTML = '<p class="empty-msg">No hay productos de reventa con ese filtro.</p>'; return; }
+  const inp = (val, ph, on) => `<input value="${escapeAttr(val)}" placeholder="${escapeAttr(ph)}" oninput="${on}">`;
+  cont.innerHTML = `<label style="display:inline-flex;gap:6px;align-items:center;font-size:0.8rem;color:#6B6258;margin-bottom:8px;cursor:pointer;"><input type="checkbox" onchange="rvSeleccionarTodos(this.checked)"> Seleccionar todos (${todas.length}) para cargar datos juntos</label>` +
+  lista.map(({ p, cat }) => {
+    const k = p._editKey, sub = rvSubtitulo(p);
+    const img = p.imagen || '';
+    return `<div class="rv-card${rvSel.has(k) ? ' sel' : ''}" data-k="${escapeAttr(k)}">
+      <div class="rv-cab"><input type="checkbox" ${rvSel.has(k) ? 'checked' : ''} onchange="rvToggle('${escapeAttr(k)}', this.checked)">
+        ${img ? `<img src="${escapeAttr(img)}" alt="">` : '<div style="width:64px;height:64px;border-radius:8px;background:#fff;"></div>'}
+        <div><div class="rv-nom">${escaparHtml(p.nombre)}</div><div class="rv-cat">${escaparHtml(cat)} · hoy: ${escaparHtml(p.composicion || '(sin subtítulo)')}</div></div></div>
+      <div class="rv-campos">
+        <label>Material / composición${inp(rvDatoP(p, 'material'), 'ej: 100% algodón, microfibra', `rvCambiarP('${escapeAttr(k)}', 'material', this.value)`)}</label>
+        <label>Marca / línea${inp(rvDatoP(p, 'marca'), 'ej: Lexington, Arcoíris', `rvCambiarP('${escapeAttr(k)}', 'marca', this.value)`)}</label>
+      </div>
+      <div class="rv-prev sub" id="rv-sub-${escapeAttr(k)}">${sub ? 'Subtítulo: ' + escaparHtml(sub) : ''}</div>
+      ${p.variantes.map(v => { const s = String(v.sku).toUpperCase(), d = rvDesc(s); return `<div class="rv-var">
+        <div class="sku">${escaparHtml(s)}</div>
+        <label>Nombre corto${inp(rvDatoV(s, 'nombre'), 'ej: 2½ plazas, King', `rvCambiarV('${escapeAttr(s)}', 'nombre', this.value)`)}</label>
+        <label>Medida (cm)${inp(rvDatoV(s, 'medida'), 'ej: 140 × 190', `rvCambiarV('${escapeAttr(s)}', 'medida', this.value)`)}</label>
+        <label>Contenido / detalle${inp(rvDatoV(s, 'contenido'), 'ej: plana, ajustable y 2 fundas', `rvCambiarV('${escapeAttr(s)}', 'contenido', this.value)`)}</label>
+        <div class="rv-prev" id="rv-prev-${escapeAttr(s)}">${d ? '→ ' + escaparHtml(d) : `<span style="color:#8A8072;">hoy: ${escaparHtml(v.desc || '')}</span>`}</div>
+      </div>`; }).join('')}
+    </div>`;
+  }).join('') + (todas.length > lista.length ? `<button type="button" class="btn btn-ghost" onclick="rvPagina++; renderReventa()">Ver más (${todas.length - lista.length})</button>` : '');
+}
+function rvMostrarGuardar(){ const n = Object.keys(rvPend).length; const b = document.getElementById('rv-guardar'); b.style.display = n ? 'block' : 'none'; b.querySelector('button').textContent = `💾 Guardar descripciones (${n} cambio${n === 1 ? '' : 's'})`; }
+function rvCambiarP(k, campo, valor){
+  rvPend['p:' + k] = { ...(rvPend['p:' + k] || {}), [campo]: valor };
+  const x = productosReventa().find(y => y.p._editKey === k); const el = document.getElementById('rv-sub-' + k);
+  if(x && el){ const s = rvSubtitulo(x.p); el.textContent = s ? 'Subtítulo: ' + s : ''; }
+  rvMostrarGuardar();
+}
+function rvCambiarV(sku, campo, valor){
+  rvPend['v:' + sku] = { ...(rvPend['v:' + sku] || {}), [campo]: valor };
+  const el = document.getElementById('rv-prev-' + sku); const d = rvDesc(sku); if(el) el.innerHTML = d ? '→ ' + escaparHtml(d) : '';
+  rvMostrarGuardar();
+}
+// toma lo que ya dice cada descripcion (ej: "2½ Plazas 140x190x25 cm") y lo reparte en los campos vacios
+function rvCompletarDesdeCatalogo(){
+  const q = normBusqueda(document.getElementById('rv-buscar').value), cat = document.getElementById('rv-cat').value;
+  let n = 0;
+  productosReventa().filter(x => (!cat || x.cat === cat) && (!q || normBusqueda(x.p.nombre + ' ' + x.p.variantes.map(v => v.sku + ' ' + v.desc).join(' ')).includes(q))).forEach(({ p }) => {
+    const k = p._editKey;
+    if(!rvDatoP(p, 'material') && p.composicion){ rvPend['p:' + k] = { ...(rvPend['p:' + k] || {}), material: p.composicion }; n++; }
+    p.variantes.forEach(v => {
+      const s = String(v.sku).toUpperCase(), d = String(v.desc || '');
+      if(rvDatoV(s, 'nombre') || rvDatoV(s, 'medida')) return;
+      if(d.includes(' — ')) return;
+      const mm = d.match(/(\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?(?:\s*[x×]\s*\d+(?:[.,]\d+)?)?)\s*(cm)?/i);
+      const medida = mm ? mm[1] : '';
+      const nombre = (mm ? d.replace(mm[0], '') : d).replace(/\s{2,}/g, ' ').replace(new RegExp('^' + s + '\\s*', 'i'), '').trim();
+      if(nombre || medida){ rvPend['v:' + s] = { ...(rvPend['v:' + s] || {}), nombre, medida }; n++; }
+    });
+  });
+  renderReventa(); rvMostrarGuardar();
+  alert(n ? `Se completaron ${n} campos. Revíselos (y sume el contenido si hace falta) antes de guardar.` : 'No había campos vacíos para completar.');
+}
+function rvToggle(k, on){ if(on) rvSel.add(k); else rvSel.delete(k); renderReventa(); }
+function rvSeleccionarTodos(on){ (window.__rvVisibles || []).forEach(k => on ? rvSel.add(k) : rvSel.delete(k)); renderReventa(); }
+function renderReventaMasivo(){
+  const c = document.getElementById('rv-masivo');
+  if(!rvSel.size){ c.style.display = 'none'; c.innerHTML = ''; return; }
+  c.style.display = 'block';
+  c.innerHTML = `<div style="background:#F3EEF7;border:1px solid #D9CCE6;border-radius:12px;padding:10px 12px;margin-bottom:10px;">
+    <b>✏️ ${rvSel.size} producto${rvSel.size === 1 ? '' : 's'} seleccionado${rvSel.size === 1 ? '' : 's'}</b> <a href="#" onclick="event.preventDefault(); rvSel.clear(); renderReventa();" style="font-size:0.8rem;margin-left:8px;">Quitar selección</a>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px;margin-top:6px;">
+      <input id="rvm-mat" placeholder="Material / composición" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
+      <input id="rvm-mar" placeholder="Marca / línea" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
+      <button type="button" class="btn-mini" onclick="rvAplicarMasivo()">Poner a todos</button>
+    </div></div>`;
+}
+function rvAplicarMasivo(){
+  const mat = document.getElementById('rvm-mat').value.trim(), mar = document.getElementById('rvm-mar').value.trim();
+  if(!mat && !mar) return;
+  rvSel.forEach(k => { const x = { ...(rvPend['p:' + k] || {}) }; if(mat) x.material = mat; if(mar) x.marca = mar; rvPend['p:' + k] = x; });
+  rvSel.clear(); renderReventa(); rvMostrarGuardar();
+}
+async function guardarReventa(){
+  const prods = productosReventa();
+  const afectados = new Set();
+  Object.keys(rvPend).forEach(key => {
+    if(key.startsWith('p:')){ const k = key.slice(2); reventaDatos.productos[k] = { ...(reventaDatos.productos[k] || {}), ...rvPend[key] }; afectados.add(k); }
+    else { const s = key.slice(2); reventaDatos.variantes[s] = { ...(reventaDatos.variantes[s] || {}), ...rvPend[key] }; const x = prods.find(y => y.p.variantes.some(v => String(v.sku).toUpperCase() === s)); if(x) afectados.add(x.p._editKey); }
+  });
+  Object.keys(rvPend).forEach(k => delete rvPend[k]);
+  if(!confirm(`Se van a actualizar las descripciones de ${afectados.size} producto${afectados.size === 1 ? '' : 's'} en el catálogo. ¿Confirmar?`)){ return; }
+  try{
+    await db.collection('config').doc('reventa').set(JSON.parse(JSON.stringify(reventaDatos)));
+    for(const k of afectados){
+      const x = prods.find(y => y.p._editKey === k); if(!x) continue;
+      const p = x.p, sub = rvSubtitulo(p);
+      const variantes = p.variantes.map(v => { const d = rvDesc(String(v.sku).toUpperCase()); return d ? { ...v, desc: d } : v; });
+      const datos = { nombre: p.nombre, composicion: sub || p.composicion || '', variantes, metros: p.metros || null };
+      if(k.startsWith('nuevo-')) await db.collection('productos_nuevos').doc(p._docId).update(datos);
+      else await db.collection('productos_editados').doc(k).set(datos, { merge: true });
+      p.composicion = datos.composicion; p.variantes = variantes;
+    }
+    rvMostrarGuardar(); renderReventa();
+    try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+    alert('Descripciones guardadas en el catálogo.');
+  } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -15589,7 +15776,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v131';
+const APP_VERSION = '2026-10-02-v132';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
