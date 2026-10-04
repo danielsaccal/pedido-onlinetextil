@@ -723,9 +723,9 @@ a.grilla-celda{display:block;}
           <div class="field"><label>Título</label><input type="text" id="ni-foto-titulo" placeholder="Ej: Fantasia"></div>
           <div class="field"><label>Subtítulo (composición, calidad, hilos, etc.)</label><input type="text" id="ni-foto-subtitulo" placeholder="Ej: 100% Algodón — 360 gr"></div>
           <div class="field">
-            <label>Variantes</label>
+            <label>Medidas (SKU)</label>
             <div id="ni-foto-variantes-cont"></div>
-            <button type="button" class="btn-mini" onclick="agregarVarianteNIFoto()">+ Agregar variante</button>
+            <button type="button" class="btn-mini" onclick="agregarVarianteNIFoto()">+ Agregar medida (SKU)</button>
           </div>
 
           <div id="ni-foto-cat-wrap" style="display:none;margin-top:10px;">
@@ -875,9 +875,9 @@ a.grilla-celda{display:block;}
       </div>
 
       <div class="ni-seccion">
-        <p class="ni-seccion-tit">Variantes</p>
+        <p class="ni-seccion-tit">Medidas (SKU)</p>
         <div id="np-variantes-cont"></div>
-        <button type="button" class="btn-mini" onclick="agregarVarianteNP()">+ Agregar variante</button>
+        <button type="button" class="btn-mini" onclick="agregarVarianteNP()">+ Agregar medida (SKU)</button>
       </div>
 
       <div class="ni-seccion">
@@ -900,7 +900,7 @@ a.grilla-celda{display:block;}
   <div class="step" id="step-editar-producto">
     <div class="form-card">
       <h2>Editar producto</h2>
-      <p class="note" style="margin-bottom:14px;">Busque cualquier producto por uno de sus SKU para editar título, subtítulo, variantes o foto.</p>
+      <p class="note" style="margin-bottom:14px;">Busque cualquier producto por uno de sus SKU para editar título, subtítulo, medidas o foto.</p>
       <div class="field"><label>SKU</label><input type="text" id="ep-sku" placeholder="Ej: TOA171B"></div>
       <div class="actions"><button class="btn btn-gold" onclick="buscarProductoParaEditar()">Buscar</button></div>
       <p class="error" id="ep-error-busqueda" style="display:none;">No encontré ningún producto con ese SKU.</p>
@@ -921,9 +921,9 @@ a.grilla-celda{display:block;}
         </div>
 
         <div class="ni-seccion">
-          <p class="ni-seccion-tit">Variantes</p>
+          <p class="ni-seccion-tit">Medidas (SKU)</p>
           <div id="ep-variantes-cont"></div>
-          <button type="button" class="btn-mini" onclick="agregarVarianteEP()">+ Agregar variante</button>
+          <button type="button" class="btn-mini" onclick="agregarVarianteEP()">+ Agregar medida (SKU)</button>
         </div>
 
         <div class="ni-seccion">
@@ -951,7 +951,7 @@ a.grilla-celda{display:block;}
   <div class="step" id="step-eliminar-producto">
     <div class="form-card">
       <h2>Eliminar producto</h2>
-      <p class="note" style="margin-bottom:14px;">Busque por SKU. Si el producto tiene varias variantes, se elimina solo esa variante; si es la única, se elimina el producto entero.</p>
+      <p class="note" style="margin-bottom:14px;">Busque por SKU. Si el producto tiene varias medidas, se elimina solo esa medida; si es la única, se elimina el producto entero.</p>
       <div class="field"><label>SKU</label><input type="text" id="dp-sku" placeholder="Ej: TOA171B"></div>
       <div class="actions"><button class="btn btn-gold" onclick="buscarProductoParaEliminar()">Buscar</button></div>
       <p class="error" id="dp-error-busqueda" style="display:none;">No encontré ningún producto con ese SKU.</p>
@@ -1577,7 +1577,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v146</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v147</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5514,7 +5514,7 @@ const GRUPOS_INICIO = {
     [['📦 Historial de órdenes', 'abrirHistorialOT()'], ['🗂️ Historial de entregas', 'abrirHistorialEntregas()'], ['🔎 ¿Cuándo hice este SKU?', 'abrirHistorialSku()']],
   ] },
   h: { lado: 'int', titulo: 'Finanzas', items: [['💰 Ventas Mercado Libre', 'abrirVentasML()'], ['🧮 Calculadora de costos', 'abrirCalculadoraCostos()']] },
-  i: { lado: 'int', titulo: 'Configuración', items: [['📝 Listas y opciones', 'abrirListas()'], ['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['🔔 Avisos push', 'abrirConfigPush()'], ['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']] },
+  i: { lado: 'int', titulo: 'Configuración', items: [['📖 Palabras de la app', 'abrirGlosario()'], ['📝 Listas y opciones', 'abrirListas()'], ['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['🔔 Avisos push', 'abrirConfigPush()'], ['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']] },
 };
 let grupoInicioAbierto = null;
 function irInicio(){
@@ -7006,9 +7006,9 @@ function renderProductosFabrico(){
   if(!filas.length){ cont.innerHTML = `<p class="empty-msg">${todas.length ? 'No hay productos que coincidan.' : 'Todavía no vinculaste productos con fabricación. Se hace desde Artículos y cortes (SKU + calidad de tela) o desde Editar producto (🏭 Fabricación propia).'}</p>`; return; }
   let prodPrev = null;
   const nombreArt = a => a ? (a.startsWith('ficha:') ? nombreFicha(a.slice(6)) : a) : '';
-  cont.innerHTML = `<label style="display:inline-flex;gap:6px;align-items:center;font-size:0.82rem;color:#6B6258;margin-bottom:8px;cursor:pointer;"><input type="checkbox" ${pfDetalle ? 'checked' : ''} onchange="pfDetalle=this.checked; renderProductosFabrico();"> Ver detalle (artículo, tela, costo, precio y margen)</label>
+  cont.innerHTML = `<label style="display:inline-flex;gap:6px;align-items:center;font-size:0.82rem;color:#6B6258;margin-bottom:8px;cursor:pointer;"><input type="checkbox" ${pfDetalle ? 'checked' : ''} onchange="pfDetalle=this.checked; renderProductosFabrico();"> Ver detalle (artículo de corte, tela, costo, precio y margen)</label>
     <div class="${pfDetalle ? '' : 'pf-simple'}" style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;"><table style="width:100%;border-collapse:collapse;font-size:0.86rem;">
-    <thead><tr style="background:var(--cream);"><th style="padding:7px 4px 7px 8px;width:24px;"><input type="checkbox" title="Seleccionar todos los de la lista" onchange="pfSeleccionarTodos(this.checked)" ${filas.length && filas.every(f => pfSel.has(f.sku)) ? 'checked' : ''}></th><th style="padding:7px 8px;text-align:left;">SKU</th><th style="padding:7px 8px;text-align:left;">Medida / variante</th><th class="pf-det" style="padding:7px 8px;text-align:left;">Se corta como</th><th class="pf-det" style="padding:7px 8px;text-align:left;">Calidad de tela</th><th class="pf-det" style="padding:7px 8px;text-align:right;">Costo</th><th class="pf-det" style="padding:7px 8px;text-align:right;">Precio de lista</th><th class="pf-det" style="padding:7px 8px;text-align:right;">Margen</th><th style="padding:7px 8px;text-align:center;">Estado</th></tr></thead><tbody>
+    <thead><tr style="background:var(--cream);"><th style="padding:7px 4px 7px 8px;width:24px;"><input type="checkbox" title="Seleccionar todos los de la lista" onchange="pfSeleccionarTodos(this.checked)" ${filas.length && filas.every(f => pfSel.has(f.sku)) ? 'checked' : ''}></th><th style="padding:7px 8px;text-align:left;">SKU</th><th style="padding:7px 8px;text-align:left;">Medida</th><th class="pf-det" style="padding:7px 8px;text-align:left;">Artículo de corte</th><th class="pf-det" style="padding:7px 8px;text-align:left;">Tela</th><th class="pf-det" style="padding:7px 8px;text-align:right;">Costo</th><th class="pf-det" style="padding:7px 8px;text-align:right;">Precio de lista</th><th class="pf-det" style="padding:7px 8px;text-align:right;">Margen</th><th style="padding:7px 8px;text-align:center;">Estado</th></tr></thead><tbody>
     ${filas.map(f => {
       let cab = '';
       if(f.producto !== prodPrev){
@@ -8137,7 +8137,7 @@ async function renderProductosAC(){
   };
   cont.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px;">
       <b style="color:var(--purple);">🏷️ SKU de este artículo</b><span class="note" style="margin:0;">uno por cada tela</span></div>
-    ${skus.length ? skus.map(tarjeta).join('') : '<p class="note" style="text-align:left;">Todavía no hay productos con este artículo.</p>'}
+    ${skus.length ? skus.map(tarjeta).join('') : '<p class="note" style="text-align:left;">Todavía no hay SKU con este artículo.</p>'}
     <div id="ac-np-form"></div>
     <button type="button" id="ac-np-btn" onclick="formNuevoProductoAC()" style="width:100%;padding:10px;border-radius:10px;border:1.5px dashed #B9AFC6;background:transparent;font-size:0.92rem;cursor:pointer;color:var(--purple);">➕ Agregar nuevo SKU</button>`;
 }
@@ -8812,6 +8812,75 @@ function validarSkuEnVivo(el, msgId){
   if(enCat){ m.innerHTML = `<span style="color:#A6432F;">⚠️ Ya está en el catálogo: ${escaparHtml(enCat.producto.nombre)}</span>`; el.style.borderColor = '#C9563F'; }
   else if(art){ m.innerHTML = `<span style="color:#8A6417;">Ya está vinculado a "${escaparHtml(art)}"</span>`; el.style.borderColor = '#D98A2B'; }
   else { m.innerHTML = '<span style="color:#2F7A47;">✓ SKU nuevo</span>'; el.style.borderColor = '#3D9A5B'; }
+}
+
+// ===== Ayudas "?": se agregan solas a los rotulos que estan en esta lista =====
+const AYUDAS = {
+  'Tela': 'La tela con la que se fabrica (nombre, hilos y composición). Sirve para cualquier ancho.',
+  'Calidad de tela': 'La tela con la que se fabrica (nombre, hilos y composición). Sirve para cualquier ancho.',
+  'Artículo de corte': 'Cómo se corta: las piezas y sus medidas. Varios SKU pueden usar el mismo artículo (por ejemplo, en distintas telas).',
+  'SKU': 'El código de cada medida que vendés. Un producto del catálogo puede tener varios SKU (uno por medida).',
+  'Producto del catálogo': 'Lo que ve el cliente: nombre, fotos y sus medidas (SKU).',
+  'Producto': 'Lo que ve el cliente: nombre, fotos y sus medidas (SKU).',
+  'Confección ($ por unidad)': 'Lo que cobra el taller por coser una unidad.',
+  'Otros insumos ($ por unidad)': 'Bolsa, etiqueta u otros gastos por unidad que no cargaste como avíos.',
+  'Colchón (para la ajustable, en cm)': 'Medida del colchón para el que es la sábana o funda (ancho × largo × alto). Se muestra en el catálogo.',
+  'Rendimiento (metros por kilo)': 'Cuántos metros salen de un kilo de tela. Con esto se pasa el precio por kilo a precio por metro.',
+  'Precio de la tela': 'Lo que pagás la tela, por metro o por kilo. Si cargás dólares, se convierte con el dólar de arriba.',
+  'Mínimo': 'Cuando el stock baja de esto, el SKU aparece como prioridad para fabricar.',
+  'En producción': 'Unidades pedidas en órdenes de trabajo que el taller todavía no entregó.',
+  'Stock': 'Unidades que tenés hoy. Las entregas del taller lo suman solas.',
+  'Precio de lista': 'El precio de venta del catálogo.',
+  'Descripción en el catálogo': 'El texto de esta medida que ve el cliente. Se arma solo, y lo podés cambiar.',
+  'Nombre corto': 'Cómo se llama esta medida (ej: 2½ plazas, King).',
+  'Medida (cm)': 'Las medidas en centímetros (ej: 140 × 190 × 25).',
+  'Contenido / detalle': 'Qué trae (ej: plana, ajustable y 2 fundas).',
+  'Material / composición': 'De qué está hecho (ej: 100% algodón). Forma el subtítulo del producto.',
+  'Marca / línea': 'Marca o línea del producto. Forma el subtítulo junto con el material.',
+  'Metros totales entregados': 'Los metros de tela que tiene el taller para esta orden.',
+  'Tela que ya está en el taller': 'Telas que mandaste a ese taller y todavía no tienen orden.',
+};
+function mostrarAyuda(ev, txt){
+  ev.stopPropagation(); ev.preventDefault();
+  let b = document.getElementById('ayuda-burbuja');
+  if(!b){ b = document.createElement('div'); b.id = 'ayuda-burbuja'; b.style.cssText = 'position:fixed;z-index:10001;max-width:280px;background:#3D2B4E;color:#fff;font-size:0.82rem;line-height:1.4;padding:9px 12px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.25);'; document.body.appendChild(b); document.addEventListener('click', () => { const x = document.getElementById('ayuda-burbuja'); if(x) x.style.display = 'none'; }); }
+  b.textContent = txt; b.style.display = 'block';
+  const r = ev.target.getBoundingClientRect();
+  b.style.left = Math.max(8, Math.min(window.innerWidth - 290, r.left - 10)) + 'px';
+  b.style.top = (r.bottom + 6) + 'px';
+}
+function ponerAyudas(raiz){
+  (raiz || document).querySelectorAll('label, th, .field > label').forEach(el => {
+    if(el.dataset.ay) return;
+    const t = Array.from(el.childNodes).filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim().replace(/^\d+\.\s*/, '');
+    const txt = AYUDAS[t]; if(!txt) return;
+    el.dataset.ay = '1';
+    const s = document.createElement('span');
+    s.textContent = '?'; s.title = txt;
+    s.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:#E8E2EF;color:var(--purple);font-size:0.68rem;font-weight:700;margin-left:4px;cursor:pointer;vertical-align:middle;';
+    s.onclick = e => mostrarAyuda(e, txt);
+    const primerControl = Array.from(el.childNodes).find(n => n.nodeType === 1 && /INPUT|SELECT|TEXTAREA|DIV/.test(n.tagName));
+    if(primerControl) el.insertBefore(s, primerControl); else el.appendChild(s);
+  });
+}
+window.addEventListener('load', () => {
+  ponerAyudas();
+  let pend = false;
+  new MutationObserver(() => { if(pend) return; pend = true; requestAnimationFrame(() => { pend = false; ponerAyudas(); }); }).observe(document.body, { childList: true, subtree: true });
+});
+
+function abrirGlosario(){
+  const items = [
+    ['Producto', 'Lo que ve el cliente en el catálogo: nombre, fotos y sus medidas.'],
+    ['SKU (medida)', 'El código de cada medida de un producto. Ej: KA183J = Juego 2½ plazas.'],
+    ['Artículo de corte', 'Cómo se corta: piezas y medidas. Lo usan uno o varios SKU.'],
+    ['Tela', 'Nombre, hilos y composición (ej: Percal 200 hilos 70/30). Sirve para cualquier ancho.'],
+    ['Código de tela', 'Cada rollo/variante de una tela, con su ancho y color (ej: MAC300B).'],
+    ['Orden de trabajo', 'Lo que le pedís a un taller: qué SKU, cuántos y con qué tela.'],
+    ['Avíos', 'Cierres, elástico, botones… que lleva cada unidad.'],
+    ['Reventa', 'Productos que comprás hechos y no fabricás.'],
+  ];
+  elegirOpcion('📖 Palabras de la app', '', [], `<div style="display:grid;gap:8px;margin-bottom:10px;">${items.map(([a, b]) => `<div><b style="color:var(--purple);">${a}</b><div style="font-size:0.85rem;color:#5A4F44;">${b}</div></div>`).join('')}</div>`);
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -12739,12 +12808,12 @@ function buscarProductoParaEliminar(){
         `).join('')}
         <p class="note" style="margin-top:12px;">
           ${esUnica
-            ? '⚠️ Es la única variante — al eliminarla se borra todo el producto.'
-            : '⚠️ Se va a eliminar solo esta variante; el resto del producto queda intacto.'}
+            ? '⚠️ Es la única medida — al eliminarla se borra todo el producto.'
+            : '⚠️ Se va a eliminar solo esta medida (SKU); el resto del producto queda intacto.'}
         </p>
         <div class="actions" style="margin-top:10px;">
           <button class="btn-mini" style="background:#A6432F;color:#fff;border-color:#A6432F;" onclick="confirmarEliminarVariante('${escapeAttr(sku)}')">
-            ${esUnica ? 'Eliminar producto entero' : 'Eliminar esta variante'}
+            ${esUnica ? 'Eliminar producto entero' : 'Eliminar esta medida'}
           </button>
         </div>
       </div>
@@ -12758,7 +12827,7 @@ async function confirmarEliminarVariante(sku){
   const p = match.producto;
   const esUnica = p.variantes.length === 1;
 
-  if(!confirm(esUnica ? '¿Eliminar todo el producto "' + p.nombre + '"? No se puede deshacer.' : '¿Eliminar la variante ' + sku + ' de "' + p.nombre + '"?')){
+  if(!confirm(esUnica ? '¿Eliminar todo el producto "' + p.nombre + '"? No se puede deshacer.' : '¿Eliminar la medida ' + sku + ' de "' + p.nombre + '"?')){
     return;
   }
 
@@ -13153,7 +13222,7 @@ async function guardarProductoNuevoInterno(){
 
   if(!categoria){ errorEl.textContent = 'Elija una categoría.'; errorEl.style.display = 'block'; return; }
   if(!titulo){ errorEl.textContent = 'Falta el título del producto.'; errorEl.style.display = 'block'; return; }
-  if(variantes.length === 0){ errorEl.textContent = 'Cargue al menos una variante con SKU, descripción y precio.'; errorEl.style.display = 'block'; return; }
+  if(variantes.length === 0){ errorEl.textContent = 'Cargue al menos una medida con SKU, descripción y precio.'; errorEl.style.display = 'block'; return; }
   if(esTelas && !metros){ errorEl.textContent = 'Es una tela: indique los metros por rollo/pieza.'; errorEl.style.display = 'block'; return; }
 
   // chequear que ningun SKU nuevo repita uno que ya existe en el catalogo (ni entre si)
@@ -16063,7 +16132,7 @@ function mostrarSelectorCategoriaFotoSuelta(){
   );
   if(!foto){ alert('Suba una foto primero.'); return; }
   if(!titulo){ alert('Falta el título.'); return; }
-  if(!hayVariante){ alert('Cargue al menos una variante con SKU, descripción y precio.'); return; }
+  if(!hayVariante){ alert('Cargue al menos una medida con SKU, descripción y precio.'); return; }
 
   const sel = document.getElementById('ni-foto-categoria');
   if(sel.options.length <= 1){
@@ -16229,7 +16298,7 @@ function irAFormatoGrafico(){
     );
     if(!foto){ errorEl.textContent = 'Suba una foto.'; errorEl.style.display = 'block'; return; }
     if(!titulo){ errorEl.textContent = 'Falta el título.'; errorEl.style.display = 'block'; return; }
-    if(!hayVariante){ errorEl.textContent = 'Cargue al menos una variante con SKU, descripción y precio.'; errorEl.style.display = 'block'; return; }
+    if(!hayVariante){ errorEl.textContent = 'Cargue al menos una medida con SKU, descripción y precio.'; errorEl.style.display = 'block'; return; }
   }
   errorEl.style.display = 'none';
   mostrarPaso('step-ni-formato');
@@ -16253,7 +16322,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v146';
+const APP_VERSION = '2026-10-02-v147';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
