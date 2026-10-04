@@ -435,6 +435,7 @@ a.grilla-celda{display:block;}
   <p>Pedido mayorista · onlinetextil.com.ar</p>
   <div class="menu-herramientas">
     <button class="menu-toggle" id="btn-atras" onclick="irAtras()" style="display:none;margin-right:6px;">← Volver</button>
+    <button class="menu-toggle" onclick="abrirBuscador()" title="Buscar en toda la app" style="margin-right:6px;">🔍</button>
     <button class="menu-toggle" onclick="irInicio()">🏠 Inicio</button>
     <button class="menu-toggle" onclick="irInicio(); setTimeout(() => abrirGrupoInicio('i'), 50);" title="Configuración" style="margin-left:6px;">⚙️</button>
     <div class="menu-dropdown" id="menu-dropdown">
@@ -581,6 +582,22 @@ a.grilla-celda{display:block;}
       .ini-sub-btns button{text-align:left;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--cream);font-size:0.95rem;cursor:pointer;color:var(--purple);}
       .ini-sub-btns button:hover{background:var(--gold);}
       .ini-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:start;}
+
+    /* ---- usabilidad: barra del celular, botones mas comodos ---- */
+    #barra-cel{display:none;}
+    @media (max-width:700px){
+      #barra-cel{display:grid;grid-template-columns:repeat(3,1fr);position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);z-index:900;padding:4px 0 calc(4px + env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,.06);}
+      #barra-cel button{border:none;background:none;font-size:1.2rem;display:flex;flex-direction:column;align-items:center;gap:1px;color:var(--purple);padding:4px;cursor:pointer;}
+      #barra-cel button span{font-size:0.68rem;}
+      body.con-barra{padding-bottom:64px;}
+      body.con-barra .rv-guardar, body.con-barra .tl-guardar-precios, body.con-barra .sk-guardar{bottom:70px;}
+      .btn-mini{padding:9px 12px !important;font-size:0.88rem !important;}
+      input, select, textarea{font-size:16px !important;}
+    }
+    .gb-item{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;align-items:center;padding:9px 8px;border-radius:10px;cursor:pointer;}
+    .gb-item:hover{background:var(--cream);}
+    .gb-item small{display:block;color:#8A8072;font-size:0.75rem;}
+    .gb-sec{font-size:0.7rem;font-weight:700;letter-spacing:.05em;color:#8A8072;text-transform:uppercase;margin:8px 4px 2px;}
       .ini-col{display:flex;flex-direction:column;gap:8px;}
       .ini-col-tit{font-size:0.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#8A8072;padding:0 2px 2px;border-bottom:2px solid var(--gold);margin-bottom:2px;}
       .ini-col button{font-size:0.88rem;}
@@ -1560,7 +1577,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v144</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v145</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1882,6 +1899,21 @@ a.grilla-celda{display:block;}
       <div id="pub-cont"></div>
     </div>
   </div>
+  <div id="dlg-modal" style="display:none;position:fixed;inset:0;background:rgba(30,20,40,.45);z-index:10000;align-items:center;justify-content:center;padding:16px;">
+    <div style="max-width:440px;width:100%;background:#fff;border-radius:16px;padding:16px 18px;box-shadow:0 10px 40px rgba(0,0,0,.25);">
+      <b id="dlg-tit" style="font-size:1.05rem;color:var(--purple);"></b>
+      <p id="dlg-txt" style="font-size:0.88rem;color:#5A4F44;margin:8px 0 12px;white-space:pre-wrap;"></p>
+      <div id="dlg-extra"></div>
+      <div id="dlg-btns" style="display:grid;gap:8px;"></div>
+    </div>
+  </div>
+  <div id="gb-modal" style="display:none;position:fixed;inset:0;background:rgba(30,20,40,.45);z-index:9999;padding:60px 12px 12px;">
+    <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:16px;padding:12px;box-shadow:0 10px 40px rgba(0,0,0,.25);">
+      <div style="display:flex;gap:8px;"><input id="gb-input" placeholder="🔍 Buscar SKU, producto, artículo, tela u orden" oninput="buscarGeneral(this.value)" style="flex:1;padding:12px;border:1px solid var(--line);border-radius:12px;font-size:16px;"><button type="button" onclick="cerrarBuscador()" style="border:none;background:none;font-size:1.3rem;cursor:pointer;color:#8A8072;">✕</button></div>
+      <div id="gb-res" style="max-height:65vh;overflow-y:auto;margin-top:8px;"></div>
+    </div>
+  </div>
+  <nav id="barra-cel"><button type="button" onclick="irInicio()">🏠<span>Inicio</span></button><button type="button" onclick="abrirBuscador()">🔍<span>Buscar</span></button><button type="button" onclick="irAtras()">←<span>Volver</span></button></nav>
   <datalist id="lista-telas"></datalist>
   <datalist id="lista-avios"></datalist>
   <datalist id="lista-proveedores-tela"></datalist>
@@ -2477,6 +2509,7 @@ function volverUnPaso(){
 window.addEventListener('popstate', () => volverUnPaso());
 function mostrarPaso(id){
   const actual = document.querySelector('.step.active');
+  if(actual && actual.id !== id && typeof cambiosSinGuardar === 'function' && cambiosSinGuardar(actual.id) && !confirm('Hay cambios sin guardar en esta pantalla. ¿Salir igual? (se pierden)')){ if(navVolviendo) try{ history.pushState({ paso: actual.id }, ''); navStack.push(id); } catch(e){} return false; }
   if(!navVolviendo && actual && actual.id !== id){
     navStack.push(actual.id);
     if(navStack.length > 40) navStack.shift();
@@ -2484,6 +2517,7 @@ function mostrarPaso(id){
   }
   const ba = document.getElementById('btn-atras');
   if(ba) ba.style.display = id === 'step-inicio' ? 'none' : 'inline-block';
+  const bc = document.getElementById('barra-cel'); if(bc){ const ver = id !== 'step-catalogo' && !location.search; bc.style.visibility = ver ? 'visible' : 'hidden'; document.body.classList.toggle('con-barra', ver); }
   if(id === 'step-inicio') try{ pintarRecientesInicio(); } catch(e){}
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -7888,18 +7922,20 @@ async function borrarSkusPf(){
   const enCat = skus.filter(s => buscarProductoPorSku(s));
   let delCatalogo = false;
   if(enCat.length){
-    const r = prompt(`Borrar ${skus.length} SKU: ${skus.join(', ')}\n\n${enCat.length} ${enCat.length === 1 ? 'está' : 'están'} en el catálogo (${enCat.join(', ')}).\n\nEscriba:\n  1 = quitarlos solo de fabricación (siguen en el catálogo)\n  2 = borrarlos de fabricación Y del catálogo\n  3 = sacarlos solo del catálogo (siguen en fabricación)`, '3');
+    const r = await elegirOpcion(`Borrar ${skus.length} SKU`, `${skus.join(', ')}\n\n${enCat.length} ${enCat.length === 1 ? 'está' : 'están'} en el catálogo.`, [
+      { t: '📦 Sacar solo del catálogo (siguen en fabricación)', v: '3', estilo: 'gold' },
+      { t: '🏭 Quitar solo de fabricación (siguen en el catálogo)', v: '1' },
+      { t: '🗑️ Borrar de fabricación y del catálogo', v: '2', estilo: 'rojo' },
+    ]);
     if(r === null) return;
-    if(r.trim() === '3'){
-      if(!confirm(`Se sacan del catálogo: ${enCat.join(', ')}. Siguen en fabricación. ¿Seguir?`)) return;
-      try{ await sacarSkusDelCatalogo(enCat); try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){} pfSel.clear(); renderProductosFabrico(); alert('Listo.'); }
+    if(r === '3'){
+      try{ await sacarSkusDelCatalogo(enCat); try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){} pfSel.clear(); renderProductosFabrico(); }
       catch(e){ alert('No se pudo: ' + e.message); }
       return;
     }
-    if(r.trim() === '2') delCatalogo = true;
-    else if(r.trim() !== '1') return;
+    if(r === '2') delCatalogo = true;
   }
-  if(!confirm(`${delCatalogo ? 'Se borran de fabricación y del catálogo' : 'Se quitan de fabricación'}: ${skus.join(', ')}.\nNo se puede deshacer. ¿Seguir?`)) return;
+  if(!enCat.length && (await elegirOpcion('Quitar de fabricación', `${skus.join(', ')}\nNo se puede deshacer.`, [{ t: '🗑️ Quitar', v: 'si', estilo: 'rojo' }])) === null) return;
   try{
     // fabricacion: vinculos, SKU del articulo y stock
     skus.forEach(s => {
@@ -8102,12 +8138,13 @@ async function renderProductosAC(){
     <button type="button" id="ac-np-btn" onclick="formNuevoProductoAC()" style="width:100%;padding:10px;border-radius:10px;border:1.5px dashed #B9AFC6;background:transparent;font-size:0.92rem;cursor:pointer;color:var(--purple);">➕ Agregar nuevo SKU</button>`;
 }
 async function cambiarTelaProductoAC(s){
-  const opciones = calidadesTela();
   const actual = calidadDeSku(s);
-  const lista = opciones.map((q, i) => `${i + 1}. ${q.etiqueta}${q.clave === actual ? '  (actual)' : ''}`).join('\n');
-  const r = prompt(`Tela de ${s}. Escriba el número:\n\n${lista}`, '');
-  if(r === null) return;
-  const q = opciones[parseInt(r, 10) - 1]; if(!q){ alert('Número no válido.'); return; }
+  const p = elegirOpcion(`Tela de ${s}`, 'Elija la tela con la que se hace.', [{ t: 'Guardar', v: 'ok', estilo: 'gold' }], `<select id="dlg-cal" style="width:100%;margin-bottom:12px;">${opcionesCalidad(actual)}</select>`);
+  setTimeout(() => { const sel = document.getElementById('dlg-cal'); hacerSelectBuscable(sel); if(sel._sync) sel._sync(); }, 0);
+  const elegido = document.getElementById('dlg-cal');
+  const r = await p;
+  if(r !== 'ok') return;
+  const q = calidadesTela().find(x => x.clave === elegido.value); if(!q){ alert('Elija una tela.'); return; }
   fabricacion.vinculos[s] = { ...(fabricacion.vinculos[s] || {}), calidad: q.clave, tela: '', articulo: acArticulo };
   const e = tablaConsumo.empaque[acArticulo] || {};
   try{
@@ -8627,6 +8664,69 @@ async function confirmarMoverSkus(){
     alert(`Movidos a "${destino.nombre}".`);
   } catch(e){ err.textContent = 'No se pudo mover: ' + e.message; err.style.display = 'block'; }
 }
+
+// ===== Usabilidad: dialogo con botones, aviso de cambios sin guardar, buscador general =====
+// elegirOpcion('Titulo', 'texto', [{t:'Texto del boton', v:'valor', estilo:'rojo'|'gold'}]) -> valor o null
+function elegirOpcion(titulo, texto, opciones, extraHtml){
+  return new Promise(res => {
+    const m = document.getElementById('dlg-modal');
+    document.getElementById('dlg-tit').textContent = titulo;
+    document.getElementById('dlg-txt').textContent = texto || '';
+    document.getElementById('dlg-extra').innerHTML = extraHtml || '';
+    const est = e => e === 'rojo' ? 'background:#fff;color:#A6432F;border:1.5px solid #E3B8AE;' : e === 'gold' ? 'background:var(--gold);color:var(--purple);border:none;' : 'background:#fff;color:var(--purple);border:1.5px solid var(--line);';
+    document.getElementById('dlg-btns').innerHTML = [...opciones, { t: 'Cancelar', v: null }].map((o, i) => `<button type="button" data-i="${i}" style="padding:11px;border-radius:10px;font-size:0.92rem;font-weight:700;cursor:pointer;text-align:left;${o.v === null ? 'background:none;border:none;color:#8A8072;text-align:center;' : est(o.estilo)}">${o.t}</button>`).join('');
+    const todas = [...opciones, { v: null }];
+    document.querySelectorAll('#dlg-btns button').forEach(b => b.onclick = () => { m.style.display = 'none'; res(todas[+b.dataset.i].v); });
+    m.style.display = 'flex';
+  });
+}
+// cambios sin guardar por pantalla
+function cambiosSinGuardar(paso){
+  const n = o => o && Object.keys(o).length;
+  if(paso === 'step-articulos-cortes') return typeof empaquePendiente !== 'undefined' && empaquePendiente;
+  if(paso === 'step-telas') return typeof preciosPend !== 'undefined' && (n(preciosPend) || (typeof tcPend !== 'undefined' && tcPend !== null));
+  if(paso === 'step-stock') return typeof stockPend !== 'undefined' && n(stockPend);
+  if(paso === 'step-reventa') return typeof rvPend !== 'undefined' && n(rvPend);
+  return false;
+}
+window.addEventListener('beforeunload', e => { const a = document.querySelector('.step.active'); if(a && cambiosSinGuardar(a.id)){ e.preventDefault(); e.returnValue = ''; } });
+// buscador general
+async function abrirBuscador(){
+  document.getElementById('gb-modal').style.display = 'block';
+  const i = document.getElementById('gb-input'); i.value = ''; i.focus();
+  document.getElementById('gb-res').innerHTML = '<p class="note">Escriba al menos 2 letras.</p>';
+  try{
+    if(tablaConsumo === null) await cargarTablaConsumo();
+    if(telasDatos === null) await cargarTelas();
+    if(fabricacion === null) await cargarFabricacion();
+    if(typeof historialOT !== 'undefined' && !historialOT) await cargarHistorialOT();
+  } catch(e){}
+}
+function cerrarBuscador(){ document.getElementById('gb-modal').style.display = 'none'; }
+function buscarGeneral(v){
+  const q = normBusqueda(v), cont = document.getElementById('gb-res');
+  if(q.length < 2){ cont.innerHTML = '<p class="note">Escriba al menos 2 letras.</p>'; return; }
+  const ok = t => q.split(/\s+/).every(w => normBusqueda(t).includes(w));
+  const sec = [];
+  const prods = [];
+  CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(vv => { if(ok(`${vv.sku} ${p.nombre} ${vv.desc}`)) prods.push({ p, v: vv }); })));
+  if(prods.length) sec.push(['Catálogo', prods.slice(0, 8).map(x => [`🏷️`, `${x.v.sku} · ${x.p.nombre}`, x.v.desc, `gbIr('sku', ${JSON.stringify(String(x.v.sku)).replace(/"/g, '&quot;')})`])]);
+  const arts = (typeof articulosAC === 'function' && tablaConsumo ? articulosAC() : []).filter(a => ok(a));
+  if(arts.length) sec.push(['Artículos y cortes', arts.slice(0, 8).map(a => ['✂️', a, 'Abrir el artículo', `gbIr('art', ${JSON.stringify(a).replace(/"/g, '&quot;')})`])]);
+  const telas = telasDatos ? Object.entries(telasDatos.telas || {}).filter(([c, t]) => ok(`${c} ${t.nombre} ${t.proveedor || ''} ${t.color || ''}`)) : [];
+  if(telas.length) sec.push(['Telas', telas.slice(0, 8).map(([c, t]) => ['🧵', `${c} · ${t.nombre || ''}`, [t.color, t.ancho ? t.ancho + ' cm' : '', t.proveedor].filter(Boolean).join(' · '), `gbIr('tela', ${JSON.stringify(c).replace(/"/g, '&quot;')})`])]);
+  const ots = (typeof historialOT !== 'undefined' && historialOT ? historialOT : []).filter(o => ok(`${o.numero} ${o.taller} ${(o.renglones || []).map(r => r.articulo + ' ' + (r.sku || '')).join(' ')}`));
+  if(ots.length) sec.push(['Órdenes de trabajo', ots.slice(0, 6).map(o => ['📋', `${o.numero} · ${o.taller}`, new Date(o.fecha).toLocaleDateString('es-AR'), `gbIr('ot', ${JSON.stringify(o.numero).replace(/"/g, '&quot;')})`])]);
+  cont.innerHTML = sec.length ? sec.map(([t, items]) => `<div class="gb-sec">${t}</div>` + items.map(([ic, a, b, fn]) => `<div class="gb-item" onclick="${fn}"><span style="font-size:1.1rem;">${ic}</span><div><b>${escaparHtml(a)}</b><small>${escaparHtml(b || '')}</small></div></div>`).join('')).join('') : '<p class="note">No se encontró nada.</p>';
+}
+async function gbIr(tipo, valor){
+  cerrarBuscador();
+  if(tipo === 'sku'){ irACatalogoDesdeInicio(); const b = document.getElementById('buscador'); if(b){ b.value = valor; renderCatalogo(valor); } }
+  else if(tipo === 'art'){ await abrirArticulosCortes(); abrirArticuloAC(valor); }
+  else if(tipo === 'tela'){ await abrirTelas(); const b = document.getElementById('tl-buscar'); b.value = valor; renderTelas(); }
+  else if(tipo === 'ot'){ await abrirHistorialOT(); const b = document.getElementById('hot-buscador'); b.value = valor; renderHistorialOT(valor); }
+}
+document.addEventListener('keydown', e => { if(e.key === 'Escape'){ cerrarBuscador(); } });
 
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
@@ -16067,7 +16167,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v144';
+const APP_VERSION = '2026-10-02-v145';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
