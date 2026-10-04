@@ -1560,7 +1560,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v132</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v133</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2044,7 +2044,11 @@ a.grilla-celda{display:block;}
         <input type="text" id="rv-buscar" placeholder="🔍 Buscar producto o SKU" oninput="rvPagina=1; renderReventa()">
         <select id="rv-cat" onchange="rvPagina=1; renderReventa()"></select>
       </div>
-      <button type="button" class="btn-mini" style="margin-bottom:10px;" onclick="rvCompletarDesdeCatalogo()">✨ Completar los campos vacíos con lo que ya dice el catálogo</button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+        <button type="button" class="btn-mini" onclick="rvCompletarSabanas()">🛏️ Completar sábanas por SKU</button>
+        <button type="button" class="btn-mini" onclick="rvCompletarDesdeCatalogo()">✨ Completar los campos vacíos con lo que ya dice el catálogo</button>
+      </div>
+      <div id="rv-reglas" style="display:none;"></div>
       <div id="rv-masivo" style="display:none;"></div>
       <div id="rv-lista"><p class="empty-msg">Cargando...</p></div>
       <div class="rv-guardar" id="rv-guardar"><button type="button" onclick="guardarReventa()">💾 Guardar descripciones</button></div>
@@ -8291,6 +8295,69 @@ function rvCompletarDesdeCatalogo(){
   renderReventa(); rvMostrarGuardar();
   alert(n ? `Se completaron ${n} campos. Revíselos (y sume el contenido si hace falta) antes de guardar.` : 'No había campos vacíos para completar.');
 }
+// ----- sabanas: medida y contenido a partir del SKU (sin IA) -----
+// La medida sale del texto si ya la dice; si no, del ultimo numero del SKU, aprendiendo de los otros
+// SKU de la misma familia (las letras del principio) que si la dicen. El colchon, de una tabla estandar.
+const MEDIDAS_SABANA = {
+  '1': { nombre: '1 plaza', colchon: '80 × 190' }, '1½': { nombre: '1½ plaza', colchon: '90 × 190' }, 'Twin': { nombre: 'Twin', colchon: '100 × 200' },
+  '2½': { nombre: '2½ plazas', colchon: '140 × 190' }, 'Full': { nombre: 'Full', colchon: '140 × 190' }, 'Queen': { nombre: 'Queen', colchon: '160 × 200' },
+  'King': { nombre: 'King', colchon: '200 × 200' }, 'Super King': { nombre: 'Super King', colchon: '200 × 200' },
+};
+function talleSabanaDeTexto(t){
+  const s = normBusqueda(t);
+  if(/super\s*king/.test(s)) return 'Super King';
+  if(/\bking\b/.test(s)) return 'King';
+  if(/\bqueen\b/.test(s)) return 'Queen';
+  if(/\btwin\b/.test(s)) return 'Twin';
+  if(/\bfull\b/.test(s)) return 'Full';
+  if(/2\s*(½|1\/2)|2 1\/2|dos plazas|2\s*plazas/.test(s)) return '2½';
+  if(/1\s*(½|1\/2)|1 1\/2|plaza y media/.test(s)) return '1½';
+  if(/\b1 plaza\b/.test(s)) return '1';
+  return null;
+}
+function partesSku(s){ const m = String(s).toUpperCase().match(/^([A-Z]+)(\d+)([A-Z]*)$/); return m ? { fam: m[1], num: m[2], suf: m[3], dig: m[2].slice(-1) } : null; }
+function rvCompletarSabanas(){
+  const sab = productosReventa().filter(x => /sabana|sábana/i.test(x.cat));
+  // aprender, por familia, que talle corresponde a cada ultimo numero
+  const votos = {};
+  sab.forEach(({ p }) => p.variantes.forEach(v => { const ps = partesSku(v.sku), t = talleSabanaDeTexto(v.desc); if(!ps || !t) return; const k = ps.fam + '|' + ps.dig; votos[k] = votos[k] || {}; votos[k][t] = (votos[k][t] || 0) + 1; }));
+  const regla = {};
+  Object.entries(votos).forEach(([k, vs]) => { const orden = Object.entries(vs).sort((a, b) => b[1] - a[1]); if(orden.length === 1 || orden[0][1] >= 2 * orden[1][1]) regla[k] = orden[0][0]; });
+  let n = 0; const sinDato = [];
+  sab.forEach(({ p }) => {
+    const nombreP = normBusqueda(p.nombre);
+    const tipo = /ajustable/.test(nombreP) ? 'ajustable' : /funda de colchon/.test(nombreP) ? 'funda de colchón' : /cubrecolchon|cubre colchon/.test(nombreP) ? 'cubrecolchón' : 'juego';
+    p.variantes.forEach(v => {
+      const s = String(v.sku).toUpperCase(), d = String(v.desc || '');
+      if(rvDatoV(s, 'nombre') || rvDatoV(s, 'medida')) return;
+      const ps = partesSku(s);
+      const talle = talleSabanaDeTexto(d) || (ps ? regla[ps.fam + '|' + ps.dig] : null);
+      const mm = d.match(/(\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?(?:\s*[x×]\s*\d+(?:[.,]\d+)?)?)/i);
+      if(!talle && !mm){ sinDato.push(s); return; }
+      const info = talle ? MEDIDAS_SABANA[talle] : null;
+      const pref = { juego: 'Juego ', ajustable: 'Ajustable ', 'funda de colchón': 'Funda de colchón ', 'cubrecolchón': 'Cubrecolchón ' }[tipo] || '';
+      const nombre = info ? pref + info.nombre : '';
+      const medida = mm ? mm[1] : (info ? info.colchon : '');
+      let contenido = '';
+      if(tipo === 'juego' && info) contenido = (['1', '1½', 'Twin'].includes(talle) ? 'plana, ajustable y 1 funda' : 'plana, ajustable y 2 fundas');
+      const x = { ...(rvPend['v:' + s] || {}) };
+      if(nombre) x.nombre = nombre; if(medida) x.medida = medida; if(contenido && !rvDatoV(s, 'contenido')) x.contenido = contenido;
+      rvPend['v:' + s] = x; n++;
+    });
+  });
+  // mostrar lo que aprendio
+  const porFam = {};
+  Object.entries(regla).forEach(([k, t]) => { const [f, dg] = k.split('|'); (porFam[f] = porFam[f] || []).push(`${dg} = ${MEDIDAS_SABANA[t].nombre}`); });
+  const box = document.getElementById('rv-reglas');
+  box.style.display = 'block';
+  box.innerHTML = `<div style="background:#EEF3FB;border-radius:12px;padding:10px 12px;margin-bottom:10px;font-size:0.82rem;">
+    <b>🛏️ Lo que entendí de tus SKU de sábanas</b> (último número → medida):<br>
+    ${Object.entries(porFam).sort().map(([f, xs]) => `<span style="display:inline-block;margin:3px 10px 0 0;"><b>${escaparHtml(f)}</b>: ${escaparHtml(xs.sort().join(', '))}</span>`).join('')}
+    <div style="margin-top:6px;color:#6B6258;">Completé ${n} medidas. ${sinDato.length ? `Sin datos para deducir: ${escaparHtml(sinDato.slice(0, 15).join(', '))}${sinDato.length > 15 ? '…' : ''}.` : ''} Revise y toque el botón verde para guardar.</div></div>`;
+  document.getElementById('rv-cat').value = (CATALOGO.find(c => /sabana|sábana/i.test(c.categoria)) || {}).categoria || '';
+  rvPagina = 1; renderReventa(); rvMostrarGuardar();
+}
+
 function rvToggle(k, on){ if(on) rvSel.add(k); else rvSel.delete(k); renderReventa(); }
 function rvSeleccionarTodos(on){ (window.__rvVisibles || []).forEach(k => on ? rvSel.add(k) : rvSel.delete(k)); renderReventa(); }
 function renderReventaMasivo(){
@@ -15776,7 +15843,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v132';
+const APP_VERSION = '2026-10-02-v133';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
