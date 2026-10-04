@@ -436,6 +436,7 @@ a.grilla-celda{display:block;}
   <div class="menu-herramientas">
     <button class="menu-toggle" id="btn-atras" onclick="irAtras()" style="display:none;margin-right:6px;">← Volver</button>
     <button class="menu-toggle" onclick="irInicio()">🏠 Inicio</button>
+    <button class="menu-toggle" onclick="irInicio(); setTimeout(() => abrirGrupoInicio('i'), 50);" title="Configuración" style="margin-left:6px;">⚙️</button>
     <div class="menu-dropdown" id="menu-dropdown">
 
       <div class="menu-cat">
@@ -567,6 +568,14 @@ a.grilla-celda{display:block;}
       .ini-tile b{display:block;font-size:0.98rem;color:var(--purple);}
       .ini-tile span{display:block;font-size:0.75rem;color:#8A8072;margin-top:4px;line-height:1.35;}
       .ini-ext .ini-tile{background:#F3F8FD;}
+      #ini-t-a{grid-column:span 2;display:grid;grid-template-columns:auto auto;justify-content:center;align-items:center;column-gap:16px;text-align:left;}
+      #ini-t-a .ini-ic{font-size:3rem;margin:0;grid-row:1 / span 2;}
+      #ini-t-a b{font-size:1.2rem;align-self:end;}
+      #ini-t-a span{align-self:start;}
+      .ini-recientes{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 6px;}
+      .ini-recientes button{border:1px solid var(--line);background:#fff;border-radius:16px;padding:6px 12px;font-size:0.82rem;cursor:pointer;color:var(--purple);}
+      .ini-recientes button:hover{background:var(--gold);}
+      @media (max-width:560px){ #ini-t-a{grid-column:span 1;} }
       .ini-sub{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:12px;}
       .ini-sub-btns{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;}
       .ini-sub-btns button{text-align:left;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--cream);font-size:0.95rem;cursor:pointer;color:var(--purple);}
@@ -580,11 +589,12 @@ a.grilla-celda{display:block;}
       @media (max-width:640px){.ini-cols{grid-template-columns:1fr !important;}}
     </style>
     <div class="search-wrap"><input type="text" id="inicio-buscar" placeholder="Buscar producto o SKU..." oninput="buscarDesdeInicio(this.value)"></div>
+    <div id="ini-recientes-wrap" style="display:none;"><p class="ini-sec">LO ÚLTIMO QUE USASTE</p><div class="ini-recientes" id="ini-recientes"></div></div>
     <p class="ini-sec">PARA CLIENTES Y PÚBLICO</p>
-    <div class="ini-grid ini-ext"><div class="ini-tile" id="ini-t-a" onclick="abrirGrupoInicio('a')"><div class="ini-ic">🛒</div><b>Armar pedido</b><span>Catálogo, escanear SKU, buscar por foto</span></div><div class="ini-tile" id="ini-t-b" onclick="abrirGrupoInicio('b')"><div class="ini-ic">🔗</div><b>Compartir catálogo</b><span>Por rubro, enviar a clientes</span></div><div class="ini-tile" id="ini-t-c" onclick="abrirGrupoInicio('c')"><div class="ini-ic">📣</div><b>Redes y anuncios</b><span>Nuevo ingreso, grilla IG, promociones, videos</span></div></div>
+    <div class="ini-grid ini-ext"><div class="ini-tile" id="ini-t-a" onclick="abrirGrupoInicio('a')"><div class="ini-ic">🛒</div><b>Armar pedido</b><span>Catálogo, escanear SKU, buscar por foto</span></div><div class="ini-tile" id="ini-t-c" onclick="abrirGrupoInicio('c')"><div class="ini-ic">📣</div><b>Difusión</b><span>Compartir catálogo, enviar a clientes, redes, promociones, videos</span></div></div>
     <div class="ini-sub" id="ini-sub-ext" style="display:none;"></div>
     <p class="ini-sec">ADMINISTRACIÓN INTERNA</p>
-    <div class="ini-grid"><div class="ini-tile" id="ini-t-d" onclick="abrirGrupoInicio('d')"><div class="ini-ic">📋</div><b>Pedidos</b><span>Historial, pedido con IA, pendientes</span></div><div class="ini-tile" id="ini-t-e" onclick="abrirGrupoInicio('e')"><div class="ini-ic">👥</div><b>Clientes</b><span>Clientes, inactivos</span></div><div class="ini-tile" id="ini-t-f" onclick="abrirGrupoInicio('f')"><div class="ini-ic">🏷️</div><b>Productos y precios</b><span>Altas, edición, fotos, precios</span></div><div class="ini-tile" id="ini-t-g" onclick="abrirGrupoInicio('g')"><div class="ini-ic">✂️</div><b>Producción</b><span>Cortes, a medida, tela en talleres, órdenes</span></div><div class="ini-tile" id="ini-t-i" onclick="abrirGrupoInicio('i')"><div class="ini-ic">⚙️</div><b>Configuración</b><span>Banco, avisos, pantallas anteriores</span></div></div>
+    <div class="ini-grid"><div class="ini-tile" id="ini-t-d" onclick="abrirGrupoInicio('d')"><div class="ini-ic">🧾</div><b>Ventas</b><span>Pedidos, pedido con IA, pendientes, clientes</span></div><div class="ini-tile" id="ini-t-f" onclick="abrirGrupoInicio('f')"><div class="ini-ic">🏷️</div><b>Catálogo</b><span>Altas, edición, fotos, precios, aumentos</span></div><div class="ini-tile" id="ini-t-g" onclick="abrirGrupoInicio('g')"><div class="ini-ic">✂️</div><b>Producción</b><span>Telas, cortes, órdenes, talleres, stock</span></div></div>
     <div class="ini-sub" id="ini-sub-int" style="display:none;"></div>
   </div>
 
@@ -1550,7 +1560,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v130</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v131</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2424,6 +2434,7 @@ function mostrarPaso(id){
   }
   const ba = document.getElementById('btn-atras');
   if(ba) ba.style.display = id === 'step-inicio' ? 'none' : 'inline-block';
+  if(id === 'step-inicio') try{ pintarRecientesInicio(); } catch(e){}
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.getElementById('cartbar').style.display = (id === 'step-catalogo') ? 'flex' : 'none';
@@ -5389,11 +5400,9 @@ function aprovechamientoCorte(c, W){
 // nivel de opciones por icono. Ninguna funcion cambia, solo como se llega a cada una.
 const GRUPOS_INICIO = {
   a: { lado: 'ext', titulo: 'Armar pedido', items: [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['📷 Escanear etiqueta (SKU)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto').click()"], ['🤖 Buscar por foto (IA)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto-producto').click()"]] },
-  b: { lado: 'ext', titulo: 'Compartir catálogo', items: [['🔗 Compartir por rubro', 'abrirCompartirRubro()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()']] },
-  c: { lado: 'ext', titulo: 'Redes y anuncios', items: [['🖼️ Nuevo ingreso (flyers, video)', 'abrirNuevoIngreso()'], ['📱 Vista previa grilla IG', 'abrirGrilla()'], ['📣 Anuncios y promociones', 'abrirAnuncio()'], ['🎬 Compartir video de producto', 'abrirCompartirVideoProducto()']] },
-  d: { lado: 'int', titulo: 'Pedidos', items: [['📋 Historial de pedidos', 'abrirHistorial()'], ['🤖 Pedido con IA (texto libre)', 'abrirPedidoIA()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']] },
-  e: { lado: 'int', titulo: 'Clientes', items: [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
-  f: { lado: 'int', titulo: 'Productos y precios', items: [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📷 Actualizar foto', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
+  c: { lado: 'ext', titulo: 'Difusión', items: [['🔗 Compartir por rubro', 'abrirCompartirRubro()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()'], ['🖼️ Nuevo ingreso (flyers, video)', 'abrirNuevoIngreso()'], ['📱 Vista previa grilla IG', 'abrirGrilla()'], ['📣 Anuncios y promociones', 'abrirAnuncio()'], ['🎬 Compartir video de producto', 'abrirCompartirVideoProducto()']] },
+  d: { lado: 'int', titulo: 'Ventas', items: [['📋 Historial de pedidos', 'abrirHistorial()'], ['🤖 Pedido con IA (texto libre)', 'abrirPedidoIA()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()'], ['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
+  f: { lado: 'int', titulo: 'Catálogo', items: [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📷 Actualizar foto', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
   g: { lado: 'int', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas'], columnas: [
     [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()']],
     [['📊 Stock y prioridades', 'abrirStock()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()']],
@@ -5416,9 +5425,9 @@ function abrirGrupoInicio(k){
   ['ext', 'int'].forEach(l => document.getElementById('ini-sub-' + l).style.display = 'none');
   if(grupoInicioAbierto === k){ grupoInicioAbierto = null; return; }
   grupoInicioAbierto = k;
-  document.getElementById('ini-t-' + k).classList.add('sel');
+  const tl = document.getElementById('ini-t-' + k); if(tl) tl.classList.add('sel');
   const cont = document.getElementById('ini-sub-' + g.lado);
-  const boton = ([t, f]) => `<button type="button" onclick="${f.replace(/"/g, '&quot;')}">${t}</button>`;
+  const boton = ([t, f]) => { window.__iniItems = window.__iniItems || []; window.__iniItems.push([t, f]); return `<button type="button" onclick="usarItemInicio(${window.__iniItems.length - 1})">${t}</button>`; };
   cont.innerHTML = `<p style="margin:0 0 10px;font-weight:700;color:var(--purple);">${g.titulo}</p>` + (g.columnas
     ? `<div class="ini-cols" style="grid-template-columns:repeat(${g.columnas.length},minmax(0,1fr));">${g.columnas.map((col, ci) => `<div class="ini-col">${g.titulosColumnas ? `<div class="ini-col-tit">${g.titulosColumnas[ci]}</div>` : ''}${col.map(boton).join('')}</div>`).join('')}</div>`
     : `<div class="ini-sub-btns">${g.items.map(boton).join('')}</div>`);
@@ -8117,6 +8126,28 @@ async function anpGuardar(){
     renderProductosAC();
     renderListaAC();
   } catch(e){ err.textContent = 'No se pudo guardar: ' + e.message; err.style.display = 'block'; }
+}
+
+// ----- accesos a lo ultimo que se uso (en este equipo) -----
+function usarItemInicio(i){
+  const it = (window.__iniItems || [])[i]; if(!it) return;
+  registrarUsoInicio(it[0], it[1]);
+  try{ (new Function(it[1]))(); } catch(e){ console.error(e); }
+}
+function registrarUsoInicio(t, f){
+  try{
+    let l = JSON.parse(localStorage.getItem('ot_recientes') || '[]').filter(x => x.t !== t);
+    l.unshift({ t, f }); localStorage.setItem('ot_recientes', JSON.stringify(l.slice(0, 5)));
+  } catch(e){}
+}
+function pintarRecientesInicio(){
+  let l = [];
+  try{ l = JSON.parse(localStorage.getItem('ot_recientes') || '[]'); } catch(e){}
+  const wrap = document.getElementById('ini-recientes-wrap'); if(!wrap) return;
+  if(!l.length){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  window.__iniItems = window.__iniItems || [];
+  document.getElementById('ini-recientes').innerHTML = l.map(x => { window.__iniItems.push([x.t, x.f]); return `<button type="button" onclick="usarItemInicio(${window.__iniItems.length - 1})">${escaparHtml(x.t)}</button>`; }).join('');
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -15558,7 +15589,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v130';
+const APP_VERSION = '2026-10-02-v131';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
