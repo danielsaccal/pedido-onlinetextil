@@ -1577,7 +1577,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v151</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v152</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1896,7 +1896,7 @@ a.grilla-celda{display:block;}
   </div>
   <div id="pub-modal" style="display:none;position:fixed;inset:0;background:rgba(30,20,40,.45);z-index:9999;overflow-y:auto;padding:20px 10px;">
     <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;padding:16px 18px;box-shadow:0 10px 40px rgba(0,0,0,.25);">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><b style="font-size:1.1rem;color:var(--purple);">📸 Publicar en el catálogo</b><button type="button" onclick="cerrarPublicar()" style="border:none;background:none;font-size:1.3rem;cursor:pointer;color:#8A8072;">✕</button></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><b id="pub-titulo" style="font-size:1.1rem;color:var(--purple);">📸 Publicar en el catálogo</b><button type="button" onclick="cerrarPublicar()" style="border:1px solid var(--line);border-radius:10px;background:#fff;font-size:0.9rem;cursor:pointer;color:var(--purple);padding:6px 12px;">✕ Cerrar</button></div>
       <div id="pub-cont"></div>
     </div>
   </div>
@@ -2508,7 +2508,12 @@ function volverUnPaso(){
   navVolviendo = true;
   try{ mostrarPaso(prev || 'step-inicio'); } finally { navVolviendo = false; }
 }
-window.addEventListener('popstate', () => volverUnPaso());
+window.addEventListener('popstate', () => {
+  const m = document.getElementById('pub-modal');
+  if(m && m.style.display === 'block'){ delete m.dataset.hist; cerrarPublicar(); return; }
+  const d = document.getElementById('dlg-modal'); if(d && d.style.display === 'flex'){ d.style.display = 'none'; return; }
+  volverUnPaso();
+});
 function mostrarPaso(id){
   const actual = document.querySelector('.step.active');
   if(actual && actual.id !== id && typeof cambiosSinGuardar === 'function' && cambiosSinGuardar(actual.id) && !confirm('Hay cambios sin guardar en esta pantalla. ¿Salir igual? (se pierden)')){ if(navVolviendo) try{ history.pushState({ paso: actual.id }, ''); navStack.push(id); } catch(e){} return false; }
@@ -7685,7 +7690,13 @@ function cambioProductoPublicar(){
   document.getElementById('pub-nuevo').style.display = nuevo ? 'block' : 'none';
   document.getElementById('pub-foto-lbl').textContent = nuevo ? 'Foto del producto' : 'Foto (opcional: reemplaza la del producto)';
 }
-function cerrarPublicar(){ document.getElementById('pub-modal').style.display = 'none'; pubSku = null; }
+function cerrarPublicar(){ document.getElementById('pub-modal').style.display = 'none'; pubSku = null; const t = document.getElementById('pub-titulo'); if(t) t.textContent = '📸 Publicar en el catálogo'; }
+// el boton "atras" del celular cierra la ventana abierta en vez de cambiar de pantalla
+new MutationObserver(() => {
+  const m = document.getElementById('pub-modal');
+  if(m && m.style.display === 'block' && !m.dataset.hist){ m.dataset.hist = '1'; try{ history.pushState({ modal: 1 }, ''); } catch(e){} }
+  if(m && m.style.display !== 'block' && m.dataset.hist){ delete m.dataset.hist; }
+}).observe(document.getElementById('pub-modal'), { attributes: true, attributeFilter: ['style'] });
 async function confirmarPublicar(){
   const err = document.getElementById('pub-error'); err.style.display = 'none';
   const cat = document.getElementById('pub-cat').value, sel = document.getElementById('pub-prod').value;
@@ -8890,6 +8901,7 @@ async function abrirAsistenteOT(){
   // se abre al instante; los datos se cargan en paralelo y se repinta cuando llegan
   asOT = { paso: 1, taller: '', envioId: null, tela: '', metros: '', comprobante: '', prods: [{ articulo: '', cantidad: '' }] };
   document.getElementById('pub-modal').style.display = 'block';
+  document.getElementById('pub-titulo').textContent = '📋 Nueva orden de trabajo';
   if(talleresLista === null){ document.getElementById('pub-cont').innerHTML = '<p class="empty-msg">Cargando talleres…</p>'; await cargarTalleres(); }
   pintarAsistenteOT();
   Promise.all([
@@ -8907,7 +8919,8 @@ function pintarAsistenteOT(){
   if(a.paso === 1){
     c.innerHTML = asPasos(1) + `<b style="font-size:1.1rem;color:var(--purple);">1. ¿A qué taller?</b>
       <div style="display:grid;gap:8px;margin-top:10px;">${talleresLista.map(t => { const n = (enviosTela || []).filter(e => e.taller === t && !e.cerrado && e.metros - asignadoEnvio(e._id) > 0.5).length; return bigBtn(escaparHtml(t), n ? `${n} tela${n === 1 ? '' : 's'} sin orden` : '', `asElegirTaller(${talleresLista.indexOf(t)})`, a.taller === t); }).join('')}</div>
-      <p class="note" style="text-align:left;margin-top:10px;">¿Otro taller? Agregalo en ⚙️ Configuración → Listas y opciones. <a href="#" onclick="event.preventDefault(); cerrarPublicar(); abrirOrdenTrabajo();">Usar el formulario completo</a> · <span style="opacity:.6;">${APP_VERSION.slice(-4)}</span></p>`;
+      <p class="note" style="text-align:left;margin-top:10px;">¿Otro taller? Agregalo en ⚙️ Configuración → Listas y opciones. <a href="#" onclick="event.preventDefault(); cerrarPublicar(); abrirOrdenTrabajo();">Usar el formulario completo</a> · <span style="opacity:.6;">${APP_VERSION.slice(-4)}</span></p>
+      <button class="btn btn-ghost" style="margin-top:10px;" onclick="cerrarPublicar()">← Volver</button>`;
   } else if(a.paso === 2){
     if(enviosTela === null || historialOT === null){ c.innerHTML = asPasos(2) + '<p class="empty-msg">Buscando las telas del taller…</p>'; return; }
     const libres = (enviosTela || []).filter(e => e.taller === a.taller && !e.cerrado).map(e => ({ e, resto: Math.round((e.metros - asignadoEnvio(e._id)) * 100) / 100 })).filter(x => x.resto > 0.5);
@@ -16442,7 +16455,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v151';
+const APP_VERSION = '2026-10-02-v152';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
