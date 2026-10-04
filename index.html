@@ -1560,7 +1560,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v135</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v136</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1648,6 +1648,7 @@ a.grilla-celda{display:block;}
           <div id="ac-lista" style="max-height:60vh;overflow-y:auto;"></div>
           <div style="display:flex;gap:6px;margin-top:8px;">
             <button type="button" class="btn-mini" style="flex:1;" onclick="nuevoArticuloAC()">+ Nuevo artículo</button>
+            <button type="button" class="btn-mini" style="flex:1;" onclick="abrirGeneradorFundaColchon()">🛏️ Funda de colchón</button>
             <button type="button" class="btn-mini" style="flex:1;" onclick="verDuplicadosAC()">🧹 Duplicados</button>
           </div>
           <div id="ac-duplicados"></div>
@@ -3837,6 +3838,7 @@ function dibujarBosquejoCorte(anchoTela, piezas, sobrantePara){
         if(it.sobrante) ctx.setLineDash([4,3]);
         ctx.strokeRect(x, y, w, h);
         ctx.setLineDash([]);
+        if(!it.sobrante && it.p.fc) dibujarPlieguesFunda(ctx, x, y, w, h, it.p, col.p.girada);
         const chico = w < 90;
         ctx.font = (chico ? 'bold 10px' : 'bold 13px') + ' Arial';
         ctx.fillText(it.p.nombre, x + w/2, y + h/2 - 6, w - 4);
@@ -4539,6 +4541,7 @@ function agregarPiezaAC(p){
   const fila = document.createElement('div');
   fila.className = 'ac-pieza';
   if(p.achicar === false) fila.dataset.fija = '1';
+  if(p.fc) fila.dataset.fc = JSON.stringify(p.fc);
   fila.style.cssText = 'display:grid;grid-template-columns:minmax(0,1.8fr) 62px 62px 46px 46px 34px 26px;gap:5px;margin-bottom:5px;align-items:center;';
   fila.innerHTML = `
     <input type="text" class="ac-p-nombre" value="${escapeAttr(p.nombre||'')}" placeholder="Plana" oninput="calcularAC()">
@@ -4560,6 +4563,7 @@ function leerPiezasAC(){
     partes: Math.max(1, parseInt(f.querySelector('.ac-p-tapas').value, 10) || 1),
     girar: f.querySelector('.ac-p-girar').checked,
     ...(f.dataset.fija ? { achicar: false } : {}),
+    ...(f.dataset.fc ? { fc: JSON.parse(f.dataset.fc) } : {}),
   })).filter(p => p.nombre || p.ancho || p.largo);
 }
 
@@ -8357,6 +8361,72 @@ async function guardarReventa(){
     try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
     alert('Descripciones guardadas en el catálogo.');
   } catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+
+// ----- funda de colchon tipo bolsa: una pieza = (largo + 2 alto + costura) x (2 x (ancho + alto) + costura) -----
+function piezaFundaColchon(a, l, h, c){
+  c = c > 0 ? c : 10;
+  return { nombre: 'Funda de colchón', ancho: Math.round((l + 2 * h + c) * 10) / 10, largo: Math.round((2 * (a + h) + c) * 10) / 10, cantidad: 1, partes: 1, girar: false, fc: { a, l, h, c } };
+}
+// lineas de doblez: a lo ancho las puntas (alto) y a lo largo arriba / costado / abajo / costado
+function dibujarPlieguesFunda(ctx, x, y, w, hh, p, girada){
+  const { a, h: alto, c } = p.fc;
+  if(girada) return;
+  const ky = hh / p.largo, kx = w / p.ancho;
+  ctx.save(); ctx.strokeStyle = '#3D2B4E'; ctx.setLineDash([6, 4]); ctx.lineWidth = 1;
+  const px = (alto + c / 2) * kx;
+  [x + px, x + w - px].forEach(xx => { ctx.beginPath(); ctx.moveTo(xx, y); ctx.lineTo(xx, y + hh); ctx.stroke(); });
+  const cortes = [a, a + alto, 2 * a + alto, 2 * a + 2 * alto];
+  cortes.forEach(v => { const yy = y + v * ky; ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x + w, yy); ctx.stroke(); });
+  ctx.setLineDash([]); ctx.fillStyle = '#3D2B4E'; ctx.font = '10px Arial'; ctx.textAlign = 'center';
+  const mid = x + w / 2;
+  [['Cara de arriba · ' + a, a / 2], ['Costado · ' + alto, a + alto / 2], ['Cara de abajo · ' + a, a + alto + a / 2], ['Costado · ' + alto, 2 * a + alto + alto / 2]].forEach(([t, v]) => ctx.fillText(t, mid, y + v * ky + (v === a / 2 ? 14 : 4)));
+  ctx.restore();
+}
+// generador: crea (o actualiza) el articulo con solo las medidas del colchon
+function abrirGeneradorFundaColchon(){
+  document.getElementById('pub-cont').innerHTML = `
+    <p class="note" style="text-align:left;margin:0 0 10px;">Funda de colchón tipo bolsa, de una sola pieza. Ponga las medidas del colchón y la app arma la pieza, el bosquejo con los dobleces y el consumo.</p>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;">
+      <div class="field" style="margin:0;"><label>Ancho</label><input id="fc-a" type="number" placeholder="80" oninput="fcPrevia()"></div>
+      <div class="field" style="margin:0;"><label>Largo</label><input id="fc-l" type="number" placeholder="190" oninput="fcPrevia()"></div>
+      <div class="field" style="margin:0;"><label>Alto</label><input id="fc-h" type="number" placeholder="20" oninput="fcPrevia()"></div>
+      <div class="field" style="margin:0;"><label>Costura</label><input id="fc-c" type="number" value="10" oninput="fcPrevia()"></div>
+    </div>
+    <div id="fc-prev" style="margin-top:10px;"></div>
+    <p class="error" id="pub-error" style="display:none;"></p>
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="fcCrear()">Crear artículo</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`;
+  document.getElementById('pub-modal').style.display = 'block';
+  document.getElementById('fc-a').focus();
+}
+function fcLeer(){ const v = id => parseFloat(document.getElementById(id).value); return { a: v('fc-a'), l: v('fc-l'), h: v('fc-h'), c: v('fc-c') || 10 }; }
+function fcPrevia(){
+  const { a, l, h, c } = fcLeer(), cont = document.getElementById('fc-prev');
+  if(!(a > 0 && l > 0 && h > 0)){ cont.innerHTML = ''; return; }
+  const pz = piezaFundaColchon(a, l, h, c);
+  const anchos = anchosConocidos().filter(w => w >= pz.ancho - Math.max(10, pz.ancho * 0.05));
+  const W = anchos.length ? anchos[0] : anchosConocidos().slice(-1)[0];
+  const k = calcularCorte([pz], W);
+  cont.innerHTML = `<div style="display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;align-items:center;background:var(--cream);border-radius:10px;padding:8px;">
+    <img src="${dibujarBosquejoCorte(W, [pz])}" onclick="verImagenGrandeAC(this.src)" style="width:150px;background:#fff;border:1px solid var(--line);border-radius:6px;cursor:zoom-in;">
+    <div style="font-size:0.85rem;"><b>Pieza ${fmtCm(pz.ancho)} × ${fmtCm(pz.largo)} cm</b><br>Tela de ${W} cm: <b>${fmtMetros(k.metros)} m por funda</b>${k.avisos.length ? `<br><span style="color:#A6432F;">${escaparHtml(k.avisos.join(' '))}</span>` : ''}<br><span class="note">Se crea como "Funda de colchón ${a}x${l}x${h}".</span></div></div>`;
+}
+async function fcCrear(){
+  const { a, l, h, c } = fcLeer(), err = document.getElementById('pub-error');
+  if(!(a > 0 && l > 0 && h > 0)){ err.textContent = 'Complete ancho, largo y alto del colchón.'; err.style.display = 'block'; return; }
+  const pz = piezaFundaColchon(a, l, h, c);
+  const nombre = `Funda de colchón ${a}x${l}x${h}`;
+  const anchos = anchosConocidos().filter(w => w >= pz.ancho - Math.max(10, pz.ancho * 0.05));
+  const W = anchos.length ? anchos[0] : anchosConocidos().slice(-1)[0];
+  const k = calcularCorte([pz], W);
+  if(tablaConsumo.instrucciones[nombre] && !confirm(`Ya existe "${nombre}". ¿Reemplazar sus medidas?`)) return;
+  tablaConsumo.articulos = tablaConsumo.articulos || {};
+  tablaConsumo.articulos[nombre] = { ...(tablaConsumo.articulos[nombre] || {}), [W]: k.metros };
+  tablaConsumo.instrucciones[nombre] = { [W]: { texto: textoCorte(nombre, [pz], W, ''), bosquejoBase64: '', piezas: [pz], tipo: 'personalizado', consumo: k.metros, guardado: Date.now() } };
+  tablaConsumo.empaque = tablaConsumo.empaque || {};
+  tablaConsumo.empaque[nombre] = { ...(tablaConsumo.empaque[nombre] || {}), colchon: `${a} × ${l} × ${h}` };
+  try{ await guardarTablaYConsumo(); cerrarPublicar(); renderListaAC(); abrirArticuloAC(nombre); }
+  catch(e){ err.textContent = 'No se pudo guardar: ' + e.message; err.style.display = 'block'; }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -15798,7 +15868,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v135';
+const APP_VERSION = '2026-10-02-v136';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
