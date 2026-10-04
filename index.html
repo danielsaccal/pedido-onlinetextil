@@ -1577,7 +1577,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v148</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v149</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2204,6 +2204,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 // los campos vacios (undefined) se ignoran al guardar en vez de dar error
 try{ db.settings({ ignoreUndefinedProperties: true }); } catch(e){ console.warn('settings firestore', e); }
+try{ db.enablePersistence({ synchronizeTabs: true }).catch(() => {}); } catch(e){}
 
 async function guardarPedidoEnHistorial(orden){
   try{
@@ -8864,9 +8865,9 @@ function ponerAyudas(raiz){
   });
 }
 window.addEventListener('load', () => {
-  ponerAyudas();
   let pend = false;
-  new MutationObserver(() => { if(pend) return; pend = true; requestAnimationFrame(() => { pend = false; ponerAyudas(); }); }).observe(document.body, { childList: true, subtree: true });
+  const zonas = () => [document.querySelector('.step.active'), document.getElementById('pub-modal'), document.getElementById('dlg-modal')].filter(Boolean);
+  new MutationObserver(() => { if(pend) return; pend = true; setTimeout(() => { pend = false; zonas().forEach(z => { if(z.offsetParent !== null || z.style.display === 'block' || z.style.display === 'flex') ponerAyudas(z); }); }, 250); }).observe(document.body, { childList: true, subtree: true });
 });
 
 function abrirGlosario(){
@@ -8973,6 +8974,28 @@ function entregoTodoRenglon(docId, i){
 function entregoTodoTaller(){
   document.querySelectorAll('.it-b').forEach(el => { const o = (historialOT || []).find(x => x._docId === el.dataset.o); if(o) el.value = pendienteRenglon(o.renglones[+el.dataset.i]); });
 }
+
+// ===== Velocidad: lo que se cargo hace poco no se vuelve a pedir al servidor =====
+const RECIENTE_MS = 120000;
+const cargadoEn = {};
+function conCache(nombreFn, getDato){
+  const orig = window[nombreFn]; if(typeof orig !== 'function') return;
+  window[nombreFn] = async function(forzar){
+    const d = getDato();
+    if(!forzar && d && cargadoEn[nombreFn] && Date.now() - cargadoEn[nombreFn] < RECIENTE_MS) return;
+    await orig.apply(this, arguments);
+    cargadoEn[nombreFn] = Date.now();
+  };
+}
+window.addEventListener('DOMContentLoaded', () => {
+  conCache('cargarHistorialOT', () => historialOT);
+  conCache('cargarEnviosTela', () => enviosTela);
+  conCache('cargarTalleres', () => talleresLista);
+  conCache('cargarStock', () => stockDatos);
+  conCache('cargarReventa', () => reventaDatos);
+  conCache('cargarAvios', () => aviosDatos);
+  conCache('cargarTelas', () => telasDatos);
+});
 
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
@@ -16413,7 +16436,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v148';
+const APP_VERSION = '2026-10-02-v149';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
