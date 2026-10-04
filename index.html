@@ -1560,7 +1560,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v137</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v138</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6831,6 +6831,12 @@ function descripcionVarianteFab(sku){
   const colchonTxt = colchon ? `${String(colchon).replace(/\s*[x×]\s*/gi, ' × ').replace(/\s*cm$/i, '')} cm` : '';
   const esJuego = /juego/i.test(nombreArt) || piezas.some(p => /ajustable/i.test(p.nombre)) && piezas.some(p => /plana/i.test(p.nombre));
   // una ajustable sola: lo que importa es para que colchon es
+  // funda de colchon: lo que importa es para que colchon es (la pieza es la medida de corte de la bolsa)
+  if(!esJuego && (piezas.some(p => p.fc) || /funda/i.test(nombreArt) && /colch/i.test(nombreArt))){
+    const fc = (piezas.find(p => p.fc) || {}).fc;
+    const col = colchonTxt || (fc ? `${fc.a} × ${fc.l} × ${fc.h} cm` : '');
+    return col ? `${titulo} — Para colchón ${col}` : null;
+  }
   if(!esJuego && (/ajustable/i.test(nombreArt) || (piezas.length === 1 && /ajustable/i.test(piezas[0].nombre)))){
     return `${titulo} — ${colchonTxt ? 'Para colchón ' + colchonTxt : md(piezas[0])}`;
   }
@@ -15880,7 +15886,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v137';
+const APP_VERSION = '2026-10-02-v138';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
