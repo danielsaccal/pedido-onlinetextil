@@ -1577,7 +1577,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v150</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v151</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -8887,14 +8887,17 @@ function abrirGlosario(){
 // ===== Asistente de orden de trabajo (paso a paso) =====
 let asOT = null;
 async function abrirAsistenteOT(){
-  if(talleresLista === null) await cargarTalleres();
-  if(tablaConsumo === null) await cargarTablaConsumo();
-  if(telasDatos === null) await cargarTelas();
-  if(fabricacion === null) await cargarFabricacion();
-  try{ await Promise.all([cargarEnviosTela(), historialOT ? null : cargarHistorialOT()]); } catch(e){}
+  // se abre al instante; los datos se cargan en paralelo y se repinta cuando llegan
   asOT = { paso: 1, taller: '', envioId: null, tela: '', metros: '', comprobante: '', prods: [{ articulo: '', cantidad: '' }] };
   document.getElementById('pub-modal').style.display = 'block';
+  if(talleresLista === null){ document.getElementById('pub-cont').innerHTML = '<p class="empty-msg">Cargando talleres…</p>'; await cargarTalleres(); }
   pintarAsistenteOT();
+  Promise.all([
+    tablaConsumo === null ? cargarTablaConsumo() : null,
+    telasDatos === null ? cargarTelas() : null,
+    fabricacion === null ? cargarFabricacion() : null,
+    cargarEnviosTela(), historialOT ? null : cargarHistorialOT(),
+  ].map(p => Promise.resolve(p).catch(() => {}))).then(() => { if(asOT && document.getElementById('pub-modal').style.display === 'block' && asOT.paso <= 2) pintarAsistenteOT(); });
 }
 function asPasos(n){ return `<div style="display:flex;gap:4px;margin-bottom:12px;">${[1, 2, 3, 4].map(i => `<div style="flex:1;height:5px;border-radius:3px;background:${i <= n ? 'var(--purple)' : '#E8E2EF'};"></div>`).join('')}</div>`; }
 function pintarAsistenteOT(){
@@ -8904,8 +8907,9 @@ function pintarAsistenteOT(){
   if(a.paso === 1){
     c.innerHTML = asPasos(1) + `<b style="font-size:1.1rem;color:var(--purple);">1. ¿A qué taller?</b>
       <div style="display:grid;gap:8px;margin-top:10px;">${talleresLista.map(t => { const n = (enviosTela || []).filter(e => e.taller === t && !e.cerrado && e.metros - asignadoEnvio(e._id) > 0.5).length; return bigBtn(escaparHtml(t), n ? `${n} tela${n === 1 ? '' : 's'} sin orden` : '', `asElegirTaller(${talleresLista.indexOf(t)})`, a.taller === t); }).join('')}</div>
-      <p class="note" style="text-align:left;margin-top:10px;">¿Otro taller? Agregalo en ⚙️ Configuración → Listas y opciones. <a href="#" onclick="event.preventDefault(); cerrarPublicar(); abrirOrdenTrabajo();">Usar el formulario completo</a></p>`;
+      <p class="note" style="text-align:left;margin-top:10px;">¿Otro taller? Agregalo en ⚙️ Configuración → Listas y opciones. <a href="#" onclick="event.preventDefault(); cerrarPublicar(); abrirOrdenTrabajo();">Usar el formulario completo</a> · <span style="opacity:.6;">${APP_VERSION.slice(-4)}</span></p>`;
   } else if(a.paso === 2){
+    if(enviosTela === null || historialOT === null){ c.innerHTML = asPasos(2) + '<p class="empty-msg">Buscando las telas del taller…</p>'; return; }
     const libres = (enviosTela || []).filter(e => e.taller === a.taller && !e.cerrado).map(e => ({ e, resto: Math.round((e.metros - asignadoEnvio(e._id)) * 100) / 100 })).filter(x => x.resto > 0.5);
     c.innerHTML = asPasos(2) + `<b style="font-size:1.1rem;color:var(--purple);">2. ¿Con qué tela?</b> <span class="note">(${escaparHtml(a.taller)})</span>
       <div style="display:grid;gap:8px;margin-top:10px;">${libres.map(({ e, resto }) => bigBtn(`${escaparHtml(e.skuTela)} · ${fmtCm(resto)} m`, `enviada ${new Date(String(e.fecha).slice(0, 10) + 'T12:00:00').toLocaleDateString('es-AR')}${e.comprobante ? ' · ' + escaparHtml(e.comprobante) : ''}`, `asElegirEnvio('${e._id}', ${resto})`, a.envioId === e._id)).join('')}
@@ -8934,8 +8938,8 @@ function pintarAsistenteOT(){
       <p class="note" style="text-align:left;margin-top:8px;">Se abre la orden con todo cargado para que la generes.</p>` + pie(true, 'asCrearOT()', '📋 Armar la orden');
   }
 }
-function asElegirTaller(i){ asOT.taller = talleresLista[i]; asOT.paso = 2; pintarAsistenteOT(); }
-function asElegirEnvio(id, resto){ const e = (enviosTela || []).find(x => x._id === id); if(!e) return; asOT.envioId = id; asOT.tela = e.skuTela; asOT.metros = String(resto); asOT.paso = 3; pintarAsistenteOT(); }
+function asElegirTaller(i){ asOT.taller = talleresLista[i]; asOT.paso = 2; pintarAsistenteOT(); document.getElementById('pub-modal').scrollTop = 0; }
+function asElegirEnvio(id, resto){ const e = (enviosTela || []).find(x => x._id === id); if(!e) return; asOT.envioId = id; asOT.tela = e.skuTela; asOT.metros = String(resto); asOT.paso = 3; pintarAsistenteOT(); document.getElementById('pub-modal').scrollTop = 0; }
 function asTelaOtra(){
   const t = document.getElementById('as-tela').value.trim().toUpperCase(), m = document.getElementById('as-metros').value;
   if(!t || !(+m > 0)){ alert('Complete el código de tela y los metros.'); return; }
@@ -16438,7 +16442,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v150';
+const APP_VERSION = '2026-10-02-v151';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
