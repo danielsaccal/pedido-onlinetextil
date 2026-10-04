@@ -1560,7 +1560,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v139</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v141</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1665,6 +1665,11 @@ a.grilla-celda{display:block;}
               </span>
             </div>
             <p class="note" id="ac-origen" style="margin:0 0 6px;"></p>
+            <div id="ac-resumen" style="margin-bottom:12px;"></div>
+            <div id="ac-productos" style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;background:#fff;"></div>
+            <details id="ac-mas" style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:12px;background:#FBFAF7;">
+              <summary style="cursor:pointer;font-weight:700;color:var(--purple);">Ver más: piezas, anchos, confección y empaque</summary>
+              <div style="margin-top:10px;">
             <div id="ac-variantes"></div>
             <div style="display:grid;grid-template-columns:minmax(0,1.8fr) 62px 62px 46px 46px 34px 26px;gap:5px;font-size:0.72rem;color:#8A8072;margin-bottom:3px;">
               <span>Pieza</span><span>Ancho</span><span>Largo</span><span>Cant.</span><span>Tapas</span><span title="Se puede girar si ahorra tela">Girar</span><span></span>
@@ -1679,7 +1684,7 @@ a.grilla-celda{display:block;}
             <div id="ac-consumos" style="margin-bottom:8px;"></div>
             <div id="ac-corte" style="margin-bottom:10px;"></div>
             <input type="text" id="ac-nota" placeholder="Nota para el taller (opcional)" oninput="calcularAC()" style="margin-bottom:10px;">
-            <div id="ac-productos" style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;background:#fff;"></div>
+
             <div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                 <span style="font-size:0.85rem;color:var(--purple);font-weight:700;">🧵 Confección y empaque <span style="font-weight:400;color:#8A8072;font-size:0.75rem;">(vale para todos los productos de este artículo)</span> <span id="ac-empaque-ok" style="color:#3D7A3D;"></span></span>
@@ -1712,8 +1717,10 @@ a.grilla-celda{display:block;}
             </div>
             <div class="actions">
               <button class="btn btn-gold" onclick="guardarAC()">Guardar</button>
-              <button class="btn btn-ghost" onclick="ordenDesdeAC()">📋 Orden de trabajo</button>
             </div>
+              </div>
+            </details>
+            <button class="btn btn-ghost" style="width:100%;" onclick="ordenDesdeAC()">📋 Orden de trabajo</button>
             <p class="error" id="ac-error" style="display:none;"></p>
           </div>
         </div>
@@ -1889,6 +1896,7 @@ a.grilla-celda{display:block;}
         <button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="abrirNuevoProductoFab()">➕ Nuevo producto</button>
         <button type="button" class="btn-mini" onclick="actualizarTodasDescripciones()">✨ Actualizar todas las descripciones del catálogo</button>
       </div>
+      <style>.pf-simple .pf-det{display:none;}</style>
       <div id="pf-masivo" style="display:none;"></div>
       <div id="pf-lista"><p class="empty-msg">Cargando...</p></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
@@ -4521,6 +4529,7 @@ function abrirArticuloAC(a, piezasForzadas){
   if(a !== acArticulo){ if(empaquePendiente) cargarTablaConsumo(); limpiarEmpaquePendiente(); }
   acArticulo = a;
   empaqueOriginalAC = JSON.parse(JSON.stringify(((tablaConsumo && tablaConsumo.empaque) || {})[a] || {}));
+  setTimeout(() => { const d = document.getElementById('ac-mas'); if(d) d.open = !juegosDePiezasAC(a).length; const r = document.getElementById('ac-resumen'); if(r && !juegosDePiezasAC(a).length) r.innerHTML = '<p class="note" style="text-align:left;">Este artículo todavía no tiene piezas: cárguelas en "Ver más".</p>'; }, 0);
   acAnchoVista = null;
   renderListaAC();
   const grupos = juegosDePiezasAC(a);
@@ -4615,6 +4624,17 @@ function calcularAC(anchoElegido){
   }).join('');
   if(!acAnchoVista){ corteEl.innerHTML = '<p class="note" style="color:#A6432F;">Estas piezas no entran en ninguno de sus anchos de tela.</p>'; return; }
   const img = dibujarBosquejoCorte(acAnchoVista, piezas);
+  const resEl = document.getElementById('ac-resumen');
+  if(resEl){
+    const r = validas.find(x => x.W === acAnchoVista);
+    resEl.innerHTML = `<div style="display:grid;grid-template-columns:130px minmax(0,1fr);gap:12px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;">
+      <img src="${img}" onclick="verImagenGrandeAC(this.src)" title="Ver grande" style="width:130px;border:1px solid var(--line);border-radius:8px;cursor:zoom-in;background:#fff;">
+      <div style="font-size:0.9rem;color:#5A4F44;line-height:1.5;">
+        <b style="color:var(--purple);font-size:1rem;">${mejor && mejor.W === acAnchoVista ? '⭐ Mejor ancho' : 'Ancho elegido'}: ${acAnchoVista} cm · ${fmtMetros(r ? r.c.metros : 0)} m</b><br>
+        <span style="font-size:0.8rem;">${escaparHtml(textoCorteCorto(piezas, acAnchoVista))}</span><br>
+        <a href="#" onclick="event.preventDefault(); document.getElementById('ac-mas').open = true; document.getElementById('ac-consumos').scrollIntoView({behavior:'smooth', block:'center'});" style="font-size:0.78rem;">ver otros anchos</a>
+      </div></div>`;
+  }
   corteEl.innerHTML = `
     <div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px;align-items:start;">
       <img src="${img}" onclick="verImagenGrandeAC(this.src)" title="Ver grande" style="width:110px;border:1px solid var(--line);border-radius:8px;cursor:zoom-in;background:#fff;">
@@ -6947,8 +6967,9 @@ function renderProductosFabrico(){
   if(!filas.length){ cont.innerHTML = `<p class="empty-msg">${todas.length ? 'No hay productos que coincidan.' : 'Todavía no vinculaste productos con fabricación. Se hace desde Artículos y cortes (SKU + calidad de tela) o desde Editar producto (🏭 Fabricación propia).'}</p>`; return; }
   let prodPrev = null;
   const nombreArt = a => a ? (a.startsWith('ficha:') ? nombreFicha(a.slice(6)) : a) : '';
-  cont.innerHTML = `<div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;"><table style="width:100%;border-collapse:collapse;font-size:0.86rem;">
-    <thead><tr style="background:var(--cream);"><th style="padding:7px 4px 7px 8px;width:24px;"><input type="checkbox" title="Seleccionar todos los de la lista" onchange="pfSeleccionarTodos(this.checked)" ${filas.length && filas.every(f => pfSel.has(f.sku)) ? 'checked' : ''}></th><th style="padding:7px 8px;text-align:left;">SKU</th><th style="padding:7px 8px;text-align:left;">Medida / variante</th><th style="padding:7px 8px;text-align:left;">Se corta como</th><th style="padding:7px 8px;text-align:left;">Calidad de tela</th><th style="padding:7px 8px;text-align:right;">Costo</th><th style="padding:7px 8px;text-align:right;">Precio de lista</th><th style="padding:7px 8px;text-align:right;">Margen</th><th style="padding:7px 8px;text-align:center;">Estado</th></tr></thead><tbody>
+  cont.innerHTML = `<label style="display:inline-flex;gap:6px;align-items:center;font-size:0.82rem;color:#6B6258;margin-bottom:8px;cursor:pointer;"><input type="checkbox" ${pfDetalle ? 'checked' : ''} onchange="pfDetalle=this.checked; renderProductosFabrico();"> Ver detalle (artículo, tela, costo, precio y margen)</label>
+    <div class="${pfDetalle ? '' : 'pf-simple'}" style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;"><table style="width:100%;border-collapse:collapse;font-size:0.86rem;">
+    <thead><tr style="background:var(--cream);"><th style="padding:7px 4px 7px 8px;width:24px;"><input type="checkbox" title="Seleccionar todos los de la lista" onchange="pfSeleccionarTodos(this.checked)" ${filas.length && filas.every(f => pfSel.has(f.sku)) ? 'checked' : ''}></th><th style="padding:7px 8px;text-align:left;">SKU</th><th style="padding:7px 8px;text-align:left;">Medida / variante</th><th class="pf-det" style="padding:7px 8px;text-align:left;">Se corta como</th><th class="pf-det" style="padding:7px 8px;text-align:left;">Calidad de tela</th><th class="pf-det" style="padding:7px 8px;text-align:right;">Costo</th><th class="pf-det" style="padding:7px 8px;text-align:right;">Precio de lista</th><th class="pf-det" style="padding:7px 8px;text-align:right;">Margen</th><th style="padding:7px 8px;text-align:center;">Estado</th></tr></thead><tbody>
     ${filas.map(f => {
       let cab = '';
       if(f.producto !== prodPrev){
@@ -6960,18 +6981,18 @@ function renderProductosFabrico(){
         <td style="padding:7px 4px 7px 8px;"><input type="checkbox" ${pfSel.has(f.sku) ? 'checked' : ''} onchange="pfToggle('${escapeAttr(f.sku)}', this.checked)"></td>
         <td style="padding:7px 8px;"><b>${escaparHtml(f.sku)}</b></td>
         <td style="padding:7px 8px;font-size:0.8rem;">${escaparHtml(f.desc || '—')}</td>
-        <td style="padding:7px 8px;">${f.articulo ? `<a href="#" onclick="event.preventDefault(); abrirArticulosCortes().then(() => abrirArticuloAC('${escapeAttr(f.articulo)}'))">${escaparHtml(nombreArt(f.articulo))}</a>` : '<span style="color:#A6432F;">falta</span>'}</td>
-        <td style="padding:7px 8px;font-size:0.8rem;">${f.calidad ? escaparHtml(f.calidad) + `<br><span class="note" style="font-size:0.72rem;">${escaparHtml(f.telas.join(', '))}</span>` : '<span style="color:#A6432F;">falta</span>'}</td>
+        <td class="pf-det" style="padding:7px 8px;">${f.articulo ? `<a href="#" onclick="event.preventDefault(); abrirArticulosCortes().then(() => abrirArticuloAC('${escapeAttr(f.articulo)}'))">${escaparHtml(nombreArt(f.articulo))}</a>` : '<span style="color:#A6432F;">falta</span>'}</td>
+        <td class="pf-det" style="padding:7px 8px;font-size:0.8rem;">${f.calidad ? escaparHtml(f.calidad) + `<br><span class="note" style="font-size:0.72rem;">${escaparHtml(f.telas.join(', '))}</span>` : '<span style="color:#A6432F;">falta</span>'}</td>
         ${(() => {
           const c = costosDeSku(f.sku), x = c && c.porTela.find(y => y.total != null);
           const r = buscarProductoPorSku(f.sku), v = r && r.variante, pr = v ? parsePrice(v.precio) : null;
           const costo = x ? x.total : null;
           const mg = costo != null && pr ? (pr - costo) / pr : null;
-          return `<td style="padding:7px 8px;text-align:right;white-space:nowrap;" title="${escapeAttr(textoCostoSku(f.sku))}">${costo != null ? '$ ' + formatoPesos(Math.round(costo)) : '<span class="note">—</span>'}</td>
-            <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${pr ? '$ ' + formatoPesos(Math.round(pr)) : '—'}</td>
-            <td style="padding:7px 8px;text-align:right;white-space:nowrap;font-weight:700;color:${mg == null ? '#8A8072' : mg < 0.2 ? '#A6432F' : mg < 0.4 ? '#8A6417' : '#2F7A47'};">${mg != null ? Math.round(mg * 100) + ' %' : '—'}</td>`;
+          return `<td class="pf-det" style="padding:7px 8px;text-align:right;white-space:nowrap;" title="${escapeAttr(textoCostoSku(f.sku))}">${costo != null ? '$ ' + formatoPesos(Math.round(costo)) : '<span class="note">—</span>'}</td>
+            <td class="pf-det" style="padding:7px 8px;text-align:right;white-space:nowrap;">${pr ? '$ ' + formatoPesos(Math.round(pr)) : '—'}</td>
+            <td class="pf-det" style="padding:7px 8px;text-align:right;white-space:nowrap;font-weight:700;color:${mg == null ? '#8A8072' : mg < 0.2 ? '#A6432F' : mg < 0.4 ? '#8A6417' : '#2F7A47'};">${mg != null ? Math.round(mg * 100) + ' %' : '—'}</td>`;
         })()}
-        <td style="padding:7px 8px;text-align:center;">${ok ? '✅' : '⚠️'}</td></tr>`;
+        <td style="padding:7px 8px;text-align:center;white-space:nowrap;">${ok ? '✅' : `<button type="button" class="btn-mini" onclick="completarSkuPf('${escapeAttr(f.sku)}')">⚠️ Completar</button>`}</td></tr>`;
     }).join('')}</tbody></table></div>
     <p class="note" style="margin-top:6px;">Costo = tela (con la tela más barata de su calidad) + confección + insumos. Margen sobre el precio de lista: rojo menos de 20 %, amarillo menos de 40 %. Aparecen los productos del catálogo marcados como fabricación propia. Para completar lo que falta: Artículos y cortes (SKU y calidad) o Editar producto (🏭 Fabricación propia).</p>`;
 }
@@ -8040,10 +8061,10 @@ async function renderProductosAC(){
         </div></div></div>`;
   };
   cont.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px;">
-      <b style="color:var(--purple);">🏷️ Productos que se hacen con este artículo</b><span class="note" style="margin:0;">uno por cada tela</span></div>
+      <b style="color:var(--purple);">🏷️ SKU de este artículo</b><span class="note" style="margin:0;">uno por cada tela</span></div>
     ${skus.length ? skus.map(tarjeta).join('') : '<p class="note" style="text-align:left;">Todavía no hay productos con este artículo.</p>'}
     <div id="ac-np-form"></div>
-    <button type="button" id="ac-np-btn" onclick="formNuevoProductoAC()" style="width:100%;padding:10px;border-radius:10px;border:1.5px dashed #B9AFC6;background:transparent;font-size:0.92rem;cursor:pointer;color:var(--purple);">➕ Nuevo producto con este artículo</button>`;
+    <button type="button" id="ac-np-btn" onclick="formNuevoProductoAC()" style="width:100%;padding:10px;border-radius:10px;border:1.5px dashed #B9AFC6;background:transparent;font-size:0.92rem;cursor:pointer;color:var(--purple);">➕ Agregar nuevo SKU</button>`;
 }
 async function cambiarTelaProductoAC(s){
   const opciones = calidadesTela();
@@ -8077,7 +8098,7 @@ function formNuevoProductoAC(){
   document.getElementById('ac-np-btn').style.display = 'none';
   const cats = CATALOGO.map(c => c.categoria);
   f.innerHTML = `<div style="border:2px solid var(--purple);border-radius:12px;padding:12px;margin-bottom:8px;">
-    <b style="color:var(--purple);">➕ Nuevo producto con "${escaparHtml(acArticulo)}"</b>
+    <b style="color:var(--purple);">➕ Nuevo SKU de "${escaparHtml(acArticulo)}"</b>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:8px;">
       <div class="field" style="margin:0;"><label>SKU</label><input id="anp-sku" placeholder="ej: MAG200" style="text-transform:uppercase;" oninput="anpSugerir()"></div>
       <div class="field" style="margin:0;"><label>Tela</label><select id="anp-cal" onchange="anpSugerir()">${opcionesCalidad('')}</select></div>
@@ -8445,6 +8466,31 @@ async function fcCrear(){
   tablaConsumo.empaque[nombre] = { ...(tablaConsumo.empaque[nombre] || {}), colchon: `${a} × ${l} × ${h}` };
   try{ await guardarTablaYConsumo(); cerrarPublicar(); renderListaAC(); abrirArticuloAC(nombre); }
   catch(e){ err.textContent = 'No se pudo guardar: ' + e.message; err.style.display = 'block'; }
+}
+
+// ----- Productos que fabrico: vista simple y "Completar" de a un dato -----
+let pfDetalle = false;
+function completarSkuPf(sku){
+  const S = String(sku).toUpperCase();
+  const art = articuloDeSku(S) || '', cal = calidadDeSku(S) || '';
+  const arts = articulosAC().sort((a, b) => a.localeCompare(b, 'es'));
+  document.getElementById('pub-cont').innerHTML = `
+    <p style="margin:0 0 10px;font-weight:700;color:var(--purple);">Completar ${escaparHtml(S)}</p>
+    <div class="field"><label>1. ¿Con qué artículo se corta?</label><select id="cs-art"><option value="">Elegir…</option>${arts.map(a => `<option value="${escapeAttr(a)}" ${a === art ? 'selected' : ''}>${escaparHtml(a)}</option>`).join('')}</select></div>
+    <div class="field"><label>2. ¿Con qué tela se hace?</label><select id="cs-cal">${opcionesCalidad(cal)}</select></div>
+    <p class="error" id="pub-error" style="display:none;"></p>
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="guardarCompletarSku('${escapeAttr(S)}')">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`;
+  ['cs-art', 'cs-cal'].forEach(id => { const s = document.getElementById(id); hacerSelectBuscable(s); if(s._sync) s._sync(); });
+  document.getElementById('pub-modal').style.display = 'block';
+}
+async function guardarCompletarSku(S){
+  const art = document.getElementById('cs-art').value, cal = document.getElementById('cs-cal').value, err = document.getElementById('pub-error');
+  if(!art || !cal){ err.textContent = 'Elija el artículo y la tela.'; err.style.display = 'block'; return; }
+  try{
+    fabricacion.vinculos[S] = { ...(fabricacion.vinculos[S] || {}), articulo: art, calidad: cal, tela: '' };
+    await guardarFabricacion();
+    cerrarPublicar(); renderProductosFabrico(); sincronizarDescripcionesCatalogo();
+  } catch(e){ err.textContent = 'No se pudo guardar: ' + e.message; err.style.display = 'block'; }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -15886,7 +15932,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v139';
+const APP_VERSION = '2026-10-02-v141';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
