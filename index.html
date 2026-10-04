@@ -573,6 +573,8 @@ a.grilla-celda{display:block;}
       .ini-sub-btns button:hover{background:var(--gold);}
       .ini-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:start;}
       .ini-col{display:flex;flex-direction:column;gap:8px;}
+      .ini-col-tit{font-size:0.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#8A8072;padding:0 2px 2px;border-bottom:2px solid var(--gold);margin-bottom:2px;}
+      .ini-col button{font-size:0.88rem;}
       .ini-col button{text-align:left;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--cream);font-size:0.95rem;cursor:pointer;color:var(--purple);}
       .ini-col button:hover{background:var(--gold);}
       @media (max-width:640px){.ini-cols{grid-template-columns:1fr !important;}}
@@ -1548,7 +1550,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v129</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v130</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5392,11 +5394,12 @@ const GRUPOS_INICIO = {
   d: { lado: 'int', titulo: 'Pedidos', items: [['📋 Historial de pedidos', 'abrirHistorial()'], ['🤖 Pedido con IA (texto libre)', 'abrirPedidoIA()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']] },
   e: { lado: 'int', titulo: 'Clientes', items: [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
   f: { lado: 'int', titulo: 'Productos y precios', items: [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📷 Actualizar foto', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
-  g: { lado: 'int', titulo: 'Producción', columnas: [
+  g: { lado: 'int', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas'], columnas: [
     [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()']],
-    [['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🚚 Ingreso a los talleres', 'abrirEnviosTela()']],
-    [['📊 Stock y prioridades', 'abrirStock()'], ['🏭 Productos en producción', 'abrirEnProduccion()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📦 Historial de órdenes', 'abrirHistorialOT()'], ['🔎 ¿Cuándo hice este SKU?', 'abrirHistorialSku()']],
-    [['📥 Entregas del taller', 'abrirIngresoTaller()'], ['🗂️ Historial de entregas', 'abrirHistorialEntregas()']],
+    [['📊 Stock y prioridades', 'abrirStock()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()']],
+    [['🚚 Ingreso a los talleres', 'abrirEnviosTela()'], ['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🏭 Productos en producción', 'abrirEnProduccion()']],
+    [['📥 Entregas del taller', 'abrirIngresoTaller()']],
+    [['📦 Historial de órdenes', 'abrirHistorialOT()'], ['🗂️ Historial de entregas', 'abrirHistorialEntregas()'], ['🔎 ¿Cuándo hice este SKU?', 'abrirHistorialSku()']],
   ] },
   h: { lado: 'int', titulo: 'Finanzas', items: [['💰 Ventas Mercado Libre', 'abrirVentasML()'], ['🧮 Calculadora de costos', 'abrirCalculadoraCostos()']] },
   i: { lado: 'int', titulo: 'Configuración', items: [['📝 Listas y opciones', 'abrirListas()'], ['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['🔔 Avisos push', 'abrirConfigPush()'], ['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']] },
@@ -5417,7 +5420,7 @@ function abrirGrupoInicio(k){
   const cont = document.getElementById('ini-sub-' + g.lado);
   const boton = ([t, f]) => `<button type="button" onclick="${f.replace(/"/g, '&quot;')}">${t}</button>`;
   cont.innerHTML = `<p style="margin:0 0 10px;font-weight:700;color:var(--purple);">${g.titulo}</p>` + (g.columnas
-    ? `<div class="ini-cols" style="grid-template-columns:repeat(${g.columnas.length},minmax(0,1fr));">${g.columnas.map(col => `<div class="ini-col">${col.map(boton).join('')}</div>`).join('')}</div>`
+    ? `<div class="ini-cols" style="grid-template-columns:repeat(${g.columnas.length},minmax(0,1fr));">${g.columnas.map((col, ci) => `<div class="ini-col">${g.titulosColumnas ? `<div class="ini-col-tit">${g.titulosColumnas[ci]}</div>` : ''}${col.map(boton).join('')}</div>`).join('')}</div>`
     : `<div class="ini-sub-btns">${g.items.map(boton).join('')}</div>`);
   cont.style.display = 'block';
   if(window.innerWidth < 700) cont.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -15555,7 +15558,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v129';
+const APP_VERSION = '2026-10-02-v130';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
