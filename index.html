@@ -1560,7 +1560,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v134</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v135</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2027,6 +2027,7 @@ a.grilla-celda{display:block;}
       .rv-campos{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;padding:8px 12px;}
       .rv-campos label{display:flex;flex-direction:column;font-size:0.68rem;color:#8A8072;gap:2px;}
       .rv-campos input{padding:7px 8px;border:1px solid var(--line);border-radius:8px;font-size:0.86rem;}
+      .rv-var.sel{background:#F3EEF7;}
       .rv-var{display:grid;grid-template-columns:80px minmax(0,1fr) minmax(0,1fr) minmax(0,1.3fr);gap:6px;padding:6px 12px;border-top:1px dashed var(--line);align-items:end;}
       .rv-var label{display:flex;flex-direction:column;font-size:0.66rem;color:#8A8072;gap:2px;}
       .rv-var input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:0.84rem;min-width:0;}
@@ -8193,7 +8194,7 @@ function pintarRecientesInicio(){
 // Por producto: material/composicion y marca -> subtitulo. Por medida: nombre corto, medida y contenido ->
 // "Nombre — medida / contenido" (mismo formato que lo fabricado). config/reventa guarda esos datos.
 let reventaDatos = null, rvPagina = 1;
-const rvPend = {}, rvSel = new Set();
+const rvPend = {}, rvSel = new Set(), rvSelV = new Set();
 async function cargarReventa(){
   try{ const d = await db.collection('config').doc('reventa').get(); reventaDatos = d.exists ? d.data() : {}; } catch(e){ reventaDatos = reventaDatos || {}; }
   reventaDatos.productos = reventaDatos.productos || {}; reventaDatos.variantes = reventaDatos.variantes || {};
@@ -8236,7 +8237,10 @@ function renderReventa(){
   const cont = document.getElementById('rv-lista');
   if(!todas.length){ cont.innerHTML = '<p class="empty-msg">No hay productos de reventa con ese filtro.</p>'; return; }
   const inp = (val, ph, on) => `<input value="${escapeAttr(val)}" placeholder="${escapeAttr(ph)}" oninput="${on}">`;
-  cont.innerHTML = `<label style="display:inline-flex;gap:6px;align-items:center;font-size:0.8rem;color:#6B6258;margin-bottom:8px;cursor:pointer;"><input type="checkbox" onchange="rvSeleccionarTodos(this.checked)"> Seleccionar todos (${todas.length}) para cargar datos juntos</label>` +
+  window.__rvSkusVisibles = todas.flatMap(x => x.p.variantes.map(v => String(v.sku).toUpperCase()));
+  cont.innerHTML = `<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;font-size:0.8rem;color:#6B6258;">
+      <label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;"><input type="checkbox" onchange="rvSeleccionarTodos(this.checked)"> Todos los productos (${todas.length}): material y marca</label>
+      <label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;"><input type="checkbox" onchange="rvSeleccionarTodosV(this.checked)"> Todos los SKU (${window.__rvSkusVisibles.length}): medida y contenido</label></div>` +
   lista.map(({ p, cat }) => {
     const k = p._editKey, sub = rvSubtitulo(p);
     const img = p.imagen || '';
@@ -8249,8 +8253,8 @@ function renderReventa(){
         <label>Marca / línea${inp(rvDatoP(p, 'marca'), 'ej: Lexington, Arcoíris', `rvCambiarP('${escapeAttr(k)}', 'marca', this.value)`)}</label>
       </div>
       <div class="rv-prev sub" id="rv-sub-${escapeAttr(k)}">${sub ? 'Subtítulo: ' + escaparHtml(sub) : ''}</div>
-      ${p.variantes.map(v => { const s = String(v.sku).toUpperCase(), d = rvDesc(s); return `<div class="rv-var">
-        <div class="sku">${escaparHtml(s)}</div>
+      ${p.variantes.map(v => { const s = String(v.sku).toUpperCase(), d = rvDesc(s); return `<div class="rv-var${rvSelV.has(s) ? ' sel' : ''}">
+        <div class="sku"><label style="flex-direction:row;align-items:center;gap:5px;font-size:0.82rem;color:var(--text);cursor:pointer;"><input type="checkbox" ${rvSelV.has(s) ? 'checked' : ''} onchange="rvToggleV('${escapeAttr(s)}', this.checked)" style="width:auto;padding:0;"> ${escaparHtml(s)}</label></div>
         <label>Nombre corto${inp(rvDatoV(s, 'nombre'), 'ej: 2½ plazas, King', `rvCambiarV('${escapeAttr(s)}', 'nombre', this.value)`)}</label>
         <label>Medida (cm)${inp(rvDatoV(s, 'medida'), 'ej: 140 × 190', `rvCambiarV('${escapeAttr(s)}', 'medida', this.value)`)}</label>
         <label>Contenido / detalle${inp(rvDatoV(s, 'contenido'), 'ej: plana, ajustable y 2 fundas', `rvCambiarV('${escapeAttr(s)}', 'contenido', this.value)`)}</label>
@@ -8293,11 +8297,29 @@ function rvCompletarDesdeCatalogo(){
 }
 function rvToggle(k, on){ if(on) rvSel.add(k); else rvSel.delete(k); renderReventa(); }
 function rvSeleccionarTodos(on){ (window.__rvVisibles || []).forEach(k => on ? rvSel.add(k) : rvSel.delete(k)); renderReventa(); }
+function rvToggleV(s, on){ if(on) rvSelV.add(s); else rvSelV.delete(s); renderReventa(); }
+function rvSeleccionarTodosV(on){ (window.__rvSkusVisibles || []).forEach(s => on ? rvSelV.add(s) : rvSelV.delete(s)); renderReventa(); }
+function rvAplicarMasivoV(){
+  const n = document.getElementById('rvv-nom').value.trim(), m = document.getElementById('rvv-med').value.trim(), c = document.getElementById('rvv-con').value.trim();
+  if(!n && !m && !c){ alert('Complete al menos un dato.'); return; }
+  rvSelV.forEach(s => { const x = { ...(rvPend['v:' + s] || {}) }; if(n) x.nombre = n; if(m) x.medida = m; if(c) x.contenido = c; rvPend['v:' + s] = x; });
+  rvSelV.clear(); renderReventa(); rvMostrarGuardar();
+}
 function renderReventaMasivo(){
   const c = document.getElementById('rv-masivo');
-  if(!rvSel.size){ c.style.display = 'none'; c.innerHTML = ''; return; }
+  const pv = rvSelV.size ? `<div style="background:#EEF3FB;border:1px solid #C9D8EC;border-radius:12px;padding:10px 12px;margin-bottom:10px;">
+    <b>✏️ ${rvSelV.size} SKU seleccionado${rvSelV.size === 1 ? '' : 's'}</b> <a href="#" onclick="event.preventDefault(); rvSelV.clear(); renderReventa();" style="font-size:0.8rem;margin-left:8px;">Quitar selección</a>
+    <div style="font-size:0.75rem;color:#6B6258;margin:2px 0 6px;">Complete solo lo que quiera poner igual en todos. Lo vacío no se toca.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px;">
+      <input id="rvv-nom" placeholder="Nombre corto (ej: 2½ plazas)" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
+      <input id="rvv-med" placeholder="Medida (ej: 140 × 190 × 30)" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
+      <input id="rvv-con" placeholder="Contenido (ej: plana, ajustable y 2 fundas)" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
+      <button type="button" class="btn-mini" onclick="rvAplicarMasivoV()">Poner a los ${rvSelV.size} SKU</button>
+    </div></div>` : '';
+  if(!rvSel.size && !rvSelV.size){ c.style.display = 'none'; c.innerHTML = ''; return; }
   c.style.display = 'block';
-  c.innerHTML = `<div style="background:#F3EEF7;border:1px solid #D9CCE6;border-radius:12px;padding:10px 12px;margin-bottom:10px;">
+  if(!rvSel.size){ c.innerHTML = pv; return; }
+  c.innerHTML = pv + `<div style="background:#F3EEF7;border:1px solid #D9CCE6;border-radius:12px;padding:10px 12px;margin-bottom:10px;">
     <b>✏️ ${rvSel.size} producto${rvSel.size === 1 ? '' : 's'} seleccionado${rvSel.size === 1 ? '' : 's'}</b> <a href="#" onclick="event.preventDefault(); rvSel.clear(); renderReventa();" style="font-size:0.8rem;margin-left:8px;">Quitar selección</a>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px;margin-top:6px;">
       <input id="rvm-mat" placeholder="Material / composición" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
@@ -15776,7 +15798,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v134';
+const APP_VERSION = '2026-10-02-v135';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
