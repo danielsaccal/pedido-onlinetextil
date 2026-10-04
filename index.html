@@ -1577,7 +1577,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v152</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v153</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -8928,10 +8928,12 @@ function pintarAsistenteOT(){
       <div style="display:grid;gap:8px;margin-top:10px;">${libres.map(({ e, resto }) => bigBtn(`${escaparHtml(e.skuTela)} · ${fmtCm(resto)} m`, `enviada ${new Date(String(e.fecha).slice(0, 10) + 'T12:00:00').toLocaleDateString('es-AR')}${e.comprobante ? ' · ' + escaparHtml(e.comprobante) : ''}`, `asElegirEnvio('${e._id}', ${resto})`, a.envioId === e._id)).join('')}
       ${bigBtn('Otra tela', 'Escribir código y metros', `asOT.envioId='__otra__'; pintarAsistenteOT()`, a.envioId === '__otra__')}</div>
       ${a.envioId === '__otra__' ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
-        <div class="field" style="margin:0;"><label>Código de tela</label><input id="as-tela" list="lista-telas" value="${escapeAttr(a.tela)}" style="text-transform:uppercase;"></div>
+        <div class="field" style="margin:0;grid-column:1 / -1;"><label>Tela</label><select id="as-tela-sel"><option value="">Buscar tela…</option>${Object.entries((telasDatos && telasDatos.telas) || {}).sort((x, y) => x[0].localeCompare(y[0])).map(([c, t]) => `<option value="${escapeAttr(c)}" ${c === a.tela ? 'selected' : ''}>${escaparHtml(c)} · ${escaparHtml(t.nombre || '')}${t.color ? ' ' + escaparHtml(t.color) : ''}${t.ancho ? ' · ' + t.ancho + ' cm' : ''}</option>`).join('')}</select></div>
+        <div class="field" style="margin:0;"><label>¿No está? Código nuevo</label><input id="as-tela" value="" placeholder="ej: MAC300B" style="text-transform:uppercase;"></div>
         <div class="field" style="margin:0;"><label>Metros</label><input id="as-metros" type="number" value="${escapeAttr(a.metros)}"></div>
         <div class="field" style="margin:0;grid-column:1 / -1;"><label>Comprobante (opcional)</label><input id="as-comp" value="${escapeAttr(a.comprobante)}"></div></div>` : ''}`
       + pie(true, a.envioId === '__otra__' ? 'asTelaOtra()' : '', 'Siguiente →');
+    const st = document.getElementById('as-tela-sel'); if(st){ hacerSelectBuscable(st); if(st._sync) st._sync(); }
   } else if(a.paso === 3){
     const arts = articulosAC().sort((x, y) => x.localeCompare(y, 'es'));
     c.innerHTML = asPasos(3) + `<b style="font-size:1.1rem;color:var(--purple);">3. ¿Qué hay que fabricar?</b> <span class="note">(${escaparHtml(a.tela)})</span>
@@ -8954,7 +8956,7 @@ function pintarAsistenteOT(){
 function asElegirTaller(i){ asOT.taller = talleresLista[i]; asOT.paso = 2; pintarAsistenteOT(); document.getElementById('pub-modal').scrollTop = 0; }
 function asElegirEnvio(id, resto){ const e = (enviosTela || []).find(x => x._id === id); if(!e) return; asOT.envioId = id; asOT.tela = e.skuTela; asOT.metros = String(resto); asOT.paso = 3; pintarAsistenteOT(); document.getElementById('pub-modal').scrollTop = 0; }
 function asTelaOtra(){
-  const t = document.getElementById('as-tela').value.trim().toUpperCase(), m = document.getElementById('as-metros').value;
+  const t = (document.getElementById('as-tela').value.trim() || (document.getElementById('as-tela-sel') || {}).value || '').toUpperCase(), m = document.getElementById('as-metros').value;
   if(!t || !(+m > 0)){ alert('Complete el código de tela y los metros.'); return; }
   asOT.tela = t; asOT.metros = m; asOT.comprobante = document.getElementById('as-comp').value.trim(); asOT.paso = 3; pintarAsistenteOT();
 }
@@ -16455,7 +16457,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v152';
+const APP_VERSION = '2026-10-02-v153';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
