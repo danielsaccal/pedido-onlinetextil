@@ -1577,7 +1577,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v147</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v148</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5508,7 +5508,7 @@ const GRUPOS_INICIO = {
   f: { lado: 'int', titulo: 'Catálogo', items: [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['📷 Actualizar foto', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
   g: { lado: 'int', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas'], columnas: [
     [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()']],
-    [['📊 Stock y prioridades', 'abrirStock()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📋 Nueva orden de trabajo', 'abrirOrdenTrabajo()']],
+    [['📊 Stock y prioridades', 'abrirStock()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📋 Nueva orden de trabajo', 'abrirAsistenteOT()']],
     [['🚚 Ingreso a los talleres', 'abrirEnviosTela()'], ['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🏭 Productos en producción', 'abrirEnProduccion()']],
     [['📥 Entregas del taller', 'abrirIngresoTaller()']],
     [['📦 Historial de órdenes', 'abrirHistorialOT()'], ['🗂️ Historial de entregas', 'abrirHistorialEntregas()'], ['🔎 ¿Cuándo hice este SKU?', 'abrirHistorialSku()']],
@@ -5712,7 +5712,7 @@ function renderIngresoTaller(){
   const ords = (historialOT || []).filter(o => o.taller === t && !o.cerrada && (o.renglones || []).some(r => pendienteRenglon(r) > 0));
   if(!ords.length){ cont.innerHTML = '<p class="empty-msg">Este taller no tiene nada pendiente de entregar.</p>'; return; }
   const metrosPend = ords.reduce((s, o) => s + (o.renglones || []).reduce((a, r) => a + pendienteRenglon(r) * (+r.consumo || 0), 0), 0);
-  cont.innerHTML = `<p class="note" style="margin:0 0 8px;">Pendiente en ${escaparHtml(t)}: ≈ ${fmtCm(Math.round(metrosPend))} m de tela por fabricar.</p>` + ords.map(o => `
+  cont.innerHTML = `<p class="note" style="margin:0 0 8px;">Pendiente en ${escaparHtml(t)}: ≈ ${fmtCm(Math.round(metrosPend))} m de tela por fabricar.</p><button type="button" class="btn-mini" style="margin-bottom:8px;" onclick="entregoTodoTaller()">✓ Entregó todo lo pendiente</button>` + ords.map(o => `
     <div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;">
       <b>${escaparHtml(o.numero)}</b> <span class="note">· ${escaparHtml(o.skuTela || '')}</span>
       <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.88rem;margin-top:6px;">
@@ -5720,7 +5720,7 @@ function renderIngresoTaller(){
         <tbody>${(o.renglones || []).map((r, i) => pendienteRenglon(r) > 0 ? `<tr style="border-top:1px solid var(--line);">
           <td style="padding:4px;">${escaparHtml(r.articulo)}${r.sku ? `<br><span class="note" style="font-size:0.72rem;">${escaparHtml(r.sku)}</span>` : ''}</td>
           <td style="padding:4px;text-align:center;font-weight:700;">${pendienteRenglon(r)}</td>
-          <td style="padding:4px;text-align:center;"><input type="number" min="0" class="it-b" data-o="${o._docId}" data-i="${i}" style="width:70px;"></td>
+          <td style="padding:4px;text-align:center;white-space:nowrap;"><input type="number" min="0" class="it-b" data-o="${o._docId}" data-i="${i}" style="width:70px;"> <button type="button" class="btn-mini" title="Entregó todo lo pendiente" onclick="entregoTodoRenglon('${o._docId}', ${i})">✓ todo</button></td>
           <td style="padding:4px;text-align:center;"><input type="number" min="0" class="it-f" data-o="${o._docId}" data-i="${i}" style="width:70px;"></td></tr>` : '').join('')}</tbody>
       </table></div>
     </div>`).join('');
@@ -8881,6 +8881,97 @@ function abrirGlosario(){
     ['Reventa', 'Productos que comprás hechos y no fabricás.'],
   ];
   elegirOpcion('📖 Palabras de la app', '', [], `<div style="display:grid;gap:8px;margin-bottom:10px;">${items.map(([a, b]) => `<div><b style="color:var(--purple);">${a}</b><div style="font-size:0.85rem;color:#5A4F44;">${b}</div></div>`).join('')}</div>`);
+}
+
+// ===== Asistente de orden de trabajo (paso a paso) =====
+let asOT = null;
+async function abrirAsistenteOT(){
+  if(talleresLista === null) await cargarTalleres();
+  if(tablaConsumo === null) await cargarTablaConsumo();
+  if(telasDatos === null) await cargarTelas();
+  if(fabricacion === null) await cargarFabricacion();
+  try{ await Promise.all([cargarEnviosTela(), historialOT ? null : cargarHistorialOT()]); } catch(e){}
+  asOT = { paso: 1, taller: '', envioId: null, tela: '', metros: '', comprobante: '', prods: [{ articulo: '', cantidad: '' }] };
+  document.getElementById('pub-modal').style.display = 'block';
+  pintarAsistenteOT();
+}
+function asPasos(n){ return `<div style="display:flex;gap:4px;margin-bottom:12px;">${[1, 2, 3, 4].map(i => `<div style="flex:1;height:5px;border-radius:3px;background:${i <= n ? 'var(--purple)' : '#E8E2EF'};"></div>`).join('')}</div>`; }
+function pintarAsistenteOT(){
+  const c = document.getElementById('pub-cont'), a = asOT;
+  const pie = (atras, sig, txtSig) => `<div style="display:flex;gap:8px;margin-top:14px;">${atras ? `<button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="asOT.paso--; pintarAsistenteOT()">← Atrás</button>` : ''}${sig ? `<button class="btn btn-gold" style="flex:1;" onclick="${sig}">${txtSig || 'Siguiente →'}</button>` : ''}</div>`;
+  const bigBtn = (txt, sub, on, sel) => `<button type="button" onclick="${on}" style="text-align:left;padding:12px;border-radius:12px;border:${sel ? '2px solid var(--purple)' : '1px solid var(--line)'};background:${sel ? '#F3EEF7' : '#fff'};cursor:pointer;"><b>${txt}</b>${sub ? `<br><span style="font-size:0.8rem;color:#8A8072;">${sub}</span>` : ''}</button>`;
+  if(a.paso === 1){
+    c.innerHTML = asPasos(1) + `<b style="font-size:1.1rem;color:var(--purple);">1. ¿A qué taller?</b>
+      <div style="display:grid;gap:8px;margin-top:10px;">${talleresLista.map(t => { const n = (enviosTela || []).filter(e => e.taller === t && !e.cerrado && e.metros - asignadoEnvio(e._id) > 0.5).length; return bigBtn(escaparHtml(t), n ? `${n} tela${n === 1 ? '' : 's'} sin orden` : '', `asOT.taller=${escapeAttr(JSON.stringify(t))}; asOT.paso=2; pintarAsistenteOT()`, a.taller === t); }).join('')}</div>
+      <p class="note" style="text-align:left;margin-top:10px;">¿Otro taller? Agregalo en ⚙️ Configuración → Listas y opciones. <a href="#" onclick="event.preventDefault(); cerrarPublicar(); abrirOrdenTrabajo();">Usar el formulario completo</a></p>`;
+  } else if(a.paso === 2){
+    const libres = (enviosTela || []).filter(e => e.taller === a.taller && !e.cerrado).map(e => ({ e, resto: Math.round((e.metros - asignadoEnvio(e._id)) * 100) / 100 })).filter(x => x.resto > 0.5);
+    c.innerHTML = asPasos(2) + `<b style="font-size:1.1rem;color:var(--purple);">2. ¿Con qué tela?</b> <span class="note">(${escaparHtml(a.taller)})</span>
+      <div style="display:grid;gap:8px;margin-top:10px;">${libres.map(({ e, resto }) => bigBtn(`${escaparHtml(e.skuTela)} · ${fmtCm(resto)} m`, `enviada ${new Date(String(e.fecha).slice(0, 10) + 'T12:00:00').toLocaleDateString('es-AR')}${e.comprobante ? ' · ' + escaparHtml(e.comprobante) : ''}`, `asOT.envioId='${e._id}'; asOT.tela=${escapeAttr(JSON.stringify(e.skuTela))}; asOT.metros='${resto}'; asOT.paso=3; pintarAsistenteOT()`, a.envioId === e._id)).join('')}
+      ${bigBtn('Otra tela', 'Escribir código y metros', `asOT.envioId='__otra__'; pintarAsistenteOT()`, a.envioId === '__otra__')}</div>
+      ${a.envioId === '__otra__' ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
+        <div class="field" style="margin:0;"><label>Código de tela</label><input id="as-tela" list="lista-telas" value="${escapeAttr(a.tela)}" style="text-transform:uppercase;"></div>
+        <div class="field" style="margin:0;"><label>Metros</label><input id="as-metros" type="number" value="${escapeAttr(a.metros)}"></div>
+        <div class="field" style="margin:0;grid-column:1 / -1;"><label>Comprobante (opcional)</label><input id="as-comp" value="${escapeAttr(a.comprobante)}"></div></div>` : ''}`
+      + pie(true, a.envioId === '__otra__' ? 'asTelaOtra()' : '', 'Siguiente →');
+  } else if(a.paso === 3){
+    const arts = articulosAC().sort((x, y) => x.localeCompare(y, 'es'));
+    c.innerHTML = asPasos(3) + `<b style="font-size:1.1rem;color:var(--purple);">3. ¿Qué hay que fabricar?</b> <span class="note">(${escaparHtml(a.tela)})</span>
+      <div style="margin-top:10px;">${a.prods.map((pr, i) => `<div style="display:grid;grid-template-columns:minmax(0,1fr) 90px 26px;gap:6px;margin-bottom:6px;align-items:center;">
+        <select class="as-art" onchange="asOT.prods[${i}].articulo=this.value"><option value="">Artículo…</option>${arts.map(x => `<option value="${escapeAttr(x)}" ${x === pr.articulo ? 'selected' : ''}>${escaparHtml(x)}</option>`).join('')}</select>
+        <input type="number" min="1" placeholder="Cant." value="${escapeAttr(pr.cantidad)}" oninput="asOT.prods[${i}].cantidad=this.value">
+        <button type="button" onclick="asOT.prods.splice(${i},1); if(!asOT.prods.length) asOT.prods.push({articulo:'',cantidad:''}); pintarAsistenteOT()" style="border:none;background:none;cursor:pointer;color:#8A8072;">✕</button></div>`).join('')}
+      <button type="button" class="btn-mini" onclick="asOT.prods.push({articulo:'',cantidad:''}); pintarAsistenteOT()">+ Otro producto</button></div>`
+      + pie(true, 'asProductosOk()', 'Siguiente →');
+    document.querySelectorAll('.as-art').forEach(s => { hacerSelectBuscable(s); if(s._sync) s._sync(); });
+  } else {
+    const ok = a.prods.filter(p => p.articulo && +p.cantidad > 0);
+    c.innerHTML = asPasos(4) + `<b style="font-size:1.1rem;color:var(--purple);">4. Revisar</b>
+      <div style="background:var(--cream);border-radius:12px;padding:12px;margin-top:10px;font-size:0.92rem;line-height:1.6;">
+        🏭 <b>${escaparHtml(a.taller)}</b><br>🧵 <b>${escaparHtml(a.tela)}</b> · ${escaparHtml(String(a.metros))} m${a.comprobante ? ' · ' + escaparHtml(a.comprobante) : ''}<br>
+        ${ok.map(p => `✂️ ${escaparHtml(String(p.cantidad))} × ${escaparHtml(p.articulo)}`).join('<br>')}</div>
+      <p class="note" style="text-align:left;margin-top:8px;">Se abre la orden con todo cargado para que la generes.</p>` + pie(true, 'asCrearOT()', '📋 Armar la orden');
+  }
+}
+function asTelaOtra(){
+  const t = document.getElementById('as-tela').value.trim().toUpperCase(), m = document.getElementById('as-metros').value;
+  if(!t || !(+m > 0)){ alert('Complete el código de tela y los metros.'); return; }
+  asOT.tela = t; asOT.metros = m; asOT.comprobante = document.getElementById('as-comp').value.trim(); asOT.paso = 3; pintarAsistenteOT();
+}
+function asProductosOk(){
+  if(!asOT.prods.some(p => p.articulo && +p.cantidad > 0)){ alert('Cargue al menos un producto con su cantidad.'); return; }
+  asOT.paso = 4; pintarAsistenteOT();
+}
+async function asCrearOT(){
+  const a = asOT; cerrarPublicar();
+  await abrirOrdenTrabajo();
+  const st = document.getElementById('ot-taller');
+  if(![...st.options].some(o => o.value === a.taller)){ const o = document.createElement('option'); o.value = o.textContent = a.taller; st.appendChild(o); }
+  st.value = a.taller; manejarCambioTallerOT();
+  if(a.envioId && a.envioId !== '__otra__' && (enviosTela || []).some(e => e._id === a.envioId)) elegirTelaDelTallerOT(a.envioId);
+  else { document.getElementById('ot-sku-tela').value = a.tela; document.getElementById('ot-metros-totales').value = a.metros; document.getElementById('ot-comprobante').value = a.comprobante; try{ aplicarTelaEnOrden(); } catch(e){} }
+  const cont = document.getElementById('ot-renglones'); cont.innerHTML = '';
+  const t = datosTela(a.tela), ancho = t && t.ancho ? t.ancho : '';
+  a.prods.filter(p => p.articulo && +p.cantidad > 0).forEach(p => {
+    agregarRenglonOrdenTrabajo();
+    const r = cont.lastElementChild, sel = r.querySelector('.ot-r-articulo');
+    sel.value = p.articulo; if(sel._sync) sel._sync(); cambiarModoRenglonOT(sel);
+    if(ancho) r.querySelector('.ot-r-ancho').value = ancho;
+    r.querySelector('.ot-r-cantidad').value = p.cantidad;
+  });
+  try{ aplicarTelaEnOrden(); } catch(e){}
+  try{ calcularReparto(); } catch(e){}
+  const btn = document.getElementById('ot-btn-generar');
+  if(btn){ btn.scrollIntoView({ behavior: 'smooth', block: 'center' }); btn.style.boxShadow = '0 0 0 4px #F3D77A'; setTimeout(() => btn.style.boxShadow = '', 3000); }
+}
+// ===== Entregas del taller: atajos =====
+function entregoTodoRenglon(docId, i){
+  const o = (historialOT || []).find(x => x._docId === docId); if(!o) return;
+  const el = [...document.querySelectorAll('.it-b')].find(x => x.dataset.o === docId && x.dataset.i === String(i));
+  if(el) el.value = pendienteRenglon(o.renglones[i]);
+}
+function entregoTodoTaller(){
+  document.querySelectorAll('.it-b').forEach(el => { const o = (historialOT || []).find(x => x._docId === el.dataset.o); if(o) el.value = pendienteRenglon(o.renglones[+el.dataset.i]); });
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -16322,7 +16413,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v147';
+const APP_VERSION = '2026-10-02-v148';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
