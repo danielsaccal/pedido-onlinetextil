@@ -590,7 +590,7 @@ a.grilla-celda{display:block;}
       #barra-cel button{border:none;background:none;font-size:1.2rem;display:flex;flex-direction:column;align-items:center;gap:1px;color:var(--purple);padding:4px;cursor:pointer;}
       #barra-cel button span{font-size:0.68rem;}
       body.con-barra{padding-bottom:64px;}
-      body.con-barra .rv-guardar, body.con-barra .tl-guardar-precios, body.con-barra .sk-guardar{bottom:70px;}
+      body.con-barra .rv-guardar, body.con-barra .tl-guardar-precios, body.con-barra .sk-guardar, body.con-barra #ac-guardar-fijo{bottom:70px !important;}
       .btn-mini{padding:9px 12px !important;font-size:0.88rem !important;}
       input, select, textarea{font-size:16px !important;}
     }
@@ -1577,7 +1577,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v145</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v146</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1737,6 +1737,7 @@ a.grilla-celda{display:block;}
             </div>
               </div>
             </details>
+            <div id="ac-guardar-fijo" style="display:none;position:sticky;bottom:10px;z-index:5;margin-bottom:10px;"><button type="button" onclick="guardarEmpaqueAC()" style="width:100%;padding:12px;border:none;border-radius:12px;background:#3D9A5B;color:#fff;font-weight:700;font-size:0.95rem;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.15);">💾 Guardar cambios</button></div>
             <button class="btn btn-ghost" style="width:100%;" onclick="ordenDesdeAC()">📋 Orden de trabajo</button>
             <p class="error" id="ac-error" style="display:none;"></p>
           </div>
@@ -5258,7 +5259,9 @@ function cambioEmpaqueAC(){
 }
 // los datos del recuadro (bolsa, etiqueta, SKU, calidad y otros SKU) se guardan con su propio boton
 let empaquePendiente = false, otrosSkuPend = null, empaqueOriginalAC = null;
+function mostrarGuardarFijoAC(){ const b = document.getElementById('ac-guardar-fijo'); if(b) b.style.display = empaquePendiente ? 'block' : 'none'; }
 function marcarEmpaquePendiente(){
+  setTimeout(mostrarGuardarFijoAC, 0);
   empaquePendiente = true;
   const b = document.getElementById('ac-empaque-guardar'), m = document.getElementById('ac-empaque-ok');
   if(b){ b.disabled = false; b.style.opacity = '1'; }
@@ -5266,6 +5269,7 @@ function marcarEmpaquePendiente(){
 }
 function limpiarEmpaquePendiente(){
   empaquePendiente = false; otrosSkuPend = null; aviosPend = null;
+  setTimeout(mostrarGuardarFijoAC, 0);
   const b = document.getElementById('ac-empaque-guardar'), m = document.getElementById('ac-empaque-ok');
   if(b){ b.disabled = true; b.style.opacity = '0.5'; }
   if(m){ m.textContent = ''; }
@@ -8014,7 +8018,7 @@ function npfCambioProd(){
 function npfPintar(){
   const arts = articulosAC().sort((a, b) => a.localeCompare(b, 'es'));
   document.getElementById('npf-filas').innerHTML = npfFilas.map((f, i) => `<div style="display:grid;grid-template-columns:minmax(0,0.8fr) minmax(0,1.3fr) 24px;gap:6px;margin-bottom:4px;align-items:center;">
-      <input value="${escapeAttr(f.sku)}" placeholder="SKU" style="text-transform:uppercase;" oninput="npfFilas[${i}].sku=this.value.trim().toUpperCase(); npfRecalcular(${i})">
+      <div><input value="${escapeAttr(f.sku)}" placeholder="SKU" style="text-transform:uppercase;width:100%;box-sizing:border-box;" oninput="npfFilas[${i}].sku=this.value.trim().toUpperCase(); npfRecalcular(${i}); validarSkuEnVivo(this, 'npf-msg-${i}')"><div id="npf-msg-${i}" style="font-size:0.72rem;margin-top:2px;"></div></div>
       <select class="npf-art" data-i="${i}" onchange="npfFilas[${i}].articulo=this.value; npfRecalcular(${i})"><option value="">Artículo de corte…</option>${arts.map(a => `<option value="${escapeAttr(a)}" ${a === f.articulo ? 'selected' : ''}>${escaparHtml(a)}</option>`).join('')}</select>
       <button type="button" onclick="npfFilas.splice(${i},1); npfPintar();" style="border:none;background:none;cursor:pointer;color:#8A8072;" title="Quitar">✕</button>
     </div>
@@ -8172,7 +8176,7 @@ function formNuevoProductoAC(){
   f.innerHTML = `<div style="border:2px solid var(--purple);border-radius:12px;padding:12px;margin-bottom:8px;">
     <b style="color:var(--purple);">➕ Nuevo SKU de "${escaparHtml(acArticulo)}"</b>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:8px;">
-      <div class="field" style="margin:0;"><label>SKU</label><input id="anp-sku" placeholder="ej: MAG200" style="text-transform:uppercase;" oninput="anpSugerir()"></div>
+      <div class="field" style="margin:0;"><label>SKU</label><input id="anp-sku" placeholder="ej: MAG200" style="text-transform:uppercase;" oninput="anpSugerir(); validarSkuEnVivo(this, 'anp-sku-msg')"><div id="anp-sku-msg" style="font-size:0.75rem;margin-top:2px;"></div></div>
       <div class="field" style="margin:0;"><label>Tela</label><select id="anp-cal" onchange="anpSugerir()">${opcionesCalidad('')}</select></div>
       <div class="field" style="margin:0;"><label>Categoría</label><select id="anp-cat" onchange="anpProductos()">${cats.map(c => `<option>${escaparHtml(c)}</option>`).join('')}</select></div>
       <div class="field" style="margin:0;"><label>Producto del catálogo</label><select id="anp-prod" onchange="anpCambioProd()"></select></div>
@@ -8727,6 +8731,88 @@ async function gbIr(tipo, valor){
   else if(tipo === 'ot'){ await abrirHistorialOT(); const b = document.getElementById('hot-buscador'); b.value = valor; renderHistorialOT(valor); }
 }
 document.addEventListener('keydown', e => { if(e.key === 'Escape'){ cerrarBuscador(); } });
+
+// ===== Deshacer general: antes de un cambio se guarda una foto de lo que se toca; el aviso permite volver =====
+const copia = o => JSON.parse(JSON.stringify(o));
+function fotoConfig(){ return { telas: telasDatos ? copia(telasDatos) : null, fabricacion: fabricacion ? copia(fabricacion) : null, tabla: tablaConsumo ? copia(tablaConsumo) : null, stock: (typeof stockDatos !== 'undefined' && stockDatos) ? copia(stockDatos) : null, reventa: (typeof reventaDatos !== 'undefined' && reventaDatos) ? copia(reventaDatos) : null }; }
+function fotoCatalogo(skus){
+  const S = skus.map(s => String(s).toUpperCase()), out = [], vistos = new Set();
+  CATALOGO.forEach(c => (c.productos || []).forEach(p => { if(!vistos.has(p) && (p.variantes || []).some(v => S.includes(String(v.sku).toUpperCase()))){ vistos.add(p); out.push({ p, cat: c.categoria, nombre: p.nombre, composicion: p.composicion || '', variantes: copia(p.variantes), imagen: p.imagen || null }); } }));
+  return out;
+}
+async function restaurarConfig(f, cuales){
+  if(cuales.includes('telas') && f.telas){ telasDatos = copia(f.telas); await db.collection('config').doc('telas').set(copia(telasDatos)); }
+  if(cuales.includes('fabricacion') && f.fabricacion){ fabricacion = copia(f.fabricacion); await guardarFabricacion(); }
+  if(cuales.includes('tabla') && f.tabla){ tablaConsumo = copia(f.tabla); await guardarTablaYConsumo(); }
+  if(cuales.includes('stock') && f.stock){ stockDatos = copia(f.stock); await db.collection('config').doc('stock').set(copia(stockDatos)); }
+  if(cuales.includes('reventa') && f.reventa){ reventaDatos = copia(f.reventa); await db.collection('config').doc('reventa').set(copia(reventaDatos)); }
+}
+async function restaurarCatalogo(fotos){
+  for(const s of fotos){
+    const p = s.p;
+    const cat = CATALOGO.find(c => c.categoria === s.cat);
+    if(cat && !cat.productos.includes(p)) cat.productos.push(p);
+    p.nombre = s.nombre; p.composicion = s.composicion; p.variantes = copia(s.variantes); p.imagen = s.imagen;
+    const datos = { nombre: p.nombre, composicion: p.composicion, variantes: p.variantes, metros: p.metros || null };
+    if(p._editKey.startsWith('nuevo-')) await db.collection('productos_nuevos').doc(p._docId).set({ ...datos, categoria: s.cat, imagenBase64: s.imagen || null }, { merge: true });
+    else { await db.collection('productos_editados').doc(p._editKey).set(datos, { merge: true }); try{ await db.collection('productos_eliminados').doc(p._editKey).delete(); } catch(e){} }
+  }
+}
+let deshacerPendiente = null;
+function ofrecerDeshacer(texto, fn){
+  deshacerPendiente = fn;
+  let t = document.getElementById('toast-deshacer');
+  if(!t){ t = document.createElement('div'); t.id = 'toast-deshacer'; t.style.cssText = 'position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#3D2B4E;color:#fff;padding:10px 14px;border-radius:12px;z-index:9998;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:0.88rem;max-width:92vw;'; document.body.appendChild(t); }
+  t.innerHTML = `<span>✓ ${escaparHtml(texto)}</span><button type="button" onclick="ejecutarDeshacer()" style="border:none;border-radius:8px;padding:6px 10px;background:var(--gold);color:var(--purple);font-weight:700;cursor:pointer;">↩️ Deshacer</button><button type="button" onclick="this.parentNode.remove()" style="border:none;background:none;color:#fff;cursor:pointer;">✕</button>`;
+  clearTimeout(window.__toastT); window.__toastT = setTimeout(() => { const x = document.getElementById('toast-deshacer'); if(x) x.remove(); deshacerPendiente = null; }, 30000);
+}
+async function ejecutarDeshacer(){
+  const fn = deshacerPendiente; deshacerPendiente = null;
+  const t = document.getElementById('toast-deshacer'); if(t) t.remove();
+  if(!fn) return;
+  try{
+    await fn();
+    try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+    const a = document.querySelector('.step.active'); const id = a && a.id;
+    const re = { 'step-telas': () => renderTelas(), 'step-stock': () => renderStock(), 'step-reventa': () => renderReventa(), 'step-productos-fabrico': () => renderProductosFabrico(), 'step-articulos-cortes': () => { renderListaAC(); if(acArticulo) abrirArticuloAC(acArticulo); } }[id];
+    if(re) re();
+    alert('Se deshizo el cambio.');
+  } catch(e){ alert('No se pudo deshacer: ' + e.message); }
+}
+// envuelve una funcion de guardado: foto antes, y si cambio algo, ofrece deshacer
+function conDeshacer(nombreFn, texto, cuales, skusFn){
+  const orig = window[nombreFn]; if(typeof orig !== 'function') return;
+  window[nombreFn] = async function(...args){
+    const fc = fotoConfig(), skus = skusFn ? skusFn(...args) : [], fcat = skus.length ? fotoCatalogo(skus) : [];
+    const antes = JSON.stringify([fc, fcat.map(x => x.variantes)]);
+    const r = await orig.apply(this, args);
+    const despues = JSON.stringify([fotoConfig(), fotoCatalogo(skus).map(x => x.variantes)]);
+    if(antes !== despues) ofrecerDeshacer(typeof texto === 'function' ? texto(...args) : texto, async () => { await restaurarConfig(fc, cuales); if(fcat.length) await restaurarCatalogo(fcat); });
+    return r;
+  };
+}
+
+// ----- deshacer en las acciones importantes -----
+window.addEventListener('load', () => {
+  conDeshacer('guardarPreciosTelas', 'Precios de telas guardados', ['telas']);
+  conDeshacer('guardarStock', 'Stock guardado', ['stock']);
+  conDeshacer('guardarReventa', 'Descripciones guardadas', ['reventa'], () => Object.keys(rvPend).filter(k => k.startsWith('v:')).map(k => k.slice(2)).concat(productosReventa().filter(x => rvPend['p:' + x.p._editKey]).flatMap(x => x.p.variantes.map(v => v.sku))));
+  conDeshacer('aplicarPfMasivo', 'Cambios aplicados a los SKU', ['fabricacion', 'tabla', 'stock']);
+  conDeshacer('borrarSkusPf', 'SKU borrados', ['fabricacion', 'tabla', 'stock'], () => [...pfSel]);
+  conDeshacer('guardarCompletarSku', 'SKU completado', ['fabricacion'], S => [S]);
+  conDeshacer('quitarProductoAC', 'SKU quitado del artículo', ['fabricacion', 'tabla']);
+  conDeshacer('cambiarTelaProductoAC', 'Tela cambiada', ['fabricacion', 'tabla']);
+  conDeshacer('confirmarMoverSkus', 'SKU movidos', ['fabricacion'], () => window.__moverSkus || []);
+});
+// avisa al escribir si el SKU ya existe (catalogo o fabricacion)
+function validarSkuEnVivo(el, msgId){
+  const s = String(el.value || '').trim().toUpperCase(), m = document.getElementById(msgId); if(!m) return;
+  if(!s){ m.textContent = ''; el.style.borderColor = ''; return; }
+  const enCat = buscarProductoPorSku(s), art = fabricacion && fabricacion.vinculos[s] && fabricacion.vinculos[s].articulo;
+  if(enCat){ m.innerHTML = `<span style="color:#A6432F;">⚠️ Ya está en el catálogo: ${escaparHtml(enCat.producto.nombre)}</span>`; el.style.borderColor = '#C9563F'; }
+  else if(art){ m.innerHTML = `<span style="color:#8A6417;">Ya está vinculado a "${escaparHtml(art)}"</span>`; el.style.borderColor = '#D98A2B'; }
+  else { m.innerHTML = '<span style="color:#2F7A47;">✓ SKU nuevo</span>'; el.style.borderColor = '#3D9A5B'; }
+}
 
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
@@ -16167,7 +16253,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v145';
+const APP_VERSION = '2026-10-02-v146';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
