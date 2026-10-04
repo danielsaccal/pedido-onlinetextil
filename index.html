@@ -1560,7 +1560,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v138</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v139</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -8393,7 +8393,7 @@ function dibujarPlieguesFunda(ctx, x, y, w, hh, p, girada){
 function abrirGeneradorFundaColchon(){
   document.getElementById('pub-cont').innerHTML = `
     <p class="note" style="text-align:left;margin:0 0 10px;">Funda de colchón tipo bolsa, de una sola pieza. Ponga las medidas del colchón y la app arma la pieza, el bosquejo con los dobleces y el consumo.</p>
-    <div class="field"><label>Aplicar a</label><select id="fc-destino" onchange="fcElegirDestino()"><option value="">➕ Artículo nuevo</option>${Object.keys(tablaConsumo.instrucciones || {}).filter(n => /funda/i.test(n) && /colch/i.test(n)).sort((x, y) => x.localeCompare(y, 'es')).map(n => `<option value="${escapeAttr(n)}">Actualizar "${escaparHtml(n)}" (conserva sus SKU, bolsa y confección)</option>`).join('')}</select></div>
+    <div class="field"><label>Aplicar a</label><select id="fc-destino" onchange="fcElegirDestino()"><option value="">➕ Artículo nuevo</option>${articulosAC().filter(n => /funda/i.test(n) && /colch/i.test(n)).sort((x, y) => x.localeCompare(y, 'es')).map(n => `<option value="${escapeAttr(n)}">Actualizar "${escaparHtml(n)}" (conserva sus SKU, bolsa y confección)</option>`).join('')}</select></div>
     <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;">
       <div class="field" style="margin:0;"><label>Ancho</label><input id="fc-a" type="number" placeholder="80" oninput="fcPrevia()"></div>
       <div class="field" style="margin:0;"><label>Largo</label><input id="fc-l" type="number" placeholder="190" oninput="fcPrevia()"></div>
@@ -8409,7 +8409,7 @@ function abrirGeneradorFundaColchon(){
 function fcElegirDestino(){
   const n = document.getElementById('fc-destino').value; if(!n) return;
   const nums = (n.match(/\d+(?:[.,]\d+)?/g) || []).map(x => parseFloat(x.replace(',', '.')));
-  const pz = (juegosDePiezasAC(n)[0] || {}).piezas || [];
+  const pz = ((tablaConsumo.instrucciones || {})[n] ? (juegosDePiezasAC(n)[0] || {}).piezas : null) || [];
   const fc = pz[0] && pz[0].fc;
   const set = (id, v) => { if(v > 0) document.getElementById(id).value = v; };
   if(fc){ set('fc-a', fc.a); set('fc-l', fc.l); set('fc-h', fc.h); set('fc-c', fc.c); }
@@ -15886,7 +15886,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v138';
+const APP_VERSION = '2026-10-02-v139';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
