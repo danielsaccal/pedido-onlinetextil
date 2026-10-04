@@ -1560,7 +1560,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v141</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v142</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1895,6 +1895,7 @@ a.grilla-celda{display:block;}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
         <button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="abrirNuevoProductoFab()">➕ Nuevo producto</button>
         <button type="button" class="btn-mini" onclick="actualizarTodasDescripciones()">✨ Actualizar todas las descripciones del catálogo</button>
+        <button type="button" class="btn-mini" onclick="deshacerUltimaPublicacion()">↩️ Deshacer la última publicación</button>
       </div>
       <style>.pf-simple .pf-det{display:none;}</style>
       <div id="pf-masivo" style="display:none;"></div>
@@ -7507,6 +7508,7 @@ function renderPfMasivo(){
     </div>
     <button class="btn btn-gold" style="width:auto;padding:10px 18px;margin-top:10px;" onclick="aplicarPfMasivo()">Aplicar a los ${pfSel.size} SKU</button>
     ${[...pfSel].some(s => !buscarProductoPorSku(s)) ? `<button class="btn btn-ghost" style="width:auto;padding:10px 18px;margin-top:10px;margin-left:6px;" onclick="abrirPublicarVarios([...pfSel])">📸 Publicar en el catálogo los que no están</button>` : ''}
+    ${[...pfSel].some(s => buscarProductoPorSku(s)) ? `<button class="btn btn-ghost" style="width:auto;padding:10px 18px;margin-top:10px;margin-left:6px;" onclick="abrirMoverSkus([...pfSel])">📦 Mover a otro producto</button>` : ''}
     <button class="btn btn-ghost" style="width:auto;padding:10px 18px;margin-top:10px;margin-left:6px;color:#A6432F;border-color:#E3B8AE;" onclick="borrarSkusPf()">🗑️ Borrar</button>
   </div>`;
   ['pm-cal', 'pm-art'].forEach(id => { const s = document.getElementById(id); hacerSelectBuscable(s); if(s._sync) s._sync(); });
@@ -7679,7 +7681,7 @@ async function confirmarPublicar(){
     cerrarPublicar();
     try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
     sincronizarDescripcionesCatalogo();
-    alert(`${variante.sku} publicado en el catálogo.`);
+    registrarPublicacion([variante.sku], (buscarProductoPorSku(variante.sku) || { producto: {} }).producto.nombre || '');
     if(document.getElementById('step-articulos-cortes').classList.contains('active')) pintarBotonesPublicarAC();
   } catch(e){ err.textContent = 'No se pudo publicar: ' + e.message; err.style.display = 'block'; }
 }
@@ -7873,7 +7875,7 @@ async function confirmarPublicarVarios(){
     cerrarPublicar();
     try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
     sincronizarDescripcionesCatalogo();
-    alert(`Publicados: ${variantesNuevas.map(v => v.sku).join(', ')}.`);
+    registrarPublicacion(variantesNuevas.map(v => v.sku), (buscarProductoPorSku(variantesNuevas[0].sku) || { producto: {} }).producto.nombre || '');
     if(document.getElementById('step-articulos-cortes').classList.contains('active')) pintarBotonesPublicarAC();
     if(document.getElementById('step-productos-fabrico').classList.contains('active')){ pfSel.clear(); renderProductosFabrico(); }
   } catch(e){ err.textContent = 'No se pudo publicar: ' + e.message; err.style.display = 'block'; }
@@ -8024,7 +8026,7 @@ async function npfGuardar(){
     cerrarPublicar();
     try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
     renderProductosFabrico();
-    alert(`Listo: "${nombre}" creado con ${variantes.length} medida${variantes.length === 1 ? '' : 's'}.`);
+    registrarPublicacion(variantes.map(v => v.sku), nombre);
   } catch(e){ err.textContent = 'No se pudo crear: ' + e.message; err.style.display = 'block'; }
 }
 
@@ -8190,6 +8192,7 @@ async function anpGuardar(){
         fabricacion.propios[prod.nombre] = true;
       }
       try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+      registrarPublicacion([sku], (buscarProductoPorSku(sku) || { producto: {} }).producto.nombre || '');
     }
     await guardarFabricacion();
     sincronizarDescripcionesCatalogo();
@@ -8491,6 +8494,101 @@ async function guardarCompletarSku(S){
     await guardarFabricacion();
     cerrarPublicar(); renderProductosFabrico(); sincronizarDescripcionesCatalogo();
   } catch(e){ err.textContent = 'No se pudo guardar: ' + e.message; err.style.display = 'block'; }
+}
+
+// ===== Deshacer la ultima publicacion y mover SKU a otro producto =====
+async function guardarProductoCatalogo(p){
+  const datos = { nombre: p.nombre, composicion: p.composicion || '', variantes: p.variantes, metros: p.metros || null };
+  if(p._editKey && p._editKey.startsWith('nuevo-')) await db.collection('productos_nuevos').doc(p._docId).update(datos);
+  else await db.collection('productos_editados').doc(p._editKey).set(datos, { merge: true });
+}
+async function eliminarProductoCatalogo(p){
+  if(p._editKey.startsWith('nuevo-')) await db.collection('productos_nuevos').doc(p._docId).delete();
+  else await db.collection('productos_eliminados').doc(p._editKey).set({ eliminado: true, fecha: new Date().toISOString() });
+  CATALOGO.forEach(c => { c.productos = c.productos.filter(x => x !== p); });
+}
+// saca SKU del catalogo (si el producto queda vacio, se borra el producto)
+async function sacarSkusDelCatalogo(skus){
+  const S = skus.map(s => String(s).toUpperCase());
+  const prods = new Set(S.map(s => buscarProductoPorSku(s)).filter(Boolean).map(r => r.producto));
+  for(const p of prods){
+    p.variantes = p.variantes.filter(v => !S.includes(String(v.sku).toUpperCase()));
+    if(!p.variantes.length) await eliminarProductoCatalogo(p); else await guardarProductoCatalogo(p);
+  }
+}
+function registrarPublicacion(skus, nombreProducto){
+  try{ localStorage.setItem('ot_ultima_pub', JSON.stringify({ skus: skus.map(s => String(s).toUpperCase()), producto: nombreProducto, fecha: new Date().toISOString() })); } catch(e){}
+  mostrarAvisoDeshacer();
+}
+function ultimaPublicacion(){ try{ return JSON.parse(localStorage.getItem('ot_ultima_pub') || 'null'); } catch(e){ return null; } }
+function mostrarAvisoDeshacer(){
+  const u = ultimaPublicacion(); if(!u) return;
+  let t = document.getElementById('toast-deshacer');
+  if(!t){ t = document.createElement('div'); t.id = 'toast-deshacer'; t.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#3D2B4E;color:#fff;padding:10px 14px;border-radius:12px;z-index:9998;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:0.88rem;max-width:92vw;'; document.body.appendChild(t); }
+  t.innerHTML = `<span>Publicado en "${escaparHtml(u.producto)}": ${escaparHtml(u.skus.join(', '))}</span><button type="button" onclick="deshacerUltimaPublicacion()" style="border:none;border-radius:8px;padding:6px 10px;background:var(--gold);color:var(--purple);font-weight:700;cursor:pointer;">↩️ Deshacer</button><button type="button" onclick="this.parentNode.remove()" style="border:none;background:none;color:#fff;cursor:pointer;">✕</button>`;
+  clearTimeout(window.__toastT); window.__toastT = setTimeout(() => { const x = document.getElementById('toast-deshacer'); if(x) x.remove(); }, 20000);
+}
+async function deshacerUltimaPublicacion(){
+  const u = ultimaPublicacion(); if(!u) { alert('No hay nada para deshacer.'); return; }
+  const esta = u.skus.filter(s => buscarProductoPorSku(s));
+  if(!esta.length){ alert('Esos SKU ya no están en el catálogo.'); localStorage.removeItem('ot_ultima_pub'); return; }
+  if(!confirm(`Se sacan del catálogo: ${esta.join(', ')} (de "${u.producto}").\nSiguen en fabricación, para publicarlos de nuevo donde corresponde. ¿Seguir?`)) return;
+  try{
+    await sacarSkusDelCatalogo(esta);
+    localStorage.removeItem('ot_ultima_pub');
+    const t = document.getElementById('toast-deshacer'); if(t) t.remove();
+    try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+    if(document.getElementById('step-productos-fabrico').classList.contains('active')) renderProductosFabrico();
+    if(document.getElementById('step-articulos-cortes').classList.contains('active')) renderProductosAC();
+    alert('Listo, se deshizo.');
+  } catch(e){ alert('No se pudo deshacer: ' + e.message); }
+}
+// mover SKU publicados a otro producto (o a uno nuevo)
+function abrirMoverSkus(skus){
+  skus = skus.map(s => String(s).toUpperCase()).filter(s => buscarProductoPorSku(s));
+  if(!skus.length){ alert('Esos SKU no están en el catálogo.'); return; }
+  const cats = CATALOGO.map(c => c.categoria);
+  window.__moverSkus = skus;
+  document.getElementById('pub-cont').innerHTML = `
+    <p style="margin:0 0 8px;font-weight:700;color:var(--purple);">📦 Mover ${skus.length} SKU a otro producto</p>
+    <p class="note" style="text-align:left;margin:0 0 10px;">${escaparHtml(skus.join(', '))}. Se mantienen su descripción y precio.</p>
+    <div class="field"><label>Categoría</label><select id="pub-cat" onchange="pintarProductosPublicar()">${cats.map(c => `<option>${escaparHtml(c)}</option>`).join('')}</select></div>
+    <div class="field"><label>Producto</label><select id="pub-prod" onchange="cambioProductoPublicar()"></select></div>
+    <div id="pub-nuevo" style="display:none;"><div class="field"><label>Nombre del producto nuevo</label><input id="pub-nombre"></div><div class="field"><label>Subtítulo</label><input id="pub-sub"></div></div>
+    <input type="file" id="pub-foto" style="display:none;"><label id="pub-foto-lbl" style="display:none;"></label>
+    <p class="error" id="pub-error" style="display:none;"></p>
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="confirmarMoverSkus()">Mover</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`;
+  window.__pubProds = c => ((CATALOGO.find(x => x.categoria === c) || {}).productos || []).filter(p => Array.isArray(p.variantes));
+  window.__pubProdSug = null;
+  pintarProductosPublicar();
+  document.getElementById('pub-modal').style.display = 'block';
+}
+async function confirmarMoverSkus(){
+  const skus = window.__moverSkus || [], err = document.getElementById('pub-error');
+  const cat = document.getElementById('pub-cat').value, sel = document.getElementById('pub-prod').value;
+  const variantes = skus.map(s => ({ ...buscarProductoPorSku(s).variante }));
+  try{
+    let destino;
+    if(sel === '__nuevo__'){
+      const nombre = document.getElementById('pub-nombre').value.trim(), sub = document.getElementById('pub-sub').value.trim();
+      if(!nombre){ err.textContent = 'Falta el nombre del producto nuevo.'; err.style.display = 'block'; return; }
+      const origen = buscarProductoPorSku(skus[0]).producto;
+      await sacarSkusDelCatalogo(skus);
+      const ref = await db.collection('productos_nuevos').add({ categoria: cat, nombre, composicion: sub, variantes, imagenBase64: origen.imagen || null, metros: null, creado: new Date().toISOString() });
+      destino = { nombre, composicion: sub, variantes, imagen: origen.imagen || null, _editKey: 'nuevo-' + ref.id, _docId: ref.id };
+      const c = CATALOGO.find(x => x.categoria === cat); if(c) c.productos.push(destino);
+    } else {
+      destino = window.__pubProds(cat)[+sel];
+      await sacarSkusDelCatalogo(skus);
+      destino.variantes = [...destino.variantes.filter(v => !skus.includes(String(v.sku).toUpperCase())), ...variantes];
+      await guardarProductoCatalogo(destino);
+    }
+    if(fabricacion){ fabricacion.propios[destino.nombre] = true; await guardarFabricacion(); }
+    cerrarPublicar();
+    try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+    if(document.getElementById('step-productos-fabrico').classList.contains('active')){ pfSel.clear(); renderProductosFabrico(); }
+    alert(`Movidos a "${destino.nombre}".`);
+  } catch(e){ err.textContent = 'No se pudo mover: ' + e.message; err.style.display = 'block'; }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -15932,7 +16030,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v141';
+const APP_VERSION = '2026-10-02-v142';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
