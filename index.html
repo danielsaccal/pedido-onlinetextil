@@ -1581,7 +1581,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v156</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v157</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2096,6 +2096,23 @@ a.grilla-celda{display:block;}
       <div id="rv-masivo" style="display:none;"></div>
       <div id="rv-lista"><p class="empty-msg">Cargando...</p></div>
       <div class="rv-guardar" id="rv-guardar"><button type="button" onclick="guardarReventa()">💾 Guardar descripciones</button></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-categorias">
+    <div class="form-card" style="max-width:900px;">
+      <h2>Ordenar categorías</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <input id="oc-nueva" placeholder="Nombre de la categoría nueva" style="flex:1;min-width:200px;padding:10px;border:1px solid var(--line);border-radius:12px;">
+        <button type="button" class="btn-mini" onclick="crearCategoria()">➕ Nueva categoría</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <select id="oc-cat" onchange="renderCategoriasMover()" style="flex:1;min-width:160px;padding:10px;border:1px solid var(--line);border-radius:12px;"></select>
+        <input id="oc-buscar" placeholder="🔍 Producto o SKU" oninput="renderCategoriasMover()" style="flex:2;min-width:180px;padding:10px;border:1px solid var(--line);border-radius:12px;">
+      </div>
+      <div id="oc-mover" style="display:none;position:sticky;top:6px;z-index:5;background:#F3EEF7;border:1px solid #D9CCE6;border-radius:12px;padding:10px;margin-bottom:10px;"></div>
+      <div id="oc-lista"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
   </div>
@@ -5516,7 +5533,7 @@ const GRUPOS_INICIO = {
   a: { lado: 'ext', titulo: 'Armar pedido', items: [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['📷 Escanear etiqueta (SKU)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto').click()"], ['🤖 Buscar por foto (IA)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto-producto').click()"]] },
   c: { lado: 'ext', titulo: 'Difusión', items: [['🔗 Compartir por rubro', 'abrirCompartirRubro()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()'], ['🖼️ Nuevo ingreso (flyers, video)', 'abrirNuevoIngreso()'], ['📱 Vista previa grilla IG', 'abrirGrilla()'], ['📣 Anuncios y promociones', 'abrirAnuncio()'], ['🎬 Compartir video de producto', 'abrirCompartirVideoProducto()']] },
   d: { lado: 'int', titulo: 'Ventas', items: [['📋 Historial de pedidos', 'abrirHistorial()'], ['🤖 Pedido con IA (texto libre)', 'abrirPedidoIA()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()'], ['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
-  f: { lado: 'int', titulo: 'Catálogo', items: [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['📷 Fotos de productos', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
+  f: { lado: 'int', titulo: 'Catálogo', items: [['🗂️ Ordenar categorías', 'abrirCategorias()'], ['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['📷 Fotos de productos', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
   g: { lado: 'int', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas'], columnas: [
     [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()']],
     [['📊 Stock y prioridades', 'abrirStock()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📋 Nueva orden de trabajo', 'abrirAsistenteOT()']],
@@ -7850,7 +7867,7 @@ async function guardarGaleriaProducto(p, fotos){
   if(ci < 0) return;
   const key = `${ci}-${pi}`;
   try{
-    await db.collection('fotos').doc(key).set({ imagenesBase64: fotos, sku: (p.variantes[0] || {}).sku || '', nombreProducto: p.nombre, actualizado: new Date().toISOString() });
+    await db.collection('fotos').doc(docFotos(key)).set({ imagenesBase64: fotos, sku: (p.variantes[0] || {}).sku || '', nombreProducto: p.nombre, actualizado: new Date().toISOString() });
     fotosOverride[key] = fotos;
   } catch(e){ console.error('galeria', e); }
 }
@@ -9079,6 +9096,115 @@ async function editarDatosTaller(i){
   if(r !== 'ok') return;
   try{ await guardarDetallesTaller(n, document.getElementById('tdl-dir').value, document.getElementById('tdl-cel').value); renderListas(); }
   catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+
+// ===== Categorias propias, productos movidos y fotos por producto (no por posicion) =====
+var categoriasCfg = { extra: [], mover: [] }, fotosMapa = {}, fotosRaw = {}, videosRaw = {};
+async function cargarCategoriasCfg(){
+  try{ const d = await db.collection('config').doc('categorias').get(); if(d.exists){ const x = d.data(); categoriasCfg = { extra: x.extra || [], mover: x.mover || [] }; } } catch(e){}
+  try{ const d = await db.collection('config').doc('fotos_mapa').get(); fotosMapa = d.exists ? (d.data().mapa || {}) : {}; } catch(e){}
+  categoriasCfg.extra.forEach(n => { if(!CATALOGO.some(c => c.categoria === n)) CATALOGO.push({ categoria: n, productos: [] }); });
+}
+// las fotos viejas (guardadas por posicion) quedan asignadas a su producto antes de mover nada
+function asignarMapaFotos(){
+  let cambio = false; const usados = new Set(Object.values(fotosMapa));
+  CATALOGO.forEach((c, ci) => (c.productos || []).forEach((p, pi) => {
+    const ek = p._editKey; if(!ek || fotosMapa[ek]) return;
+    const id = `${ci}-${pi}`;
+    if((fotosRaw[id] || videosRaw[id]) && !usados.has(id)){ fotosMapa[ek] = id; usados.add(id); cambio = true; }
+  }));
+  if(cambio) db.collection('config').doc('fotos_mapa').set({ mapa: fotosMapa }).catch(() => {});
+}
+function aplicarMovimientos(){
+  (categoriasCfg.mover || []).forEach(([ek, cat]) => {
+    const dest = CATALOGO.find(c => c.categoria === cat); if(!dest) return;
+    let prod = null;
+    CATALOGO.forEach(c => { const i = c.productos.findIndex(p => p._editKey === ek); if(i >= 0) prod = c.productos.splice(i, 1)[0]; });
+    if(prod) dest.productos.push(prod);
+  });
+}
+function reconstruirFotos(){
+  fotosOverride = {}; if(typeof videosOverride !== 'undefined') videosOverride = {};
+  CATALOGO.forEach((c, ci) => (c.productos || []).forEach((p, pi) => {
+    const id = fotosMapa[p._editKey] || ('k:' + p._editKey);
+    if(fotosRaw[id] !== undefined) fotosOverride[`${ci}-${pi}`] = fotosRaw[id];
+    if(videosRaw[id] !== undefined && typeof videosOverride !== 'undefined') videosOverride[`${ci}-${pi}`] = videosRaw[id];
+  }));
+}
+// documento de fotos de un producto (a partir de su posicion actual "ci-pi")
+function docFotos(key){
+  const [ci, pi] = String(key).split('-').map(Number);
+  const p = CATALOGO[ci] && CATALOGO[ci].productos[pi]; if(!p || !p._editKey) return key;
+  if(!fotosMapa[p._editKey]){ fotosMapa[p._editKey] = 'k:' + p._editKey; db.collection('config').doc('fotos_mapa').set({ mapa: fotosMapa }).catch(() => {}); }
+  return fotosMapa[p._editKey];
+}
+function sincronizarFotosRaw(){
+  CATALOGO.forEach((c, ci) => (c.productos || []).forEach((p, pi) => {
+    const k = `${ci}-${pi}`, id = fotosMapa[p._editKey] || ('k:' + p._editKey);
+    if(fotosOverride[k] !== undefined) fotosRaw[id] = fotosOverride[k];
+    if(typeof videosOverride !== 'undefined' && videosOverride[k] !== undefined) videosRaw[id] = videosOverride[k];
+  }));
+}
+
+// ----- pantalla Ordenar categorias -----
+const ocSel = new Set();
+function abrirCategorias(){
+  mostrarPaso('step-categorias');
+  const s = document.getElementById('oc-cat');
+  s.innerHTML = '<option value="">Todas las categorías</option>' + CATALOGO.map(c => `<option>${escaparHtml(c.categoria)}</option>`).join('');
+  renderCategoriasMover();
+}
+function renderCategoriasMover(){
+  const cat = document.getElementById('oc-cat').value, q = normBusqueda(document.getElementById('oc-buscar').value);
+  const cont = document.getElementById('oc-lista');
+  cont.innerHTML = CATALOGO.filter(c => !cat || c.categoria === cat).map(c => {
+    const ps = (c.productos || []).filter(p => Array.isArray(p.variantes) && (!q || normBusqueda(p.nombre + ' ' + p.variantes.map(v => v.sku).join(' ')).includes(q)));
+    if(!ps.length && (q || cat === '')) return c.productos.length ? '' : `<div class="gb-sec">${escaparHtml(c.categoria)} · vacía</div>`;
+    return `<div class="gb-sec">${escaparHtml(c.categoria)} · ${c.productos.length}</div>` + ps.map(p => `<label style="display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;background:${ocSel.has(p._editKey) ? '#F3EEF7' : '#fff'};cursor:pointer;">
+        <input type="checkbox" ${ocSel.has(p._editKey) ? 'checked' : ''} onchange="ocToggle('${escapeAttr(p._editKey)}', this.checked)">
+        <div style="flex:1;"><b style="font-size:0.88rem;">${escaparHtml(p.nombre)}</b><div style="font-size:0.72rem;color:#8A8072;">${escaparHtml(p.variantes.map(v => v.sku).slice(0, 5).join(', '))}</div></div></label>`).join('');
+  }).join('') || '<p class="empty-msg">No hay productos con ese filtro.</p>';
+  const m = document.getElementById('oc-mover');
+  if(!ocSel.size){ m.style.display = 'none'; return; }
+  m.style.display = 'block';
+  m.innerHTML = `<b>${ocSel.size} producto${ocSel.size === 1 ? '' : 's'}</b> → <select id="oc-dest" style="padding:8px;border:1px solid var(--line);border-radius:10px;">${CATALOGO.map(c => `<option>${escaparHtml(c.categoria)}</option>`).join('')}</select>
+    <button type="button" class="btn-mini" onclick="moverProductosCategoria()">Mover</button>
+    <a href="#" onclick="event.preventDefault(); ocSel.clear(); renderCategoriasMover();" style="font-size:0.8rem;margin-left:6px;">Quitar selección</a>`;
+}
+function ocToggle(ek, on){ if(on) ocSel.add(ek); else ocSel.delete(ek); renderCategoriasMover(); }
+async function crearCategoria(){
+  const n = document.getElementById('oc-nueva').value.trim().toUpperCase();
+  if(!n) return;
+  if(CATALOGO.some(c => normBusqueda(c.categoria) === normBusqueda(n))){ alert('Esa categoría ya existe.'); return; }
+  categoriasCfg.extra = [...(categoriasCfg.extra || []), n];
+  try{
+    await db.collection('config').doc('categorias').set(JSON.parse(JSON.stringify(categoriasCfg)));
+    CATALOGO.push({ categoria: n, productos: [] });
+    document.getElementById('oc-nueva').value = '';
+    abrirCategorias(); document.getElementById('oc-cat').value = '';
+    alert(`Categoría "${n}" creada. Ahora tildá productos y movelos ahí.`);
+  } catch(e){ alert('No se pudo crear: ' + e.message); }
+}
+async function moverProductosCategoria(){
+  const dest = document.getElementById('oc-dest').value;
+  const eks = [...ocSel];
+  if(!(await elegirOpcion('Mover productos', `${eks.length} producto${eks.length === 1 ? '' : 's'} a "${dest}". Fotos, precios y SKU se mantienen.`, [{ t: 'Mover', v: 'si', estilo: 'gold' }]))) return;
+  const antes = JSON.parse(JSON.stringify(categoriasCfg));
+  sincronizarFotosRaw();
+  const destC = CATALOGO.find(c => c.categoria === dest);
+  eks.forEach(ek => {
+    let prod = null;
+    CATALOGO.forEach(c => { const i = c.productos.findIndex(p => p._editKey === ek); if(i >= 0) prod = c.productos.splice(i, 1)[0]; });
+    if(prod){ destC.productos.push(prod); categoriasCfg.mover = (categoriasCfg.mover || []).filter(x => x[0] !== ek).concat([[ek, dest]]); }
+  });
+  try{
+    await db.collection('config').doc('categorias').set(JSON.parse(JSON.stringify(categoriasCfg)));
+    reconstruirFotos();
+    ocSel.clear();
+    try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+    renderCategoriasMover();
+    ofrecerDeshacer(`${eks.length} movido${eks.length === 1 ? '' : 's'} a ${dest}`, async () => { await db.collection('config').doc('categorias').set(antes); location.reload(); });
+  } catch(e){ alert('No se pudo mover: ' + e.message); }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -11273,12 +11399,14 @@ function cargarFotosOverride(){
   return db.collection('fotos').get().then(snap => {
     fotosOverride = {};
     videosOverride = {};
+    fotosRaw = {}; videosRaw = {};
     snap.docs.forEach(d => {
       const data = d.data();
       fotosOverride[d.id] = data.imagenesBase64 && data.imagenesBase64.length
         ? data.imagenesBase64
         : (data.imagenBase64 ? [data.imagenBase64] : []);
       videosOverride[d.id] = data.videoLinks || [];
+      fotosRaw[d.id] = fotosOverride[d.id]; videosRaw[d.id] = videosOverride[d.id];
     });
   }).catch(e => console.error('Error cargando fotos override:', e));
 }
@@ -13493,7 +13621,7 @@ async function guardarProductoNuevoInterno(){
     if(fotosBase64.length > 1 && ci !== -1){
       const key = `${ci}-${pi}`;
       try{
-        await db.collection('fotos').doc(key).set({
+        await db.collection('fotos').doc(docFotos(key)).set({
           imagenesBase64: fotosBase64,
           sku: variantes[0].sku,
           nombreProducto: titulo,
@@ -13646,7 +13774,7 @@ async function subirFotosRapido(ci, pi, input){
     const key = `${ci}-${pi}`;
     const actuales = fotosOverride[key] || imagenesEfectivas(ci, pi, p) || [];
     const fotos = r === 'reemplazar' ? nuevas : [...actuales, ...nuevas];
-    await db.collection('fotos').doc(key).set({ imagenesBase64: fotos, sku: (p.variantes[0] || {}).sku || '', nombreProducto: p.nombre, actualizado: new Date().toISOString() });
+    await db.collection('fotos').doc(docFotos(key)).set({ imagenesBase64: fotos, sku: (p.variantes[0] || {}).sku || '', nombreProducto: p.nombre, actualizado: new Date().toISOString() });
     fotosOverride[key] = fotos;
     renderGrillaFotos();
     try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
@@ -13769,7 +13897,7 @@ async function guardarVideoLink(ci, pi, url, nota){
   const key = `${ci}-${pi}`;
   const nuevos = [...(videosOverride[key] || []), { url, nota }];
   try{
-    await db.collection('fotos').doc(key).set({
+    await db.collection('fotos').doc(docFotos(key)).set({
       videoLinks: nuevos,
       sku: CATALOGO[ci].productos[pi].variantes[0]?.sku || '',
       nombreProducto: CATALOGO[ci].productos[pi].nombre,
@@ -13793,7 +13921,7 @@ async function borrarVideoLink(ci, pi, indice){
   const key = `${ci}-${pi}`;
   const nuevos = (videosOverride[key] || []).filter((_, i) => i !== indice);
   try{
-    await db.collection('fotos').doc(key).set({ videoLinks: nuevos }, { merge: true });
+    await db.collection('fotos').doc(docFotos(key)).set({ videoLinks: nuevos }, { merge: true });
     videosOverride[key] = nuevos;
     return true;
   } catch(err){
@@ -13839,7 +13967,7 @@ async function agregarFotosProducto(ci, pi){
     const actuales = fotosOverride[key] || [];
     const combinadas = [...actuales, ...nuevasBase64];
 
-    await db.collection('fotos').doc(key).set({
+    await db.collection('fotos').doc(docFotos(key)).set({
       imagenesBase64: combinadas,
       sku: CATALOGO[ci].productos[pi].variantes[0]?.sku || '',
       nombreProducto: CATALOGO[ci].productos[pi].nombre,
@@ -13860,7 +13988,7 @@ async function eliminarFotoProducto(ci, pi, indice){
   if(actuales.length <= 1){ alert('No puede borrar la única foto — agregue otra antes de sacar esta.'); return; }
   const nuevas = actuales.filter((_, i) => i !== indice);
   try{
-    await db.collection('fotos').doc(key).set({
+    await db.collection('fotos').doc(docFotos(key)).set({
       imagenesBase64: nuevas,
       sku: CATALOGO[ci].productos[pi].variantes[0]?.sku || '',
       nombreProducto: CATALOGO[ci].productos[pi].nombre,
@@ -13879,7 +14007,7 @@ async function hacerFotoPrincipal(ci, pi, indice){
   const actuales = fotosOverride[key] || [];
   const reordenadas = [actuales[indice], ...actuales.filter((_, i) => i !== indice)];
   try{
-    await db.collection('fotos').doc(key).set({
+    await db.collection('fotos').doc(docFotos(key)).set({
       imagenesBase64: reordenadas,
       sku: CATALOGO[ci].productos[pi].variantes[0]?.sku || '',
       nombreProducto: CATALOGO[ci].productos[pi].nombre,
@@ -16566,11 +16694,12 @@ function irAFormatoGrafico(){
 <script>
 etiquetarProductosEstaticos();
 revisarRegresoDeInstagram();
-Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancarios(), cargarPerfilIG()]).then(() => {
+cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancarios(), cargarPerfilIG()])).then(() => {
   return cargarProductosEliminados();
 }).then(() => {
   return cargarProductosEditados();
 }).then(() => {
+  asignarMapaFotos(); aplicarMovimientos(); reconstruirFotos();
   renderCatalogo(document.getElementById('buscador').value);
   // las descripciones de lo que se fabrica se mantienen solas al dia (sin tener que tocar ningun boton)
   setTimeout(sincronizarDescripcionesCatalogo, 1500);
@@ -16580,7 +16709,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v156';
+const APP_VERSION = '2026-10-02-v157';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
