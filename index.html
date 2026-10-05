@@ -1581,7 +1581,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v161</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v162</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2113,6 +2113,22 @@ a.grilla-celda{display:block;}
       </div>
       <div id="oc-mover" style="display:none;position:sticky;top:6px;z-index:5;background:#F3EEF7;border:1px solid #D9CCE6;border-radius:12px;padding:10px;margin-bottom:10px;"></div>
       <div id="oc-lista"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-confeccion">
+    <div class="form-card" style="max-width:820px;">
+      <h2>Costos de confección</h2>
+      <p class="note" style="text-align:left;margin-bottom:10px;">Lo que cobra el taller por unidad de cada artículo. Escribí y guardá con el botón verde.</p>
+      <input id="cf-buscar" placeholder="🔍 Buscar artículo" oninput="renderConfeccion()" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:10px;box-sizing:border-box;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;font-size:0.85rem;">
+        <label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;"><input type="checkbox" id="cf-sin" onchange="renderConfeccion()"> Solo los que no tienen precio</label>
+        <span style="flex:1;"></span>
+        <span>Aumentar todos los visibles</span><input id="cf-pct" type="number" placeholder="%" style="width:70px;padding:6px;border:1px solid var(--line);border-radius:8px;"><button type="button" class="btn-mini" onclick="aumentarConfeccion()">Aplicar %</button>
+      </div>
+      <div id="cf-lista"></div>
+      <div id="cf-guardar" style="display:none;position:sticky;bottom:10px;z-index:5;margin-top:10px;"><button type="button" onclick="guardarConfeccion()" style="width:100%;padding:12px;border:none;border-radius:12px;background:#3D9A5B;color:#fff;font-weight:700;font-size:0.95rem;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.15);">💾 Guardar</button></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
   </div>
@@ -5535,7 +5551,7 @@ const GRUPOS_INICIO = {
   d: { lado: 'int', titulo: 'Ventas', items: [['📋 Historial de pedidos', 'abrirHistorial()'], ['🤖 Pedido con IA (texto libre)', 'abrirPedidoIA()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()'], ['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
   f: { lado: 'int', titulo: 'Catálogo', items: [['🗂️ Ordenar categorías', 'abrirCategorias()'], ['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['📷 Fotos de productos', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
   g: { lado: 'int', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas'], columnas: [
-    [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()']],
+    [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()'], ['💰 Costos de confección', 'abrirConfeccion()']],
     [['📊 Stock y prioridades', 'abrirStock()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📋 Nueva orden de trabajo', 'abrirAsistenteOT()']],
     [['🚚 Ingreso a los talleres', 'abrirEnviosTela()'], ['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🏭 Productos en producción', 'abrirEnProduccion()']],
     [['📥 Entregas del taller', 'abrirIngresoTaller()']],
@@ -8748,6 +8764,7 @@ function cambiosSinGuardar(paso){
   if(paso === 'step-telas') return typeof preciosPend !== 'undefined' && (n(preciosPend) || (typeof tcPend !== 'undefined' && tcPend !== null));
   if(paso === 'step-stock') return typeof stockPend !== 'undefined' && n(stockPend);
   if(paso === 'step-reventa') return typeof rvPend !== 'undefined' && n(rvPend);
+  if(paso === 'step-confeccion') return typeof cfPend !== 'undefined' && n(cfPend);
   return false;
 }
 window.addEventListener('beforeunload', e => { const a = document.querySelector('.step.active'); if(a && cambiosSinGuardar(a.id)){ e.preventDefault(); e.returnValue = ''; } });
@@ -8831,7 +8848,7 @@ async function ejecutarDeshacer(){
     await fn();
     try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
     const a = document.querySelector('.step.active'); const id = a && a.id;
-    const re = { 'step-telas': () => renderTelas(), 'step-stock': () => renderStock(), 'step-reventa': () => renderReventa(), 'step-productos-fabrico': () => renderProductosFabrico(), 'step-articulos-cortes': () => { renderListaAC(); if(acArticulo) abrirArticuloAC(acArticulo); } }[id];
+    const re = { 'step-confeccion': () => renderConfeccion(), 'step-telas': () => renderTelas(), 'step-stock': () => renderStock(), 'step-reventa': () => renderReventa(), 'step-productos-fabrico': () => renderProductosFabrico(), 'step-articulos-cortes': () => { renderListaAC(); if(acArticulo) abrirArticuloAC(acArticulo); } }[id];
     if(re) re();
     alert('Se deshizo el cambio.');
   } catch(e){ alert('No se pudo deshacer: ' + e.message); }
@@ -8853,6 +8870,7 @@ function conDeshacer(nombreFn, texto, cuales, skusFn){
 window.addEventListener('load', () => {
   conDeshacer('guardarPreciosTelas', 'Precios de telas guardados', ['telas']);
   conDeshacer('guardarStock', 'Stock guardado', ['stock']);
+  conDeshacer('guardarConfeccion', 'Costos de confección guardados', ['tabla']);
   conDeshacer('guardarReventa', 'Descripciones guardadas', ['reventa'], () => Object.keys(rvPend).filter(k => k.startsWith('v:')).map(k => k.slice(2)).concat(productosReventa().filter(x => rvPend['p:' + x.p._editKey]).flatMap(x => x.p.variantes.map(v => v.sku))));
   conDeshacer('aplicarPfMasivo', 'Cambios aplicados a los SKU', ['fabricacion', 'tabla', 'stock']);
   conDeshacer('borrarSkusPf', 'SKU borrados', ['fabricacion', 'tabla', 'stock'], () => [...pfSel]);
@@ -9231,6 +9249,51 @@ async function moverProductosCategoria(){
     renderCategoriasMover();
     ofrecerDeshacer(`${eks.length} movido${eks.length === 1 ? '' : 's'} a ${dest}`, async () => { await db.collection('config').doc('categorias').set(antes); location.reload(); });
   } catch(e){ categoriasCfg = antes; alert('No se pudo mover: ' + e.message); location.reload(); }
+}
+
+// ===== Costos de confeccion (mano de obra) de todos los articulos =====
+const cfPend = {};
+async function abrirConfeccion(){
+  mostrarPaso('step-confeccion');
+  if(tablaConsumo === null) await cargarTablaConsumo();
+  renderConfeccion();
+}
+function cfValor(a, campo){ const p = cfPend[a]; if(p && p[campo] !== undefined) return p[campo]; const e = ((tablaConsumo.empaque || {})[a] || {}); return e[campo] ? String(e[campo]).replace('.', ',') : ''; }
+function renderConfeccion(){
+  const q = normBusqueda(document.getElementById('cf-buscar').value), sin = document.getElementById('cf-sin').checked;
+  const arts = articulosAC().sort((a, b) => a.localeCompare(b, 'es')).filter(a => (!q || normBusqueda(a).includes(q)) && (!sin || !cfValor(a, 'confeccion')));
+  window.__cfVisibles = arts;
+  document.getElementById('cf-lista').innerHTML = arts.length ? `<div style="display:grid;grid-template-columns:minmax(0,1fr) 120px 120px;gap:6px;font-size:0.72rem;color:#8A8072;padding:0 4px 4px;"><span>Artículo</span><span style="text-align:right;">Confección $</span><span style="text-align:right;">Otros insumos $</span></div>` + arts.map((a, i) => `<div style="display:grid;grid-template-columns:minmax(0,1fr) 120px 120px;gap:6px;align-items:center;padding:6px 4px;border-top:1px solid var(--line);">
+      <span style="font-size:0.88rem;">${escaparHtml(a)}</span>
+      <input inputmode="decimal" value="${escapeAttr(cfValor(a, 'confeccion'))}" placeholder="—" oninput="cfCambiar(${i}, 'confeccion', this.value)" style="padding:7px;border:1px solid var(--line);border-radius:8px;text-align:right;">
+      <input inputmode="decimal" value="${escapeAttr(cfValor(a, 'insumos'))}" placeholder="—" oninput="cfCambiar(${i}, 'insumos', this.value)" style="padding:7px;border:1px solid var(--line);border-radius:8px;text-align:right;"></div>`).join('') : '<p class="empty-msg">No hay artículos con ese filtro.</p>';
+}
+function cfCambiar(i, campo, v){
+  const a = window.__cfVisibles[i]; cfPend[a] = { ...(cfPend[a] || {}), [campo]: v };
+  const n = Object.keys(cfPend).length, b = document.getElementById('cf-guardar');
+  b.style.display = 'block'; b.querySelector('button').textContent = `💾 Guardar (${n} artículo${n === 1 ? '' : 's'})`;
+}
+function aumentarConfeccion(){
+  const pct = parseFloat(document.getElementById('cf-pct').value); if(!pct) return;
+  (window.__cfVisibles || []).forEach(a => { const v = numAr(cfValor(a, 'confeccion')); if(v > 0) cfPend[a] = { ...(cfPend[a] || {}), confeccion: String(Math.round(v * (1 + pct / 100))) }; });
+  renderConfeccion();
+  const n = Object.keys(cfPend).length, b = document.getElementById('cf-guardar');
+  if(n){ b.style.display = 'block'; b.querySelector('button').textContent = `💾 Guardar (${n} artículo${n === 1 ? '' : 's'})`; }
+}
+async function guardarConfeccion(){
+  tablaConsumo.empaque = tablaConsumo.empaque || {};
+  Object.entries(cfPend).forEach(([a, p]) => {
+    const e = { ...(tablaConsumo.empaque[a] || {}) };
+    if(p.confeccion !== undefined) e.confeccion = numAr(p.confeccion) || 0;
+    if(p.insumos !== undefined) e.insumos = numAr(p.insumos) || 0;
+    tablaConsumo.empaque[a] = e;
+  });
+  try{
+    await guardarTablaYConsumo();
+    Object.keys(cfPend).forEach(k => delete cfPend[k]);
+    document.getElementById('cf-guardar').style.display = 'none';
+    renderConfeccion();
+  } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -16735,7 +16798,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v161';
+const APP_VERSION = '2026-10-02-v162';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
