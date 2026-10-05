@@ -1581,7 +1581,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v159</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v160</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -7046,7 +7046,7 @@ function renderProductosFabrico(){
       const ok = completo(f);
       return cab + `<tr style="border-top:1px solid var(--line);${pfSel.has(f.sku) ? 'background:#F3EEF7;' : ''}">
         <td style="padding:7px 4px 7px 8px;"><input type="checkbox" ${pfSel.has(f.sku) ? 'checked' : ''} onchange="pfToggle('${escapeAttr(f.sku)}', this.checked)"></td>
-        <td style="padding:7px 8px;"><b>${escaparHtml(f.sku)}</b></td>
+        <td style="padding:7px 8px;"><b>${escaparHtml(f.sku)}</b>${!buscarProductoPorSku(f.sku) && fabricacion.vinculos[f.sku] && fabricacion.vinculos[f.sku].categoria ? `<div style="font-size:0.68rem;color:#2E5A8C;">→ ${escaparHtml(fabricacion.vinculos[f.sku].categoria)}</div>` : ''}</td>
         <td style="padding:7px 8px;font-size:0.8rem;">${escaparHtml(f.desc || '—')}</td>
         <td class="pf-det" style="padding:7px 8px;">${f.articulo ? `<a href="#" onclick="event.preventDefault(); abrirArticulosCortes().then(() => abrirArticuloAC('${escapeAttr(f.articulo)}'))">${escaparHtml(nombreArt(f.articulo))}</a>` : '<span style="color:#A6432F;">falta</span>'}</td>
         <td class="pf-det" style="padding:7px 8px;font-size:0.8rem;">${f.calidad ? escaparHtml(f.calidad) + `<br><span class="note" style="font-size:0.72rem;">${escaparHtml(f.telas.join(', '))}</span>` : '<span style="color:#A6432F;">falta</span>'}</td>
@@ -7575,6 +7575,7 @@ function renderPfMasivo(){
       <div class="field" style="margin:0;"><label>Bolsa</label><select id="pm-bolsa">${nc}<option value="__sin__">Sin bolsa</option>${bolsasDisponibles().map(b => `<option value="${escapeAttr(b)}">Bolsa ${escaparHtml(b)}</option>`).join('')}</select></div>
       <div class="field" style="margin:0;"><label>Unidades por bolsa</label><input id="pm-porbolsa" type="number" min="1" placeholder="no cambiar"></div>
       <div class="field" style="margin:0;"><label>Stock mínimo</label><input id="pm-min" type="text" inputmode="decimal" placeholder="no cambiar"></div>
+      <div class="field" style="margin:0;"><label>Categoría (al publicar)</label><select id="pm-cat">${nc}${CATALOGO.map(c => `<option value="${escapeAttr(c.categoria)}">${escaparHtml(c.categoria)}</option>`).join('')}</select></div>
     </div>
     <button class="btn btn-gold" style="width:auto;padding:10px 18px;margin-top:10px;" onclick="aplicarPfMasivo()">Aplicar a los ${pfSel.size} SKU</button>
     ${[...pfSel].some(s => !buscarProductoPorSku(s)) ? `<button class="btn btn-ghost" style="width:auto;padding:10px 18px;margin-top:10px;margin-left:6px;" onclick="abrirPublicarVarios([...pfSel])">📸 Publicar en el catálogo los que no están</button>` : ''}
@@ -7585,7 +7586,7 @@ function renderPfMasivo(){
 }
 async function aplicarPfMasivo(){
   const v = id => String(document.getElementById(id).value || '').trim();
-  const cal = v('pm-cal'), art = v('pm-art'), conf = v('pm-conf'), ins = v('pm-ins'), bolsa = v('pm-bolsa'), pb = v('pm-porbolsa'), min = v('pm-min');
+  const cal = v('pm-cal'), art = v('pm-art'), conf = v('pm-conf'), ins = v('pm-ins'), bolsa = v('pm-bolsa'), pb = v('pm-porbolsa'), min = v('pm-min'), catP = v('pm-cat');
   const desc = [];
   if(cal){ const q = calidadesTela().find(x => x.clave === cal); desc.push('Calidad de tela: ' + (q ? q.etiqueta : cal)); }
   if(art) desc.push('Artículo de corte: ' + art);
@@ -7594,6 +7595,7 @@ async function aplicarPfMasivo(){
   if(bolsa) desc.push('Bolsa: ' + (bolsa === '__sin__' ? 'sin bolsa' : bolsa));
   if(pb) desc.push('Unidades por bolsa: ' + pb);
   if(min) desc.push('Stock mínimo: ' + min);
+  if(catP) desc.push('Categoría al publicar: ' + catP);
   if(!desc.length){ alert('No completó nada para cambiar.'); return; }
   const skus = [...pfSel];
   if(!confirm(`Aplicar a ${skus.length} SKU:\n\n• ${desc.join('\n• ')}\n\n¿Seguir?`)) return;
@@ -7603,8 +7605,9 @@ async function aplicarPfMasivo(){
       const x = { ...(fabricacion.vinculos[s] || {}) };
       if(cal){ x.calidad = cal; x.tela = ''; }
       if(art) x.articulo = art;
+      if(catP) x.categoria = catP;
       fabricacion.vinculos[s] = x;
-      if(cal || art) fabricacion.propios = fabricacion.propios || {};
+      if(cal || art || catP) fabricacion.propios = fabricacion.propios || {};
     });
     await guardarFabricacion();
     // confeccion, insumos y bolsa: por articulo de corte
@@ -7670,6 +7673,8 @@ function sugerenciasPublicar(sku){
   } else if(art){
     for(const cc of CATALOGO) for(const p of (cc.productos || [])) for(const v of (p.variantes || [])) if(!precio && articuloDeSku(String(v.sku).toUpperCase()) === art && String(v.sku).toUpperCase() !== S && parsePrice(v.precio)){ precio = parsePrice(v.precio); motivo = `igual que ${v.sku}, mismo artículo`; }
   }
+  const catElegida = fabricacion && fabricacion.vinculos[S] && fabricacion.vinculos[S].categoria;
+  if(catElegida && CATALOGO.some(c => c.categoria === catElegida)){ if(cat !== catElegida) prod = null; cat = catElegida; }
   return { prod, cat, precio, motivo, desc: descripcionVarianteFab(S) || (art ? nombreLindoArticulo(art) : ''), sub: cal ? descripcionDesdeCalidad(cal, cat) : '' };
 }
 function abrirPublicar(sku, solo){
@@ -16716,7 +16721,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v159';
+const APP_VERSION = '2026-10-02-v160';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
