@@ -1581,7 +1581,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v158</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v159</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -9116,7 +9116,8 @@ function asignarMapaFotos(){
   if(cambio) db.collection('config').doc('fotos_mapa').set({ mapa: fotosMapa }).catch(() => {});
 }
 function aplicarMovimientos(){
-  (categoriasCfg.mover || []).forEach(([ek, cat]) => {
+  (categoriasCfg.mover || []).forEach(x => {
+    const ek = Array.isArray(x) ? x[0] : x.k, cat = Array.isArray(x) ? x[1] : x.c;
     const dest = CATALOGO.find(c => c.categoria === cat); if(!dest) return;
     let prod = null;
     CATALOGO.forEach(c => { const i = c.productos.findIndex(p => p._editKey === ek); if(i >= 0) prod = c.productos.splice(i, 1)[0]; });
@@ -9201,7 +9202,7 @@ async function moverProductosCategoria(){
   eks.forEach(ek => {
     let prod = null;
     CATALOGO.forEach(c => { const i = c.productos.findIndex(p => p._editKey === ek); if(i >= 0) prod = c.productos.splice(i, 1)[0]; });
-    if(prod){ destC.productos.push(prod); categoriasCfg.mover = (categoriasCfg.mover || []).filter(x => x[0] !== ek).concat([[ek, dest]]); }
+    if(prod){ destC.productos.push(prod); categoriasCfg.mover = (categoriasCfg.mover || []).filter(x => (Array.isArray(x) ? x[0] : x.k) !== ek).concat([{ k: ek, c: dest }]); }
   });
   try{
     await db.collection('config').doc('categorias').set(JSON.parse(JSON.stringify(categoriasCfg)));
@@ -9210,7 +9211,7 @@ async function moverProductosCategoria(){
     try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
     renderCategoriasMover();
     ofrecerDeshacer(`${eks.length} movido${eks.length === 1 ? '' : 's'} a ${dest}`, async () => { await db.collection('config').doc('categorias').set(antes); location.reload(); });
-  } catch(e){ alert('No se pudo mover: ' + e.message); }
+  } catch(e){ categoriasCfg = antes; alert('No se pudo mover: ' + e.message); location.reload(); }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -16715,7 +16716,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v158';
+const APP_VERSION = '2026-10-02-v159';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
