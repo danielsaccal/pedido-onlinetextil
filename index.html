@@ -1581,7 +1581,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v157</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v158</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2105,7 +2105,7 @@ a.grilla-celda{display:block;}
       <h2>Ordenar categorías</h2>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
         <input id="oc-nueva" placeholder="Nombre de la categoría nueva" style="flex:1;min-width:200px;padding:10px;border:1px solid var(--line);border-radius:12px;">
-        <button type="button" class="btn-mini" onclick="crearCategoria()">➕ Nueva categoría</button>
+        <button type="button" class="btn btn-gold" style="width:auto;padding:10px 16px;" onclick="crearCategoria()">➕ Crear categoría</button>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
         <select id="oc-cat" onchange="renderCategoriasMover()" style="flex:1;min-width:160px;padding:10px;border:1px solid var(--line);border-radius:12px;"></select>
@@ -8718,7 +8718,7 @@ function elegirOpcion(titulo, texto, opciones, extraHtml){
     const est = e => e === 'rojo' ? 'background:#fff;color:#A6432F;border:1.5px solid #E3B8AE;' : e === 'gold' ? 'background:var(--gold);color:var(--purple);border:none;' : 'background:#fff;color:var(--purple);border:1.5px solid var(--line);';
     document.getElementById('dlg-btns').innerHTML = [...opciones, { t: 'Cancelar', v: null }].map((o, i) => `<button type="button" data-i="${i}" style="padding:11px;border-radius:10px;font-size:0.92rem;font-weight:700;cursor:pointer;text-align:left;${o.v === null ? 'background:none;border:none;color:#8A8072;text-align:center;' : est(o.estilo)}">${o.t}</button>`).join('');
     const todas = [...opciones, { v: null }];
-    document.querySelectorAll('#dlg-btns button').forEach(b => b.onclick = () => { m.style.display = 'none'; res(todas[+b.dataset.i].v); });
+    document.querySelectorAll('#dlg-btns button').forEach(b => b.onclick = () => { const ic = document.getElementById('dlg-cat-nombre'); if(ic) window.__ultimoNombreCat = ic.value; m.style.display = 'none'; res(todas[+b.dataset.i].v); });
     m.style.display = 'flex';
   });
 }
@@ -9173,8 +9173,14 @@ function renderCategoriasMover(){
 }
 function ocToggle(ek, on){ if(on) ocSel.add(ek); else ocSel.delete(ek); renderCategoriasMover(); }
 async function crearCategoria(){
-  const n = document.getElementById('oc-nueva').value.trim().toUpperCase();
-  if(!n) return;
+  let n = document.getElementById('oc-nueva').value.trim().toUpperCase();
+  if(!n){
+    const r = await elegirOpcion('➕ Nueva categoría', 'Escribí el nombre.', [{ t: 'Crear', v: 'ok', estilo: 'gold' }], '<input id="dlg-cat-nombre" placeholder="Ej: PROMOCIONES" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:12px;box-sizing:border-box;">');
+    setTimeout(() => {}, 0);
+    if(r !== 'ok') return;
+    n = String((window.__ultimoNombreCat || '')).trim().toUpperCase();
+    if(!n){ alert('No escribiste el nombre.'); return; }
+  }
   if(CATALOGO.some(c => normBusqueda(c.categoria) === normBusqueda(n))){ alert('Esa categoría ya existe.'); return; }
   categoriasCfg.extra = [...(categoriasCfg.extra || []), n];
   try{
@@ -16709,7 +16715,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v157';
+const APP_VERSION = '2026-10-02-v158';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
