@@ -1581,7 +1581,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v160</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v161</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -7604,12 +7604,13 @@ async function aplicarPfMasivo(){
     skus.forEach(s => {
       const x = { ...(fabricacion.vinculos[s] || {}) };
       if(cal){ x.calidad = cal; x.tela = ''; }
-      if(art) x.articulo = art;
+      if(art){ Object.entries(tablaConsumo.empaque || {}).forEach(([a, e]) => { if(a !== art && e && String(e.sku || '').toUpperCase() === s){ e.sku = ''; window.__empCambio = true; } }); x.articulo = art; }
       if(catP) x.categoria = catP;
       fabricacion.vinculos[s] = x;
       if(cal || art || catP) fabricacion.propios = fabricacion.propios || {};
     });
     await guardarFabricacion();
+    if(window.__empCambio){ window.__empCambio = false; await guardarTablaYConsumo(); }
     // confeccion, insumos y bolsa: por articulo de corte
     if(conf || ins || bolsa || pb){
       tablaConsumo.empaque = tablaConsumo.empaque || {};
@@ -8186,12 +8187,25 @@ async function renderProductosAC(){
 }
 async function cambiarTelaProductoAC(s){
   const actual = calidadDeSku(s);
-  const p = elegirOpcion(`Tela de ${s}`, 'Elija la tela con la que se hace.', [{ t: 'Guardar', v: 'ok', estilo: 'gold' }], `<select id="dlg-cal" style="width:100%;margin-bottom:12px;">${opcionesCalidad(actual)}</select>`);
-  setTimeout(() => { const sel = document.getElementById('dlg-cal'); hacerSelectBuscable(sel); if(sel._sync) sel._sync(); }, 0);
-  const elegido = document.getElementById('dlg-cal');
+  const arts = articulosAC().sort((a, b) => a.localeCompare(b, 'es'));
+  const p = elegirOpcion(`Editar ${s}`, '', [{ t: 'Guardar', v: 'ok', estilo: 'gold' }], `<label style="font-size:0.8rem;font-weight:700;color:#8A6B3F;">Artículo de corte</label><select id="dlg-art" style="width:100%;margin:4px 0 10px;">${arts.map(a => `<option value="${escapeAttr(a)}" ${a === acArticulo ? 'selected' : ''}>${escaparHtml(a)}</option>`).join('')}</select><label style="font-size:0.8rem;font-weight:700;color:#8A6B3F;">Tela</label><select id="dlg-cal" style="width:100%;margin:4px 0 12px;">${opcionesCalidad(actual)}</select>`);
+  setTimeout(() => { ['dlg-art', 'dlg-cal'].forEach(id => { const sel = document.getElementById(id); hacerSelectBuscable(sel); if(sel._sync) sel._sync(); }); }, 0);
+  const elegido = document.getElementById('dlg-cal'), elArt = document.getElementById('dlg-art');
   const r = await p;
   if(r !== 'ok') return;
   const q = calidadesTela().find(x => x.clave === elegido.value); if(!q){ alert('Elija una tela.'); return; }
+  const nuevoArt = elArt.value;
+  if(nuevoArt && nuevoArt !== acArticulo){
+    fabricacion.vinculos[s] = { ...(fabricacion.vinculos[s] || {}), calidad: q.clave, tela: '', articulo: nuevoArt };
+    const e0 = tablaConsumo.empaque[acArticulo] || {};
+    try{
+      await guardarFabricacion();
+      if(String(e0.sku || '').toUpperCase() === s){ e0.sku = ''; await guardarTablaYConsumo(); }
+      renderProductosAC(); renderListaAC(); sincronizarDescripcionesCatalogo();
+      alert(`${s} ahora se hace con "${nuevoArt}". Consumo, costo y descripción se recalculan solos.`);
+    } catch(err){ alert('No se pudo guardar: ' + err.message); }
+    return;
+  }
   fabricacion.vinculos[s] = { ...(fabricacion.vinculos[s] || {}), calidad: q.clave, tela: '', articulo: acArticulo };
   const e = tablaConsumo.empaque[acArticulo] || {};
   try{
@@ -16721,7 +16735,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v160';
+const APP_VERSION = '2026-10-02-v161';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
