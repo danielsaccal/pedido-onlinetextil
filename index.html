@@ -828,11 +828,15 @@ a.grilla-celda{display:block;}
   <!-- STEP: ACTUALIZAR FOTO DE PRODUCTO -->
   <div class="step" id="step-foto-sku">
     <div class="form-card">
-      <h2>Actualizar foto de producto</h2>
-      <p class="note" style="margin-bottom:14px;">Busque el producto por SKU y suba una foto nueva para reemplazar la actual (aplica a todas las variantes de ese producto).</p>
-      <div class="field"><label>SKU</label><input type="text" id="fs-sku" placeholder="Ej: TOA171B"></div>
-      <div class="actions"><button class="btn btn-gold" onclick="buscarProductoParaFoto()">Buscar</button></div>
-      <div id="fs-resultado" style="margin-top:16px;"></div>
+      <h2>Fotos de productos</h2>
+      <p class="note" style="text-align:left;margin-bottom:10px;">Elegí una categoría y tocá <b>📷</b> en cada producto para subirle fotos. Tocando la foto ves y ordenás todas.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <select id="fg-cat" onchange="renderGrillaFotos()" style="flex:1;min-width:160px;padding:10px;border:1px solid var(--line);border-radius:12px;"></select>
+        <input id="fs-sku" placeholder="🔍 Producto o SKU" oninput="renderGrillaFotos()" style="flex:2;min-width:180px;padding:10px;border:1px solid var(--line);border-radius:12px;">
+      </div>
+      <label style="display:inline-flex;gap:6px;align-items:center;font-size:0.82rem;color:#6B6258;margin-bottom:10px;cursor:pointer;"><input type="checkbox" id="fg-sin" onchange="renderGrillaFotos()"> Solo los que tienen 1 foto o menos</label>
+      <div id="fs-resultado" style="margin-bottom:12px;"></div>
+      <div id="fg-grilla" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
   </div>
@@ -1577,7 +1581,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v155</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v156</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5512,7 +5516,7 @@ const GRUPOS_INICIO = {
   a: { lado: 'ext', titulo: 'Armar pedido', items: [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['📷 Escanear etiqueta (SKU)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto').click()"], ['🤖 Buscar por foto (IA)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto-producto').click()"]] },
   c: { lado: 'ext', titulo: 'Difusión', items: [['🔗 Compartir por rubro', 'abrirCompartirRubro()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()'], ['🖼️ Nuevo ingreso (flyers, video)', 'abrirNuevoIngreso()'], ['📱 Vista previa grilla IG', 'abrirGrilla()'], ['📣 Anuncios y promociones', 'abrirAnuncio()'], ['🎬 Compartir video de producto', 'abrirCompartirVideoProducto()']] },
   d: { lado: 'int', titulo: 'Ventas', items: [['📋 Historial de pedidos', 'abrirHistorial()'], ['🤖 Pedido con IA (texto libre)', 'abrirPedidoIA()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()'], ['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
-  f: { lado: 'int', titulo: 'Catálogo', items: [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['📷 Actualizar foto', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
+  f: { lado: 'int', titulo: 'Catálogo', items: [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['📷 Fotos de productos', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
   g: { lado: 'int', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas'], columnas: [
     [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()']],
     [['📊 Stock y prioridades', 'abrirStock()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📋 Nueva orden de trabajo', 'abrirAsistenteOT()']],
@@ -13602,6 +13606,52 @@ function abrirActualizarFoto(){
   mostrarPaso('step-foto-sku');
   document.getElementById('fs-resultado').innerHTML = '';
   document.getElementById('fs-sku').value = '';
+  const s = document.getElementById('fg-cat');
+  s.innerHTML = '<option value="">Todas las categorías</option>' + CATALOGO.map((c, i) => `<option value="${i}">${escaparHtml(c.categoria)}</option>`).join('');
+  renderGrillaFotos();
+}
+// grilla de productos para cargar fotos rapido
+function renderGrillaFotos(){
+  const cat = document.getElementById('fg-cat').value, q = normBusqueda(document.getElementById('fs-sku').value), soloPocas = document.getElementById('fg-sin').checked;
+  const items = [];
+  CATALOGO.forEach((c, ci) => { if(cat !== '' && String(ci) !== cat) return; (c.productos || []).forEach((p, pi) => {
+    if(!Array.isArray(p.variantes)) return;
+    if(q && !normBusqueda(p.nombre + ' ' + p.variantes.map(v => v.sku).join(' ')).includes(q)) return;
+    const fotos = imagenesEfectivas(ci, pi, p) || [];
+    if(soloPocas && fotos.length > 1) return;
+    items.push({ ci, pi, p, fotos });
+  }); });
+  const g = document.getElementById('fg-grilla');
+  if(!items.length){ g.innerHTML = '<p class="empty-msg" style="grid-column:1 / -1;">No hay productos con ese filtro.</p>'; return; }
+  g.innerHTML = items.slice(0, 120).map(({ ci, pi, p, fotos }) => `<div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;">
+      <div onclick="renderGaleriaFoto(${ci}, ${pi}, CATALOGO[${ci}].productos[${pi}]); document.getElementById('fs-resultado').scrollIntoView({behavior:'smooth'});" style="cursor:pointer;aspect-ratio:1;background:var(--cream);display:flex;align-items:center;justify-content:center;position:relative;">
+        ${fotos[0] ? `<img src="${escapeAttr(fotos[0])}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">` : '<span style="font-size:2rem;opacity:.4;">🖼️</span>'}
+        <span style="position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:0.72rem;border-radius:8px;padding:1px 6px;">${fotos.length} foto${fotos.length === 1 ? '' : 's'}</span></div>
+      <div style="padding:8px;display:flex;flex-direction:column;gap:6px;flex:1;">
+        <div style="font-size:0.82rem;font-weight:700;line-height:1.2;">${escaparHtml(p.nombre)}</div>
+        <div style="font-size:0.7rem;color:#8A8072;">${escaparHtml(p.variantes.map(v => v.sku).slice(0, 4).join(', '))}${p.variantes.length > 4 ? '…' : ''}</div>
+        <label class="btn-mini" style="margin-top:auto;text-align:center;cursor:pointer;">📷 Subir fotos<input type="file" accept="image/*" multiple style="display:none;" onchange="subirFotosRapido(${ci}, ${pi}, this)"></label>
+      </div></div>`).join('') + (items.length > 120 ? `<p class="note" style="grid-column:1 / -1;">Mostrando 120 de ${items.length}. Elegí una categoría o buscá para ver el resto.</p>` : '');
+}
+async function subirFotosRapido(ci, pi, input){
+  const files = [...input.files]; if(!files.length) return;
+  const p = CATALOGO[ci].productos[pi];
+  const r = await elegirOpcion(`📷 ${p.nombre}`, `${files.length} foto${files.length === 1 ? '' : 's'} nueva${files.length === 1 ? '' : 's'}.`, [
+    { t: 'Agregar a las que ya tiene', v: 'agregar', estilo: 'gold' },
+    { t: 'Reemplazar todas las fotos', v: 'reemplazar' },
+  ]);
+  if(r === null){ input.value = ''; return; }
+  try{
+    const nuevas = await Promise.all(files.map(comprimirImagenAFotoBase64));
+    const key = `${ci}-${pi}`;
+    const actuales = fotosOverride[key] || imagenesEfectivas(ci, pi, p) || [];
+    const fotos = r === 'reemplazar' ? nuevas : [...actuales, ...nuevas];
+    await db.collection('fotos').doc(key).set({ imagenesBase64: fotos, sku: (p.variantes[0] || {}).sku || '', nombreProducto: p.nombre, actualizado: new Date().toISOString() });
+    fotosOverride[key] = fotos;
+    renderGrillaFotos();
+    try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+  } catch(e){ alert('No se pudo guardar: ' + e.message); }
+  input.value = '';
 }
 
 function abrirCompartirVideoProducto(){
@@ -16530,7 +16580,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v155';
+const APP_VERSION = '2026-10-02-v156';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
