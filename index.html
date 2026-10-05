@@ -1577,7 +1577,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v154</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v155</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -3291,6 +3291,7 @@ async function cargarTalleres(){
   try{
     const doc = await db.collection('config').doc('talleres').get();
     talleresLista = (doc.exists && Array.isArray(doc.data().nombres) && doc.data().nombres.length) ? doc.data().nombres : [...DEFAULT_TALLERES];
+    talleresDetalles = (doc.exists && doc.data().detalles) || {};
   } catch(e){
     console.error('Error cargando talleres:', e);
     talleresLista = talleresLista || [...DEFAULT_TALLERES];
@@ -7486,7 +7487,7 @@ async function guardarLista(id, valores){
     await db.collection('config').doc('telas').set(JSON.parse(JSON.stringify(telasDatos)));
   } else if(id === 'talleres'){
     talleresLista = valores;
-    await db.collection('config').doc('talleres').set({ nombres: talleresLista });
+    await db.collection('config').doc('talleres').set({ nombres: talleresLista, detalles: talleresDetalles || {} });
   } else if(id === 'bolsas'){
     tablaConsumo.bolsas = valores; await guardarTablaYConsumo();
   } else if(id === 'anchos'){
@@ -7503,7 +7504,11 @@ async function abrirListas(){
 function renderListas(){
   document.getElementById('ls-cont').innerHTML = LISTAS_DEF.map(l => `<div class="ls-sec">
       <h3>${l.titulo}</h3><p>${l.ayuda}</p>
-      <div class="ls-chips">${valoresLista(l.id).map((v, i) => `<span class="ls-chip">${escaparHtml(v)}<button type="button" title="Quitar" onclick="quitarDeLista('${l.id}', ${i})">✕</button></span>`).join('') || '<span class="note">Vacía</span>'}</div>
+      ${l.id === 'talleres' ? `<div style="display:grid;gap:6px;margin-bottom:8px;">${valoresLista('talleres').map((v, i) => { const d = talleresDetalles[v] || {}; return `<div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;align-items:center;background:var(--cream);border-radius:10px;padding:8px 10px;">
+          <div><b>${escaparHtml(v)}</b><div style="font-size:0.75rem;color:#6B6258;">${d.direccion ? '📍 ' + escaparHtml(d.direccion) : '<span style="color:#A89E90;">sin dirección</span>'} · ${d.celular ? '📱 ' + escaparHtml(d.celular) : '<span style="color:#A89E90;">sin celular</span>'}</div></div>
+          <button type="button" class="btn-mini" onclick="editarDatosTaller(${i})">✏️ Datos</button>
+          <button type="button" class="btn-mini" title="Quitar" onclick="quitarDeLista('talleres', ${i})">✕</button></div>`; }).join('')}</div>` :
+      `<div class="ls-chips">${valoresLista(l.id).map((v, i) => `<span class="ls-chip">${escaparHtml(v)}<button type="button" title="Quitar" onclick="quitarDeLista('${l.id}', ${i})">✕</button></span>`).join('') || '<span class="note">Vacía</span>'}</div>`}
       <div class="ls-add"><input type="text" id="ls-in-${l.id}" placeholder="Agregar…" onkeydown="if(event.key==='Enter') agregarALista('${l.id}')"><button type="button" onclick="agregarALista('${l.id}')">+ Agregar</button></div>
     </div>`).join('');
 }
@@ -9048,6 +9053,30 @@ window.addEventListener('DOMContentLoaded', () => {
   conCache('cargarTelas', () => telasDatos);
 });
 
+// ===== Datos de los talleres: direccion y WhatsApp =====
+var talleresDetalles = talleresDetalles || {};
+function numeroWhatsApp(cel){
+  let d = String(cel || '').replace(/\D/g, '');
+  if(!d) return '';
+  if(d.startsWith('00')) d = d.slice(2);
+  if(d.startsWith('0')) d = d.slice(1);
+  if(d.startsWith('54')) return d.startsWith('549') ? d : '549' + d.slice(2);
+  d = d.replace(/^(\d{2,4})15(\d{6,8})$/, '$1$2'); // saca el 15
+  return '549' + d;
+}
+async function guardarDetallesTaller(nombre, dir, cel){
+  talleresDetalles[nombre] = { direccion: dir.trim(), celular: cel.trim() };
+  await db.collection('config').doc('talleres').set({ nombres: talleresLista, detalles: talleresDetalles });
+}
+async function editarDatosTaller(i){
+  const n = talleresLista[i], d = talleresDetalles[n] || {};
+  const r = await elegirOpcion(`🏭 ${n}`, 'Dirección y celular con WhatsApp (para mandarle las órdenes).', [{ t: '💾 Guardar', v: 'ok', estilo: 'gold' }],
+    `<div style="display:grid;gap:8px;margin-bottom:12px;"><input id="tdl-dir" placeholder="Dirección" value="${escapeAttr(d.direccion || '')}" style="padding:10px;border:1px solid var(--line);border-radius:10px;"><input id="tdl-cel" type="tel" placeholder="Celular (ej: 11 5555-1234)" value="${escapeAttr(d.celular || '')}" style="padding:10px;border:1px solid var(--line);border-radius:10px;"></div>`);
+  if(r !== 'ok') return;
+  try{ await guardarDetallesTaller(n, document.getElementById('tdl-dir').value, document.getElementById('tdl-cel').value); renderListas(); }
+  catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -9650,7 +9679,7 @@ function compartirOrdenTrabajo(modo){
     }
     return;
   }
-  compartirConBosquejos(texto, window.ultimaOTRenglones || []);
+  compartirConBosquejos(texto, window.ultimaOTRenglones || [], (document.getElementById('ot-taller') || {}).value);
 }
 
 // ===== PDF de la orden de trabajo (texto + bosquejos) =====
@@ -9753,7 +9782,21 @@ async function imagenesBosquejosOT(renglones){
   }
   return archivos;
 }
-async function compartirConBosquejos(texto, renglones){
+async function compartirConBosquejos(texto, renglones, taller){
+  const d = taller && talleresDetalles[taller], num = d && numeroWhatsApp(d.celular);
+  if(num){
+    const r = await elegirOpcion(`Enviar a ${taller}`, `WhatsApp: ${d.celular}`, [
+      { t: `💬 Abrir el chat de ${taller} con la orden`, v: 'chat', estilo: 'gold' },
+      { t: '📤 Compartir con las imágenes del corte', v: 'share' },
+    ]);
+    if(r === null) return;
+    if(r === 'chat'){
+      window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(texto), '_blank');
+      let archivos = []; try{ archivos = await imagenesBosquejosOT(renglones); } catch(e){}
+      if(archivos.length){ archivos.forEach(f => { const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); }); alert(`Se descargaron ${archivos.length} bosquejo(s) para adjuntar en el chat.`); }
+      return;
+    }
+  }
   let archivos = [];
   try{ archivos = await imagenesBosquejosOT(renglones); } catch(e){ archivos = []; }
   if(archivos.length && navigator.canShare && navigator.canShare({ files: archivos })){
@@ -10010,7 +10053,7 @@ function compartirTextoOrdenGuardada(docId, modo){
     else window.prompt('Copie el texto:', texto);
     return;
   }
-  compartirConBosquejos(texto, orden.renglones || []);
+  compartirConBosquejos(texto, orden.renglones || [], orden.taller);
 }
 
 async function abrirDatosBancarios(){
@@ -16487,7 +16530,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v154';
+const APP_VERSION = '2026-10-02-v155';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
