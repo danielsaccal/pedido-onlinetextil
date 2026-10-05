@@ -1577,7 +1577,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v153</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v154</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -8937,13 +8937,16 @@ function pintarAsistenteOT(){
   } else if(a.paso === 3){
     const arts = articulosAC().sort((x, y) => x.localeCompare(y, 'es'));
     c.innerHTML = asPasos(3) + `<b style="font-size:1.1rem;color:var(--purple);">3. ¿Qué hay que fabricar?</b> <span class="note">(${escaparHtml(a.tela)})</span>
-      <div style="margin-top:10px;">${a.prods.map((pr, i) => `<div style="display:grid;grid-template-columns:minmax(0,1fr) 90px 26px;gap:6px;margin-bottom:6px;align-items:center;">
-        <select class="as-art" onchange="asOT.prods[${i}].articulo=this.value"><option value="">Artículo…</option>${arts.map(x => `<option value="${escapeAttr(x)}" ${x === pr.articulo ? 'selected' : ''}>${escaparHtml(x)}</option>`).join('')}</select>
-        <input type="number" min="1" placeholder="Cant." value="${escapeAttr(pr.cantidad)}" oninput="asOT.prods[${i}].cantidad=this.value">
-        <button type="button" onclick="asOT.prods.splice(${i},1); if(!asOT.prods.length) asOT.prods.push({articulo:'',cantidad:''}); pintarAsistenteOT()" style="border:none;background:none;cursor:pointer;color:#8A8072;">✕</button></div>`).join('')}
+      <div style="margin-top:10px;">${a.prods.map((pr, i) => `<div style="display:grid;grid-template-columns:minmax(0,1fr) 90px 26px;gap:6px;align-items:center;">
+        <select class="as-art" onchange="asOT.prods[${i}].articulo=this.value; asSugerencias()"><option value="">Artículo…</option>${arts.map(x => `<option value="${escapeAttr(x)}" ${x === pr.articulo ? 'selected' : ''}>${escaparHtml(x)}</option>`).join('')}</select>
+        <input type="number" min="1" placeholder="Cant." value="${escapeAttr(pr.cantidad)}" oninput="asOT.prods[${i}].cantidad=this.value; asSugerencias()" class="as-cant" style="padding:10px;border:1px solid var(--line);border-radius:10px;font-size:16px;width:100%;box-sizing:border-box;">
+        <button type="button" onclick="asOT.prods.splice(${i},1); if(!asOT.prods.length) asOT.prods.push({articulo:'',cantidad:''}); pintarAsistenteOT()" style="border:none;background:none;cursor:pointer;color:#8A8072;">✕</button></div>
+        <div id="as-sug-${i}" style="font-size:0.8rem;color:#2F7A47;margin:3px 0 10px;"></div>`).join('')}
+      <div id="as-sug-total" style="font-size:0.8rem;color:#6B6258;margin-bottom:8px;"></div>
       <button type="button" class="btn-mini" onclick="asOT.prods.push({articulo:'',cantidad:''}); pintarAsistenteOT()">+ Otro producto</button></div>`
       + pie(true, 'asProductosOk()', 'Siguiente →');
     document.querySelectorAll('.as-art').forEach(s => { hacerSelectBuscable(s); if(s._sync) s._sync(); });
+    asSugerencias();
   } else {
     const ok = a.prods.filter(p => p.articulo && +p.cantidad > 0);
     c.innerHTML = asPasos(4) + `<b style="font-size:1.1rem;color:var(--purple);">4. Revisar</b>
@@ -8960,6 +8963,33 @@ function asTelaOtra(){
   if(!t || !(+m > 0)){ alert('Complete el código de tela y los metros.'); return; }
   asOT.tela = t; asOT.metros = m; asOT.comprobante = document.getElementById('as-comp').value.trim(); asOT.paso = 3; pintarAsistenteOT();
 }
+// consumo por unidad de un articulo en el ancho de la tela elegida
+function asConsumo(art){
+  const t = datosTela(asOT.tela), W = t && +t.ancho;
+  if(!art || !(W > 0)) return null;
+  const pz = piezasDeArticuloAny(art);
+  if(pz){ try{ const k = calcularCorte(pz, W); if(!k.avisos.length && k.metros > 0) return k.metros; } catch(e){} }
+  const tab = ((tablaConsumo && tablaConsumo.articulos) || {})[art];
+  return tab && tab[W] ? +tab[W] : null;
+}
+// cuantas unidades salen con la tela que queda, teniendo en cuenta lo ya cargado en las otras filas
+function asSugerencias(){
+  const total = parseFloat(String(asOT.metros).replace(',', '.')) || 0;
+  const usos = asOT.prods.map(p => { const c = asConsumo(p.articulo); return { c, m: c && +p.cantidad > 0 ? c * +p.cantidad : 0 }; });
+  const usado = usos.reduce((s, u) => s + u.m, 0);
+  asOT.prods.forEach((p, i) => {
+    const el = document.getElementById('as-sug-' + i); if(!el) return;
+    const c = usos[i].c;
+    if(!p.articulo){ el.innerHTML = ''; return; }
+    if(!c){ el.innerHTML = '<span style="color:#8A8072;">Sin consumo cargado para el ancho de esta tela.</span>'; return; }
+    const libre = total - (usado - usos[i].m);
+    const n = Math.max(0, Math.floor(libre / c + 1e-9));
+    el.innerHTML = `Con ${fmtCm(Math.round(libre * 100) / 100)} m salen <b>${n} unidades</b> (${fmtMetros(c)} m c/u) <button type="button" class="btn-mini" style="margin-left:4px;" onclick="asUsar(${i}, ${n})">Usar ${n}</button>`;
+  });
+  const t = document.getElementById('as-sug-total');
+  if(t) t.innerHTML = total ? `Tela: ${fmtCm(total)} m · usados ${fmtCm(Math.round(usado * 100) / 100)} m · quedan <b style="color:${total - usado < -0.01 ? '#A6432F' : '#2F7A47'};">${fmtCm(Math.round((total - usado) * 100) / 100)} m</b>` : '';
+}
+function asUsar(i, n){ asOT.prods[i].cantidad = String(n); const el = document.querySelectorAll('.as-cant')[i]; if(el) el.value = n; asSugerencias(); }
 function asProductosOk(){
   if(!asOT.prods.some(p => p.articulo && +p.cantidad > 0)){ alert('Cargue al menos un producto con su cantidad.'); return; }
   asOT.paso = 4; pintarAsistenteOT();
@@ -16457,7 +16487,7 @@ Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancario
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v153';
+const APP_VERSION = '2026-10-02-v154';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
