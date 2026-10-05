@@ -2050,7 +2050,8 @@ function asignarMapaFotos(){
   if(cambio) db.collection('config').doc('fotos_mapa').set({ mapa: fotosMapa }).catch(() => {});
 }
 function aplicarMovimientos(){
-  (categoriasCfg.mover || []).forEach(([ek, cat]) => {
+  (categoriasCfg.mover || []).forEach(x => {
+    const ek = Array.isArray(x) ? x[0] : x.k, cat = Array.isArray(x) ? x[1] : x.c;
     const dest = CATALOGO.find(c => c.categoria === cat); if(!dest) return;
     let prod = null;
     CATALOGO.forEach(c => { const i = c.productos.findIndex(p => p._editKey === ek); if(i >= 0) prod = c.productos.splice(i, 1)[0]; });
