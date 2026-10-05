@@ -2032,10 +2032,59 @@ function abrirCompartirRubro(){
 }
 
 // ---------- fotos personalizadas (reemplazo por SKU) ----------
+// ===== Categorias propias, productos movidos y fotos por producto (no por posicion) =====
+var categoriasCfg = { extra: [], mover: [] }, fotosMapa = {}, fotosRaw = {}, videosRaw = {};
+async function cargarCategoriasCfg(){
+  try{ const d = await db.collection('config').doc('categorias').get(); if(d.exists){ const x = d.data(); categoriasCfg = { extra: x.extra || [], mover: x.mover || [] }; } } catch(e){}
+  try{ const d = await db.collection('config').doc('fotos_mapa').get(); fotosMapa = d.exists ? (d.data().mapa || {}) : {}; } catch(e){}
+  categoriasCfg.extra.forEach(n => { if(!CATALOGO.some(c => c.categoria === n)) CATALOGO.push({ categoria: n, productos: [] }); });
+}
+// las fotos viejas (guardadas por posicion) quedan asignadas a su producto antes de mover nada
+function asignarMapaFotos(){
+  let cambio = false; const usados = new Set(Object.values(fotosMapa));
+  CATALOGO.forEach((c, ci) => (c.productos || []).forEach((p, pi) => {
+    const ek = p._editKey; if(!ek || fotosMapa[ek]) return;
+    const id = `${ci}-${pi}`;
+    if((fotosRaw[id] || videosRaw[id]) && !usados.has(id)){ fotosMapa[ek] = id; usados.add(id); cambio = true; }
+  }));
+  if(cambio) db.collection('config').doc('fotos_mapa').set({ mapa: fotosMapa }).catch(() => {});
+}
+function aplicarMovimientos(){
+  (categoriasCfg.mover || []).forEach(([ek, cat]) => {
+    const dest = CATALOGO.find(c => c.categoria === cat); if(!dest) return;
+    let prod = null;
+    CATALOGO.forEach(c => { const i = c.productos.findIndex(p => p._editKey === ek); if(i >= 0) prod = c.productos.splice(i, 1)[0]; });
+    if(prod) dest.productos.push(prod);
+  });
+}
+function reconstruirFotos(){
+  fotosOverride = {}; if(typeof videosOverride !== 'undefined') videosOverride = {};
+  CATALOGO.forEach((c, ci) => (c.productos || []).forEach((p, pi) => {
+    const id = fotosMapa[p._editKey] || ('k:' + p._editKey);
+    if(fotosRaw[id] !== undefined) fotosOverride[`${ci}-${pi}`] = fotosRaw[id];
+    if(videosRaw[id] !== undefined && typeof videosOverride !== 'undefined') videosOverride[`${ci}-${pi}`] = videosRaw[id];
+  }));
+}
+// documento de fotos de un producto (a partir de su posicion actual "ci-pi")
+function docFotos(key){
+  const [ci, pi] = String(key).split('-').map(Number);
+  const p = CATALOGO[ci] && CATALOGO[ci].productos[pi]; if(!p || !p._editKey) return key;
+  if(!fotosMapa[p._editKey]){ fotosMapa[p._editKey] = 'k:' + p._editKey; db.collection('config').doc('fotos_mapa').set({ mapa: fotosMapa }).catch(() => {}); }
+  return fotosMapa[p._editKey];
+}
+function sincronizarFotosRaw(){
+  CATALOGO.forEach((c, ci) => (c.productos || []).forEach((p, pi) => {
+    const k = `${ci}-${pi}`, id = fotosMapa[p._editKey] || ('k:' + p._editKey);
+    if(fotosOverride[k] !== undefined) fotosRaw[id] = fotosOverride[k];
+    if(typeof videosOverride !== 'undefined' && videosOverride[k] !== undefined) videosRaw[id] = videosOverride[k];
+  }));
+}
+
 function cargarFotosOverride(){
   return db.collection('fotos').get().then(snap => {
     fotosOverride = {};
-    snap.docs.forEach(d => { fotosOverride[d.id] = d.data().imagenBase64; });
+    fotosRaw = {};
+    snap.docs.forEach(d => { const x = d.data(); fotosOverride[d.id] = (x.imagenesBase64 && x.imagenesBase64[0]) || x.imagenBase64; fotosRaw[d.id] = fotosOverride[d.id]; });
   }).catch(e => console.error('Error cargando fotos override:', e));
 }
 function imagenEfectiva(ci, pi, p){
@@ -2687,7 +2736,7 @@ function guardarFotoProducto(ci, pi){
       const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
 
       try{
-        await db.collection('fotos').doc(`${ci}-${pi}`).set({
+        await db.collection('fotos').doc(docFotos(`${ci}-${pi}`)).set({
           imagenBase64: dataUrl,
           sku: CATALOGO[ci].productos[pi].variantes[0]?.sku || '',
           nombreProducto: CATALOGO[ci].productos[pi].nombre,
@@ -4302,11 +4351,12 @@ function irAFormatoGrafico(){
 </script>
 <script>
 etiquetarProductosEstaticos();
-Promise.all([cargarFotosOverride(), cargarProductosNuevos()]).then(() => {
+cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProductosNuevos()])).then(() => {
   return cargarProductosEliminados();
 }).then(() => {
   return cargarProductosEditados();
 }).then(() => {
+  asignarMapaFotos(); aplicarMovimientos(); reconstruirFotos();
   renderCatalogo(document.getElementById('buscador').value);
 });
 </script>
