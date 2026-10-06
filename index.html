@@ -1581,7 +1581,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v164</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v165</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -9664,7 +9664,22 @@ async function siguienteNumeroOrdenTrabajo(taller){
   return n;
 }
 
+// evita crear la misma orden dos veces (doble toque o volver a tocar Generar)
+let generandoOT = false;
 async function generarOrdenTrabajoCompleta(){
+  if(generandoOT) return;
+  const btn = document.getElementById('ot-btn-generar');
+  if(!otEditando){
+    const taller = document.getElementById('ot-taller').value, tela = document.getElementById('ot-sku-tela').value.trim().toUpperCase();
+    const arts = [...document.querySelectorAll('#ot-renglones .ot-r-articulo')].map(s => s.value).filter(Boolean).sort().join('|');
+    const igual = [...(historialOT || []), ...(window.__ultimasOT || [])].find(o => o.taller === taller && String(o.skuTela || '').toUpperCase() === tela && (o.renglones || []).map(r => r.articulo).sort().join('|') === arts && Date.now() - new Date(o.fecha).getTime() < 24 * 3600000);
+    if(igual && !confirm(`Ya hay una orden igual de hoy: ${igual.numero} (${taller}, ${tela}).\n\n¿Crear otra igual de todos modos?`)) return;
+  }
+  generandoOT = true; if(btn){ btn.disabled = true; btn.dataset.txt = btn.textContent; btn.textContent = 'Generando…'; }
+  try{ await generarOrdenTrabajoCompletaReal(); }
+  finally{ generandoOT = false; if(btn){ btn.disabled = false; if(btn.textContent === 'Generando…') btn.textContent = btn.dataset.txt || 'Generar orden de trabajo'; } }
+}
+async function generarOrdenTrabajoCompletaReal(){
   const errorEl = document.getElementById('ot-error');
   const cont = document.getElementById('ot-resultado');
   errorEl.style.display = 'none';
@@ -9879,6 +9894,7 @@ async function generarOrdenTrabajoCompleta(){
         ...(envioUsado ? { envioId: envioUsado } : {}),
       });
       historialOT = null;
+      window.__ultimasOT = [...(window.__ultimasOT || []), { taller, skuTela: String(skuTela).toUpperCase(), fecha: fechaNueva, numero: numeroFormateado, renglones: renglones.map(r => ({ articulo: r.articulo })) }];
       if(envioUsado){ otEnvioId = null; document.getElementById('ot-envio-banner').style.display = 'none'; }
       // la orden recien generada queda abierta para corregir: volver a tocar el boton la actualiza, no crea otra
       otEditando = { docId: ref.id, numero: numeroFormateado, fecha: fechaNueva, renglones: JSON.parse(JSON.stringify(renglones)), envioId: envioUsado || null };
@@ -16822,7 +16838,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v164';
+const APP_VERSION = '2026-10-02-v165';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
