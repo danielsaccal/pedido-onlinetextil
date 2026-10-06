@@ -1581,7 +1581,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v166</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v167</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -10832,35 +10832,20 @@ function renderClientesInactivos(){
 }
 
 // ---------- pendientes de entrega ----------
+let histModoPend = false;
 function abrirPendientesEntrega(){
   mostrarPaso('step-pendientes-entrega');
-  const cont = document.getElementById('pe-lista');
-  cont.innerHTML = '<p class="empty-msg">Cargando...</p>';
-  db.collection('pedidos').get().then(snap => {
-    const pedidos = snap.docs.map(d => d.data())
-      .filter(p => (p.estado || 'pendiente') === 'pendiente' || p.estado === 'parcial')
-      .sort((a,b) => new Date(a.fecha||0) - new Date(b.fecha||0));
-
-    if(pedidos.length === 0){
-      cont.innerHTML = '<p class="empty-msg">No hay pedidos pendientes ni parciales. 🎉</p>';
-      return;
-    }
-    const ahora = Date.now();
-    cont.innerHTML = pedidos.map(p => {
-      const dias = p.fecha ? Math.floor((ahora - new Date(p.fecha).getTime())/(1000*60*60*24)) : null;
-      const estado = p.estado || 'pendiente';
-      return `<div class="hist-pedido"><div class="hist-head" style="cursor:default;">
-        <div><div class="num">${p.numero}</div><div class="meta">${p.cliente?.nombre||''} ${p.cliente?.apellido||''} · ${p.fecha ? new Date(p.fecha).toLocaleDateString('es-AR') : ''}${dias!==null ? ' · hace ' + dias + ' día'+(dias===1?'':'s') : ''}</div></div>
-        <span class="estado-pedido estado-${estado}" style="pointer-events:none;">${estado==='pendiente'?'Pendiente':'Parcial'}</span>
-      </div></div>`;
-    }).join('');
-  }).catch(e => {
-    cont.innerHTML = '<p class="empty-msg">No se pudo cargar: ' + e.message + '</p>';
-  });
+  histModoPend = true;
+  document.getElementById('pe-lista').innerHTML = '<p class="empty-msg">Cargando...</p>';
+  db.collection('pedidos').orderBy('fecha', 'desc').get().then(snap => {
+    historialPedidos = snap.docs.map(d => d.data());
+    renderHistorial('');
+  }).catch(e => { document.getElementById('pe-lista').innerHTML = '<p class="empty-msg">No se pudo cargar: ' + e.message + '</p>'; });
 }
 
 function abrirHistorial(){
   mostrarPaso('step-historial');
+  histModoPend = false;
   cargarHistorial();
 }
 
@@ -11063,11 +11048,14 @@ function cargarHistorial(){
 }
 
 function renderHistorial(filtro){
-  filtro = (filtro||'').trim().toLowerCase();
-  const cont = document.getElementById('hist-lista');
-  const pedidos = historialPedidos || [];
+  filtro = histModoPend ? '' : (filtro||'').trim().toLowerCase();
+  // la misma lista sirve para "Pendientes de entrega" (solo pendientes y parciales, del mas viejo al mas nuevo)
+  const cont = document.getElementById(histModoPend ? 'pe-lista' : 'hist-lista');
+  document.getElementById(histModoPend ? 'hist-lista' : 'pe-lista').innerHTML = '';
+  let pedidos = historialPedidos || [];
+  if(histModoPend) pedidos = pedidos.filter(p => ['pendiente', 'parcial'].includes(p.estado || 'pendiente')).sort((a, b) => new Date(a.fecha || 0) - new Date(b.fecha || 0));
   const filtroEstadoEl = document.querySelector('input[name="hist-filtro-estado"]:checked');
-  const filtroEstado = filtroEstadoEl ? filtroEstadoEl.value : 'todos';
+  const filtroEstado = histModoPend ? 'todos' : (filtroEstadoEl ? filtroEstadoEl.value : 'todos');
   const filtrados = pedidos.filter(p => {
     if(filtroEstado !== 'todos' && (p.estado || 'pendiente') !== filtroEstado) return false;
     if(!filtro) return true;
@@ -11076,7 +11064,7 @@ function renderHistorial(filtro){
   });
 
   if(filtrados.length === 0){
-    cont.innerHTML = '<p class="empty-msg">No hay pedidos que coincidan.</p>';
+    cont.innerHTML = histModoPend ? '<p class="empty-msg">No hay pedidos pendientes ni parciales. 🎉</p>' : '<p class="empty-msg">No hay pedidos que coincidan.</p>';
     return;
   }
 
@@ -11093,7 +11081,7 @@ function renderHistorial(filtro){
         <div class="hist-head" onclick="document.getElementById('hp-${p.numero}').classList.toggle('open')">
           <div>
             <div class="num">${p.numero}</div>
-            <div class="meta">${p.cliente?.nombre||''} ${p.cliente?.apellido||''} · ${fecha}</div>
+            <div class="meta">${p.cliente?.nombre||''} ${p.cliente?.apellido||''} · ${fecha}${histModoPend && p.fecha ? ' · hace ' + Math.floor((Date.now() - new Date(p.fecha).getTime()) / 86400000) + ' días' : ''}</div>
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
             <select class="estado-pedido estado-${estado}" onclick="event.stopPropagation()" onchange="event.stopPropagation(); cambiarEstadoPedido('${p.numero}', this.value, this)">
@@ -11137,6 +11125,7 @@ async function cambiarEstadoPedido(numero, nuevoEstado, selectEl){
     await db.collection('pedidos').doc(numero).update({ estado: nuevoEstado });
     const p = (historialPedidos || []).find(x => x.numero === numero);
     if(p) p.estado = nuevoEstado;
+    if(histModoPend) renderHistorial('');
   } catch(e){
     alert('No se pudo guardar el estado: ' + e.message);
   }
@@ -16890,7 +16879,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v166';
+const APP_VERSION = '2026-10-02-v167';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
