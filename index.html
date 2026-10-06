@@ -1581,7 +1581,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v165</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v166</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1808,7 +1808,8 @@ a.grilla-celda{display:block;}
       <p class="note" style="margin-bottom:10px;">Elija el taller y cargue lo que entregó: las unidades buenas y las falladas de cada producto. Lo pendiente baja solo.</p>
       <div class="field"><label>Taller</label><select id="it-taller" onchange="renderIngresoTaller()"></select></div>
       <div id="it-lista"></div>
-      <div class="field" style="margin-top:10px;"><label>Remito / nota de la entrega (opcional)</label><input type="text" id="it-nota" placeholder="Ej: remito 0012"></div>
+      <div class="field" style="margin-top:10px;"><label>Fecha de recepción</label><input type="date" id="it-fecha"></div>
+      <div class="field"><label>Remito / nota de la entrega (opcional)</label><input type="text" id="it-nota" placeholder="Ej: remito 0012"></div>
       <div class="field"><label>📷 Foto del remito (opcional)</label><input type="file" id="it-foto" accept="image/*"></div>
       <button class="btn btn-gold" style="width:100%;" onclick="registrarIngresoTaller()">Registrar entrega</button>
       <button class="btn btn-ghost" style="width:100%;margin-top:8px;" onclick="abrirHistorialEntregas()">🗂️ Ver historial de entregas</button>
@@ -1979,6 +1980,7 @@ a.grilla-celda{display:block;}
         <div class="he-seg" id="he-periodo-seg"></div>
       </div>
       <div class="he-talleres" id="he-talleres"></div>
+      <div id="he-taller-stats"></div>
       <div class="he-kpis" id="he-resumen"></div>
       <div id="he-lista"><p class="empty-msg">Cargando...</p></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
@@ -5754,6 +5756,7 @@ async function abrirIngresoTaller(){
   renderIngresoTaller();
 }
 function renderIngresoTaller(){
+  const fe = document.getElementById('it-fecha'); if(fe && !fe.value) fe.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   const t = document.getElementById('it-taller').value;
   const cont = document.getElementById('it-lista');
   if(!t){ cont.innerHTML = ''; return; }
@@ -5764,12 +5767,13 @@ function renderIngresoTaller(){
     <div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;">
       <b>${escaparHtml(o.numero)}</b> <span class="note">· ${escaparHtml(o.skuTela || '')}</span>
       <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.88rem;margin-top:6px;">
-        <thead><tr style="color:#8A8072;font-size:0.78rem;"><th style="text-align:left;padding:4px;">Producto</th><th style="padding:4px;">Pendiente</th><th style="padding:4px;">Buenas</th><th style="padding:4px;">Falladas</th></tr></thead>
+        <thead><tr style="color:#8A8072;font-size:0.78rem;"><th style="text-align:left;padding:4px;">Producto</th><th style="padding:4px;">Pendiente</th><th style="padding:4px;">Buenas</th><th style="padding:4px;">Falladas</th><th style="padding:4px;" title="Unidades que el taller no va a entregar (merma, faltó tela)">No las entrega</th></tr></thead>
         <tbody>${(o.renglones || []).map((r, i) => pendienteRenglon(r) > 0 ? `<tr style="border-top:1px solid var(--line);">
           <td style="padding:4px;">${escaparHtml(r.articulo)}${r.sku ? `<br><span class="note" style="font-size:0.72rem;">${escaparHtml(r.sku)}</span>` : ''}</td>
           <td style="padding:4px;text-align:center;font-weight:700;">${pendienteRenglon(r)}</td>
           <td style="padding:4px;text-align:center;white-space:nowrap;"><input type="number" min="0" class="it-b" data-o="${o._docId}" data-i="${i}" style="width:70px;"> <button type="button" class="btn-mini" title="Entregó todo lo pendiente" onclick="entregoTodoRenglon('${o._docId}', ${i})">✓ todo</button></td>
-          <td style="padding:4px;text-align:center;"><input type="number" min="0" class="it-f" data-o="${o._docId}" data-i="${i}" style="width:70px;"></td></tr>` : '').join('')}</tbody>
+          <td style="padding:4px;text-align:center;"><input type="number" min="0" class="it-f" data-o="${o._docId}" data-i="${i}" style="width:70px;"></td>
+          <td style="padding:4px;text-align:center;white-space:nowrap;"><input type="number" min="0" class="it-x" data-o="${o._docId}" data-i="${i}" style="width:70px;"> <button type="button" class="btn-mini" title="No entrega el resto pendiente" onclick="noEntregaResto('${o._docId}', ${i})">✗ resto</button></td></tr>` : '').join('')}</tbody>
       </table></div>
     </div>`).join('');
 }
@@ -5781,31 +5785,36 @@ async function registrarIngresoTaller(){
     const b = parseInt(el.value, 10) || 0;
     const fEl = [...document.querySelectorAll('.it-f')].find(x => x.dataset.o === el.dataset.o && x.dataset.i === el.dataset.i);
     const f = parseInt(fEl && fEl.value, 10) || 0;
-    if(b < 0 || f < 0 || (!b && !f)) return;
-    const arr = cambios.get(el.dataset.o) || []; arr.push({ i: +el.dataset.i, b, f }); cambios.set(el.dataset.o, arr);
+    const xEl = [...document.querySelectorAll('.it-x')].find(x => x.dataset.o === el.dataset.o && x.dataset.i === el.dataset.i);
+    const x = parseInt(xEl && xEl.value, 10) || 0;
+    if(b < 0 || f < 0 || x < 0 || (!b && !f && !x)) return;
+    const arr = cambios.get(el.dataset.o) || []; arr.push({ i: +el.dataset.i, b, f, x }); cambios.set(el.dataset.o, arr);
   });
   if(!cambios.size){ err.textContent = 'Cargue al menos una cantidad.'; err.style.display = 'block'; return; }
   // controlar que no se pase de lo pendiente
   for(const [id, arr] of cambios){
     const o = historialOT.find(x => x._docId === id);
-    for(const c of arr){ const r = o.renglones[c.i]; if(c.b + c.f > pendienteRenglon(r) && !confirm(`${r.articulo} (${o.numero}): quedan ${pendienteRenglon(r)} pendientes y está cargando ${c.b + c.f}. ¿Registrar igual?`)) return; }
+    for(const c of arr){ const r = o.renglones[c.i]; if(c.b + c.f + c.x > pendienteRenglon(r) && !confirm(`${r.articulo} (${o.numero}): quedan ${pendienteRenglon(r)} pendientes y está cargando ${c.b + c.f + c.x}. ¿Registrar igual?`)) return; }
   }
   const detalle = [];
+  const fv = (document.getElementById('it-fecha') || {}).value;
+  const fechaRecepcion = fv ? new Date(fv + 'T' + new Date().toTimeString().slice(0, 8)).toISOString() : new Date().toISOString();
   try{
     for(const [id, arr] of cambios){
       const o = historialOT.find(x => x._docId === id);
-      const nuevos = o.renglones.map((r, i) => { const c = arr.find(x => x.i === i); if(!c) return r; detalle.push({ orden: o.numero, articulo: r.articulo, sku: r.sku || '', buenas: c.b, falladas: c.f }); return { ...r, entregado: (r.entregado || 0) + c.b, fallados: (r.fallados || 0) + c.f }; });
-      const entregas = [...(o.entregas || []), { fecha: new Date().toISOString(), unidades: arr.reduce((s, c) => s + c.b + c.f, 0) }];
+      const nuevos = o.renglones.map((r, i) => { const c = arr.find(x => x.i === i); if(!c) return r; detalle.push({ orden: o.numero, articulo: r.articulo, sku: r.sku || '', buenas: c.b, falladas: c.f, faltantes: c.x }); return { ...r, entregado: (r.entregado || 0) + c.b, fallados: (r.fallados || 0) + c.f, faltantes: (r.faltantes || 0) + c.x }; });
+      const entregas = [...(o.entregas || []), { fecha: fechaRecepcion, unidades: arr.reduce((s, c) => s + c.b + c.f, 0) }];
       await db.collection('ordenes_trabajo').doc(id).update({ renglones: nuevos, entregas });
       o.renglones = nuevos; o.entregas = entregas;
     }
     const fi = document.getElementById('it-foto').files[0];
     const remitoFoto = fi ? await fotoRemito(fi) : null;
-    await db.collection('ingresos_taller').add({ taller: t, fecha: new Date().toISOString(), nota: document.getElementById('it-nota').value.trim(), detalle, ...(remitoFoto ? { remitoFoto } : {}) });
+    await db.collection('ingresos_taller').add({ taller: t, fecha: fechaRecepcion, nota: document.getElementById('it-nota').value.trim(), detalle, ...(remitoFoto ? { remitoFoto } : {}) });
     document.getElementById('it-foto').value = '';
     for(const d of detalle){ if(d.sku && d.buenas > 0){ try{ await moverStock(d.sku, d.buenas, 'entrega del taller', `${t} · ${d.orden}`); } catch(e){ console.error('stock', e); } } }
     const tb = detalle.reduce((s, d) => s + d.buenas, 0), tf = detalle.reduce((s, d) => s + d.falladas, 0);
-    alert(`Entrega registrada: ${tb} buenas${tf ? ` y ${tf} falladas` : ''}.`);
+    const tx = detalle.reduce((s, d) => s + (d.faltantes || 0), 0);
+    alert(`Entrega registrada: ${tb} buenas${tf ? `, ${tf} falladas` : ''}${tx ? `, ${tx} que no entrega` : ''}.`);
     document.getElementById('it-nota').value = '';
     renderIngresoTaller();
   } catch(e){ err.textContent = 'No se pudo registrar: ' + e.message; err.style.display = 'block'; }
@@ -7197,6 +7206,7 @@ async function sincronizarDescripcionesCatalogo(){
 let entregasTaller = null, heTaller = '', hePeriodo = 30;
 async function abrirHistorialEntregas(){
   mostrarPaso('step-historial-entregas');
+  try{ if(!historialOT) await cargarHistorialOT(); } catch(e){}
   document.getElementById('he-lista').innerHTML = '<p class="empty-msg">Cargando...</p>';
   try{
     const snap = await db.collection('ingresos_taller').get();
@@ -7204,7 +7214,42 @@ async function abrirHistorialEntregas(){
   } catch(e){ entregasTaller = []; document.getElementById('he-lista').innerHTML = '<p class="error">No se pudo cargar: ' + escaparHtml(e.message) + '</p>'; return; }
   renderHistorialEntregas();
 }
+// cuanto tarda cada taller y cuanta merma tiene (en general y por tela)
+function estadisticasTaller(t){
+  const ords = (historialOT || []).filter(o => !t || o.taller === t);
+  let diasPond = 0, uni = 0, pedido = 0, malas = 0; const porTela = {};
+  ords.forEach(o => {
+    const f0 = new Date(o.fecha).getTime();
+    (o.entregas || []).forEach(e => { const u = +e.unidades || 0; if(u > 0){ diasPond += Math.max(0, (new Date(e.fecha).getTime() - f0) / 86400000) * u; uni += u; } });
+    (o.renglones || []).forEach(r => {
+      const cerr = (+r.entregado || 0) + (+r.fallados || 0) + (+r.faltantes || 0); if(!cerr) return;
+      const m = (+r.fallados || 0) + (+r.faltantes || 0);
+      pedido += cerr; malas += m;
+      const k = String(o.skuTela || '—').toUpperCase(); porTela[k] = porTela[k] || { p: 0, m: 0 }; porTela[k].p += cerr; porTela[k].m += m;
+    });
+  });
+  return { dias: uni ? diasPond / uni : null, merma: pedido ? malas / pedido * 100 : null, porTela };
+}
+function pintarEstadisticasTaller(){
+  const cont = document.getElementById('he-taller-stats'); if(!cont) return;
+  const fmtP = v => v == null ? '—' : (Math.round(v * 10) / 10).toString().replace('.', ',') + ' %';
+  const fmtD = v => v == null ? '—' : Math.round(v) + ' días';
+  if(heTaller){
+    const s = estadisticasTaller(heTaller);
+    const telas = Object.entries(s.porTela).sort((a, b) => b[1].p - a[1].p);
+    cont.innerHTML = `<div style="background:#EEF3FB;border-radius:12px;padding:12px;margin-bottom:12px;">
+      <b style="color:var(--purple);">📊 ${escaparHtml(heTaller)}</b>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin:6px 0;font-size:0.92rem;"><span>⏱️ Suele tardar <b>${fmtD(s.dias)}</b></span><span>📉 Merma <b>${fmtP(s.merma)}</b> <span class="note">(falladas + no entregadas)</span></span></div>
+      ${telas.length ? `<div style="font-size:0.82rem;color:#5A4F44;">Por tela: ${telas.map(([k, v]) => `<b>${escaparHtml(k)}</b> ${fmtP(v.m / v.p * 100)}`).join(' · ')}</div>` : ''}</div>`;
+  } else {
+    const ts = [...new Set((historialOT || []).map(o => o.taller).filter(Boolean))].sort();
+    cont.innerHTML = ts.length ? `<div style="background:#EEF3FB;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:0.85rem;">
+      <b style="color:var(--purple);">📊 Talleres</b> <span class="note">(tocá un taller arriba para ver el detalle por tela)</span>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:4px 14px;margin-top:6px;">${ts.map(t => { const s = estadisticasTaller(t); return `<span>${escaparHtml(t)}</span><span>⏱️ ${fmtD(s.dias)}</span><span>📉 ${fmtP(s.merma)}</span>`; }).join('')}</div></div>` : '';
+  }
+}
 function renderHistorialEntregas(){
+  try{ pintarEstadisticasTaller(); } catch(e){}
   const talleres = [...new Set((entregasTaller || []).map(x => x.taller).filter(Boolean))].sort();
   document.getElementById('he-talleres').innerHTML = [['', 'Todos'], ...talleres.map(t => [t, t])].map(([v, t]) => `<span class="${heTaller === v ? 'on' : ''}" onclick="heTaller='${escapeAttr(v)}'; renderHistorialEntregas();">${escaparHtml(t)}</span>`).join('');
   document.getElementById('he-periodo-seg').innerHTML = [[7, '7 días'], [30, '30 días'], [90, '90 días'], [0, 'Todo']].map(([v, t]) => `<button type="button" class="${hePeriodo === v ? 'on' : ''}" onclick="hePeriodo=${v}; renderHistorialEntregas();">${t}</button>`).join('');
@@ -7227,7 +7272,7 @@ function renderHistorialEntregas(){
     diaPrev = dia;
     const b = sum(x, 'buenas'), fa = sum(x, 'falladas');
     const ordenes = [...new Set((x.detalle || []).map(d => d.orden).filter(Boolean))];
-    const prods = (x.detalle || []).map(d => `<span class="he-prod"><b>${+d.buenas || 0}</b> × ${escaparHtml(d.articulo || '')}${d.sku ? `<small>${escaparHtml(d.sku)}</small>` : ''}${d.falladas ? `<span class="fall">+${d.falladas} fall.</span>` : ''}</span>`).join('');
+    const prods = (x.detalle || []).map(d => `<span class="he-prod"><b>${+d.buenas || 0}</b> × ${escaparHtml(d.articulo || '')}${d.sku ? `<small>${escaparHtml(d.sku)}</small>` : ''}${d.falladas ? `<span class="fall">+${d.falladas} fall.</span>` : ''}${d.faltantes ? `<span class="fall">${d.faltantes} no entrega</span>` : ''}</span>`).join('');
     return cab + `<div class="he-card">
       <div class="he-av">${escaparHtml(String(x.taller || '?').charAt(0).toUpperCase())}</div>
       <div>
@@ -9320,6 +9365,13 @@ function fotoRemito(file){
 function verRemitoEnvio(id){ const e = (enviosTela || []).find(x => x._id === id); if(e && e.remitoFoto) verImagenGrandeAC(e.remitoFoto); }
 function verRemitoEntrega(id){ const x = (entregasTaller || []).find(e => e._id === id); if(x && x.remitoFoto) verImagenGrandeAC(x.remitoFoto); }
 
+function noEntregaResto(docId, i){
+  const o = (historialOT || []).find(x => x._docId === docId); if(!o) return;
+  const q = sel => [...document.querySelectorAll(sel)].find(x => x.dataset.o === docId && x.dataset.i === String(i));
+  const b = parseInt(q('.it-b').value, 10) || 0, f = parseInt(q('.it-f').value, 10) || 0;
+  q('.it-x').value = Math.max(0, pendienteRenglon(o.renglones[i]) - b - f);
+}
+
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -10103,7 +10155,7 @@ async function cargarHistorialOT(){
 
 // pendiente = lo que falta entregar de un renglon; entregado nunca se muestra por encima de lo pedido
 function pendienteRenglon(r){
-  return Math.max(0, (r.cantidad||0) - (r.entregado||0) - (r.fallados||0));
+  return Math.max(0, (r.cantidad||0) - (r.entregado||0) - (r.fallados||0) - (r.faltantes||0));
 }
 
 function estadoOrdenTrabajo(orden){
@@ -16838,7 +16890,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v165';
+const APP_VERSION = '2026-10-02-v166';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
