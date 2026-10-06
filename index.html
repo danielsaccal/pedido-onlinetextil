@@ -1581,7 +1581,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v163</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v164</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1791,6 +1791,7 @@ a.grilla-celda{display:block;}
           <div class="field" style="margin:0;"><label>Metros</label><input type="number" id="et-metros" min="0" step="0.01" placeholder="640"></div>
           <div class="field" style="margin:0;"><label>Comprobante</label><input type="text" id="et-comprobante" placeholder="R-7343"></div>
           <div class="field" style="margin:0;"><label>Fecha</label><input type="date" id="et-fecha"></div>
+          <div class="field" style="margin:0;"><label>📷 Foto del remito</label><input type="file" id="et-foto" accept="image/*"></div>
         </div>
         <button class="btn btn-gold" style="width:100%;margin-top:10px;" onclick="guardarEnvioTela()">Guardar envío</button>
         <p class="error" id="et-error" style="display:none;"></p>
@@ -1808,6 +1809,7 @@ a.grilla-celda{display:block;}
       <div class="field"><label>Taller</label><select id="it-taller" onchange="renderIngresoTaller()"></select></div>
       <div id="it-lista"></div>
       <div class="field" style="margin-top:10px;"><label>Remito / nota de la entrega (opcional)</label><input type="text" id="it-nota" placeholder="Ej: remito 0012"></div>
+      <div class="field"><label>📷 Foto del remito (opcional)</label><input type="file" id="it-foto" accept="image/*"></div>
       <button class="btn btn-gold" style="width:100%;" onclick="registrarIngresoTaller()">Registrar entrega</button>
       <button class="btn btn-ghost" style="width:100%;margin-top:8px;" onclick="abrirHistorialEntregas()">🗂️ Ver historial de entregas</button>
       <p class="error" id="it-error" style="display:none;"></p>
@@ -5643,10 +5645,12 @@ async function guardarEnvioTela(){
     creado: new Date().toISOString(),
   };
   if(!d.taller || !d.skuTela || !(d.metros > 0)){ err.textContent = 'Complete taller, código de tela y metros.'; err.style.display = 'block'; return; }
+  const ft = document.getElementById('et-foto').files[0];
+  if(ft){ try{ d.remitoFoto = await fotoRemito(ft); } catch(e){ err.textContent = 'No se pudo leer la foto.'; err.style.display = 'block'; return; } }
   try{
     const ref = await db.collection('envios_tela').add(d);
     enviosTela.unshift({ _id: ref.id, ...d });
-    ['et-sku', 'et-metros', 'et-comprobante'].forEach(id => document.getElementById(id).value = '');
+    ['et-sku', 'et-metros', 'et-comprobante', 'et-foto'].forEach(id => document.getElementById(id).value = '');
     renderEnviosTela();
   } catch(e){ err.textContent = 'No se pudo guardar: ' + e.message; err.style.display = 'block'; }
 }
@@ -5680,7 +5684,7 @@ function renderEnviosTela(){
         <b>${escaparHtml(e.taller)} · ${escaparHtml(e.skuTela)} · ${fmtCm(e.metros)} m</b>
         <span style="font-size:0.75rem;padding:2px 9px;border-radius:10px;background:${tag[1]};color:${tag[2]};white-space:nowrap;">${tag[0]}</span>
       </div>
-      <div style="font-size:0.8rem;color:#8A8072;">${e.desdeOrden ? '📋 Cargada desde la orden · ' : ''}Enviado ${fecha}${e.resto > 0.01 ? ` · hace ${e.dias} día${e.dias === 1 ? '' : 's'}` : ''}${e.comprobante ? ' · ' + escaparHtml(e.comprobante) : ''}</div>
+      <div style="font-size:0.8rem;color:#8A8072;">${e.desdeOrden ? '📋 Cargada desde la orden · ' : ''}Enviado ${fecha}${e.resto > 0.01 ? ` · hace ${e.dias} día${e.dias === 1 ? '' : 's'}` : ''}${e.comprobante ? ' · ' + escaparHtml(e.comprobante) : ''}${e.remitoFoto ? ` · <a href="#" onclick="event.preventDefault(); event.stopPropagation(); verRemitoEnvio('${e._id}')">📷 ver remito</a>` : ''}</div>
       <div style="height:8px;border-radius:4px;background:var(--cream);overflow:hidden;margin:8px 0 6px;"><div style="height:100%;width:${pct}%;background:var(--purple);"></div></div>
       <div style="font-size:0.8rem;color:#6B6258;margin-bottom:4px;">${ots.length ? ots.map(o => `${escaparHtml(o.numero)} · ${fmtCm(+o.metrosTotales || 0)} m`).join(' · ') : 'Todavía sin órdenes'}</div>
       ${m && m.esperadas ? `<div style="font-size:0.8rem;color:#6B6258;margin-bottom:8px;">Recibido del taller: ${m.buenas} buenas${m.falladas ? ` + ${m.falladas} falladas` : ''} de ${m.esperadas} unidades</div>` : ''}
@@ -5795,7 +5799,10 @@ async function registrarIngresoTaller(){
       await db.collection('ordenes_trabajo').doc(id).update({ renglones: nuevos, entregas });
       o.renglones = nuevos; o.entregas = entregas;
     }
-    await db.collection('ingresos_taller').add({ taller: t, fecha: new Date().toISOString(), nota: document.getElementById('it-nota').value.trim(), detalle });
+    const fi = document.getElementById('it-foto').files[0];
+    const remitoFoto = fi ? await fotoRemito(fi) : null;
+    await db.collection('ingresos_taller').add({ taller: t, fecha: new Date().toISOString(), nota: document.getElementById('it-nota').value.trim(), detalle, ...(remitoFoto ? { remitoFoto } : {}) });
+    document.getElementById('it-foto').value = '';
     for(const d of detalle){ if(d.sku && d.buenas > 0){ try{ await moverStock(d.sku, d.buenas, 'entrega del taller', `${t} · ${d.orden}`); } catch(e){ console.error('stock', e); } } }
     const tb = detalle.reduce((s, d) => s + d.buenas, 0), tf = detalle.reduce((s, d) => s + d.falladas, 0);
     alert(`Entrega registrada: ${tb} buenas${tf ? ` y ${tf} falladas` : ''}.`);
@@ -5978,7 +5985,7 @@ function detallePartidaHTML(e){
   botones.push(b('🗑️ Eliminar', `eliminarPartidaDT('${e._id}')`));
   const detOts = ots.map(o => `<div style="font-size:0.82rem;margin-top:4px;"><b>${escaparHtml(o.numero)}</b> · ${(o.renglones || []).map(r => `${r.cantidad} ${escaparHtml(r.articulo)}${(r.entregado || r.fallados) ? ` (entregó ${r.entregado || 0}${r.fallados ? ' + ' + r.fallados + ' falladas' : ''})` : ''}`).join(' · ')}</div>`).join('');
   return `<div style="${caja}">
-    <div style="font-size:0.82rem;color:#6B6258;">${escaparHtml(e.taller)} · ${escaparHtml(e.skuTela)} · ${fmtCm(e.metros)} m${e.comprobante ? ' · ' + escaparHtml(e.comprobante) : ''}</div>
+    <div style="font-size:0.82rem;color:#6B6258;">${escaparHtml(e.taller)} · ${escaparHtml(e.skuTela)} · ${fmtCm(e.metros)} m${e.comprobante ? ' · ' + escaparHtml(e.comprobante) : ''}${e.remitoFoto ? ` · <a href="#" onclick="event.preventDefault(); event.stopPropagation(); verRemitoEnvio('${e._id}')">📷 ver remito</a>` : ''}</div>
     ${detOts || '<div style="font-size:0.82rem;margin-top:4px;color:#8A8072;">Todavía sin trabajo asignado.</div>'}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">${botones.join('')}</div>
   </div>`;
@@ -7225,7 +7232,7 @@ function renderHistorialEntregas(){
       <div class="he-av">${escaparHtml(String(x.taller || '?').charAt(0).toUpperCase())}</div>
       <div>
         <div class="he-tit">${escaparHtml(x.taller || '')}</div>
-        <div class="he-sub">${f.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })} h${ordenes.length ? ' · ' + escaparHtml(ordenes.join(', ')) : ''}${x.nota && !/historial de órdenes/i.test(x.nota) ? ' · 📄 ' + escaparHtml(x.nota) : ''}</div>
+        <div class="he-sub">${x.remitoFoto ? `<a href="#" onclick="event.preventDefault(); verRemitoEntrega('${x._id}')">📷 remito</a> · ` : ''}${f.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })} h${ordenes.length ? ' · ' + escaparHtml(ordenes.join(', ')) : ''}${x.nota && !/historial de órdenes/i.test(x.nota) ? ' · 📄 ' + escaparHtml(x.nota) : ''}</div>
         <div class="he-prods">${prods}</div>
       </div>
       <div class="he-tot"><b>${b}</b><span>buenas</span>${fa ? `<div class="f">${fa} falladas</div>` : ''}</div>
@@ -9294,6 +9301,24 @@ async function guardarConfeccion(){
     renderConfeccion();
   } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
+
+// foto del remito: comprimida (cabe en el documento)
+function fotoRemito(file){
+  return new Promise((res, rej) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const max = 1400, k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      let q = 0.7, d = c.toDataURL('image/jpeg', q);
+      while(d.length > 700000 && q > 0.3){ q -= 0.1; d = c.toDataURL('image/jpeg', q); }
+      URL.revokeObjectURL(url); res(d);
+    };
+    img.onerror = rej; img.src = url;
+  });
+}
+function verRemitoEnvio(id){ const e = (enviosTela || []).find(x => x._id === id); if(e && e.remitoFoto) verImagenGrandeAC(e.remitoFoto); }
+function verRemitoEntrega(id){ const x = (entregasTaller || []).find(e => e._id === id); if(x && x.remitoFoto) verImagenGrandeAC(x.remitoFoto); }
 
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
@@ -16797,7 +16822,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v163';
+const APP_VERSION = '2026-10-02-v164';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
