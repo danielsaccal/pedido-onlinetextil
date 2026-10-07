@@ -70,6 +70,8 @@
       </div>
       <label class="f">Texto de apertura<input type="text" id="g-apertura" placeholder="Ej: Textiles para el hogar y la hotelería" oninput="act()"></label>
       <label class="f">Franja fija al pie<input type="text" id="g-franja" value="MAYORISTA Y MINORISTA • ENVÍOS A TODO EL PAÍS" oninput="act()"></label>
+      <label class="sw" style="font-size:.85rem;"><input type="checkbox" id="g-safe" checked onchange="act()"> Zona segura para Instagram (que la interfaz de Reels/Historias no tape nada)</label>
+      <label class="sw" style="font-size:.8rem;font-weight:600;"><input type="checkbox" id="g-guia" onchange="act()"> Mostrar en la vista previa lo que tapa Instagram</label>
     </div>
     <div class="card">
       <h3>2. Escenas</h3>
@@ -225,7 +227,15 @@ function datos(){
   };
 }
 let SEG = [], TOTAL = 0, D = null;
+// Reels/Historias tapan arriba (~250 px), abajo (~420 px: texto y botones) y la derecha (~140 px: iconos)
+let L = {};
+function medidasDiseno(){
+  const s = !!($('g-safe') && $('g-safe').checked);
+  L = s ? { s, top: 285, franja: 1405, mov: -365, der: 160, cardY: 330, porqueY: 525, porquePaso: 198, tit: 80, cierreY: 0.31 }
+        : { s, top: 110, franja: H - 150, mov: 0, der: 70, cardY: 170, porqueY: 730, porquePaso: 250, tit: 96, cierreY: 0.42 };
+}
 function armar(){
+  medidasDiseno();
   D = datos(); SEG = []; let t = 0;
   const add = (tipo, dur, extra) => { SEG.push({ tipo, t0: t, dur, ...extra }); t += dur - TR; };
   add('intro', 3);
@@ -297,10 +307,11 @@ function texto(x, s, X, Y, font, color, t, delay, align){
 function ajustarTexto(x, s, font, max){ let f = font; let px = +font.match(/(\d+)px/)[1]; x.font = f; while(x.measureText(s).width > max && px > 14){ px -= 2; f = font.replace(/\d+px/, px + 'px'); x.font = f; } return f; }
 function franja(x){
   if(!D.franja) return;
-  const y = H - 150, h = 84, mx = 60;
-  x.save(); rr(x, mx, y, W - mx * 2, h, 42); x.fillStyle = C.d; x.shadowColor = 'rgba(0,0,0,.3)'; x.shadowBlur = 20; x.fill(); x.shadowBlur = 0;
-  x.font = ajustarTexto(x, D.franja, '800 34px Montserrat', W - mx * 2 - 60); x.fillStyle = C.v; x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.fillText(D.franja, W / 2, y + h / 2 + 2); x.restore();
+  const y = L.franja, h = 84, mx = 60;
+  const fw = L.s ? W - mx - 150 : W - mx * 2;
+  x.save(); rr(x, mx, y, fw, h, 42); x.fillStyle = C.d; x.shadowColor = 'rgba(0,0,0,.3)'; x.shadowBlur = 20; x.fill(); x.shadowBlur = 0;
+  x.font = ajustarTexto(x, D.franja, '800 34px Montserrat', fw - 60); x.fillStyle = C.v; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText(D.franja, mx + fw / 2, y + h / 2 + 2); x.restore();
 }
 function vineta(x){
   const g = x.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.75);
@@ -319,14 +330,15 @@ function lineasDe(x, s, font, max){
   return ls.map(l => ({ l, f: ajustarTexto(x, l, f, max) }));
 }
 function bloqueTextos(x, t, cat, t1, t2, frase, yBase, t2Dorado, det, precio){
-  const lf = lineasDe(x, frase, '600 36px Montserrat', W - 140), ld = lineasDe(x, det ? '📏 ' + det : '', '700 36px Montserrat', W - 140), lp = lineasDe(x, precio, '800 44px Montserrat', W - 140);
+  const MW = W - 70 - L.der; yBase += L.mov;
+  const lf = lineasDe(x, frase, '600 36px Montserrat', MW), ld = lineasDe(x, det ? '📏 ' + det : '', '700 36px Montserrat', MW), lp = lineasDe(x, precio, '800 44px Montserrat', MW);
   yBase -= (Math.max(0, lf.length - 1) + ld.length + lp.length) * 56;
   let y = yBase;
   if(cat){ texto(x, cat.toUpperCase(), 70, y, '800 34px Montserrat', C.d, t, 0.25); y += 100; } else y += 50;
   const f = '900 104px Montserrat';
-  if(t1){ texto(x, t1.toUpperCase(), 70, y, ajustarTexto(x, t1.toUpperCase(), f, W - 140), '#fff', t, 0.4); y += 112; }
-  if(t2){ texto(x, t2.toUpperCase(), 70, y, ajustarTexto(x, t2.toUpperCase(), f, W - 140), t2Dorado ? C.d : '#fff', t, 0.55); y += 30; }
-  lineaPunteada(x, 70, y + 10, W - 140, (t - 0.7) / 0.9);
+  if(t1){ texto(x, t1.toUpperCase(), 70, y, ajustarTexto(x, t1.toUpperCase(), f, MW), '#fff', t, 0.4); y += 112; }
+  if(t2){ texto(x, t2.toUpperCase(), 70, y, ajustarTexto(x, t2.toUpperCase(), f, MW), t2Dorado ? C.d : '#fff', t, 0.55); y += 30; }
+  lineaPunteada(x, 70, y + 10, MW, (t - 0.7) / 0.9);
   let yy = y + 80;
   lf.forEach(o => { texto(x, o.l, 70, yy, o.f, '#fff', t, 0.9); yy += 50; }); if(lf.length) yy += 8;
   ld.forEach(o => { texto(x, o.l, 70, yy, o.f, '#fff', t, 1.0); yy += 52; }); if(ld.length) yy += 10;
@@ -353,8 +365,8 @@ function escEscena(x, t, T, e){
       x.globalAlpha = 0.6; cover(x, e.foto._blur, 0, 0, W, H, 1.1); x.globalAlpha = 1;
       x.fillStyle = 'rgba(61,20,102,0.45)'; x.fillRect(0, 0, W, H);
       const extra = [e.frase, e.det, e.precio].filter(Boolean).length + (e.frase && e.frase.length > 38 ? 1 : 0) + (e.det && e.det.length > 34 ? 1 : 0);
-      const tope = H * 0.62 - extra * 56 - (e.cat ? 60 : 20) - 70;
-      const cw = W - 120, cy = 170, ch = Math.max(420, Math.min(1000, cw * e.foto.height / e.foto.width, tope - cy));
+      const tope = H * 0.62 + L.mov - extra * 56 - (e.cat ? 60 : 20) - 70;
+      const cw = W - 120, cy = L.cardY, ch = Math.max(L.s ? 300 : 420, Math.min(1000, cw * e.foto.height / e.foto.width, tope - cy));
       const k = ease(t / 0.7);
       x.save(); x.globalAlpha = k; x.translate(0, (1 - k) * 60);
       rr(x, 60, cy, cw, ch, 28); x.shadowColor = 'rgba(0,0,0,.4)'; x.shadowBlur = 40; x.fillStyle = '#fff'; x.fill(); x.shadowBlur = 0; x.clip();
@@ -365,22 +377,22 @@ function escEscena(x, t, T, e){
   }
   else if(!exportando){ x.save(); x.strokeStyle = 'rgba(244,196,48,.6)'; x.setLineDash([20, 14]); x.lineWidth = 6; rr(x, 120, 300, W - 240, 700, 30); x.stroke(); x.fillStyle = 'rgba(255,255,255,.75)'; x.font = '700 48px Montserrat'; x.textAlign = 'center'; x.fillText('📷 Subí la foto', W / 2, 670); x.restore(); }
   degradeAbajo(x, H * 0.5);
-  marca(x, 60, 110, 54);
+  marca(x, 60, L.top, 54);
   bloqueTextos(x, t, e.cat, e.t1, e.t2, e.frase, H * 0.62, false, e.det, e.precio);
 }
 function escCollage(x, t, T){
   fondo(x, T);
-  const fs = escenas.filter(e => e.foto).slice(0, 6);
-  const cols = 2, gw = (W - 60 * 2 - 24) / 2, gh = 330;
+  const fs = escenas.filter(e => e.foto).slice(0, L.s ? 4 : 6);
+  const cols = 2, gw = (W - 60 * 2 - 24) / 2, gh = L.s ? 280 : 330;
   fs.forEach((e, i) => {
-    const cx = 60 + (i % cols) * (gw + 24), cy = 170 + Math.floor(i / cols) * (gh + 24);
+    const cx = 60 + (i % cols) * (gw + 24), cy = L.cardY + Math.floor(i / cols) * (gh + 24);
     const k = rebote((t - i * 0.12) / 0.6); if(k <= 0) return;
     x.save(); x.globalAlpha = Math.min(1, k); x.translate(cx + gw / 2, cy + gh / 2); x.scale(0.85 + 0.15 * k, 0.85 + 0.15 * k);
     rr(x, -gw / 2, -gh / 2, gw, gh, 22); x.shadowColor = 'rgba(0,0,0,.35)'; x.shadowBlur = 24; x.fillStyle = '#fff'; x.fill(); x.shadowBlur = 0; x.clip();
     cover(x, e.foto, -gw / 2, -gh / 2, gw, gh, 1 + 0.05 * t / 4); x.restore();
   });
   degradeAbajo(x, H * 0.6);
-  marca(x, 60, 110, 54);
+  marca(x, 60, L.top, 54);
   const [l1, l2] = (D.collage.tit || '').split('/').map(s => s.trim());
   bloqueTextos(x, t, D.collage.cat, l1, l2, '', H * 0.71, true);
 }
@@ -394,40 +406,43 @@ function icono(x, tipo, cx, cy, r){
   x.restore();
 }
 function escPorque(x, t, T){
-  fondo(x, T); marca(x, 60, 110, 54);
-  texto(x, (D.porque.cat || '').toUpperCase(), 60, 330, '800 36px Montserrat', C.d, t, 0.15);
+  fondo(x, T); marca(x, 60, L.top, 54);
+  const y0 = L.s ? 380 : 330;
+  texto(x, (D.porque.cat || '').toUpperCase(), 60, y0, '800 36px Montserrat', C.d, t, 0.15);
   const [l1, l2] = (D.porque.tit || '').split('/').map(s => s.trim());
-  texto(x, l1, 60, 440, '900 96px Montserrat', '#fff', t, 0.3); texto(x, l2, 60, 545, '900 96px Montserrat', '#fff', t, 0.4);
+  texto(x, l1, 60, y0 + 100, `900 ${L.tit}px Montserrat`, '#fff', t, 0.3); texto(x, l2, 60, y0 + 100 + L.tit + 8, `900 ${L.tit}px Montserrat`, '#fff', t, 0.4);
   const vs = ventajas.filter(v => v.t);
   vs.forEach((v, i) => {
-    const y = 730 + i * 250, k = rebote((t - 0.6 - i * 0.25) / 0.6); if(k <= 0) return;
+    const y = L.porqueY + 70 + i * L.porquePaso, k = rebote((t - 0.6 - i * 0.25) / 0.6); if(k <= 0) return;
     x.save(); x.globalAlpha = Math.min(1, k); x.translate(0, (1 - Math.min(1, k)) * 50);
-    rr(x, 50, y, W - 100, 210, 26); x.fillStyle = 'rgba(255,255,255,0.08)'; x.fill(); x.strokeStyle = 'rgba(255,255,255,0.18)'; x.lineWidth = 2; x.stroke();
-    icono(x, v.ic, 175, y + 105, 75);
-    x.fillStyle = '#fff'; x.textAlign = 'left'; x.font = ajustarTexto(x, v.t, '800 54px Montserrat', W - 400); x.fillText(v.t, 280, y + 98);
-    if(v.s){ x.fillStyle = 'rgba(255,255,255,0.85)'; x.font = ajustarTexto(x, v.s, '600 34px Montserrat', W - 400); x.fillText(v.s, 280, y + 152); }
+    rr(x, 50, y, W - 50 - L.der + 20, L.s ? 178 : 210, 26); x.fillStyle = 'rgba(255,255,255,0.08)'; x.fill(); x.strokeStyle = 'rgba(255,255,255,0.18)'; x.lineWidth = 2; x.stroke();
+    icono(x, v.ic, 160, y + (L.s ? 89 : 105), L.s ? 62 : 75);
+    x.fillStyle = '#fff'; x.textAlign = 'left'; x.font = ajustarTexto(x, v.t, '800 52px Montserrat', W - 280 - L.der); x.fillText(v.t, 255, y + (L.s ? 82 : 98));
+    if(v.s){ x.fillStyle = 'rgba(255,255,255,0.85)'; x.font = ajustarTexto(x, v.s, '600 32px Montserrat', W - 280 - L.der); x.fillText(v.s, 255, y + (L.s ? 130 : 152)); }
     x.restore();
   });
 }
 function escOferta(x, t, T){
-  fondo(x, T); marca(x, 60, 110, 54);
+  fondo(x, T); marca(x, 60, L.top, 54);
   const k = rebote((t - 0.2) / 0.7);
-  x.save(); x.translate(W / 2, H * 0.43); x.rotate(t * 0.4); x.scale(Math.max(0, k), Math.max(0, k));
+  const oy = L.s ? H * 0.38 : H * 0.43;
+  x.save(); x.translate(W / 2, oy); x.rotate(t * 0.4); x.scale(Math.max(0, k), Math.max(0, k));
   x.fillStyle = C.d; x.beginPath(); for(let i = 0; i < 48; i++){ const a = i / 48 * Math.PI * 2, r = i % 2 ? 380 : 420; x.lineTo(Math.cos(a) * r, Math.sin(a) * r); } x.closePath(); x.fill(); x.restore();
   if(D.oferta.txt){
     x.save(); x.globalAlpha = Math.max(0, Math.min(1, k)); x.fillStyle = C.v; x.textAlign = 'center'; x.textBaseline = 'middle';
     const ls = partir(x, D.oferta.txt.toUpperCase(), '900 150px Montserrat', 640);
-    ls.forEach((l, i) => { x.font = ajustarTexto(x, l, '900 150px Montserrat', 640); x.fillText(l, W / 2, H * 0.43 + (i - (ls.length - 1) / 2) * 150); });
+    ls.forEach((l, i) => { x.font = ajustarTexto(x, l, '900 150px Montserrat', 640); x.fillText(l, W / 2, oy + (i - (ls.length - 1) / 2) * 150); });
     x.restore();
   }
-  if(D.oferta.fec){ const ls = partir(x, D.oferta.fec, '700 50px Montserrat', W - 160); ls.forEach((l, i) => texto(x, l, W / 2, H * 0.72 + i * 66, '700 50px Montserrat', '#fff', t, 0.8 + i * 0.1, 'center')); }
+  if(D.oferta.fec){ const ls = partir(x, D.oferta.fec, '700 50px Montserrat', W - 160); ls.forEach((l, i) => texto(x, l, W / 2, (L.s ? H * 0.64 : H * 0.72) + i * 66, '700 50px Montserrat', '#fff', t, 0.8 + i * 0.1, 'center')); }
 }
 function escCierre(x, t, T){
   fondo(x, T);
   const k = ease(t / 0.8);
-  x.save(); x.globalAlpha = k; x.translate(W / 2, H * 0.42); x.scale(0.9 + 0.1 * k, 0.9 + 0.1 * k); marca(x, 0, 0, 130, 'center'); x.restore();
-  lineaPunteada(x, W / 2 - 300, H * 0.42 + 55, 600, (t - 0.4) / 0.8);
-  let y = H * 0.42 + 150;
+  const cy0 = H * L.cierreY;
+  x.save(); x.globalAlpha = k; x.translate(W / 2, cy0); x.scale(0.9 + 0.1 * k, 0.9 + 0.1 * k); marca(x, 0, 0, 130, 'center'); x.restore();
+  lineaPunteada(x, W / 2 - 300, cy0 + 55, 600, (t - 0.4) / 0.8);
+  let y = cy0 + 150;
   if(D.cierre.prod){ partir(x, D.cierre.prod, '700 44px Montserrat', W - 200).forEach((l, i) => { texto(x, l, W / 2, y, '700 44px Montserrat', '#fff', t, 0.7 + i * 0.1, 'center'); y += 60; }); }
   if(D.cierre.btn){
     y += 50; const kb = rebote((t - 1.1) / 0.6);
@@ -463,6 +478,10 @@ function dibujar(T){
     ctx.drawImage(capa, W / 2 - W * z / 2, H / 2 - H * z / 2, W * z, H * z); ctx.globalAlpha = 1;
   }
   franja(ctx); vineta(ctx);
+  if(!exportando && $('g-guia') && $('g-guia').checked){
+    ctx.save(); ctx.fillStyle = 'rgba(255,0,0,0.22)'; ctx.fillRect(0, 0, W, 250); ctx.fillRect(0, H - 420, W, 420); ctx.fillRect(W - 140, 250, 140, H - 670);
+    ctx.fillStyle = '#fff'; ctx.font = '700 34px Montserrat'; ctx.textAlign = 'center'; ctx.fillText('Lo tapa Instagram', W / 2, 150); ctx.fillText('Lo tapa Instagram (texto y botones)', W / 2, H - 200); ctx.restore();
+  }
   if(T < 0.6){ ctx.fillStyle = `rgba(0,0,0,${1 - T / 0.6})`; ctx.fillRect(0, 0, W, H); }
   ctx.restore();
   $('t').value = T.toFixed(2); $('t-txt').textContent = T.toFixed(1) + ' / ' + TOTAL.toFixed(1) + ' s';
