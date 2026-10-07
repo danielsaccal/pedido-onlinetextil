@@ -590,6 +590,7 @@ async function cargarAuto(){
   $('g-nombre').value = pq.nombre || ''; $('g-apertura').value = pq.apertura || '';
   $('c-on').checked = escenas.filter(e => e.foto).length >= 3; $('p-on').checked = true;
   if(pq.prods) $('z-prod').value = pq.prods;
+  if(pq.oferta){ $('o-on').checked = true; $('o-txt').value = pq.oferta; }
   history.replaceState(null, '', location.pathname);
   pintarEscenas(); act(); verGrande();
 }
