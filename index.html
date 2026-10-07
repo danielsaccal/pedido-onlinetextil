@@ -1584,7 +1584,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v184</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v185</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1695,8 +1695,8 @@ a.grilla-celda{display:block;}
               <summary style="cursor:pointer;font-weight:700;color:var(--purple);">Ver más: piezas, anchos, confección y empaque</summary>
               <div style="margin-top:10px;">
             <div id="ac-variantes"></div>
-            <div style="display:grid;grid-template-columns:minmax(0,1.6fr) 58px 52px 58px 44px 44px 32px 24px;gap:5px;font-size:0.72rem;color:#8A8072;margin-bottom:3px;">
-              <span>Pieza</span><span>Ancho</span><span title="Medida mínima: el lado que se puede achicar (ej: mantel 200×140 que se hace 200×120 en tela de 240). La app lo achica solo para aprovechar todo el ancho de la tela.">Mín. ⓘ</span><span>Largo</span><span>Cant.</span><span>Tapas</span><span title="Se puede girar si ahorra tela">Girar</span><span></span>
+            <div style="display:grid;grid-template-columns:minmax(0,1.6fr) 66px 66px 44px 44px 32px 24px;gap:5px;font-size:0.72rem;color:#8A8072;margin-bottom:3px;">
+              <span>Pieza</span><span title="Abajo: ancho mínimo (opcional)">Ancho</span><span title="Abajo: largo mínimo (opcional)">Largo</span><span>Cant.</span><span>Tapas</span><span title="Se puede girar si ahorra tela">Girar</span><span></span>
             </div>
             <div id="ac-piezas"></div>
             <button type="button" class="btn-mini" onclick="agregarPiezaAC(); calcularAC();">+ Pieza</button>
@@ -3657,16 +3657,22 @@ function calcularCorte(piezas, W){
   return mejor;
 }
 // piezas con ancho minimo: se achican lo justo para que entren N exactas en el ancho de la tela (sin desperdicio)
+// que lado de la pieza tiene minimo: el elegido, o (piezas viejas) el que esta por encima del minimo, el mas chico
+function ladoMinPieza(p){
+  if(!p || !(p.anchoMin > 0)) return '';
+  if(p.minLado) return p.minLado;
+  const a = +p.ancho, l = +p.largo, m = +p.anchoMin;
+  if(a > m && l > m) return l < a ? 'largo' : 'ancho';
+  return l > m ? 'largo' : 'ancho';
+}
 function ajustarAnchoFlexible(piezas, W){
   if(!piezas.some(p => p.anchoMin > 0)) return piezas;
   return piezas.map(p => {
     const min = +p.anchoMin;
     if(!(min > 0) || !(W > 0)) return p;
     // el lado que se puede achicar es el que esta por encima del minimo (si los dos, el mas chico: ej 200x140 con min 120 -> el 140)
-    const lados = [{ v: +p.ancho, otro: +p.largo }, { v: +p.largo, otro: +p.ancho }].filter(x => x.v > min);
-    if(!lados.length) return p;
-    lados.sort((x, y) => x.v - y.v);
-    const lado = lados[0];
+    const lado = ladoMinPieza(p) === 'largo' ? { v: +p.largo, otro: +p.ancho } : { v: +p.ancho, otro: +p.largo };
+    if(!(lado.v > min)) return p;
     if(Math.abs(W % lado.v) < 0.5) return { ...p, ancho: lado.v, largo: lado.otro, girar: false };
     for(let n = Math.ceil(W / lado.v); n <= Math.floor(W / min); n++){
       const a = Math.floor(W / n * 10) / 10;
@@ -4658,12 +4664,11 @@ function agregarPiezaAC(p){
   fila.className = 'ac-pieza';
   if(p.achicar === false) fila.dataset.fija = '1';
   if(p.fc) fila.dataset.fc = JSON.stringify(p.fc);
-  fila.style.cssText = 'display:grid;grid-template-columns:minmax(0,1.6fr) 58px 52px 58px 44px 44px 32px 24px;gap:5px;margin-bottom:5px;align-items:center;';
+  fila.style.cssText = 'display:grid;grid-template-columns:minmax(0,1.6fr) 66px 66px 44px 44px 32px 24px;gap:5px;margin-bottom:5px;align-items:center;';
   fila.innerHTML = `
     <input type="text" class="ac-p-nombre" value="${escapeAttr(p.nombre||'')}" placeholder="Plana" oninput="calcularAC()">
-    <input type="number" step="0.1" class="ac-p-ancho" value="${p.ancho||''}" placeholder="250" oninput="calcularAC()">
-    <input type="number" step="0.1" class="ac-p-min" value="${p.anchoMin||''}" placeholder="—" title="Ancho mínimo (opcional)" oninput="calcularAC()">
-    <input type="number" step="0.1" class="ac-p-largo" value="${p.largo||''}" placeholder="275" oninput="calcularAC()">
+    <div style="display:flex;flex-direction:column;gap:3px;"><input type="number" step="0.1" class="ac-p-ancho" value="${p.ancho||''}" placeholder="250" oninput="calcularAC()"><input type="number" step="0.1" class="ac-p-amin" value="${ladoMinPieza(p) === 'ancho' ? p.anchoMin : ''}" placeholder="ancho mín." title="Ancho mínimo (opcional): hasta cuánto se puede achicar el ancho para aprovechar la tela" oninput="calcularAC()" style="font-size:0.72rem;padding:4px 5px;"></div>
+    <div style="display:flex;flex-direction:column;gap:3px;"><input type="number" step="0.1" class="ac-p-largo" value="${p.largo||''}" placeholder="275" oninput="calcularAC()"><input type="number" step="0.1" class="ac-p-lmin" value="${ladoMinPieza(p) === 'largo' ? p.anchoMin : ''}" placeholder="largo mín." title="Largo mínimo (opcional): hasta cuánto se puede achicar el largo para aprovechar la tela" oninput="calcularAC()" style="font-size:0.72rem;padding:4px 5px;"></div>
     <input type="number" min="1" class="ac-p-cant" value="${p.cantidad||1}" oninput="calcularAC()">
     <input type="number" min="1" class="ac-p-tapas" value="${p.partes||1}" oninput="calcularAC()">
     <input type="checkbox" class="ac-p-girar" ${puedeGirar(p) ? 'checked' : ''} onchange="calcularAC()" title="Se puede girar si ahorra tela" style="width:18px;height:18px;justify-self:center;">
@@ -4675,7 +4680,7 @@ function leerPiezasAC(){
   return [...document.querySelectorAll('.ac-pieza')].map(f => ({
     nombre: f.querySelector('.ac-p-nombre').value.trim(),
     ancho: parseFloat(f.querySelector('.ac-p-ancho').value),
-    ...(parseFloat(f.querySelector('.ac-p-min').value) > 0 ? { anchoMin: parseFloat(f.querySelector('.ac-p-min').value) } : {}),
+    ...(parseFloat(f.querySelector('.ac-p-amin').value) > 0 ? { anchoMin: parseFloat(f.querySelector('.ac-p-amin').value), minLado: 'ancho' } : parseFloat(f.querySelector('.ac-p-lmin').value) > 0 ? { anchoMin: parseFloat(f.querySelector('.ac-p-lmin').value), minLado: 'largo' } : {}),
     largo: parseFloat(f.querySelector('.ac-p-largo').value),
     cantidad: Math.max(1, parseInt(f.querySelector('.ac-p-cant').value, 10) || 1),
     partes: Math.max(1, parseInt(f.querySelector('.ac-p-tapas').value, 10) || 1),
@@ -17076,7 +17081,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v184';
+const APP_VERSION = '2026-10-02-v185';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
