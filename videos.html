@@ -351,7 +351,9 @@ function escEscena(x, t, T, e){
     if(e.modo === 'tarjeta'){
       x.globalAlpha = 0.6; cover(x, e.foto._blur, 0, 0, W, H, 1.1); x.globalAlpha = 1;
       x.fillStyle = 'rgba(61,20,102,0.45)'; x.fillRect(0, 0, W, H);
-      const cw = W - 120, ch = Math.min(1000, cw * e.foto.height / e.foto.width), cy = 170;
+      const extra = [e.frase, e.det, e.precio].filter(Boolean).length + (e.frase && e.frase.length > 38 ? 1 : 0) + (e.det && e.det.length > 34 ? 1 : 0);
+      const tope = H * 0.62 - extra * 56 - (e.cat ? 60 : 20) - 70;
+      const cw = W - 120, cy = 170, ch = Math.max(420, Math.min(1000, cw * e.foto.height / e.foto.width, tope - cy));
       const k = ease(t / 0.7);
       x.save(); x.globalAlpha = k; x.translate(0, (1 - k) * 60);
       rr(x, 60, cy, cw, ch, 28); x.shadowColor = 'rgba(0,0,0,.4)'; x.shadowBlur = 40; x.fillStyle = '#fff'; x.fill(); x.shadowBlur = 0; x.clip();
