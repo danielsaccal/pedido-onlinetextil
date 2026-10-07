@@ -46,6 +46,11 @@
 <header><b>OnLine<span>Textil</span> · 🎬 Crear video</b><span style="flex:1"></span><a href="./">← Volver a la app</a></header>
 <div class="wrap">
   <div>
+    <div class="card" style="border:2px solid var(--d);">
+      <h3>🧭 ¿Qué video te conviene?</h3>
+      <p class="note" style="margin:0 0 8px;">Elegí el objetivo y tocá <b>Armar con esta guía</b>: se cargan las escenas con textos de ejemplo. Después solo subís las fotos y cambiás lo que quieras.</p>
+      <div id="guias" style="display:grid;gap:8px;"></div>
+    </div>
     <div class="card">
       <h3>📁 Plantillas</h3>
       <div class="g2">
@@ -109,12 +114,17 @@
     <div class="card">
       <canvas id="cv" width="1080" height="1920"></canvas>
       <div class="ctrl"><button class="btn v sm" id="b-play" onclick="play()">▶</button><input type="range" id="t" min="0" max="10" step="0.01" value="0" oninput="pausar(); dibujar(+this.value)"><span id="t-txt" class="note">0 s</span></div>
-      <div style="text-align:center;margin-top:10px;"><button class="btn d" id="b-exp" onclick="exportar()">⬇️ Exportar MP4</button></div>
+      <div style="text-align:center;margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;"><button class="btn v" onclick="verGrande()">👁️ Ver cómo queda</button><button class="btn d" id="b-exp" onclick="exportar()">⬇️ Exportar MP4</button></div>
+      <div class="note" style="margin-top:10px;line-height:1.5;"><b>Consejos rápidos</b><br>• Fotos <b>verticales</b> y bien iluminadas.<br>• <b>5 a 8 escenas</b>, 30–40 segundos en total.<br>• Títulos de <b>2 o 3 palabras</b>. Una idea por escena.<br>• Si hay oferta, poné <b>fechas concretas</b>.<br>• Siempre terminá con <b>web y WhatsApp</b>.</div>
       <div class="prog" id="prog"><div></div></div>
       <p class="note" id="prog-txt" style="text-align:center;"></p>
       <div class="aviso" id="aviso">Este navegador no puede exportar video. Usá <b>Chrome</b> o <b>Edge</b> actualizados (en computadora o Android).</div>
     </div>
   </div>
+</div>
+<div id="grande" style="display:none;position:fixed;inset:0;background:rgba(10,3,20,.92);z-index:50;align-items:center;justify-content:center;flex-direction:column;gap:10px;">
+  <canvas id="cv2" width="1080" height="1920" style="height:86vh;max-width:96vw;aspect-ratio:9/16;border-radius:14px;"></canvas>
+  <div style="display:flex;gap:8px;"><button class="btn d" onclick="verGrande()">↺ Repetir</button><button class="btn g" onclick="cerrarGrande()">✕ Cerrar</button></div>
 </div>
 <script>
 firebase.initializeApp({ apiKey: "AIzaSyCE0N4d-Hn_1S0X1B_LsiEvFtX-93LWn3A", authDomain: "catalogo-onlinetextil.firebaseapp.com", projectId: "catalogo-onlinetextil", storageBucket: "catalogo-onlinetextil.firebasestorage.app", messagingSenderId: "380063692818", appId: "1:380063692818:web:9d3bcfee44bf36c3d780cb" });
@@ -316,6 +326,7 @@ function escEscena(x, t, T, e){
       cover(x, e.foto, 0, 0, W, H, kb);
     }
   }
+  else if(!exportando){ x.save(); x.strokeStyle = 'rgba(244,196,48,.6)'; x.setLineDash([20, 14]); x.lineWidth = 6; rr(x, 120, 300, W - 240, 700, 30); x.stroke(); x.fillStyle = 'rgba(255,255,255,.75)'; x.font = '700 48px Montserrat'; x.textAlign = 'center'; x.fillText('📷 Subí la foto', W / 2, 670); x.restore(); }
   degradeAbajo(x, H * 0.5);
   marca(x, 60, 110, 54);
   bloqueTextos(x, t, e.cat, e.t1, e.t2, e.frase, H * 0.62);
@@ -427,6 +438,7 @@ function cuadro(){ if(!jugando) return; const T = desde + (performance.now() - t
 function pausar(){ jugando = false; $('b-play').textContent = '▶'; }
 
 // ---------------- exportar MP4 (WebCodecs + mp4-muxer) ----------------
+let exportando = false;
 async function exportar(){
   if(typeof VideoEncoder === 'undefined' || typeof Mp4Muxer === 'undefined'){ $('aviso').style.display = 'block'; return; }
   pausar(); armar();
@@ -440,7 +452,7 @@ async function exportar(){
   const enc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: e => { error = e; } });
   enc.configure({ codec, width: W, height: H, bitrate: 10e6, framerate: FPS });
   const n = Math.ceil(TOTAL * FPS);
-  $('prog').style.display = 'block'; $('b-exp').disabled = true;
+  $('prog').style.display = 'block'; $('b-exp').disabled = true; exportando = true;
   for(let i = 0; i < n; i++){
     if(error) break;
     dibujar(i / FPS);
@@ -449,7 +461,7 @@ async function exportar(){
     if(enc.encodeQueueSize > 8) await new Promise(r => setTimeout(r, 5));
     if(i % 10 === 0){ $('prog').firstElementChild.style.width = (i / n * 100) + '%'; $('prog-txt').textContent = `Generando… ${Math.round(i / n * 100)} %`; await new Promise(r => setTimeout(r, 0)); }
   }
-  await enc.flush(); enc.close(); muxer.finalize();
+  await enc.flush(); enc.close(); muxer.finalize(); exportando = false;
   $('b-exp').disabled = false;
   if(error){ $('prog-txt').textContent = 'Error al generar: ' + error.message; return; }
   $('prog').firstElementChild.style.width = '100%'; $('prog-txt').textContent = '✓ Listo, se descargó el video.';
@@ -491,8 +503,45 @@ async function guardarPlantilla(duplicar){
   } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 
+
+// ---------------- guias segun el objetivo ----------------
+const GUIAS = [
+  { id: 'categoria', titulo: '🛏️ Mostrar una categoría', desc: 'Ej: toda la línea de blanco. 5–6 escenas, collage y por qué elegirnos.', apertura: 'Textiles para el hogar y la hotelería',
+    escenas: [['ROPA DE CAMA', 'SÁBANAS Y', 'ACOLCHADOS', 'Todas las medidas y calidades'], ['BAÑO', 'TOALLAS Y', 'TOALLONES', 'Algodón de primera calidad'], ['COCINA Y MESA', 'MANTELES Y', 'REPASADORES', 'Para tu casa y tu negocio'], ['DECO', 'CORTINAS', '', 'Para cada ambiente']], collage: true, porque: true, oferta: false },
+  { id: 'producto', titulo: '✨ Lanzar un producto', desc: 'Un producto nuevo: 3 fotos del mismo (de lejos, detalle, en uso).', apertura: 'Nuevo en OnLineTextil',
+    escenas: [['NUEVO', 'NOMBRE DEL', 'PRODUCTO', 'Qué lo hace especial'], ['DETALLE', 'CALIDAD QUE', 'SE NOTA', 'Material y terminación'], ['MEDIDAS', 'PARA CADA', 'NECESIDAD', 'Medidas disponibles']], collage: false, porque: true, oferta: false },
+  { id: 'promo', titulo: '🔥 Promoción con fechas', desc: 'Hot Sale, Black Friday, liquidación. Oferta grande con fechas.', apertura: 'Ofertas por tiempo limitado',
+    escenas: [['OFERTA', 'SÁBANAS', '', 'Todas las medidas'], ['OFERTA', 'TOALLAS', '', 'Juegos y sueltas'], ['OFERTA', 'MANTELES', '', 'Lisos y estampados']], collage: true, porque: false, oferta: true },
+  { id: 'mayoristas', titulo: '🏨 Captar hoteles y mayoristas', desc: 'Hotelería, salud, gastronomía. Enfocado en volumen y condiciones.', apertura: 'Textiles para hotelería y salud',
+    escenas: [['HOTELES • HOSPITALES', 'PRODUCTOS PARA', 'HOTELERÍA', 'Compras por volumen al mejor precio'], ['BLANCOS', 'SÁBANAS DE', 'HOTEL', 'Percal y algodón'], ['BAÑO', 'TOALLAS DE', 'HOTEL', 'Resistentes al lavado industrial']], collage: false, porque: true, oferta: false },
+];
+function pintarGuias(){
+  $('guias').innerHTML = GUIAS.map(g => `<div style="border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;gap:10px;align-items:center;">
+    <div style="flex:1;"><b>${g.titulo}</b><div class="note">${g.desc}</div></div>
+    <button class="btn g sm" onclick="usarGuia('${g.id}')">Armar con esta guía</button></div>`).join('');
+}
+function usarGuia(id){
+  const g = GUIAS.find(x => x.id === id); if(!g) return;
+  if(escenas.some(e => e.t1 || e.foto) && !confirm('Se reemplazan las escenas actuales por las de la guía (las fotos que ya subiste se mantienen en orden). ¿Seguir?')) return;
+  const fotos = escenas.map(e => e.foto).filter(Boolean);
+  escenas = g.escenas.map((e, i) => ({ foto: fotos[i] || null, modo: fotos[i] && esFondoClaroOHorizontal(fotos[i]) ? 'tarjeta' : 'full', cat: e[0], t1: e[1], t2: e[2], frase: e[3], dur: 3.5 }));
+  $('g-apertura').value = g.apertura;
+  $('c-on').checked = g.collage; $('p-on').checked = g.porque; $('o-on').checked = g.oferta;
+  if(g.oferta && !$('o-txt').value) $('o-txt').value = '20% OFF';
+  pintarEscenas(); act(); verGrande();
+}
+// ---------------- vista previa grande ----------------
+let jg = false;
+function verGrande(){
+  armar(); const m = $('grande'); m.style.display = 'flex';
+  const c2 = $('cv2').getContext('2d'); const ini = performance.now(); jg = true;
+  const paso = () => { if(!jg) return; const T = (performance.now() - ini) / 1000; dibujar(Math.min(T, TOTAL - 0.01)); c2.drawImage(cv, 0, 0); if(T < TOTAL) requestAnimationFrame(paso); };
+  requestAnimationFrame(paso);
+}
+function cerrarGrande(){ jg = false; $('grande').style.display = 'none'; }
+
 // ---------------- inicio ----------------
-pintarEscenas(); pintarVentajas();
+pintarGuias(); pintarEscenas(); pintarVentajas();
 if(typeof VideoEncoder === 'undefined') $('aviso').style.display = 'block';
 Promise.all(['600', '700', '800', '900'].map(w => document.fonts.load(`${w} 40px Montserrat`))).catch(() => {}).then(() => document.fonts.ready).then(() => act());
 cargarListaPlantillas();
