@@ -667,7 +667,7 @@ function renderCatalogo(filtro){
           <div class="variante">
             <div class="variante-fila">
               <div class="desc">${descVarianteHtml(v.desc)}<span class="sku">SKU ${v.sku}</span>${rolloNota}</div>
-              <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioEfectivo) + (p.metros ? ' /m' : '')}</div>
+              <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioEfectivo) + sufijoPrecio(p)}</div>
               ${precioNum===null ? '<div></div>' : `
               <div class="qty">
                 <button type="button" onclick="cambiarCantidad('${id}', -1, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioEfectivo})">−</button>
@@ -2034,7 +2034,12 @@ function abrirCompartirRubro(){
 // ---------- fotos personalizadas (reemplazo por SKU) ----------
 // ===== Categorias propias, productos movidos y fotos por producto (no por posicion) =====
 var categoriasCfg = { extra: [], mover: [] }, fotosMapa = {}, fotosRaw = {}, videosRaw = {};
+// unidad de venta del precio (ej: por docena), guardada aparte en config/unidades
+var unidadesVenta = {};
+async function cargarUnidadesVenta(){ try{ const d = await db.collection('config').doc('unidades').get(); unidadesVenta = d.exists ? (d.data().u || {}) : {}; } catch(e){} }
+function sufijoPrecio(p){ if(p && p.metros) return ' /m'; const u = p && unidadesVenta[p._editKey]; return u ? ' /' + u : ''; }
 async function cargarCategoriasCfg(){
+  await cargarUnidadesVenta();
   try{ const d = await db.collection('config').doc('categorias').get(); if(d.exists){ const x = d.data(); categoriasCfg = { extra: x.extra || [], mover: x.mover || [] }; } } catch(e){}
   try{ const d = await db.collection('config').doc('fotos_mapa').get(); fotosMapa = d.exists ? (d.data().mapa || {}) : {}; } catch(e){}
   categoriasCfg.extra.forEach(n => { if(!CATALOGO.some(c => c.categoria === n)) CATALOGO.push({ categoria: n, productos: [] }); });
