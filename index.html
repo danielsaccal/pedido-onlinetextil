@@ -1582,7 +1582,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v170</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v171</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5552,7 +5552,7 @@ function aprovechamientoCorte(c, W){
 // nivel de opciones por icono. Ninguna funcion cambia, solo como se llega a cada una.
 const GRUPOS_INICIO = {
   a: { lado: 'ext', titulo: 'Armar pedido', items: [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['📷 Escanear etiqueta (SKU)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto').click()"], ['🤖 Buscar por foto (IA)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto-producto').click()"]] },
-  c: { lado: 'ext', titulo: 'Difusión', items: [['🎬 Crear video promocional', "location.href='videos.html'"], ['🔗 Compartir por rubro', 'abrirCompartirRubro()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()'], ['🖼️ Nuevo ingreso (flyers, video)', 'abrirNuevoIngreso()'], ['📱 Vista previa grilla IG', 'abrirGrilla()'], ['📣 Anuncios y promociones', 'abrirAnuncio()'], ['🎬 Compartir video de producto', 'abrirCompartirVideoProducto()']] },
+  c: { lado: 'ext', titulo: 'Difusión', items: [['🎬 Crear video promocional', 'abrirCrearVideo()'], ['🔗 Compartir por rubro', 'abrirCompartirRubro()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()'], ['🖼️ Nuevo ingreso (flyers, video)', 'abrirNuevoIngreso()'], ['📱 Vista previa grilla IG', 'abrirGrilla()'], ['📣 Anuncios y promociones', 'abrirAnuncio()'], ['🎬 Compartir video de producto', 'abrirCompartirVideoProducto()']] },
   d: { lado: 'int', titulo: 'Ventas', items: [['📋 Historial de pedidos', 'abrirHistorial()'], ['🤖 Pedido con IA (texto libre)', 'abrirPedidoIA()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()'], ['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
   f: { lado: 'int', titulo: 'Catálogo', items: [['🗂️ Ordenar categorías', 'abrirCategorias()'], ['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['📷 Fotos de productos', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
   g: { lado: 'int', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas'], columnas: [
@@ -9371,6 +9371,87 @@ function noEntregaResto(docId, i){
   const q = sel => [...document.querySelectorAll(sel)].find(x => x.dataset.o === docId && x.dataset.i === String(i));
   const b = parseInt(q('.it-b').value, 10) || 0, f = parseInt(q('.it-f').value, 10) || 0;
   q('.it-x').value = Math.max(0, pendienteRenglon(o.renglones[i]) - b - f);
+}
+
+// ===== Crear video: manual o automatico (por categoria o eligiendo productos) =====
+function idbGuardar(clave, valor){
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('onlinetextil', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => { const tx = r.result.transaction('kv', 'readwrite'); tx.objectStore('kv').put(valor, clave); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); };
+    r.onerror = () => rej(r.error);
+  });
+}
+function partirTitulo(nombre){
+  const ps = String(nombre || '').toUpperCase().split(/\s+/).filter(Boolean);
+  if(ps.length <= 2) return [ps[0] || '', ps[1] || ''];
+  let mejor = 1, dif = 1e9;
+  for(let i = 1; i < ps.length; i++){ const a = ps.slice(0, i).join(' ').length, b = ps.slice(i).join(' ').length; if(Math.abs(a - b) < dif){ dif = Math.abs(a - b); mejor = i; } }
+  return [ps.slice(0, mejor).join(' '), ps.slice(mejor).join(' ')];
+}
+function escenaDeProducto(ci, pi, conPrecio){
+  const c = CATALOGO[ci], p = c.productos[pi];
+  const fotos = imagenesEfectivas(ci, pi, p);
+  const [t1, t2] = partirTitulo(p.nombre);
+  let frase = p.composicion || '';
+  if(conPrecio){ const pr = (p.variantes || []).map(v => parsePrice(v.precio)).filter(x => x > 0); if(pr.length) frase = `Desde ${formatPrice(Math.min(...pr))}${p.metros ? ' /m' : ''}`; }
+  return { img: fotos[0] || '', cat: c.categoria.toUpperCase(), t1, t2, frase };
+}
+function abrirCrearVideo(){
+  const t = document.getElementById('pub-titulo'); if(t) t.textContent = '🎬 Crear video';
+  document.getElementById('pub-cont').innerHTML = `
+    <p class="note" style="text-align:left;margin:0 0 10px;">¿Cómo querés armarlo?</p>
+    <div style="display:grid;gap:8px;">
+      <button type="button" class="btn btn-ghost" style="text-align:left;" onclick="cerrarPublicar(); location.href='videos.html'">✍️ <b>Manual</b><br><span class="note">Subís las fotos y escribís cada escena.</span></button>
+      <button type="button" class="btn btn-ghost" style="text-align:left;" onclick="videoPorCategoria()">🗂️ <b>Automático: una categoría completa</b><br><span class="note">Toma los productos de la categoría con sus fotos.</span></button>
+      <button type="button" class="btn btn-ghost" style="text-align:left;" onclick="videoPorProductos()">🏷️ <b>Automático: elegir productos</b><br><span class="note">Buscás y tildás los productos que querés mostrar.</span></button>
+    </div>`;
+  document.getElementById('pub-modal').style.display = 'block';
+}
+function videoPorCategoria(){
+  document.getElementById('pub-cont').innerHTML = `
+    <div class="field"><label>Categoría</label><select id="vc-cat">${CATALOGO.map((c, i) => ({ c, i, n: (c.productos || []).filter((p, pi) => imagenesEfectivas(i, pi, p).length).length })).filter(x => x.n).map(x => `<option value="${x.i}">${escaparHtml(x.c.categoria)} (${x.n})</option>`).join('')}</select></div>
+    <div class="field"><label>Cantidad de escenas</label><select id="vc-n"><option>4</option><option selected>6</option><option>8</option><option>10</option></select></div>
+    <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;margin-bottom:10px;"><input type="checkbox" id="vc-precio"> Mostrar "Desde $…" en cada producto</label>
+    <button class="btn btn-gold" onclick="generarVideoAuto('cat')">🎬 Armar video</button>`;
+}
+let vpSel = new Set();
+function videoPorProductos(){
+  vpSel = new Set();
+  document.getElementById('pub-cont').innerHTML = `
+    <input id="vp-q" placeholder="🔍 Buscar producto o SKU" oninput="vpPintar()" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;box-sizing:border-box;">
+    <div id="vp-lista" style="max-height:45vh;overflow-y:auto;"></div>
+    <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;margin:10px 0;"><input type="checkbox" id="vc-precio"> Mostrar "Desde $…" en cada producto</label>
+    <button class="btn btn-gold" id="vp-btn" onclick="generarVideoAuto('prod')">🎬 Armar video (0)</button>`;
+  vpPintar();
+}
+function vpPintar(){
+  const q = normBusqueda(document.getElementById('vp-q').value);
+  const out = [];
+  CATALOGO.forEach((c, ci) => (c.productos || []).forEach((p, pi) => { if(!Array.isArray(p.variantes) || !imagenesEfectivas(ci, pi, p).length) return; if(q && !normBusqueda(p.nombre + ' ' + p.variantes.map(v => v.sku).join(' ')).includes(q)) return; out.push({ ci, pi, p, k: ci + '-' + pi }); }));
+  document.getElementById('vp-lista').innerHTML = out.slice(0, 80).map(x => `<label style="display:flex;gap:8px;align-items:center;padding:6px;border-bottom:1px solid var(--line);cursor:pointer;">
+    <input type="checkbox" ${vpSel.has(x.k) ? 'checked' : ''} onchange="this.checked ? vpSel.add('${x.k}') : vpSel.delete('${x.k}'); document.getElementById('vp-btn').textContent='🎬 Armar video (' + vpSel.size + ')'">
+    <img src="${escapeAttr(imagenesEfectivas(x.ci, x.pi, x.p)[0])}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">
+    <span style="font-size:0.85rem;"><b>${escaparHtml(x.p.nombre)}</b><br><span class="note">${escaparHtml(x.p.variantes.map(v => v.sku).slice(0, 4).join(', '))}</span></span></label>`).join('') || '<p class="note">No se encontró.</p>';
+}
+async function generarVideoAuto(modo){
+  const conPrecio = document.getElementById('vc-precio').checked;
+  let escenas = [], nombre = '', apertura = '', prods = '';
+  if(modo === 'cat'){
+    const ci = +document.getElementById('vc-cat').value, n = +document.getElementById('vc-n').value, c = CATALOGO[ci];
+    const pis = (c.productos || []).map((p, pi) => pi).filter(pi => Array.isArray(c.productos[pi].variantes) && imagenesEfectivas(ci, pi, c.productos[pi]).length).slice(0, n);
+    escenas = pis.map(pi => escenaDeProducto(ci, pi, conPrecio));
+    nombre = c.categoria; apertura = c.categoria; prods = pis.map(pi => c.productos[pi].nombre).slice(0, 5).join(' • ');
+  } else {
+    if(!vpSel.size){ alert('Tildá al menos un producto.'); return; }
+    escenas = [...vpSel].map(k => { const [ci, pi] = k.split('-').map(Number); return escenaDeProducto(ci, pi, conPrecio); });
+    const cats = [...new Set([...vpSel].map(k => CATALOGO[+k.split('-')[0]].categoria))];
+    nombre = cats.join(' y '); apertura = 'Textiles para el hogar y la hotelería'; prods = cats.join(' • ');
+  }
+  try{
+    await idbGuardar('video_auto', { escenas, nombre, apertura, prods, fecha: Date.now() });
+    cerrarPublicar(); location.href = 'videos.html?auto=1';
+  } catch(e){ alert('No se pudo preparar el video: ' + e.message); }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -16903,7 +16984,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v170';
+const APP_VERSION = '2026-10-02-v171';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
