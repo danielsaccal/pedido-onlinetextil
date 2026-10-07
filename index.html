@@ -1584,7 +1584,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v178</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v179</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -9403,15 +9403,16 @@ function partirTitulo(nombre){
 // medidas de un producto, cortas: "1½ Plazas • 2½ Plazas" o "140×190 • 160×200"
 function medidasCortas(p){
   // solo medidas reales: dimensiones (50×70) o talles (1½ Plaza, Queen…). Si las variantes son modelos/colores, no se muestran.
-  const esTalle = s => /plaza|twin|full|queen|king|super|cuna|1\s*½|2\s*½|1 1\/2|2 1\/2|\bxs\b|\bs\b|\bm\b|\bl\b|\bxl\b|\bxxl\b/i.test(s);
+  const esTalle = s => /plaza|twin|full|queen|king|super|cuna|1\s*½|2\s*½|1 1\/2|2 1\/2|\bxs\b|\bs\b|\bm\b|\bl\b|\bxl\b|\bxxl\b|toalla|toall[oó]n|bata|juego|funda|plana|ajustable|mantel|camino|individual|set|alfombra|repasador|almohad/i.test(s);
   const dimRe = /\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?(?:\s*[x×]\s*\d+(?:[.,]\d+)?)?/i;
   const vs = (p.variantes || []).map(v => {
     let d = String(v.desc || '').split(' — ')[0].trim();
     if(d.toUpperCase().startsWith(String(v.sku).toUpperCase())) d = d.slice(String(v.sku).length).trim();
     const dims = d.match(dimRe);
-    const nom = d.replace(new RegExp(dimRe.source, 'gi'), '').replace(/\bcm\b/gi, '').replace(/^(juego|sábana|sabana|funda|mantel|toalla|toallón|toallon|repasador)\s+(de\s+)?/i, '').replace(/\s{2,}/g, ' ').trim();
-    if(nom && esTalle(nom) && nom.length <= 22) return nom;
-    if(dims) return dims[0].replace(/\s*[x×]\s*/gi, '×') + ' cm';
+    const nom = d.replace(new RegExp(dimRe.source, 'gi'), '').replace(/\bcm\b/gi, '').replace(/^(sábana|sabana)\s+(de\s+)?/i, '').replace(/\s{2,}/g, ' ').trim();
+    const dd = dims ? dims[0].replace(/\s*[x×]\s*/gi, '×') : '';
+    if(nom && esTalle(nom) && nom.length <= 22) return dd ? `${nom} ${dd}` : nom;
+    if(dd) return dd + ' cm';
     return '';
   }).filter(Boolean);
   let u = [...new Set(vs)];
@@ -9433,7 +9434,16 @@ function escenaDeProducto(ci, pi, conPrecio, desc, opc){
   const frase = [comp, gr && !comp.includes(gr.replace(' g', '')) ? gr : ''].filter(Boolean).join(' · ');
   const det = opc.med ? medidasCortas(p) : '';
   let precio = '';
-  if(conPrecio){ const pr = (p.variantes || []).map(v => parsePrice(v.precio)).filter(x => x > 0); if(pr.length){ const m = Math.min(...pr) * (1 - (desc || 0) / 100); precio = 'Desde ' + formatPrice(Math.round(m)) + sufijoPrecio(p); } }
+  if(conPrecio){
+    const vs = (p.variantes || []).map(v => ({ v, n: parsePrice(v.precio) })).filter(x => x.n > 0).sort((a, b) => a.n - b.n);
+    if(vs.length){
+      const m = vs[0].n * (1 - (desc || 0) / 100);
+      let cual = String(vs[0].v.desc || '').split(' — ')[0].trim();
+      if(cual.toUpperCase().startsWith(String(vs[0].v.sku).toUpperCase())) cual = cual.slice(String(vs[0].v.sku).length).trim();
+      cual = cual.replace(/\s*[x×]\s*/g, '×');
+      precio = (vs.length > 1 ? 'Desde ' : '') + formatPrice(Math.round(m)) + sufijoPrecio(p) + (cual && vs.length > 1 && cual.length <= 28 ? ` · ${cual}` : '');
+    }
+  }
   return { img: fotos[0] || '', cat: c.categoria.toUpperCase(), t1, t2, frase, det, precio };
 }
 function abrirCrearVideo(){
@@ -17039,7 +17049,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v178';
+const APP_VERSION = '2026-10-02-v179';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
