@@ -1584,7 +1584,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v186</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v187</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5851,6 +5851,7 @@ async function registrarIngresoTaller(){
     const tb = detalle.reduce((s, d) => s + d.buenas, 0), tf = detalle.reduce((s, d) => s + d.falladas, 0);
     const tx = detalle.reduce((s, d) => s + (d.faltantes || 0), 0);
     alert(`Entrega registrada: ${tb} buenas${tf ? `, ${tf} falladas` : ''}${tx ? `, ${tx} que no entrega` : ''}.`);
+    try{ ofrecerDifusion(detalle.filter(d => d.sku && d.buenas > 0).map(d => d.sku)); } catch(e){ console.error(e); }
     document.getElementById('it-nota').value = '';
     renderIngresoTaller();
   } catch(e){ err.textContent = 'No se pudo registrar: ' + e.message; err.style.display = 'block'; }
@@ -9548,6 +9549,52 @@ async function generarVideoAuto(modo){
     await idbGuardar('video_auto', { escenas, nombre, apertura, prods, oferta: desc ? `${desc}% OFF` : '', fecha: Date.now() });
     cerrarPublicar(); location.href = 'videos.html?auto=1';
   } catch(e){ alert('No se pudo preparar el video: ' + e.message); }
+}
+
+// ===== Difundir lo que entro al stock (despues de registrar una entrega del taller) =====
+let difSkus = [];
+function ofrecerDifusion(skus){
+  const prods = [], vistos = new Set();
+  [...new Set(skus.map(s => String(s).toUpperCase()))].forEach(s => {
+    const r = buscarProductoPorSku(s); if(!r) return;
+    let ci = -1, pi = -1; CATALOGO.forEach((c, i) => { const j = c.productos.indexOf(r.producto); if(j >= 0){ ci = i; pi = j; } });
+    if(ci < 0 || vistos.has(ci + '-' + pi)) return; vistos.add(ci + '-' + pi);
+    prods.push({ ci, pi, p: r.producto, sku: s });
+  });
+  if(!prods.length) return;
+  difSkus = prods;
+  const t = document.getElementById('pub-titulo'); if(t) t.textContent = '📣 Difundir lo que entró';
+  document.getElementById('pub-cont').innerHTML = `
+    <p class="note" style="text-align:left;margin:0 0 8px;">Ingresaron ${prods.length} producto${prods.length === 1 ? '' : 's'} del catálogo:</p>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">${prods.map(x => `<span style="display:inline-flex;gap:6px;align-items:center;background:var(--cream);border-radius:10px;padding:4px 8px;font-size:0.8rem;">${imagenesEfectivas(x.ci, x.pi, x.p)[0] ? `<img src="${escapeAttr(imagenesEfectivas(x.ci, x.pi, x.p)[0])}" style="width:28px;height:28px;object-fit:cover;border-radius:5px;">` : ''}${escaparHtml(x.p.nombre)}</span>`).join('')}</div>
+    <div style="display:grid;gap:8px;">
+      <button type="button" class="btn btn-ghost" style="text-align:left;" onclick="difFlyer()">🖼️ <b>Flyer "Nuevo ingreso"</b><br><span class="note">Con las fotos y precios de estos productos.</span></button>
+      <button type="button" class="btn btn-ghost" style="text-align:left;" onclick="difVideo()">🎬 <b>Video automático</b><br><span class="note">Una escena por producto, con medidas y precio.</span></button>
+      <button type="button" class="btn btn-ghost" style="text-align:left;" onclick="difWhatsApp()">💬 <b>Mensaje de WhatsApp</b><br><span class="note">Aviso a clientes con el link del catálogo.</span></button>
+      <button type="button" class="btn btn-ghost" style="width:auto;" onclick="cerrarPublicar()">Ahora no</button>
+    </div>`;
+  document.getElementById('pub-modal').style.display = 'block';
+}
+function difFlyer(){
+  cerrarPublicar();
+  abrirNuevoIngreso();
+  document.getElementById('ni-sku-cantidad').value = String(Math.min(24, difSkus.length));
+  generarCamposSku();
+  [...document.getElementById('ni-sku-campos').querySelectorAll('input')].forEach((inp, i) => { if(difSkus[i]) inp.value = difSkus[i].sku; inp.dispatchEvent(new Event('input')); inp.dispatchEvent(new Event('change')); });
+  document.getElementById('ni-texto').value = 'NUEVO INGRESO';
+}
+async function difVideo(){
+  const escenas = difSkus.map(x => escenaDeProducto(x.ci, x.pi, true, 0, { med: true, gr: true, comp: true }));
+  const cats = [...new Set(difSkus.map(x => CATALOGO[x.ci].categoria))];
+  try{
+    await idbGuardar('video_auto', { escenas, nombre: 'Nuevo ingreso', apertura: 'Nuevo ingreso', prods: cats.join(' • '), oferta: '', fecha: Date.now() });
+    cerrarPublicar(); location.href = 'videos.html?auto=1';
+  } catch(e){ alert('No se pudo preparar el video: ' + e.message); }
+}
+function difWhatsApp(){
+  const lineas = difSkus.map(x => `• ${x.p.nombre}`);
+  const txt = `¡Ingresó mercadería nueva! 🎉\n\n${lineas.join('\n')}\n\nMirá el catálogo y armá tu pedido:\nhttps://danielsaccal.github.io/pedido-onlinetextil/cliente/\n\nOnLineTextil · Mayorista y minorista · Envíos a todo el país`;
+  window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -17007,7 +17054,7 @@ function abrirNuevoIngreso(){
   document.getElementById('ni-fmt-reel').checked = false;
   document.getElementById('ni-video').checked = false;
   document.getElementById('ni-video-estilo-wrap').style.display = 'none';
-  document.querySelector('input[name="ni-video-estilo"][value="zoom"]').checked = true;
+  { const r = document.querySelector('input[name="ni-video-estilo"][value="pop"]'); if(r) r.checked = true; }
   document.getElementById('ni-video-ia-reel').checked = false;
   document.getElementById('ni-video-ml').checked = false;
   document.getElementById('ni-fmt-carrusel').checked = false;
@@ -17083,7 +17130,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v186';
+const APP_VERSION = '2026-10-02-v187';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
