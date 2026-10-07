@@ -1584,7 +1584,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v182</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v183</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1695,8 +1695,8 @@ a.grilla-celda{display:block;}
               <summary style="cursor:pointer;font-weight:700;color:var(--purple);">Ver más: piezas, anchos, confección y empaque</summary>
               <div style="margin-top:10px;">
             <div id="ac-variantes"></div>
-            <div style="display:grid;grid-template-columns:minmax(0,1.8fr) 62px 62px 46px 46px 34px 26px;gap:5px;font-size:0.72rem;color:#8A8072;margin-bottom:3px;">
-              <span>Pieza</span><span>Ancho</span><span>Largo</span><span>Cant.</span><span>Tapas</span><span title="Se puede girar si ahorra tela">Girar</span><span></span>
+            <div style="display:grid;grid-template-columns:minmax(0,1.6fr) 58px 52px 58px 44px 44px 32px 24px;gap:5px;font-size:0.72rem;color:#8A8072;margin-bottom:3px;">
+              <span>Pieza</span><span>Ancho</span><span title="Ancho mínimo: si se puede achicar hasta esta medida para aprovechar todo el ancho de la tela (ej: mantel 140 que se hace de 120 en tela de 240)">Mín. ⓘ</span><span>Largo</span><span>Cant.</span><span>Tapas</span><span title="Se puede girar si ahorra tela">Girar</span><span></span>
             </div>
             <div id="ac-piezas"></div>
             <button type="button" class="btn-mini" onclick="agregarPiezaAC(); calcularAC();">+ Pieza</button>
@@ -3656,7 +3656,21 @@ function calcularCorte(piezas, W){
   cacheCorte.set(clave, mejor);
   return mejor;
 }
+// piezas con ancho minimo: se achican lo justo para que entren N exactas en el ancho de la tela (sin desperdicio)
+function ajustarAnchoFlexible(piezas, W){
+  if(!piezas.some(p => p.anchoMin > 0)) return piezas;
+  return piezas.map(p => {
+    if(!(p.anchoMin > 0) || !(p.ancho > p.anchoMin) || !(W > 0)) return p;
+    if(Math.abs(W % p.ancho) < 0.5) return p;
+    for(let n = Math.ceil(W / p.ancho); n <= Math.floor(W / p.anchoMin); n++){
+      const a = Math.floor(W / n * 10) / 10;
+      if(a <= p.ancho && a >= p.anchoMin) return { ...p, ancho: a, achicar: false, ajustadoDe: p.ancho };
+    }
+    return p;
+  });
+}
 function calcularCorteBase(piezas, W){
+  piezas = ajustarAnchoFlexible(piezas, W);
   const girables = piezas.map((p, i) => i).filter(i => puedeGirar(piezas[i]) && Math.abs(piezas[i].ancho - piezas[i].largo) > 0.01);
   if(!girables.length || girables.length > 6) return calcularCorteFijo(piezas, W);
   let mejor = null;
@@ -4638,10 +4652,11 @@ function agregarPiezaAC(p){
   fila.className = 'ac-pieza';
   if(p.achicar === false) fila.dataset.fija = '1';
   if(p.fc) fila.dataset.fc = JSON.stringify(p.fc);
-  fila.style.cssText = 'display:grid;grid-template-columns:minmax(0,1.8fr) 62px 62px 46px 46px 34px 26px;gap:5px;margin-bottom:5px;align-items:center;';
+  fila.style.cssText = 'display:grid;grid-template-columns:minmax(0,1.6fr) 58px 52px 58px 44px 44px 32px 24px;gap:5px;margin-bottom:5px;align-items:center;';
   fila.innerHTML = `
     <input type="text" class="ac-p-nombre" value="${escapeAttr(p.nombre||'')}" placeholder="Plana" oninput="calcularAC()">
     <input type="number" step="0.1" class="ac-p-ancho" value="${p.ancho||''}" placeholder="250" oninput="calcularAC()">
+    <input type="number" step="0.1" class="ac-p-min" value="${p.anchoMin||''}" placeholder="—" title="Ancho mínimo (opcional)" oninput="calcularAC()">
     <input type="number" step="0.1" class="ac-p-largo" value="${p.largo||''}" placeholder="275" oninput="calcularAC()">
     <input type="number" min="1" class="ac-p-cant" value="${p.cantidad||1}" oninput="calcularAC()">
     <input type="number" min="1" class="ac-p-tapas" value="${p.partes||1}" oninput="calcularAC()">
@@ -4654,6 +4669,7 @@ function leerPiezasAC(){
   return [...document.querySelectorAll('.ac-pieza')].map(f => ({
     nombre: f.querySelector('.ac-p-nombre').value.trim(),
     ancho: parseFloat(f.querySelector('.ac-p-ancho').value),
+    ...(parseFloat(f.querySelector('.ac-p-min').value) > 0 ? { anchoMin: parseFloat(f.querySelector('.ac-p-min').value) } : {}),
     largo: parseFloat(f.querySelector('.ac-p-largo').value),
     cantidad: Math.max(1, parseInt(f.querySelector('.ac-p-cant').value, 10) || 1),
     partes: Math.max(1, parseInt(f.querySelector('.ac-p-tapas').value, 10) || 1),
@@ -6911,6 +6927,8 @@ function descripcionAutomaticaProducto(producto, categoria){
 // Si la calidad viene en varios anchos, se toma la medida mas chica que pueda salir.
 function medidasAdaptadas(piezas, anchos){
   const res = piezas.map(p => ({ a: p.ancho, l: p.largo }));
+  // ancho flexible (ancho minimo): la medida final es la que se corta en esa tela
+  (anchos || []).slice(0, 1).forEach(W => { ajustarAnchoFlexible(piezas, W).forEach((q, i) => { if(q.ajustadoDe) res[i] = { a: q.ancho, l: q.largo }; }); });
   (anchos || []).forEach(W => {
     if(!(W > 0)) return;
     let c; try{ c = calcularCorte(piezas, W); } catch(e){ return; }
@@ -17052,7 +17070,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v182';
+const APP_VERSION = '2026-10-02-v183';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
