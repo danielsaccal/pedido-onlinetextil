@@ -1584,7 +1584,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v183</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v184</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1696,7 +1696,7 @@ a.grilla-celda{display:block;}
               <div style="margin-top:10px;">
             <div id="ac-variantes"></div>
             <div style="display:grid;grid-template-columns:minmax(0,1.6fr) 58px 52px 58px 44px 44px 32px 24px;gap:5px;font-size:0.72rem;color:#8A8072;margin-bottom:3px;">
-              <span>Pieza</span><span>Ancho</span><span title="Ancho mínimo: si se puede achicar hasta esta medida para aprovechar todo el ancho de la tela (ej: mantel 140 que se hace de 120 en tela de 240)">Mín. ⓘ</span><span>Largo</span><span>Cant.</span><span>Tapas</span><span title="Se puede girar si ahorra tela">Girar</span><span></span>
+              <span>Pieza</span><span>Ancho</span><span title="Medida mínima: el lado que se puede achicar (ej: mantel 200×140 que se hace 200×120 en tela de 240). La app lo achica solo para aprovechar todo el ancho de la tela.">Mín. ⓘ</span><span>Largo</span><span>Cant.</span><span>Tapas</span><span title="Se puede girar si ahorra tela">Girar</span><span></span>
             </div>
             <div id="ac-piezas"></div>
             <button type="button" class="btn-mini" onclick="agregarPiezaAC(); calcularAC();">+ Pieza</button>
@@ -3660,11 +3660,17 @@ function calcularCorte(piezas, W){
 function ajustarAnchoFlexible(piezas, W){
   if(!piezas.some(p => p.anchoMin > 0)) return piezas;
   return piezas.map(p => {
-    if(!(p.anchoMin > 0) || !(p.ancho > p.anchoMin) || !(W > 0)) return p;
-    if(Math.abs(W % p.ancho) < 0.5) return p;
-    for(let n = Math.ceil(W / p.ancho); n <= Math.floor(W / p.anchoMin); n++){
+    const min = +p.anchoMin;
+    if(!(min > 0) || !(W > 0)) return p;
+    // el lado que se puede achicar es el que esta por encima del minimo (si los dos, el mas chico: ej 200x140 con min 120 -> el 140)
+    const lados = [{ v: +p.ancho, otro: +p.largo }, { v: +p.largo, otro: +p.ancho }].filter(x => x.v > min);
+    if(!lados.length) return p;
+    lados.sort((x, y) => x.v - y.v);
+    const lado = lados[0];
+    if(Math.abs(W % lado.v) < 0.5) return { ...p, ancho: lado.v, largo: lado.otro, girar: false };
+    for(let n = Math.ceil(W / lado.v); n <= Math.floor(W / min); n++){
       const a = Math.floor(W / n * 10) / 10;
-      if(a <= p.ancho && a >= p.anchoMin) return { ...p, ancho: a, achicar: false, ajustadoDe: p.ancho };
+      if(a <= lado.v && a >= min) return { ...p, ancho: a, largo: lado.otro, girar: false, achicar: false, ajustadoDe: lado.v };
     }
     return p;
   });
@@ -6928,7 +6934,7 @@ function descripcionAutomaticaProducto(producto, categoria){
 function medidasAdaptadas(piezas, anchos){
   const res = piezas.map(p => ({ a: p.ancho, l: p.largo }));
   // ancho flexible (ancho minimo): la medida final es la que se corta en esa tela
-  (anchos || []).slice(0, 1).forEach(W => { ajustarAnchoFlexible(piezas, W).forEach((q, i) => { if(q.ajustadoDe) res[i] = { a: q.ancho, l: q.largo }; }); });
+  (anchos || []).slice(0, 1).forEach(W => { ajustarAnchoFlexible(piezas, W).forEach((q, i) => { if(q.ajustadoDe){ const p0 = piezas[i]; res[i] = Math.abs(p0.largo - q.ajustadoDe) < 0.01 && Math.abs(p0.ancho - q.largo) < 0.01 ? { a: q.largo, l: q.ancho } : { a: q.ancho, l: q.largo }; } }); });
   (anchos || []).forEach(W => {
     if(!(W > 0)) return;
     let c; try{ c = calcularCorte(piezas, W); } catch(e){ return; }
@@ -17070,7 +17076,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v183';
+const APP_VERSION = '2026-10-02-v184';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
