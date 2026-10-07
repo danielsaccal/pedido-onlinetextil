@@ -1584,7 +1584,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v180</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v181</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -9406,8 +9406,11 @@ function medidasCortas(p){
   const esTalle = s => /plaza|twin|full|queen|king|super|cuna|1\s*½|2\s*½|1 1\/2|2 1\/2|\bxs\b|\bs\b|\bm\b|\bl\b|\bxl\b|\bxxl\b|toalla|toall[oó]n|bata|juego|funda|plana|ajustable|mantel|camino|individual|set|alfombra|repasador|almohad|talle|ancho\s*\d|micrones|\d+\s*cm/i.test(s);
   const dimRe = /\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?(?:\s*[x×]\s*\d+(?:[.,]\d+)?)?/i;
   const vs = (p.variantes || []).map(v => {
-    let d = String(v.desc || '').split(' — ')[0].trim();
+    // la descripcion puede venir como "Nombre — 58 × 48 cm / contenido": se busca la medida en todo el texto
+    const partes = String(v.desc || '').split(' — ');
+    let d = partes[0].trim();
     if(d.toUpperCase().startsWith(String(v.sku).toUpperCase())) d = d.slice(String(v.sku).length).trim();
+    if(!dimRe.test(d)){ const resto = partes.slice(1).join(' ').split(' / ')[0]; const mr = resto.match(dimRe); if(mr) d = (d ? d + ' ' : '') + mr[0]; }
     const dims = d.match(dimRe);
     if((d.match(new RegExp(dimRe.source, 'gi')) || []).length > 1 && d.length <= 44) return d.replace(/\s*[x×]\s*/g, '×').replace(/\s*cm\b/gi, '');
     const nom = d.replace(new RegExp(dimRe.source, 'gi'), '').replace(/(\D)\s*\bcm\b/gi, '$1').replace(/^(sábana|sabana)\s+(de\s+)?/i, '').replace(/\s{2,}/g, ' ').trim();
@@ -9439,9 +9442,8 @@ function escenaDeProducto(ci, pi, conPrecio, desc, opc){
     const vs = (p.variantes || []).map(v => ({ v, n: parsePrice(v.precio) })).filter(x => x.n > 0).sort((a, b) => a.n - b.n);
     if(vs.length){
       const m = vs[0].n * (1 - (desc || 0) / 100);
-      let cual = String(vs[0].v.desc || '').split(' — ')[0].trim();
-      if(cual.toUpperCase().startsWith(String(vs[0].v.sku).toUpperCase())) cual = cual.slice(String(vs[0].v.sku).length).trim();
-      cual = cual.replace(/\s*[x×]\s*/g, '×');
+      let cual = medidasCortas({ nombre: '', composicion: '', variantes: [vs[0].v] });
+      if(!cual){ cual = String(vs[0].v.desc || '').split(' — ')[0].trim(); if(cual.toUpperCase().startsWith(String(vs[0].v.sku).toUpperCase())) cual = cual.slice(String(vs[0].v.sku).length).trim(); }
       precio = (vs.length > 1 ? 'Desde ' : '') + formatPrice(Math.round(m)) + sufijoPrecio(p) + (cual && vs.length > 1 && cual.length <= 28 ? ` · ${cual}` : '');
     }
   }
@@ -17050,7 +17052,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v180';
+const APP_VERSION = '2026-10-02-v181';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
