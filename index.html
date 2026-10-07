@@ -1582,7 +1582,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v169</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v170</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5552,7 +5552,7 @@ function aprovechamientoCorte(c, W){
 // nivel de opciones por icono. Ninguna funcion cambia, solo como se llega a cada una.
 const GRUPOS_INICIO = {
   a: { lado: 'ext', titulo: 'Armar pedido', items: [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['📷 Escanear etiqueta (SKU)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto').click()"], ['🤖 Buscar por foto (IA)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto-producto').click()"]] },
-  c: { lado: 'ext', titulo: 'Difusión', items: [['🔗 Compartir por rubro', 'abrirCompartirRubro()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()'], ['🖼️ Nuevo ingreso (flyers, video)', 'abrirNuevoIngreso()'], ['📱 Vista previa grilla IG', 'abrirGrilla()'], ['📣 Anuncios y promociones', 'abrirAnuncio()'], ['🎬 Compartir video de producto', 'abrirCompartirVideoProducto()']] },
+  c: { lado: 'ext', titulo: 'Difusión', items: [['🎬 Crear video promocional', "location.href='videos.html'"], ['🔗 Compartir por rubro', 'abrirCompartirRubro()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()'], ['🖼️ Nuevo ingreso (flyers, video)', 'abrirNuevoIngreso()'], ['📱 Vista previa grilla IG', 'abrirGrilla()'], ['📣 Anuncios y promociones', 'abrirAnuncio()'], ['🎬 Compartir video de producto', 'abrirCompartirVideoProducto()']] },
   d: { lado: 'int', titulo: 'Ventas', items: [['📋 Historial de pedidos', 'abrirHistorial()'], ['🤖 Pedido con IA (texto libre)', 'abrirPedidoIA()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()'], ['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
   f: { lado: 'int', titulo: 'Catálogo', items: [['🗂️ Ordenar categorías', 'abrirCategorias()'], ['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['📷 Fotos de productos', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
   g: { lado: 'int', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas'], columnas: [
@@ -16903,7 +16903,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v169';
+const APP_VERSION = '2026-10-02-v170';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
