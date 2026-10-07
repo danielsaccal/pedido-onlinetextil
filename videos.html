@@ -163,7 +163,8 @@ function pintarEscenas(){
     </div>
     <label class="f">Categoría (dorado)<input type="text" value="${esc(e.cat)}" placeholder="Ej: BAÑO" oninput="setE(${i},'cat',this.value)"></label>
     <div class="g2"><label class="f">Título línea 1<input type="text" value="${esc(e.t1)}" oninput="setE(${i},'t1',this.value)"></label><label class="f">Título línea 2<input type="text" value="${esc(e.t2)}" oninput="setE(${i},'t2',this.value)"></label></div>
-    <label class="f">Frase corta (opcional)<input type="text" value="${esc(e.frase)}" oninput="setE(${i},'frase',this.value)"></label>
+    <label class="f">Frase corta (opcional)<input type="text" value="${esc(e.frase)}" placeholder="Ej: 100% algodón · 500 g" oninput="setE(${i},'frase',this.value)"></label>
+    <div class="g2"><label class="f">Medidas (opcional)<input type="text" value="${esc(e.det || '')}" placeholder="Ej: 1½ • 2½ • Queen • King" oninput="setE(${i},'det',this.value)"></label><label class="f">Precio (opcional)<input type="text" value="${esc(e.precio || '')}" placeholder="Ej: Desde $ 12.000" oninput="setE(${i},'precio',this.value)"></label></div>
   </div>`).join('');
 }
 function pintarVentajas(){
@@ -308,14 +309,18 @@ function degradeAbajo(x, desde){
   const g = x.createLinearGradient(0, desde, 0, H); g.addColorStop(0, 'rgba(28,7,51,0)'); g.addColorStop(0.45, 'rgba(28,7,51,0.85)'); g.addColorStop(1, 'rgba(28,7,51,0.98)');
   x.fillStyle = g; x.fillRect(0, desde, W, H - desde);
 }
-function bloqueTextos(x, t, cat, t1, t2, frase, yBase, t2Dorado){
+function bloqueTextos(x, t, cat, t1, t2, frase, yBase, t2Dorado, det, precio){
+  yBase -= ((det ? 1 : 0) + (precio ? 1 : 0)) * 60;
   let y = yBase;
   if(cat){ texto(x, cat.toUpperCase(), 70, y, '800 34px Montserrat', C.d, t, 0.25); y += 100; } else y += 50;
   const f = '900 104px Montserrat';
   if(t1){ texto(x, t1.toUpperCase(), 70, y, ajustarTexto(x, t1.toUpperCase(), f, W - 140), '#fff', t, 0.4); y += 112; }
   if(t2){ texto(x, t2.toUpperCase(), 70, y, ajustarTexto(x, t2.toUpperCase(), f, W - 140), t2Dorado ? C.d : '#fff', t, 0.55); y += 30; }
   lineaPunteada(x, 70, y + 10, W - 140, (t - 0.7) / 0.9);
-  if(frase) texto(x, frase, 70, y + 80, '600 36px Montserrat', '#fff', t, 0.9);
+  let yy = y + 80;
+  if(frase){ texto(x, frase, 70, yy, ajustarTexto(x, frase, '600 36px Montserrat', W - 140), '#fff', t, 0.9); yy += 58; }
+  if(det){ texto(x, '📏 ' + det, 70, yy, ajustarTexto(x, '📏 ' + det, '700 36px Montserrat', W - 140), '#fff', t, 1.0); yy += 62; }
+  if(precio){ texto(x, precio, 70, yy, ajustarTexto(x, precio, '800 44px Montserrat', W - 140), C.d, t, 1.1); }
 }
 function escIntro(x, t, T){
   fondo(x, T);
@@ -349,7 +354,7 @@ function escEscena(x, t, T, e){
   else if(!exportando){ x.save(); x.strokeStyle = 'rgba(244,196,48,.6)'; x.setLineDash([20, 14]); x.lineWidth = 6; rr(x, 120, 300, W - 240, 700, 30); x.stroke(); x.fillStyle = 'rgba(255,255,255,.75)'; x.font = '700 48px Montserrat'; x.textAlign = 'center'; x.fillText('📷 Subí la foto', W / 2, 670); x.restore(); }
   degradeAbajo(x, H * 0.5);
   marca(x, 60, 110, 54);
-  bloqueTextos(x, t, e.cat, e.t1, e.t2, e.frase, H * 0.62);
+  bloqueTextos(x, t, e.cat, e.t1, e.t2, e.frase, H * 0.62, false, e.det, e.precio);
 }
 function escCollage(x, t, T){
   fondo(x, T);
@@ -493,7 +498,7 @@ async function exportar(){
 }
 
 // ---------------- plantillas ----------------
-function aJSON(){ return { datos: datos(), escenas: escenas.map(e => ({ modo: e.modo, cat: e.cat, t1: e.t1, t2: e.t2, frase: e.frase, dur: e.dur })), ventajas }; }
+function aJSON(){ return { datos: datos(), escenas: escenas.map(e => ({ modo: e.modo, cat: e.cat, t1: e.t1, t2: e.t2, frase: e.frase, det: e.det || '', precio: e.precio || '', dur: e.dur })), ventajas }; }
 function desdeJSON(j){
   const d = j.datos || {};
   $('g-nombre').value = d.nombre || ''; $('g-tipo').value = d.tipo || 'producto'; $('g-apertura').value = d.apertura || ''; $('g-franja').value = d.franja || '';
@@ -586,7 +591,7 @@ async function cargarAuto(){
   const pq = await idbLeer('video_auto'); if(!pq) return;
   $('escenas').innerHTML = '<p class="note">Armando el video con las fotos del catálogo…</p>';
   const ims = await Promise.all(pq.escenas.map(e => cargarImgSrc(e.img)));
-  escenas = pq.escenas.map((e, i) => ({ foto: ims[i], modo: ims[i] && esFondoClaroOHorizontal(ims[i]) ? 'tarjeta' : 'full', cat: e.cat, t1: e.t1, t2: e.t2, frase: e.frase, dur: 3.5 }));
+  escenas = pq.escenas.map((e, i) => ({ foto: ims[i], modo: ims[i] && esFondoClaroOHorizontal(ims[i]) ? 'tarjeta' : 'full', cat: e.cat, t1: e.t1, t2: e.t2, frase: e.frase, det: e.det || '', precio: e.precio || '', dur: (e.det || e.precio) ? 4 : 3.5 }));
   $('g-nombre').value = pq.nombre || ''; $('g-apertura').value = pq.apertura || '';
   $('c-on').checked = escenas.filter(e => e.foto).length >= 3; $('p-on').checked = true;
   if(pq.prods) $('z-prod').value = pq.prods;
