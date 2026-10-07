@@ -1584,7 +1584,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v185</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v186</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5416,20 +5416,22 @@ async function editarBolsasDisponibles(){
 // resumen de bolsas y etiquetas de una orden
 function resumenBolsas(renglones){
   const porBolsa = new Map(); let etiquetas = 0;
-  (renglones || []).forEach(r => { if(!r.bolsa) return; const n = Math.ceil((+r.cantidad || 0) / (r.porBolsa || 1)); porBolsa.set(r.bolsa, (porBolsa.get(r.bolsa) || 0) + n); etiquetas += n; });
+  const sinBolsa = [];
+  (renglones || []).forEach(r => { const cant = +r.cantidad || 0; if(!cant) return; if(!r.bolsa){ etiquetas += cant; sinBolsa.push(r.articulo); return; } const n = Math.ceil(cant / (r.porBolsa || 1)); porBolsa.set(r.bolsa, (porBolsa.get(r.bolsa) || 0) + n); etiquetas += n; });
   // avios (cierres, elastico, botones…): cantidad por unidad x unidades
   const av = new Map();
   (renglones || []).forEach(r => (r.avios || []).forEach(a => { const k = a.nombre; const x = av.get(k) || { n: 0, u: a.unidad || 'unidad' }; x.n += (+a.cantidad || 0) * (+r.cantidad || 0); av.set(k, x); }));
   const partes = [];
-  if(etiquetas) partes.push(`🛍️ Bolsas: ${[...porBolsa].map(([b, n]) => `${b} → ${n}`).join(' · ')} · Etiquetas: ${etiquetas}`);
+  if(etiquetas) partes.push(`🛍️ ${porBolsa.size ? `Bolsas: ${[...porBolsa].map(([b, n]) => `${b} → ${n}`).join(' · ')} · ` : ''}Etiquetas: ${etiquetas}${sinBolsa.length ? ` (sin bolsa cargada: ${[...new Set(sinBolsa)].join(', ')})` : ''}`);
   if(av.size) partes.push(`🧷 Avíos: ${[...av].map(([nom, x]) => x.u === 'metro' ? `${fmtCm(Math.round(x.n * 100) / 100)} m de ${nom}` : `${Math.round(x.n * 100) / 100} × ${nom}`).join(' · ')}`);
   return partes.join('\n');
 }
 // PDF de etiquetas 50 x 25 mm, una por pagina, tantas como unidades
 async function etiquetasOrden(o){
-  const rs = (o.renglones || []).filter(r => r.bolsa && (+r.cantidad || 0) > 0);
-  if(!rs.length){ alert('Ningún producto de esta orden lleva bolsa con etiqueta.'); return; }
-  const total = rs.reduce((s, r) => s + Math.ceil((+r.cantidad || 0) / (r.porBolsa || 1)), 0);
+  // una etiqueta por bolsa; si el producto no tiene bolsa cargada, una por unidad
+  const rs = (o.renglones || []).filter(r => (+r.cantidad || 0) > 0);
+  if(!rs.length){ alert('La orden no tiene productos.'); return; }
+  const total = rs.reduce((s, r) => s + Math.ceil((+r.cantidad || 0) / (r.bolsa ? (r.porBolsa || 1) : 1)), 0);
   if(total > 300 && !confirm(`Son ${total} etiquetas. ¿Armar el PDF con todas?`)) return;
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: [50, 25], orientation: 'landscape' });
@@ -5438,7 +5440,7 @@ async function etiquetasOrden(o){
     const desc = limpiarPDF(r.etDesc || r.articulo).toUpperCase();
     const medida = limpiarPDF(r.etMedida || '').toUpperCase();
     const sku = limpiarPDF(r.sku || r.fichaSku || '');
-    const pack = r.porBolsa || 1;
+    const pack = r.bolsa ? (r.porBolsa || 1) : 1;
     const bolsas = Math.ceil((+r.cantidad || 0) / pack);
     for(let i = 0; i < bolsas; i++){
       if(!primera) doc.addPage([50, 25], 'landscape');
@@ -17081,7 +17083,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v185';
+const APP_VERSION = '2026-10-02-v186';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
