@@ -561,10 +561,42 @@ function verGrande(){
 }
 function cerrarGrande(){ jg = false; $('grande').style.display = 'none'; }
 
+
+// ---------------- armado automatico (viene de la app) ----------------
+function idbLeer(clave){
+  return new Promise(res => {
+    const r = indexedDB.open('onlinetextil', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => { try{ const g = r.result.transaction('kv').objectStore('kv').get(clave); g.onsuccess = () => res(g.result); g.onerror = () => res(null); } catch(e){ res(null); } };
+    r.onerror = () => res(null);
+  });
+}
+function cargarImgSrc(src){
+  return new Promise(res => {
+    if(!src){ res(null); return; }
+    const im = new Image();
+    if(!/^data:/.test(src)) im.crossOrigin = 'anonymous';
+    im.onload = () => { try{ im._blur = desenfocar(im); res(im); } catch(e){ res(null); } };
+    im.onerror = () => res(null);
+    im.src = src;
+  });
+}
+async function cargarAuto(){
+  if(!/auto=1/.test(location.search)) return;
+  const pq = await idbLeer('video_auto'); if(!pq) return;
+  $('escenas').innerHTML = '<p class="note">Armando el video con las fotos del catálogo…</p>';
+  const ims = await Promise.all(pq.escenas.map(e => cargarImgSrc(e.img)));
+  escenas = pq.escenas.map((e, i) => ({ foto: ims[i], modo: ims[i] && esFondoClaroOHorizontal(ims[i]) ? 'tarjeta' : 'full', cat: e.cat, t1: e.t1, t2: e.t2, frase: e.frase, dur: 3.5 }));
+  $('g-nombre').value = pq.nombre || ''; $('g-apertura').value = pq.apertura || '';
+  $('c-on').checked = escenas.filter(e => e.foto).length >= 3; $('p-on').checked = true;
+  if(pq.prods) $('z-prod').value = pq.prods;
+  history.replaceState(null, '', location.pathname);
+  pintarEscenas(); act(); verGrande();
+}
 // ---------------- inicio ----------------
 pintarGuias(); pintarEscenas(); pintarVentajas();
 if(typeof VideoEncoder === 'undefined') $('aviso').style.display = 'block';
-Promise.all(['600', '700', '800', '900'].map(w => document.fonts.load(`${w} 40px Montserrat`))).catch(() => {}).then(() => document.fonts.ready).then(() => act());
+Promise.all(['600', '700', '800', '900'].map(w => document.fonts.load(`${w} 40px Montserrat`))).catch(() => {}).then(() => document.fonts.ready).then(() => act()).then(() => cargarAuto());
 cargarListaPlantillas();
 </script>
 </body>
