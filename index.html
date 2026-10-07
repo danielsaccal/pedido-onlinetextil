@@ -922,6 +922,8 @@ a.grilla-celda{display:block;}
             <label>Se vende por rollo: metros por rollo (opcional)</label>
             <input type="number" id="ep-metros" min="0" step="0.5" placeholder="Ej: 30 · vacío = se vende por unidad">
             <p class="note" style="text-align:left;margin:3px 0 0;">El precio se carga por metro; al agregar 1 al pedido se suma precio × metros del rollo.</p>
+            <label style="margin-top:10px;display:block;">El precio es por</label>
+            <select id="ep-unidad"><option value="">unidad (no se aclara)</option><option>docena</option><option>media docena</option><option>par</option><option>juego</option><option>pack</option><option>kilo</option></select>
           </div>
         </div>
 
@@ -1582,7 +1584,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v172</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v173</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2411,7 +2413,7 @@ function renderCatalogo(filtro){
           <div class="variante">
             <div class="variante-fila">
               <div class="desc">${descVarianteHtml(v.desc)}<span class="sku">SKU ${v.sku}</span>${rolloNota}</div>
-              <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioNum) + (p.metros ? ' /m' : '')}</div>
+              <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioNum) + sufijoPrecio(p)}</div>
               ${precioNum===null ? '<div></div>' : `
               <div class="qty">
                 <button type="button" onclick="cambiarCantidad('${id}', -1, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioEfectivo})">−</button>
@@ -9193,7 +9195,12 @@ async function editarDatosTaller(i){
 
 // ===== Categorias propias, productos movidos y fotos por producto (no por posicion) =====
 var categoriasCfg = { extra: [], mover: [] }, fotosMapa = {}, fotosRaw = {}, videosRaw = {};
+// unidad de venta del precio (ej: por docena), guardada aparte en config/unidades
+var unidadesVenta = {};
+async function cargarUnidadesVenta(){ try{ const d = await db.collection('config').doc('unidades').get(); unidadesVenta = d.exists ? (d.data().u || {}) : {}; } catch(e){} }
+function sufijoPrecio(p){ if(p && p.metros) return ' /m'; const u = p && unidadesVenta[p._editKey]; return u ? ' /' + u : ''; }
 async function cargarCategoriasCfg(){
+  await cargarUnidadesVenta();
   try{ const d = await db.collection('config').doc('categorias').get(); if(d.exists){ const x = d.data(); categoriasCfg = { extra: x.extra || [], mover: x.mover || [] }; } } catch(e){}
   try{ const d = await db.collection('config').doc('fotos_mapa').get(); fotosMapa = d.exists ? (d.data().mapa || {}) : {}; } catch(e){}
   categoriasCfg.extra.forEach(n => { if(!CATALOGO.some(c => c.categoria === n)) CATALOGO.push({ categoria: n, productos: [] }); });
@@ -9393,12 +9400,12 @@ function partirTitulo(nombre){
   for(let i = 1; i < ps.length; i++){ const a = ps.slice(0, i).join(' ').length, b = ps.slice(i).join(' ').length; if(Math.abs(a - b) < dif){ dif = Math.abs(a - b); mejor = i; } }
   return [ps.slice(0, mejor).join(' '), ps.slice(mejor).join(' ')];
 }
-function escenaDeProducto(ci, pi, conPrecio){
+function escenaDeProducto(ci, pi, conPrecio, desc){
   const c = CATALOGO[ci], p = c.productos[pi];
   const fotos = imagenesEfectivas(ci, pi, p);
   const [t1, t2] = partirTitulo(p.nombre);
   let frase = p.composicion || '';
-  if(conPrecio){ const pr = (p.variantes || []).map(v => parsePrice(v.precio)).filter(x => x > 0); if(pr.length) frase = `Desde ${formatPrice(Math.min(...pr))}${p.metros ? ' /m' : ''}`; }
+  if(conPrecio){ const pr = (p.variantes || []).map(v => parsePrice(v.precio)).filter(x => x > 0); if(pr.length){ const m = Math.min(...pr) * (1 - (desc || 0) / 100); frase = `Desde ${formatPrice(Math.round(m))}${sufijoPrecio(p)}${desc ? ` (−${desc}%)` : ''}`; } }
   return { img: fotos[0] || '', cat: c.categoria.toUpperCase(), t1, t2, frase };
 }
 function abrirCrearVideo(){
@@ -9416,7 +9423,8 @@ function videoPorCategoria(){
   document.getElementById('pub-cont').innerHTML = `
     <div class="field"><label>Categoría</label><select id="vc-cat">${CATALOGO.map((c, i) => ({ c, i, n: (c.productos || []).filter((p, pi) => imagenesEfectivas(i, pi, p).length).length })).filter(x => x.n).map(x => `<option value="${x.i}">${escaparHtml(x.c.categoria)} (${x.n})</option>`).join('')}</select></div>
     <div class="field"><label>Cantidad de escenas</label><select id="vc-n"><option>4</option><option selected>6</option><option>8</option><option>10</option></select></div>
-    <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;margin-bottom:10px;"><input type="checkbox" id="vc-precio"> Mostrar "Desde $…" en cada producto</label>
+    <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;margin-bottom:6px;"><input type="checkbox" id="vc-precio"> Mostrar "Desde $…" en cada producto</label>
+    <div class="field"><label>Descuento general % (opcional)</label><input id="vc-desc" type="number" min="0" max="90" placeholder="Ej: 15"></div>
     <button class="btn btn-gold" onclick="generarVideoAuto('cat')">🎬 Armar video</button>`;
 }
 let vpSel = new Set();
@@ -9425,7 +9433,8 @@ function videoPorProductos(){
   document.getElementById('pub-cont').innerHTML = `
     <input id="vp-q" placeholder="🔍 Buscar producto o SKU" oninput="vpPintar()" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;box-sizing:border-box;">
     <div id="vp-lista" style="max-height:45vh;overflow-y:auto;"></div>
-    <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;margin:10px 0;"><input type="checkbox" id="vc-precio"> Mostrar "Desde $…" en cada producto</label>
+    <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;margin:10px 0 6px;"><input type="checkbox" id="vc-precio"> Mostrar "Desde $…" en cada producto</label>
+    <div class="field"><label>Descuento general % (opcional)</label><input id="vc-desc" type="number" min="0" max="90" placeholder="Ej: 15"></div>
     <button class="btn btn-gold" id="vp-btn" onclick="generarVideoAuto('prod')">🎬 Armar video (0)</button>`;
   vpPintar();
 }
@@ -9440,20 +9449,21 @@ function vpPintar(){
 }
 async function generarVideoAuto(modo){
   const conPrecio = document.getElementById('vc-precio').checked;
+  const desc = Math.max(0, Math.min(90, parseFloat(document.getElementById('vc-desc').value) || 0));
   let escenas = [], nombre = '', apertura = '', prods = '';
   if(modo === 'cat'){
     const ci = +document.getElementById('vc-cat').value, n = +document.getElementById('vc-n').value, c = CATALOGO[ci];
     const pis = (c.productos || []).map((p, pi) => pi).filter(pi => Array.isArray(c.productos[pi].variantes) && imagenesEfectivas(ci, pi, c.productos[pi]).length).slice(0, n);
-    escenas = pis.map(pi => escenaDeProducto(ci, pi, conPrecio));
+    escenas = pis.map(pi => escenaDeProducto(ci, pi, conPrecio, desc));
     nombre = c.categoria; apertura = c.categoria; prods = pis.map(pi => c.productos[pi].nombre).slice(0, 5).join(' • ');
   } else {
     if(!vpSel.size){ alert('Tildá al menos un producto.'); return; }
-    escenas = [...vpSel].map(k => { const [ci, pi] = k.split('-').map(Number); return escenaDeProducto(ci, pi, conPrecio); });
+    escenas = [...vpSel].map(k => { const [ci, pi] = k.split('-').map(Number); return escenaDeProducto(ci, pi, conPrecio, desc); });
     const cats = [...new Set([...vpSel].map(k => CATALOGO[+k.split('-')[0]].categoria))];
     nombre = cats.join(' y '); apertura = 'Textiles para el hogar y la hotelería'; prods = cats.join(' • ');
   }
   try{
-    await idbGuardar('video_auto', { escenas, nombre, apertura, prods, fecha: Date.now() });
+    await idbGuardar('video_auto', { escenas, nombre, apertura, prods, oferta: desc ? `${desc}% OFF` : '', fecha: Date.now() });
     cerrarPublicar(); location.href = 'videos.html?auto=1';
   } catch(e){ alert('No se pudo preparar el video: ' + e.message); }
 }
@@ -13636,6 +13646,7 @@ function buscarProductoParaEditar(){
   const esTelas = match.categoria === 'TELAS';
   document.getElementById('ep-metros-wrap').style.display = 'block';
   document.getElementById('ep-metros').value = p.metros || '';
+  document.getElementById('ep-unidad').value = unidadesVenta[p._editKey] || '';
 
   const cont = document.getElementById('ep-variantes-cont');
   cont.innerHTML = '';
@@ -13676,6 +13687,8 @@ async function guardarProductoEditado(){
   const subtitulo = document.getElementById('ep-subtitulo').value.trim();
   const esTelas = productoEnEdicion.categoria === 'TELAS';
   const metros = parseFloat(String(document.getElementById('ep-metros').value).replace(',', '.')) || null;
+  const unidadSel = document.getElementById('ep-unidad').value;
+  { const ek = productoEnEdicion.producto && productoEnEdicion.producto._editKey; if(ek && (unidadesVenta[ek] || '') !== unidadSel){ if(unidadSel) unidadesVenta[ek] = unidadSel; else delete unidadesVenta[ek]; db.collection('config').doc('unidades').set({ u: unidadesVenta }).catch(() => {}); } }
   const archivoFoto = document.getElementById('ep-foto').files[0];
 
   const variantes = [];
@@ -16988,7 +17001,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v172';
+const APP_VERSION = '2026-10-02-v173';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
