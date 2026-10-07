@@ -40,6 +40,9 @@
   .prog div{ height:100%; width:0; background:var(--d); }
   .aviso{ background:#FDEBE7; color:#A6432F; border-radius:10px; padding:10px; font-size:.85rem; display:none; margin-top:8px; }
   .note{ font-size:.75rem; color:#8A8072; }
+  #mini{ display:none; position:fixed; right:10px; bottom:10px; width:118px; aspect-ratio:9/16; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.4); z-index:40; background:#000; cursor:pointer; }
+  @media (max-width:860px){ #mini{ display:block; } .vista{ position:static; } .vista canvas{ max-width:260px; } }
+  .esc.activa{ border:2px solid var(--d); }
 </style>
 </head>
 <body>
@@ -122,6 +125,7 @@
     </div>
   </div>
 </div>
+<canvas id="mini" width="270" height="480" title="Ver en grande" onclick="verGrande()"></canvas>
 <div id="grande" style="display:none;position:fixed;inset:0;background:rgba(10,3,20,.92);z-index:50;align-items:center;justify-content:center;flex-direction:column;gap:10px;">
   <canvas id="cv2" width="1080" height="1920" style="height:86vh;max-width:96vw;aspect-ratio:9/16;border-radius:14px;"></canvas>
   <div style="display:flex;gap:8px;"><button class="btn d" onclick="verGrande()">↺ Repetir</button><button class="btn g" onclick="cerrarGrande()">✕ Cerrar</button></div>
@@ -147,7 +151,7 @@ let ventajas = [
   { ic: 'camion', t: 'Envíos a todo el país', s: 'Llegamos a cada provincia' },
 ];
 function pintarEscenas(){
-  $('escenas').innerHTML = escenas.map((e, i) => `<div class="esc">
+  $('escenas').innerHTML = escenas.map((e, i) => `<div class="esc${i === escActiva ? ' activa' : ''}" onfocusin="irAEscena(${i})" onclick="if(event.target.tagName!=='BUTTON') irAEscena(${i})">
     <div class="top">
       <label class="thumb" style="${e.foto ? `background-image:url(${e.foto.src})` : ''}">${e.foto ? '' : '📷'}<input type="file" accept="image/*" style="display:none" onchange="fotoEscena(${i}, this)"></label>
       <div style="flex:1;"><b>Escena ${i + 1}</b><div class="note">${e.foto ? 'Tocá la foto para cambiarla' : 'Tocá 📷 para subir la foto'}</div></div>
@@ -168,10 +172,19 @@ function pintarVentajas(){
     <input type="text" value="${esc(v.t)}" placeholder="Título (vacío = no se muestra)" oninput="ventajas[${i}].t=this.value;act()">
     <input type="text" value="${esc(v.s)}" placeholder="Subtítulo" oninput="ventajas[${i}].s=this.value;act()"></div>`).join('');
 }
-function setE(i, k, v){ escenas[i][k] = v; act(); }
+function setE(i, k, v){ escenas[i][k] = v; armar(); irAEscena(i); }
+// muestra en la vista previa la escena que se esta editando (con los textos ya entrados)
+let escActiva = -1;
+function irAEscena(i){
+  pausar(); armar();
+  const s = SEG.filter(x => x.tipo === 'escena')[i];
+  if(!s) return;
+  dibujar(s.t0 + Math.min(s.dur - TR - 0.05, 1.6));
+  if(escActiva !== i){ escActiva = i; document.querySelectorAll('.esc').forEach((el, j) => el.classList.toggle('activa', j === i)); }
+}
 function mover(i, d){ const j = i + d; if(j < 0 || j >= escenas.length) return; [escenas[i], escenas[j]] = [escenas[j], escenas[i]]; pintarEscenas(); act(); }
 function quitar(i){ escenas.splice(i, 1); pintarEscenas(); act(); }
-function agregarEscena(){ escenas.push({ foto: null, modo: 'full', cat: '', t1: '', t2: '', frase: '', dur: 3.5 }); pintarEscenas(); act(); }
+function agregarEscena(){ escenas.push({ foto: null, modo: 'full', cat: '', t1: '', t2: '', frase: '', dur: 3.5 }); escActiva = escenas.length - 1; pintarEscenas(); irAEscena(escActiva); }
 // fotos: con onload (no decode) y una version desenfocada precalculada
 function cargarImg(file){
   return new Promise((res, rej) => {
@@ -187,7 +200,7 @@ function desenfocar(im){
   const y = b.getContext('2d'); y.imageSmoothingQuality = 'high'; y.drawImage(s, 0, 0, 270, 480);
   return b;
 }
-async function fotoEscena(i, inp){ const f = inp.files[0]; if(!f) return; escenas[i].foto = await cargarImg(f); const v = esFondoClaroOHorizontal(escenas[i].foto); if(v) escenas[i].modo = 'tarjeta'; pintarEscenas(); act(); }
+async function fotoEscena(i, inp){ const f = inp.files[0]; if(!f) return; escenas[i].foto = await cargarImg(f); const v = esFondoClaroOHorizontal(escenas[i].foto); if(v) escenas[i].modo = 'tarjeta'; pintarEscenas(); irAEscena(i); }
 async function variasFotos(inp){
   for(const f of inp.files){ const im = await cargarImg(f); escenas.push({ foto: im, modo: esFondoClaroOHorizontal(im) ? 'tarjeta' : 'full', cat: '', t1: '', t2: '', frase: '', dur: 3.5 }); }
   escenas = escenas.filter(e => e.foto || e.t1 || e.t2 || e.cat);
@@ -223,7 +236,14 @@ function armar(){
   TOTAL = t + TR;
   $('t').max = TOTAL.toFixed(2);
 }
-function act(){ armar(); dibujar(Math.min(+$('t').value, TOTAL)); }
+function act(){
+  armar();
+  const el = document.activeElement, id = el && el.id || '';
+  const tipo = id.startsWith('c-') ? 'collage' : id.startsWith('p-') || (el && el.closest && el.closest('#ventajas')) ? 'porque' : id.startsWith('o-') ? 'oferta' : id.startsWith('z-') ? 'cierre' : id === 'g-apertura' ? 'intro' : null;
+  const s = tipo && SEG.find(x => x.tipo === tipo);
+  if(s){ pausar(); dibujar(s.t0 + Math.min(s.dur - TR - 0.05, 2.2)); return; }
+  dibujar(Math.min(+$('t').value, TOTAL));
+}
 
 // ---------------- dibujo ----------------
 const ease = x => 1 - Math.pow(1 - Math.max(0, Math.min(1, x)), 3);
@@ -429,6 +449,7 @@ function dibujar(T){
   if(T < 0.6){ ctx.fillStyle = `rgba(0,0,0,${1 - T / 0.6})`; ctx.fillRect(0, 0, W, H); }
   ctx.restore();
   $('t').value = T.toFixed(2); $('t-txt').textContent = T.toFixed(1) + ' / ' + TOTAL.toFixed(1) + ' s';
+  const mn = $('mini'); if(mn && getComputedStyle(mn).display !== 'none') mn.getContext('2d').drawImage(cv, 0, 0, 270, 480);
 }
 
 // ---------------- reproducir ----------------
