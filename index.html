@@ -1584,7 +1584,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v176</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v177</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -9449,6 +9449,7 @@ function videoPorCategoria(){
   document.getElementById('pub-cont').innerHTML = `
     <div class="field"><label>Categoría</label><select id="vc-cat">${CATALOGO.map((c, i) => ({ c, i, n: (c.productos || []).filter((p, pi) => imagenesEfectivas(i, pi, p).length).length })).filter(x => x.n).map(x => `<option value="${x.i}">${escaparHtml(x.c.categoria)} (${x.n})</option>`).join('')}</select></div>
     <div class="field"><label>Cantidad de escenas</label><select id="vc-n"><option>4</option><option selected>6</option><option>8</option><option>10</option></select></div>
+    <div class="field"><label>Qué productos elegir</label><select id="vc-orden"><option value="azar">Al azar (cambia cada vez)</option><option value="primeros">Los primeros del catálogo</option><option value="baratos">Los más económicos</option><option value="caros">Los de mayor precio</option></select></div>
     <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;margin-bottom:6px;"><input type="checkbox" id="vc-precio"> Mostrar "Desde $…" en cada producto</label>
     <div class="field"><label>Descuento general % (opcional)</label><input id="vc-desc" type="number" min="0" max="90" placeholder="Ej: 15"></div>
     <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:0.85rem;margin:4px 0 10px;"><span class="note" style="margin:0;">Mostrar:</span><label><input type="checkbox" id="vc-med" checked> Medidas</label><label><input type="checkbox" id="vc-gr" checked> Gramaje</label><label><input type="checkbox" id="vc-comp" checked> Composición</label></div>
@@ -9482,7 +9483,13 @@ async function generarVideoAuto(modo){
   let escenas = [], nombre = '', apertura = '', prods = '';
   if(modo === 'cat'){
     const ci = +document.getElementById('vc-cat').value, n = +document.getElementById('vc-n').value, c = CATALOGO[ci];
-    const pis = (c.productos || []).map((p, pi) => pi).filter(pi => Array.isArray(c.productos[pi].variantes) && imagenesEfectivas(ci, pi, c.productos[pi]).length).slice(0, n);
+    let pis = (c.productos || []).map((p, pi) => pi).filter(pi => Array.isArray(c.productos[pi].variantes) && imagenesEfectivas(ci, pi, c.productos[pi]).length);
+    const orden = (document.getElementById('vc-orden') || {}).value || 'azar';
+    const minP = pi => Math.min(...(c.productos[pi].variantes || []).map(v => parsePrice(v.precio)).filter(x => x > 0), Infinity);
+    if(orden === 'azar'){ for(let i = pis.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [pis[i], pis[j]] = [pis[j], pis[i]]; } }
+    else if(orden === 'baratos') pis.sort((a, b) => minP(a) - minP(b));
+    else if(orden === 'caros') pis.sort((a, b) => (minP(b) === Infinity ? -1 : minP(b)) - (minP(a) === Infinity ? -1 : minP(a)));
+    pis = pis.slice(0, n);
     escenas = pis.map(pi => escenaDeProducto(ci, pi, conPrecio, desc, opc));
     nombre = c.categoria; apertura = c.categoria; prods = pis.map(pi => c.productos[pi].nombre).slice(0, 5).join(' • ');
   } else {
@@ -17030,7 +17037,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v176';
+const APP_VERSION = '2026-10-02-v177';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
