@@ -309,8 +309,17 @@ function degradeAbajo(x, desde){
   const g = x.createLinearGradient(0, desde, 0, H); g.addColorStop(0, 'rgba(28,7,51,0)'); g.addColorStop(0.45, 'rgba(28,7,51,0.85)'); g.addColorStop(1, 'rgba(28,7,51,0.98)');
   x.fillStyle = g; x.fillRect(0, desde, W, H - desde);
 }
+// renglon que no entra: hasta 2 lineas, achicando un poco si hace falta
+function lineasDe(x, s, font, max){
+  if(!s) return [];
+  let px = +font.match(/(\d+)px/)[1], f = font, ls = partir(x, s, f, max);
+  while(ls.length > 2 && px > 26){ px -= 2; f = font.replace(/\d+px/, px + 'px'); ls = partir(x, s, f, max); }
+  if(ls.length > 2) ls = [ls[0], ls.slice(1).join(' ')];
+  return ls.map(l => ({ l, f: ajustarTexto(x, l, f, max) }));
+}
 function bloqueTextos(x, t, cat, t1, t2, frase, yBase, t2Dorado, det, precio){
-  yBase -= ((det ? 1 : 0) + (precio ? 1 : 0)) * 60;
+  const lf = lineasDe(x, frase, '600 36px Montserrat', W - 140), ld = lineasDe(x, det ? '📏 ' + det : '', '700 36px Montserrat', W - 140), lp = lineasDe(x, precio, '800 44px Montserrat', W - 140);
+  yBase -= (Math.max(0, lf.length - 1) + ld.length + lp.length) * 56;
   let y = yBase;
   if(cat){ texto(x, cat.toUpperCase(), 70, y, '800 34px Montserrat', C.d, t, 0.25); y += 100; } else y += 50;
   const f = '900 104px Montserrat';
@@ -318,9 +327,9 @@ function bloqueTextos(x, t, cat, t1, t2, frase, yBase, t2Dorado, det, precio){
   if(t2){ texto(x, t2.toUpperCase(), 70, y, ajustarTexto(x, t2.toUpperCase(), f, W - 140), t2Dorado ? C.d : '#fff', t, 0.55); y += 30; }
   lineaPunteada(x, 70, y + 10, W - 140, (t - 0.7) / 0.9);
   let yy = y + 80;
-  if(frase){ texto(x, frase, 70, yy, ajustarTexto(x, frase, '600 36px Montserrat', W - 140), '#fff', t, 0.9); yy += 58; }
-  if(det){ texto(x, '📏 ' + det, 70, yy, ajustarTexto(x, '📏 ' + det, '700 36px Montserrat', W - 140), '#fff', t, 1.0); yy += 62; }
-  if(precio){ texto(x, precio, 70, yy, ajustarTexto(x, precio, '800 44px Montserrat', W - 140), C.d, t, 1.1); }
+  lf.forEach(o => { texto(x, o.l, 70, yy, o.f, '#fff', t, 0.9); yy += 50; }); if(lf.length) yy += 8;
+  ld.forEach(o => { texto(x, o.l, 70, yy, o.f, '#fff', t, 1.0); yy += 52; }); if(ld.length) yy += 10;
+  lp.forEach(o => { texto(x, o.l, 70, yy, o.f, C.d, t, 1.1); yy += 58; });
 }
 function escIntro(x, t, T){
   fondo(x, T);
