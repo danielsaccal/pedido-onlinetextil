@@ -2037,7 +2037,7 @@ var categoriasCfg = { extra: [], mover: [] }, fotosMapa = {}, fotosRaw = {}, vid
 // unidad de venta del precio (ej: por docena), guardada aparte en config/unidades
 var unidadesVenta = {};
 async function cargarUnidadesVenta(){ try{ const d = await db.collection('config').doc('unidades').get(); unidadesVenta = d.exists ? (d.data().u || {}) : {}; } catch(e){} }
-function sufijoPrecio(p){ if(p && p.metros) return ' /m'; const u = p && unidadesVenta[p._editKey]; return u ? ' /' + u : ''; }
+function sufijoPrecio(p){ if(p && p.metros) return ' /m'; const u = p && (typeof unidadesVenta === 'object' && unidadesVenta ? unidadesVenta : {})[p._editKey]; return u ? ' /' + u : ''; }
 async function cargarCategoriasCfg(){
   await cargarUnidadesVenta();
   try{ const d = await db.collection('config').doc('categorias').get(); if(d.exists){ const x = d.data(); categoriasCfg = { extra: x.extra || [], mover: x.mover || [] }; } } catch(e){}
