@@ -621,6 +621,8 @@ async function cargarAuto(){
   history.replaceState(null, '', location.pathname);
   pintarEscenas(); act(); verGrande();
 }
+// la miniatura flotante no tapa nada cuando la vista previa ya se ve
+try{ new IntersectionObserver(es => { const v = es[0].isIntersecting; $('mini').style.visibility = v ? 'hidden' : 'visible'; }, { threshold: 0.15 }).observe($('cv')); } catch(e){}
 // ---------------- inicio ----------------
 pintarGuias(); pintarEscenas(); pintarVentajas();
 if(typeof VideoEncoder === 'undefined') $('aviso').style.display = 'block';
