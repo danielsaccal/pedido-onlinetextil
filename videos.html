@@ -117,7 +117,7 @@
     <div class="card">
       <canvas id="cv" width="1080" height="1920"></canvas>
       <div class="ctrl"><button class="btn v sm" id="b-play" onclick="play()">▶</button><input type="range" id="t" min="0" max="10" step="0.01" value="0" oninput="pausar(); dibujar(+this.value)"><span id="t-txt" class="note">0 s</span></div>
-      <div style="text-align:center;margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;"><button class="btn v" onclick="verGrande()">👁️ Ver cómo queda</button><button class="btn d" id="b-exp" onclick="exportar()">⬇️ Exportar MP4</button></div>
+      <div style="text-align:center;margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;"><button class="btn v" onclick="verGrande()">👁️ Ver cómo queda</button><button class="btn d" id="b-exp" onclick="exportar()">⬇️ Exportar MP4</button><button class="btn v" id="b-comp" onclick="compartirVideo()" style="display:none;">📤 Compartir</button></div>
       <div class="note" style="margin-top:10px;line-height:1.5;"><b>Consejos rápidos</b><br>• Fotos <b>verticales</b> y bien iluminadas.<br>• <b>5 a 8 escenas</b>, 30–40 segundos en total.<br>• Títulos de <b>2 o 3 palabras</b>. Una idea por escena.<br>• Si hay oferta, poné <b>fechas concretas</b>.<br>• Siempre terminá con <b>web y WhatsApp</b>.</div>
       <div class="prog" id="prog"><div></div></div>
       <p class="note" id="prog-txt" style="text-align:center;"></p>
@@ -475,7 +475,15 @@ function cuadro(){ if(!jugando) return; const T = desde + (performance.now() - t
 function pausar(){ jugando = false; $('b-play').textContent = '▶'; }
 
 // ---------------- exportar MP4 (WebCodecs + mp4-muxer) ----------------
-let exportando = false;
+let exportando = false, ultimoVideo = null;
+// compartir el video recien generado (WhatsApp, Instagram, mail…) con el menu del celular o la PC
+async function compartirVideo(){
+  if(!ultimoVideo){ alert('Primero exportá el video.'); return; }
+  try{
+    if(navigator.canShare && navigator.canShare({ files: [ultimoVideo] })){ await navigator.share({ files: [ultimoVideo], title: 'OnLineTextil', text: 'OnLineTextil · onlinetextil.com.ar' }); return; }
+  } catch(e){ if(e.name === 'AbortError') return; }
+  alert('Este navegador no deja compartir archivos directamente. El video ya está descargado: compartilo desde la carpeta de Descargas o la galería (en WhatsApp Web, con el clip 📎).');
+}
 async function exportar(){
   if(typeof VideoEncoder === 'undefined' || typeof Mp4Muxer === 'undefined'){ $('aviso').style.display = 'block'; return; }
   pausar(); armar();
@@ -503,9 +511,12 @@ async function exportar(){
   if(error){ $('prog-txt').textContent = 'Error al generar: ' + error.message; return; }
   $('prog').firstElementChild.style.width = '100%'; $('prog-txt').textContent = '✓ Listo, se descargó el video.';
   const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = 'onlinetextil_' + (D.nombre || 'video').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_') + '.mp4';
+  const nombreArch = 'onlinetextil_' + (D.nombre || 'video').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_') + '.mp4';
+  ultimoVideo = new File([blob], nombreArch, { type: 'video/mp4' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombreArch;
   document.body.appendChild(a); a.click(); a.remove();
+  $('b-comp').style.display = 'inline-block';
+  $('prog-txt').textContent = '✓ Listo. Se descargó; también podés tocar 📤 Compartir.';
 }
 
 // ---------------- plantillas ----------------
