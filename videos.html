@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OnLineTextil — Crear video</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5/build/mp4-muxer.min.js"></script>
+<style>
+  :root{ --v:#3d1466; --vo:#1c0733; --vc:#5b2a86; --d:#f4c430; --cream:#F4F1EC; --line:#E3DCD2; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:Montserrat, Arial, sans-serif; background:var(--cream); color:#2B2233; }
+  header{ background:var(--v); color:#fff; padding:12px 16px; display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:10; }
+  header b{ font-size:1.1rem; } header b span{ color:var(--d); }
+  header a{ color:#fff; text-decoration:none; border:1px solid rgba(255,255,255,.4); border-radius:10px; padding:6px 10px; font-size:.85rem; }
+  .wrap{ display:grid; grid-template-columns:minmax(0,1fr) 400px; gap:16px; padding:16px; max-width:1200px; margin:0 auto; }
+  @media (max-width:860px){ .wrap{ grid-template-columns:1fr; } .vista{ order:-1; } }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .card h3{ margin:0 0 10px; font-size:1rem; color:var(--v); display:flex; align-items:center; gap:8px; }
+  label.f{ display:flex; flex-direction:column; gap:3px; font-size:.75rem; font-weight:700; color:#7A6A55; margin-bottom:8px; }
+  input[type=text], input[type=number], select, textarea{ font-family:inherit; font-size:15px; padding:9px 10px; border:1px solid var(--line); border-radius:10px; background:#fff; width:100%; }
+  .g2{ display:grid; grid-template-columns:1fr 1fr; gap:8px; } .g3{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  @media (max-width:520px){ .g2,.g3{ grid-template-columns:1fr; } }
+  .btn{ font-family:inherit; border:none; border-radius:10px; padding:10px 14px; font-weight:800; cursor:pointer; font-size:.9rem; }
+  .btn.d{ background:var(--d); color:var(--v); } .btn.v{ background:var(--v); color:#fff; } .btn.g{ background:#fff; border:1px solid var(--line); color:var(--v); }
+  .btn.sm{ padding:6px 10px; font-size:.8rem; }
+  .esc{ border:1px solid var(--line); border-radius:12px; padding:10px; margin-bottom:10px; background:#FCFBF8; }
+  .esc .top{ display:flex; gap:10px; align-items:center; margin-bottom:8px; }
+  .esc .thumb{ width:64px; height:96px; border-radius:8px; background:#EEE9F3 center/cover no-repeat; flex:0 0 auto; display:flex; align-items:center; justify-content:center; font-size:1.4rem; cursor:pointer; }
+  .esc .acc{ margin-left:auto; display:flex; gap:4px; }
+  .sw{ display:flex; align-items:center; gap:8px; font-weight:800; color:var(--v); cursor:pointer; }
+  .vista{ position:sticky; top:70px; align-self:start; }
+  .vista canvas{ width:100%; max-width:360px; aspect-ratio:9/16; display:block; margin:0 auto; border-radius:14px; background:#000; box-shadow:0 8px 30px rgba(0,0,0,.25); }
+  .ctrl{ display:flex; gap:8px; align-items:center; margin:10px auto 0; max-width:360px; }
+  .ctrl input[type=range]{ flex:1; }
+  .prog{ height:10px; background:#eee; border-radius:6px; overflow:hidden; margin-top:8px; display:none; }
+  .prog div{ height:100%; width:0; background:var(--d); }
+  .aviso{ background:#FDEBE7; color:#A6432F; border-radius:10px; padding:10px; font-size:.85rem; display:none; margin-top:8px; }
+  .note{ font-size:.75rem; color:#8A8072; }
+</style>
+</head>
+<body>
+<header><b>OnLine<span>Textil</span> · 🎬 Crear video</b><span style="flex:1"></span><a href="./">← Volver a la app</a></header>
+<div class="wrap">
+  <div>
+    <div class="card">
+      <h3>📁 Plantillas</h3>
+      <div class="g2">
+        <select id="pl-lista"><option value="">Plantillas guardadas…</option></select>
+        <div style="display:flex;gap:6px;"><button class="btn g sm" onclick="cargarPlantilla()">Cargar</button><button class="btn g sm" onclick="guardarPlantilla(false)">💾 Guardar</button><button class="btn g sm" onclick="guardarPlantilla(true)">Duplicar</button></div>
+      </div>
+      <p class="note">Se guardan textos y orden de escenas (las fotos se cargan cada vez).</p>
+    </div>
+    <div class="card">
+      <h3>1. Datos generales</h3>
+      <div class="g2">
+        <label class="f">Nombre de la campaña<input type="text" id="g-nombre" placeholder="Ej: Hot Sale" oninput="act()"></label>
+        <label class="f">Tipo<select id="g-tipo" onchange="act()"><option>producto</option><option>categoría</option><option>evento</option><option>promoción</option></select></label>
+      </div>
+      <label class="f">Texto de apertura<input type="text" id="g-apertura" placeholder="Ej: Textiles para el hogar y la hotelería" oninput="act()"></label>
+      <label class="f">Franja fija al pie<input type="text" id="g-franja" value="MAYORISTA Y MINORISTA • ENVÍOS A TODO EL PAÍS" oninput="act()"></label>
+    </div>
+    <div class="card">
+      <h3>2. Escenas</h3>
+      <div id="escenas"></div>
+      <button class="btn d" onclick="agregarEscena()">+ Agregar escena</button>
+      <label class="btn g" style="display:inline-block;margin-left:6px;">📷 Varias fotos a la vez<input type="file" accept="image/*" multiple style="display:none" onchange="variasFotos(this)"></label>
+    </div>
+    <div class="card">
+      <label class="sw"><input type="checkbox" id="c-on" onchange="act()"> 3. Escena "Collage"</label>
+      <div class="g2" style="margin-top:8px;">
+        <label class="f">Texto chico<input type="text" id="c-cat" value="TODO EN UN SOLO LUGAR" oninput="act()"></label>
+        <label class="f">Título (2 líneas)<input type="text" id="c-tit" value="EL MEJOR / SURTIDO" oninput="act()"></label>
+      </div>
+    </div>
+    <div class="card">
+      <label class="sw"><input type="checkbox" id="p-on" onchange="act()"> 4. "¿Por qué elegirnos?"</label>
+      <div class="g2" style="margin-top:8px;">
+        <label class="f">Texto chico<input type="text" id="p-cat" value="COMPRÁ CON VENTAJAS" oninput="act()"></label>
+        <label class="f">Título<input type="text" id="p-tit" value="¿Por qué / elegirnos?" oninput="act()"></label>
+      </div>
+      <div id="ventajas"></div>
+    </div>
+    <div class="card">
+      <label class="sw"><input type="checkbox" id="o-on" onchange="act()"> 5. Escena "Oferta"</label>
+      <div class="g2" style="margin-top:8px;">
+        <label class="f">Texto grande<input type="text" id="o-txt" placeholder="Ej: 20% OFF" oninput="act()"></label>
+        <label class="f">Fechas<input type="text" id="o-fec" placeholder="Ej: del 10 al 15 de noviembre" oninput="act()"></label>
+      </div>
+    </div>
+    <div class="card">
+      <h3>6. Cierre</h3>
+      <label class="f">Productos<input type="text" id="z-prod" value="Sábanas • Toallas • Manteles • Cortinas • Hotelería" oninput="act()"></label>
+      <div class="g2">
+        <label class="f">Botón<input type="text" id="z-btn" value="ENVÍOS A TODO EL PAÍS" oninput="act()"></label>
+        <label class="f">Frase debajo<input type="text" id="z-frase" value="Mejores condiciones de venta y de financiación" oninput="act()"></label>
+      </div>
+      <div class="g3">
+        <label class="f">Web<input type="text" id="z-web" value="onlinetextil.com.ar" oninput="act()"></label>
+        <label class="f">WhatsApp<input type="text" id="z-wa" placeholder="11 5555-1234" oninput="act()"></label>
+        <label class="f">Instagram<input type="text" id="z-ig" placeholder="@onlinetextil" oninput="act()"></label>
+      </div>
+    </div>
+  </div>
+  <div class="vista">
+    <div class="card">
+      <canvas id="cv" width="1080" height="1920"></canvas>
+      <div class="ctrl"><button class="btn v sm" id="b-play" onclick="play()">▶</button><input type="range" id="t" min="0" max="10" step="0.01" value="0" oninput="pausar(); dibujar(+this.value)"><span id="t-txt" class="note">0 s</span></div>
+      <div style="text-align:center;margin-top:10px;"><button class="btn d" id="b-exp" onclick="exportar()">⬇️ Exportar MP4</button></div>
+      <div class="prog" id="prog"><div></div></div>
+      <p class="note" id="prog-txt" style="text-align:center;"></p>
+      <div class="aviso" id="aviso">Este navegador no puede exportar video. Usá <b>Chrome</b> o <b>Edge</b> actualizados (en computadora o Android).</div>
+    </div>
+  </div>
+</div>
+<script>
+firebase.initializeApp({ apiKey: "AIzaSyCE0N4d-Hn_1S0X1B_LsiEvFtX-93LWn3A", authDomain: "catalogo-onlinetextil.firebaseapp.com", projectId: "catalogo-onlinetextil", storageBucket: "catalogo-onlinetextil.firebasestorage.app", messagingSenderId: "380063692818", appId: "1:380063692818:web:9d3bcfee44bf36c3d780cb" });
+const db = firebase.firestore();
+const W = 1080, H = 1920, FPS = 30, TR = 0.45;
+const C = { v: '#3d1466', vo: '#1c0733', vc: '#5b2a86', d: '#f4c430' };
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const $ = id => document.getElementById(id);
+const esc = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// ---------------- datos ----------------
+let escenas = [
+  { foto: null, modo: 'full', cat: 'ROPA DE CAMA', t1: 'SÁBANAS Y', t2: 'ACOLCHADOS', frase: 'Todas las medidas y calidades', dur: 3.5 },
+];
+const ICONOS = { surtido: 'Surtido', etiqueta: 'Etiqueta %', tarjeta: 'Tarjeta', camion: 'Camión' };
+let ventajas = [
+  { ic: 'surtido', t: 'El mejor surtido', s: 'Hogar, gastronomía y hotelería' },
+  { ic: 'etiqueta', t: 'Mejores condiciones', s: 'de venta mayorista y minorista' },
+  { ic: 'tarjeta', t: 'Financiación', s: 'con las mejores opciones de pago' },
+  { ic: 'camion', t: 'Envíos a todo el país', s: 'Llegamos a cada provincia' },
+];
+function pintarEscenas(){
+  $('escenas').innerHTML = escenas.map((e, i) => `<div class="esc">
+    <div class="top">
+      <label class="thumb" style="${e.foto ? `background-image:url(${e.foto.src})` : ''}">${e.foto ? '' : '📷'}<input type="file" accept="image/*" style="display:none" onchange="fotoEscena(${i}, this)"></label>
+      <div style="flex:1;"><b>Escena ${i + 1}</b><div class="note">${e.foto ? 'Tocá la foto para cambiarla' : 'Tocá 📷 para subir la foto'}</div></div>
+      <div class="acc"><button class="btn g sm" onclick="mover(${i},-1)">↑</button><button class="btn g sm" onclick="mover(${i},1)">↓</button><button class="btn g sm" onclick="quitar(${i})">✕</button></div>
+    </div>
+    <div class="g2">
+      <label class="f">Modo de foto<select onchange="setE(${i},'modo',this.value)"><option value="full" ${e.modo === 'full' ? 'selected' : ''}>Pantalla completa</option><option value="tarjeta" ${e.modo === 'tarjeta' ? 'selected' : ''}>Tarjeta (horizontal o fondo blanco)</option></select></label>
+      <label class="f">Duración (s)<input type="number" step="0.5" min="1.5" value="${e.dur}" oninput="setE(${i},'dur',+this.value||3.5)"></label>
+    </div>
+    <label class="f">Categoría (dorado)<input type="text" value="${esc(e.cat)}" placeholder="Ej: BAÑO" oninput="setE(${i},'cat',this.value)"></label>
+    <div class="g2"><label class="f">Título línea 1<input type="text" value="${esc(e.t1)}" oninput="setE(${i},'t1',this.value)"></label><label class="f">Título línea 2<input type="text" value="${esc(e.t2)}" oninput="setE(${i},'t2',this.value)"></label></div>
+    <label class="f">Frase corta (opcional)<input type="text" value="${esc(e.frase)}" oninput="setE(${i},'frase',this.value)"></label>
+  </div>`).join('');
+}
+function pintarVentajas(){
+  $('ventajas').innerHTML = ventajas.map((v, i) => `<div class="g3" style="margin-bottom:6px;">
+    <select onchange="ventajas[${i}].ic=this.value;act()">${Object.entries(ICONOS).map(([k, n]) => `<option value="${k}" ${v.ic === k ? 'selected' : ''}>${n}</option>`).join('')}</select>
+    <input type="text" value="${esc(v.t)}" placeholder="Título (vacío = no se muestra)" oninput="ventajas[${i}].t=this.value;act()">
+    <input type="text" value="${esc(v.s)}" placeholder="Subtítulo" oninput="ventajas[${i}].s=this.value;act()"></div>`).join('');
+}
+function setE(i, k, v){ escenas[i][k] = v; act(); }
+function mover(i, d){ const j = i + d; if(j < 0 || j >= escenas.length) return; [escenas[i], escenas[j]] = [escenas[j], escenas[i]]; pintarEscenas(); act(); }
+function quitar(i){ escenas.splice(i, 1); pintarEscenas(); act(); }
+function agregarEscena(){ escenas.push({ foto: null, modo: 'full', cat: '', t1: '', t2: '', frase: '', dur: 3.5 }); pintarEscenas(); act(); }
+// fotos: con onload (no decode) y una version desenfocada precalculada
+function cargarImg(file){
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => { const im = new Image(); im.onload = () => { im._blur = desenfocar(im); res(im); }; im.onerror = rej; im.src = r.result; };
+    r.onerror = rej; r.readAsDataURL(file);
+  });
+}
+function desenfocar(im){
+  const s = document.createElement('canvas'); s.width = 54; s.height = 96;
+  const x = s.getContext('2d'); cover(x, im, 0, 0, 54, 96, 1);
+  const b = document.createElement('canvas'); b.width = 270; b.height = 480;
+  const y = b.getContext('2d'); y.imageSmoothingQuality = 'high'; y.drawImage(s, 0, 0, 270, 480);
+  return b;
+}
+async function fotoEscena(i, inp){ const f = inp.files[0]; if(!f) return; escenas[i].foto = await cargarImg(f); const v = esFondoClaroOHorizontal(escenas[i].foto); if(v) escenas[i].modo = 'tarjeta'; pintarEscenas(); act(); }
+async function variasFotos(inp){
+  for(const f of inp.files){ const im = await cargarImg(f); escenas.push({ foto: im, modo: esFondoClaroOHorizontal(im) ? 'tarjeta' : 'full', cat: '', t1: '', t2: '', frase: '', dur: 3.5 }); }
+  escenas = escenas.filter(e => e.foto || e.t1 || e.t2 || e.cat);
+  pintarEscenas(); act();
+}
+function esFondoClaroOHorizontal(im){
+  if(im.width > im.height * 1.1) return true;
+  const c = document.createElement('canvas'); c.width = 20; c.height = 20; const x = c.getContext('2d'); x.drawImage(im, 0, 0, 20, 20);
+  const d = x.getImageData(0, 0, 20, 1).data; let claros = 0; for(let k = 0; k < d.length; k += 4) if(d[k] > 235 && d[k + 1] > 235 && d[k + 2] > 235) claros++;
+  return claros > 15;
+}
+
+// ---------------- linea de tiempo ----------------
+function datos(){
+  return {
+    nombre: $('g-nombre').value.trim(), tipo: $('g-tipo').value, apertura: $('g-apertura').value.trim(), franja: $('g-franja').value.trim(),
+    collage: { on: $('c-on').checked, cat: $('c-cat').value.trim(), tit: $('c-tit').value.trim() },
+    porque: { on: $('p-on').checked, cat: $('p-cat').value.trim(), tit: $('p-tit').value.trim() },
+    oferta: { on: $('o-on').checked, txt: $('o-txt').value.trim(), fec: $('o-fec').value.trim() },
+    cierre: { prod: $('z-prod').value.trim(), btn: $('z-btn').value.trim(), frase: $('z-frase').value.trim(), web: $('z-web').value.trim(), wa: $('z-wa').value.trim(), ig: $('z-ig').value.trim() },
+  };
+}
+let SEG = [], TOTAL = 0, D = null;
+function armar(){
+  D = datos(); SEG = []; let t = 0;
+  const add = (tipo, dur, extra) => { SEG.push({ tipo, t0: t, dur, ...extra }); t += dur - TR; };
+  add('intro', 3);
+  escenas.forEach(e => add('escena', Math.max(1.5, +e.dur || 3.5), { e }));
+  if(D.collage.on && escenas.some(e => e.foto)) add('collage', 4);
+  if(D.porque.on && ventajas.some(v => v.t)) add('porque', 5);
+  if(D.oferta.on && (D.oferta.txt || D.oferta.fec)) add('oferta', 4);
+  add('cierre', 5);
+  TOTAL = t + TR;
+  $('t').max = TOTAL.toFixed(2);
+}
+function act(){ armar(); dibujar(Math.min(+$('t').value, TOTAL)); }
+
+// ---------------- dibujo ----------------
+const ease = x => 1 - Math.pow(1 - Math.max(0, Math.min(1, x)), 3);
+const rebote = x => { x = Math.max(0, Math.min(1, x)); const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+function cover(x, im, dx, dy, dw, dh, esc){
+  const r = Math.max(dw / im.width, dh / im.height) * esc, w = im.width * r, h = im.height * r;
+  x.drawImage(im, dx + (dw - w) / 2, dy + (dh - h) / 2, w, h);
+}
+function contain(x, im, dx, dy, dw, dh, esc){
+  const r = Math.min(dw / im.width, dh / im.height) * esc, w = im.width * r, h = im.height * r;
+  x.drawImage(im, dx + (dw - w) / 2, dy + (dh - h) / 2, w, h);
+}
+function rr(x, X, Y, w, h, r){ x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + w, Y, X + w, Y + h, r); x.arcTo(X + w, Y + h, X, Y + h, r); x.arcTo(X, Y + h, X, Y, r); x.arcTo(X, Y, X + w, Y, r); x.closePath(); }
+function fondo(x, T){
+  const g = x.createRadialGradient(W * 0.5, H * 0.38, 80, W * 0.5, H * 0.5, H * 0.75);
+  g.addColorStop(0, C.vc); g.addColorStop(0.55, C.v); g.addColorStop(1, C.vo);
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  // brillo diagonal lento
+  const p = ((T * 0.12) % 1.6) - 0.3;
+  const gb = x.createLinearGradient(W * p - 400, 0, W * p + 400, H);
+  gb.addColorStop(0, 'rgba(255,255,255,0)'); gb.addColorStop(0.5, 'rgba(255,255,255,0.07)'); gb.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = gb; x.fillRect(0, 0, W, H);
+  particulas(x, T);
+}
+function particulas(x, T){
+  for(let i = 0; i < 36; i++){
+    const sx = (i * 397) % W, vel = 40 + (i * 53) % 70, y = H - ((T * vel + i * 211) % (H + 100)), r = 2 + (i % 4);
+    x.globalAlpha = 0.25 + 0.35 * Math.abs(Math.sin(T * 1.3 + i));
+    x.fillStyle = C.d; x.beginPath(); x.arc(sx + Math.sin(T + i) * 12, y, r, 0, Math.PI * 2); x.fill();
+  }
+  x.globalAlpha = 1;
+}
+function marca(x, X, Y, size, align){
+  x.font = `800 ${size}px Montserrat`; x.textBaseline = 'alphabetic';
+  const a = x.measureText('OnLine').width, b = x.measureText('Textil').width;
+  let sx = align === 'center' ? X - (a + b) / 2 : X;
+  x.textAlign = 'left'; x.fillStyle = '#fff'; x.fillText('OnLine', sx, Y); x.fillStyle = C.d; x.fillText('Textil', sx + a, Y);
+}
+function lineaPunteada(x, X, Y, w, prog){
+  x.save(); x.strokeStyle = C.d; x.lineWidth = 5; x.setLineDash([22, 14]);
+  x.beginPath(); x.moveTo(X, Y); x.lineTo(X + w * ease(prog), Y); x.stroke(); x.restore();
+}
+function texto(x, s, X, Y, font, color, t, delay, align){
+  if(!s) return;
+  const k = ease((t - delay) / 0.6); if(k <= 0) return;
+  x.save(); x.globalAlpha = k; x.font = font; x.fillStyle = color; x.textAlign = align || 'left';
+  x.shadowColor = 'rgba(0,0,0,0.35)'; x.shadowBlur = 18; x.fillText(s, X, Y + (1 - k) * 50); x.restore();
+}
+function ajustarTexto(x, s, font, max){ let f = font; let px = +font.match(/(\d+)px/)[1]; x.font = f; while(x.measureText(s).width > max && px > 14){ px -= 2; f = font.replace(/\d+px/, px + 'px'); x.font = f; } return f; }
+function franja(x){
+  if(!D.franja) return;
+  const y = H - 150, h = 84, mx = 60;
+  x.save(); rr(x, mx, y, W - mx * 2, h, 42); x.fillStyle = C.d; x.shadowColor = 'rgba(0,0,0,.3)'; x.shadowBlur = 20; x.fill(); x.shadowBlur = 0;
+  x.font = ajustarTexto(x, D.franja, '800 34px Montserrat', W - mx * 2 - 60); x.fillStyle = C.v; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText(D.franja, W / 2, y + h / 2 + 2); x.restore();
+}
+function vineta(x){
+  const g = x.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.75);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.35)'); x.fillStyle = g; x.fillRect(0, 0, W, H);
+}
+function degradeAbajo(x, desde){
+  const g = x.createLinearGradient(0, desde, 0, H); g.addColorStop(0, 'rgba(28,7,51,0)'); g.addColorStop(0.45, 'rgba(28,7,51,0.85)'); g.addColorStop(1, 'rgba(28,7,51,0.98)');
+  x.fillStyle = g; x.fillRect(0, desde, W, H - desde);
+}
+function bloqueTextos(x, t, cat, t1, t2, frase, yBase, t2Dorado){
+  let y = yBase;
+  if(cat){ texto(x, cat.toUpperCase(), 70, y, '800 34px Montserrat', C.d, t, 0.25); y += 100; } else y += 50;
+  const f = '900 104px Montserrat';
+  if(t1){ texto(x, t1.toUpperCase(), 70, y, ajustarTexto(x, t1.toUpperCase(), f, W - 140), '#fff', t, 0.4); y += 112; }
+  if(t2){ texto(x, t2.toUpperCase(), 70, y, ajustarTexto(x, t2.toUpperCase(), f, W - 140), t2Dorado ? C.d : '#fff', t, 0.55); y += 30; }
+  lineaPunteada(x, 70, y + 10, W - 140, (t - 0.7) / 0.9);
+  if(frase) texto(x, frase, 70, y + 80, '600 36px Montserrat', '#fff', t, 0.9);
+}
+function escIntro(x, t, T){
+  fondo(x, T);
+  const f = escenas.find(e => e.foto);
+  if(f){ x.globalAlpha = 0.45; cover(x, f.foto._blur, 0, 0, W, H, 1 + t * 0.02); x.globalAlpha = 1; x.fillStyle = 'rgba(61,20,102,0.55)'; x.fillRect(0, 0, W, H); particulas(x, T); }
+  const k = ease(t / 0.8);
+  x.save(); x.globalAlpha = k; x.translate(W / 2, H * 0.44); x.scale(0.9 + 0.1 * k, 0.9 + 0.1 * k); marca(x, 0, 0, 150, 'center'); x.restore();
+  lineaPunteada(x, W / 2 - 300, H * 0.44 + 60, 600, (t - 0.5) / 0.8);
+  if(D.apertura){
+    const lineas = partir(x, D.apertura.toUpperCase(), '700 44px Montserrat', W - 220);
+    lineas.forEach((l, i) => texto(x, l, W / 2, H * 0.44 + 150 + i * 62, '700 44px Montserrat', '#fff', t, 0.8 + i * 0.15, 'center'));
+  }
+}
+function partir(x, s, font, max){ x.font = font; const ps = s.split(' '), out = []; let l = ''; ps.forEach(p => { const n = l ? l + ' ' + p : p; if(x.measureText(n).width > max && l){ out.push(l); l = p; } else l = n; }); if(l) out.push(l); return out; }
+function escEscena(x, t, T, e){
+  fondo(x, T);
+  const kb = 1 + 0.08 * (t / (e.dur || 3.5));
+  if(e.foto){
+    if(e.modo === 'tarjeta'){
+      x.globalAlpha = 0.6; cover(x, e.foto._blur, 0, 0, W, H, 1.1); x.globalAlpha = 1;
+      x.fillStyle = 'rgba(61,20,102,0.45)'; x.fillRect(0, 0, W, H);
+      const cw = W - 120, ch = Math.min(1000, cw * e.foto.height / e.foto.width), cy = 170;
+      const k = ease(t / 0.7);
+      x.save(); x.globalAlpha = k; x.translate(0, (1 - k) * 60);
+      rr(x, 60, cy, cw, ch, 28); x.shadowColor = 'rgba(0,0,0,.4)'; x.shadowBlur = 40; x.fillStyle = '#fff'; x.fill(); x.shadowBlur = 0; x.clip();
+      cover(x, e.foto, 60, cy, cw, ch, 1 + 0.04 * (t / (e.dur || 3.5))); x.restore();
+    } else {
+      cover(x, e.foto, 0, 0, W, H, kb);
+    }
+  }
+  degradeAbajo(x, H * 0.5);
+  marca(x, 60, 110, 54);
+  bloqueTextos(x, t, e.cat, e.t1, e.t2, e.frase, H * 0.62);
+}
+function escCollage(x, t, T){
+  fondo(x, T);
+  const fs = escenas.filter(e => e.foto).slice(0, 6);
+  const cols = 2, gw = (W - 60 * 2 - 24) / 2, gh = 330;
+  fs.forEach((e, i) => {
+    const cx = 60 + (i % cols) * (gw + 24), cy = 170 + Math.floor(i / cols) * (gh + 24);
+    const k = rebote((t - i * 0.12) / 0.6); if(k <= 0) return;
+    x.save(); x.globalAlpha = Math.min(1, k); x.translate(cx + gw / 2, cy + gh / 2); x.scale(0.85 + 0.15 * k, 0.85 + 0.15 * k);
+    rr(x, -gw / 2, -gh / 2, gw, gh, 22); x.shadowColor = 'rgba(0,0,0,.35)'; x.shadowBlur = 24; x.fillStyle = '#fff'; x.fill(); x.shadowBlur = 0; x.clip();
+    cover(x, e.foto, -gw / 2, -gh / 2, gw, gh, 1 + 0.05 * t / 4); x.restore();
+  });
+  degradeAbajo(x, H * 0.6);
+  marca(x, 60, 110, 54);
+  const [l1, l2] = (D.collage.tit || '').split('/').map(s => s.trim());
+  bloqueTextos(x, t, D.collage.cat, l1, l2, '', H * 0.71, true);
+}
+function icono(x, tipo, cx, cy, r){
+  x.save(); x.fillStyle = C.d; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill();
+  x.fillStyle = C.v; x.strokeStyle = C.v; x.lineWidth = 6;
+  if(tipo === 'surtido'){ for(let i = 0; i < 3; i++){ rr(x, cx - 30, cy - 34 + i * 24, 60, 18, 6); x.fill(); } }
+  else if(tipo === 'etiqueta'){ x.save(); x.translate(cx, cy); x.rotate(-Math.PI / 4); rr(x, -26, -34, 52, 68, 8); x.fill(); x.fillStyle = C.d; x.font = '900 30px Montserrat'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('%', 0, 8); x.beginPath(); x.arc(0, -20, 5, 0, Math.PI * 2); x.fill(); x.restore(); }
+  else if(tipo === 'tarjeta'){ rr(x, cx - 38, cy - 26, 76, 52, 8); x.fill(); x.fillStyle = C.d; x.fillRect(cx - 38, cy - 12, 76, 10); x.fillRect(cx - 26, cy + 8, 22, 6); }
+  else { x.fillRect(cx - 40, cy - 22, 46, 36); rr(x, cx + 6, cy - 10, 30, 24, 4); x.fill(); x.beginPath(); x.arc(cx - 24, cy + 18, 9, 0, Math.PI * 2); x.arc(cx + 22, cy + 18, 9, 0, Math.PI * 2); x.fill(); }
+  x.restore();
+}
+function escPorque(x, t, T){
+  fondo(x, T); marca(x, 60, 110, 54);
+  texto(x, (D.porque.cat || '').toUpperCase(), 60, 330, '800 36px Montserrat', C.d, t, 0.15);
+  const [l1, l2] = (D.porque.tit || '').split('/').map(s => s.trim());
+  texto(x, l1, 60, 440, '900 96px Montserrat', '#fff', t, 0.3); texto(x, l2, 60, 545, '900 96px Montserrat', '#fff', t, 0.4);
+  const vs = ventajas.filter(v => v.t);
+  vs.forEach((v, i) => {
+    const y = 730 + i * 250, k = rebote((t - 0.6 - i * 0.25) / 0.6); if(k <= 0) return;
+    x.save(); x.globalAlpha = Math.min(1, k); x.translate(0, (1 - Math.min(1, k)) * 50);
+    rr(x, 50, y, W - 100, 210, 26); x.fillStyle = 'rgba(255,255,255,0.08)'; x.fill(); x.strokeStyle = 'rgba(255,255,255,0.18)'; x.lineWidth = 2; x.stroke();
+    icono(x, v.ic, 175, y + 105, 75);
+    x.fillStyle = '#fff'; x.textAlign = 'left'; x.font = ajustarTexto(x, v.t, '800 54px Montserrat', W - 400); x.fillText(v.t, 280, y + 98);
+    if(v.s){ x.fillStyle = 'rgba(255,255,255,0.85)'; x.font = ajustarTexto(x, v.s, '600 34px Montserrat', W - 400); x.fillText(v.s, 280, y + 152); }
+    x.restore();
+  });
+}
+function escOferta(x, t, T){
+  fondo(x, T); marca(x, 60, 110, 54);
+  const k = rebote((t - 0.2) / 0.7);
+  x.save(); x.translate(W / 2, H * 0.43); x.rotate(t * 0.4); x.scale(Math.max(0, k), Math.max(0, k));
+  x.fillStyle = C.d; x.beginPath(); for(let i = 0; i < 48; i++){ const a = i / 48 * Math.PI * 2, r = i % 2 ? 380 : 420; x.lineTo(Math.cos(a) * r, Math.sin(a) * r); } x.closePath(); x.fill(); x.restore();
+  if(D.oferta.txt){
+    x.save(); x.globalAlpha = Math.max(0, Math.min(1, k)); x.fillStyle = C.v; x.textAlign = 'center'; x.textBaseline = 'middle';
+    const ls = partir(x, D.oferta.txt.toUpperCase(), '900 150px Montserrat', 640);
+    ls.forEach((l, i) => { x.font = ajustarTexto(x, l, '900 150px Montserrat', 640); x.fillText(l, W / 2, H * 0.43 + (i - (ls.length - 1) / 2) * 150); });
+    x.restore();
+  }
+  if(D.oferta.fec){ const ls = partir(x, D.oferta.fec, '700 50px Montserrat', W - 160); ls.forEach((l, i) => texto(x, l, W / 2, H * 0.72 + i * 66, '700 50px Montserrat', '#fff', t, 0.8 + i * 0.1, 'center')); }
+}
+function escCierre(x, t, T){
+  fondo(x, T);
+  const k = ease(t / 0.8);
+  x.save(); x.globalAlpha = k; x.translate(W / 2, H * 0.42); x.scale(0.9 + 0.1 * k, 0.9 + 0.1 * k); marca(x, 0, 0, 130, 'center'); x.restore();
+  lineaPunteada(x, W / 2 - 300, H * 0.42 + 55, 600, (t - 0.4) / 0.8);
+  let y = H * 0.42 + 150;
+  if(D.cierre.prod){ partir(x, D.cierre.prod, '700 44px Montserrat', W - 200).forEach((l, i) => { texto(x, l, W / 2, y, '700 44px Montserrat', '#fff', t, 0.7 + i * 0.1, 'center'); y += 60; }); }
+  if(D.cierre.btn){
+    y += 50; const kb = rebote((t - 1.1) / 0.6);
+    if(kb > 0){ x.save(); x.font = '900 46px Montserrat'; const bw = Math.min(W - 160, x.measureText(D.cierre.btn).width + 110);
+      x.translate(W / 2, y + 50); x.scale(kb, kb); rr(x, -bw / 2, -55, bw, 110, 55); x.fillStyle = C.d; x.shadowColor = 'rgba(244,196,48,.5)'; x.shadowBlur = 30; x.fill(); x.shadowBlur = 0;
+      x.fillStyle = C.v; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = ajustarTexto(x, D.cierre.btn, '900 46px Montserrat', bw - 60); x.fillText(D.cierre.btn, 0, 3); x.restore(); }
+    y += 170;
+  }
+  if(D.cierre.frase){ partir(x, D.cierre.frase, '600 38px Montserrat', W - 220).forEach((l, i) => { texto(x, l, W / 2, y, '600 38px Montserrat', '#fff', t, 1.4 + i * 0.1, 'center'); y += 52; }); y += 20; }
+  [D.cierre.web && '🌐 ' + D.cierre.web, D.cierre.wa && '💬 ' + D.cierre.wa, D.cierre.ig && '📷 ' + D.cierre.ig].filter(Boolean).forEach((l, i) => { texto(x, l, W / 2, y, '700 38px Montserrat', C.d, t, 1.6 + i * 0.12, 'center'); y += 56; });
+}
+function dibujarSeg(x, s, T){
+  const t = T - s.t0;
+  if(s.tipo === 'intro') escIntro(x, t, T);
+  else if(s.tipo === 'escena') escEscena(x, t, T, s.e);
+  else if(s.tipo === 'collage') escCollage(x, t, T);
+  else if(s.tipo === 'porque') escPorque(x, t, T);
+  else if(s.tipo === 'oferta') escOferta(x, t, T);
+  else escCierre(x, t, T);
+}
+const capa = document.createElement('canvas'); capa.width = W; capa.height = H; const cx2 = capa.getContext('2d');
+function dibujar(T){
+  if(!SEG.length) armar();
+  T = Math.max(0, Math.min(T, TOTAL - 0.001));
+  const act = SEG.filter(s => T >= s.t0 && T < s.t0 + s.dur);
+  const a = act[0], b = act[1];
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  dibujarSeg(ctx, a, T);
+  if(b){ // transicion: fundido con leve zoom
+    const k = (T - b.t0) / TR;
+    cx2.setTransform(1, 0, 0, 1, 0, 0); cx2.clearRect(0, 0, W, H); dibujarSeg(cx2, b, T);
+    ctx.globalAlpha = ease(k); const z = 1.04 - 0.04 * ease(k);
+    ctx.drawImage(capa, W / 2 - W * z / 2, H / 2 - H * z / 2, W * z, H * z); ctx.globalAlpha = 1;
+  }
+  franja(ctx); vineta(ctx);
+  if(T < 0.6){ ctx.fillStyle = `rgba(0,0,0,${1 - T / 0.6})`; ctx.fillRect(0, 0, W, H); }
+  ctx.restore();
+  $('t').value = T.toFixed(2); $('t-txt').textContent = T.toFixed(1) + ' / ' + TOTAL.toFixed(1) + ' s';
+}
+
+// ---------------- reproducir ----------------
+let jugando = false, t0p = 0, desde = 0;
+function play(){ if(jugando){ pausar(); return; } jugando = true; $('b-play').textContent = '⏸'; desde = +$('t').value >= TOTAL - 0.05 ? 0 : +$('t').value; t0p = performance.now(); requestAnimationFrame(cuadro); }
+function cuadro(){ if(!jugando) return; const T = desde + (performance.now() - t0p) / 1000; if(T >= TOTAL){ dibujar(TOTAL); pausar(); return; } dibujar(T); requestAnimationFrame(cuadro); }
+function pausar(){ jugando = false; $('b-play').textContent = '▶'; }
+
+// ---------------- exportar MP4 (WebCodecs + mp4-muxer) ----------------
+async function exportar(){
+  if(typeof VideoEncoder === 'undefined' || typeof Mp4Muxer === 'undefined'){ $('aviso').style.display = 'block'; return; }
+  pausar(); armar();
+  let codec = null;
+  for(const c of ['avc1.640033', 'avc1.4d0033', 'avc1.42003e']){
+    try{ const s = await VideoEncoder.isConfigSupported({ codec: c, width: W, height: H, bitrate: 10e6, framerate: FPS }); if(s.supported){ codec = c; break; } } catch(e){}
+  }
+  if(!codec){ $('aviso').style.display = 'block'; return; }
+  const muxer = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: 'avc', width: W, height: H }, fastStart: 'in-memory' });
+  let error = null;
+  const enc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: e => { error = e; } });
+  enc.configure({ codec, width: W, height: H, bitrate: 10e6, framerate: FPS });
+  const n = Math.ceil(TOTAL * FPS);
+  $('prog').style.display = 'block'; $('b-exp').disabled = true;
+  for(let i = 0; i < n; i++){
+    if(error) break;
+    dibujar(i / FPS);
+    const fr = new VideoFrame(cv, { timestamp: Math.round(i * 1e6 / FPS), duration: Math.round(1e6 / FPS) });
+    enc.encode(fr, { keyFrame: i % (FPS * 2) === 0 }); fr.close();
+    if(enc.encodeQueueSize > 8) await new Promise(r => setTimeout(r, 5));
+    if(i % 10 === 0){ $('prog').firstElementChild.style.width = (i / n * 100) + '%'; $('prog-txt').textContent = `Generando… ${Math.round(i / n * 100)} %`; await new Promise(r => setTimeout(r, 0)); }
+  }
+  await enc.flush(); enc.close(); muxer.finalize();
+  $('b-exp').disabled = false;
+  if(error){ $('prog-txt').textContent = 'Error al generar: ' + error.message; return; }
+  $('prog').firstElementChild.style.width = '100%'; $('prog-txt').textContent = '✓ Listo, se descargó el video.';
+  const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'onlinetextil_' + (D.nombre || 'video').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_') + '.mp4';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+// ---------------- plantillas ----------------
+function aJSON(){ return { datos: datos(), escenas: escenas.map(e => ({ modo: e.modo, cat: e.cat, t1: e.t1, t2: e.t2, frase: e.frase, dur: e.dur })), ventajas }; }
+function desdeJSON(j){
+  const d = j.datos || {};
+  $('g-nombre').value = d.nombre || ''; $('g-tipo').value = d.tipo || 'producto'; $('g-apertura').value = d.apertura || ''; $('g-franja').value = d.franja || '';
+  $('c-on').checked = !!(d.collage && d.collage.on); $('c-cat').value = (d.collage || {}).cat || ''; $('c-tit').value = (d.collage || {}).tit || '';
+  $('p-on').checked = !!(d.porque && d.porque.on); $('p-cat').value = (d.porque || {}).cat || ''; $('p-tit').value = (d.porque || {}).tit || '';
+  $('o-on').checked = !!(d.oferta && d.oferta.on); $('o-txt').value = (d.oferta || {}).txt || ''; $('o-fec').value = (d.oferta || {}).fec || '';
+  const z = d.cierre || {}; ['prod', 'btn', 'frase', 'web', 'wa', 'ig'].forEach(k => $('z-' + k).value = z[k] || '');
+  const viejas = escenas;
+  escenas = (j.escenas || []).map((e, i) => ({ ...e, foto: viejas[i] ? viejas[i].foto : null }));
+  if(Array.isArray(j.ventajas)) ventajas = j.ventajas;
+  pintarEscenas(); pintarVentajas(); act();
+}
+let plantillas = [];
+async function cargarListaPlantillas(){
+  try{ const s = await db.collection('videos_plantillas').get(); plantillas = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => String(a.nombre).localeCompare(b.nombre)); } catch(e){ plantillas = []; }
+  $('pl-lista').innerHTML = '<option value="">Plantillas guardadas…</option>' + plantillas.map(p => `<option value="${p.id}">${esc(p.nombre)}</option>`).join('');
+}
+function cargarPlantilla(){ const p = plantillas.find(x => x.id === $('pl-lista').value); if(!p) return; desdeJSON(JSON.parse(p.json)); }
+async function guardarPlantilla(duplicar){
+  const sel = plantillas.find(x => x.id === $('pl-lista').value);
+  let nombre = $('g-nombre').value.trim() || (sel && sel.nombre) || '';
+  if(duplicar || !sel){ nombre = prompt(duplicar ? 'Nombre de la copia:' : 'Nombre de la plantilla:', duplicar ? nombre + ' (copia)' : nombre); if(!nombre) return; }
+  const datosJ = { nombre, json: JSON.stringify(aJSON()), actualizado: new Date().toISOString() };
+  try{
+    if(sel && !duplicar) await db.collection('videos_plantillas').doc(sel.id).set(datosJ);
+    else { const r = await db.collection('videos_plantillas').add(datosJ); await cargarListaPlantillas(); $('pl-lista').value = r.id; alert('Guardada: ' + nombre); return; }
+    await cargarListaPlantillas(); $('pl-lista').value = sel.id; alert('Guardada: ' + nombre);
+  } catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+
+// ---------------- inicio ----------------
+pintarEscenas(); pintarVentajas();
+if(typeof VideoEncoder === 'undefined') $('aviso').style.display = 'block';
+Promise.all(['600', '700', '800', '900'].map(w => document.fonts.load(`${w} 40px Montserrat`))).catch(() => {}).then(() => document.fonts.ready).then(() => act());
+cargarListaPlantillas();
+</script>
+</body>
+</html>
