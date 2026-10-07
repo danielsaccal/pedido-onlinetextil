@@ -117,7 +117,7 @@
     <div class="card">
       <canvas id="cv" width="1080" height="1920"></canvas>
       <div class="ctrl"><button class="btn v sm" id="b-play" onclick="play()">▶</button><input type="range" id="t" min="0" max="10" step="0.01" value="0" oninput="pausar(); dibujar(+this.value)"><span id="t-txt" class="note">0 s</span></div>
-      <div style="text-align:center;margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;"><button class="btn v" onclick="verGrande()">👁️ Ver cómo queda</button><button class="btn d" id="b-exp" onclick="exportar()">⬇️ Exportar MP4</button><button class="btn v" id="b-comp" onclick="compartirVideo()" style="display:none;">📤 Compartir</button></div>
+      <div style="text-align:center;margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;"><button class="btn v" onclick="verGrande()">👁️ Ver cómo queda</button><button class="btn d" id="b-exp" onclick="exportar()">⬇️ Exportar MP4</button><button class="btn v" id="b-comp" onclick="compartirVideo()">📤 Compartir</button></div>
       <div class="note" style="margin-top:10px;line-height:1.5;"><b>Consejos rápidos</b><br>• Fotos <b>verticales</b> y bien iluminadas.<br>• <b>5 a 8 escenas</b>, 30–40 segundos en total.<br>• Títulos de <b>2 o 3 palabras</b>. Una idea por escena.<br>• Si hay oferta, poné <b>fechas concretas</b>.<br>• Siempre terminá con <b>web y WhatsApp</b>.</div>
       <div class="prog" id="prog"><div></div></div>
       <p class="note" id="prog-txt" style="text-align:center;"></p>
@@ -173,7 +173,7 @@ function pintarVentajas(){
     <input type="text" value="${esc(v.t)}" placeholder="Título (vacío = no se muestra)" oninput="ventajas[${i}].t=this.value;act()">
     <input type="text" value="${esc(v.s)}" placeholder="Subtítulo" oninput="ventajas[${i}].s=this.value;act()"></div>`).join('');
 }
-function setE(i, k, v){ escenas[i][k] = v; armar(); irAEscena(i); }
+function setE(i, k, v){ escenas[i][k] = v; videoVigente = false; armar(); irAEscena(i); }
 // muestra en la vista previa la escena que se esta editando (con los textos ya entrados)
 let escActiva = -1;
 function irAEscena(i){
@@ -238,6 +238,7 @@ function armar(){
   $('t').max = TOTAL.toFixed(2);
 }
 function act(){
+  videoVigente = false;
   armar();
   const el = document.activeElement, id = el && el.id || '';
   const tipo = id.startsWith('c-') ? 'collage' : id.startsWith('p-') || (el && el.closest && el.closest('#ventajas')) ? 'porque' : id.startsWith('o-') ? 'oferta' : id.startsWith('z-') ? 'cierre' : id === 'g-apertura' ? 'intro' : null;
@@ -475,16 +476,25 @@ function cuadro(){ if(!jugando) return; const T = desde + (performance.now() - t
 function pausar(){ jugando = false; $('b-play').textContent = '▶'; }
 
 // ---------------- exportar MP4 (WebCodecs + mp4-muxer) ----------------
-let exportando = false, ultimoVideo = null;
+let exportando = false, ultimoVideo = null, videoVigente = false;
 // compartir el video recien generado (WhatsApp, Instagram, mail…) con el menu del celular o la PC
 async function compartirVideo(){
-  if(!ultimoVideo){ alert('Primero exportá el video.'); return; }
+  // si no hay video generado (o cambiaste algo), se genera primero; despues un toque mas para compartir
+  if(!ultimoVideo || !videoVigente){
+    const ok = await exportar(true);
+    if(!ok || !ultimoVideo) return;
+    const m = $('grande'); // reutiliza el fondo oscuro para el boton final
+    let box = document.getElementById('listo-comp');
+    if(!box){ box = document.createElement('div'); box.id = 'listo-comp'; box.style.cssText = 'position:fixed;inset:0;background:rgba(10,3,20,.85);z-index:60;display:flex;align-items:center;justify-content:center;'; document.body.appendChild(box); }
+    box.innerHTML = '<div style="background:#fff;border-radius:16px;padding:20px;text-align:center;max-width:320px;"><b style="color:var(--v);font-size:1.1rem;">✓ Video listo</b><p class="note">Tocá para elegir dónde mandarlo.</p><button class="btn d" style="width:100%;" onclick="document.getElementById(\'listo-comp\').remove(); compartirVideo()">📤 Compartir</button><button class="btn g" style="width:100%;margin-top:8px;" onclick="document.getElementById(\'listo-comp\').remove()">Cerrar</button></div>';
+    return;
+  }
   try{
     if(navigator.canShare && navigator.canShare({ files: [ultimoVideo] })){ await navigator.share({ files: [ultimoVideo], title: 'OnLineTextil', text: 'OnLineTextil · onlinetextil.com.ar' }); return; }
   } catch(e){ if(e.name === 'AbortError') return; }
   alert('Este navegador no deja compartir archivos directamente. El video ya está descargado: compartilo desde la carpeta de Descargas o la galería (en WhatsApp Web, con el clip 📎).');
 }
-async function exportar(){
+async function exportar(soloGenerar){
   if(typeof VideoEncoder === 'undefined' || typeof Mp4Muxer === 'undefined'){ $('aviso').style.display = 'block'; return; }
   pausar(); armar();
   let codec = null;
@@ -508,14 +518,15 @@ async function exportar(){
   }
   await enc.flush(); enc.close(); muxer.finalize(); exportando = false;
   $('b-exp').disabled = false;
-  if(error){ $('prog-txt').textContent = 'Error al generar: ' + error.message; return; }
+  if(error){ $('prog-txt').textContent = 'Error al generar: ' + error.message; return false; }
   $('prog').firstElementChild.style.width = '100%'; $('prog-txt').textContent = '✓ Listo, se descargó el video.';
   const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
   const nombreArch = 'onlinetextil_' + (D.nombre || 'video').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_') + '.mp4';
   ultimoVideo = new File([blob], nombreArch, { type: 'video/mp4' });
+  videoVigente = true;
+  if(soloGenerar){ $('prog-txt').textContent = '✓ Video listo.'; return true; }
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombreArch;
   document.body.appendChild(a); a.click(); a.remove();
-  $('b-comp').style.display = 'inline-block';
   $('prog-txt').textContent = '✓ Listo. Se descargó; también podés tocar 📤 Compartir.';
 }
 
