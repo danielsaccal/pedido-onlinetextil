@@ -616,7 +616,7 @@ a.grilla-celda{display:block;}
     <div class="ini-grid ini-ext"><div class="ini-tile" id="ini-t-a" onclick="abrirGrupoInicio('a')"><div class="ini-ic">🛒</div><b>Armar pedido</b><span>Catálogo, escanear SKU, buscar por foto</span></div><div class="ini-tile" id="ini-t-c" onclick="abrirGrupoInicio('c')"><div class="ini-ic">📣</div><b>Difusión</b><span>Compartir catálogo, enviar a clientes, redes, promociones, videos</span></div></div>
     <div class="ini-sub" id="ini-sub-ext" style="display:none;"></div>
     <p class="ini-sec">ADMINISTRACIÓN INTERNA</p>
-    <div class="ini-grid"><div class="ini-tile" id="ini-t-d" onclick="abrirGrupoInicio('d')"><div class="ini-ic">🧾</div><b>Ventas</b><span>Pedidos, pedido con IA, pendientes, clientes</span></div><div class="ini-tile" id="ini-t-f" onclick="abrirGrupoInicio('f')"><div class="ini-ic">🏷️</div><b>Catálogo</b><span>Altas, edición, fotos, precios, aumentos</span></div><div class="ini-tile" id="ini-t-g" onclick="abrirGrupoInicio('g')"><div class="ini-ic">✂️</div><b>Producción</b><span>Telas, cortes, órdenes, talleres, stock</span></div></div>
+    <div class="ini-grid"><div class="ini-tile" id="ini-t-d" onclick="abrirGrupoInicio('d')"><div class="ini-ic">🧾</div><b>Ventas</b><span>Pedidos, pedido con IA, pendientes, clientes</span></div><div class="ini-tile" id="ini-t-f" onclick="abrirGrupoInicio('f')"><div class="ini-ic">🏷️</div><b>Catálogo</b><span>Altas, edición, fotos, precios, aumentos</span></div><div class="ini-tile" id="ini-t-g" onclick="abrirGrupoInicio('g')"><div class="ini-ic">✂️</div><b>Producción</b><span>Telas, cortes, órdenes, talleres, stock</span></div><div class="ini-tile" id="ini-t-ml" onclick="abrirResultadosML()"><div class="ini-ic">📈</div><b>Resultados ML</b><span>Cuánto queda de cada venta y la ganancia</span></div></div>
     <div class="ini-sub" id="ini-sub-int" style="display:none;"></div>
   </div>
 
@@ -1589,7 +1589,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v193</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v194</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -7665,8 +7665,23 @@ async function abrirListas(){
   if(tablaConsumo === null) await cargarTablaConsumo();
   renderListas();
 }
+async function guardarCadete(){
+  const d = await db.collection('config').doc('ml_zonas').get(); const z = d.exists ? d.data() : {};
+  z.cost = { caba: +document.getElementById('cad-caba').value || 0, z1: +document.getElementById('cad-z1').value || 0, z2: +document.getElementById('cad-z2').value || 0, lej: +document.getElementById('cad-lej').value || 0 };
+  try{ await db.collection('config').doc('ml_zonas').set(JSON.parse(JSON.stringify(z))); alert('Costos del cadete guardados.'); } catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+async function pintarCadeteListas(){
+  const box = document.getElementById('ls-cadete'); if(!box) return;
+  let c = { caba: 2804, z1: 5008, z2: 5008, lej: 7375 };
+  try{ const d = await db.collection('config').doc('ml_zonas').get(); if(d.exists && d.data().cost) c = Object.assign(c, d.data().cost); } catch(e){}
+  const f = (id, n, v) => `<label style="display:flex;flex-direction:column;font-size:0.75rem;color:#8A8072;gap:2px;">${n}<input id="${id}" type="number" min="0" value="${v}" style="padding:8px;border:1px solid var(--line);border-radius:10px;"></label>`;
+  box.innerHTML = `<h3>🛵 Cadete Flex por zona (Mercado Libre)</h3><p>Lo que cobra el cadete por envío, según la zona. Se usa en Resultados ML.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;">${f('cad-caba', 'CABA', c.caba)}${f('cad-z1', 'Provincia zona 1', c.z1)}${f('cad-z2', 'Provincia zona 2', c.z2)}${f('cad-lej', 'Provincia alejada', c.lej)}</div>
+    <button type="button" class="btn-mini" style="margin-top:8px;" onclick="guardarCadete()">💾 Guardar</button>`;
+}
 function renderListas(){
-  document.getElementById('ls-cont').innerHTML = LISTAS_DEF.map(l => `<div class="ls-sec">
+  setTimeout(() => { if(esDueno()) pintarCadeteListas(); }, 0);
+  document.getElementById('ls-cont').innerHTML = (esDueno() ? '<div class="ls-sec" id="ls-cadete"></div>' : '') + LISTAS_DEF.map(l => `<div class="ls-sec">
       <h3>${l.titulo}</h3><p>${l.ayuda}</p>
       ${l.id === 'talleres' ? `<div style="display:grid;gap:6px;margin-bottom:8px;">${valoresLista('talleres').map((v, i) => { const d = talleresDetalles[v] || {}; return `<div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;align-items:center;background:var(--cream);border-radius:10px;padding:8px 10px;">
           <div><b>${escaparHtml(v)}</b><div style="font-size:0.75rem;color:#6B6258;">${d.direccion ? '📍 ' + escaparHtml(d.direccion) : '<span style="color:#A89E90;">sin dirección</span>'} · ${d.celular ? '📱 ' + escaparHtml(d.celular) : '<span style="color:#A89E90;">sin celular</span>'}</div></div>
@@ -8997,6 +9012,7 @@ window.addEventListener('load', () => {
   conDeshacer('guardarPreciosTelas', 'Precios de telas guardados', ['telas']);
   conDeshacer('guardarStock', 'Stock guardado', ['stock']);
   conDeshacer('guardarConfeccion', 'Costos de confección guardados', ['tabla']);
+  ['guardarConfeccion', 'guardarPreciosTelas', 'aplicarPfMasivo'].forEach(n => { const o = window[n]; if(typeof o !== 'function') return; window[n] = async function(...a){ const r = await o.apply(this, a); setTimeout(() => registrarHistorialCostos().catch(() => {}), 500); return r; }; });
   conDeshacer('aplicarMinimosTodos', 'Mínimos aplicados', ['tabla']);
   conDeshacer('guardarReventa', 'Descripciones guardadas', ['reventa'], () => Object.keys(rvPend).filter(k => k.startsWith('v:')).map(k => k.slice(2)).concat(productosReventa().filter(x => rvPend['p:' + x.p._editKey]).flatMap(x => x.p.variantes.map(v => v.sku))));
   conDeshacer('aplicarPfMasivo', 'Cambios aplicados a los SKU', ['fabricacion', 'tabla', 'stock']);
@@ -9757,6 +9773,8 @@ auth.onAuthStateChanged(async u => {
     document.getElementById('login').style.display = 'none';
     pintarUsuarioEnCabecera();
     resolverSesion(u);
+    if(rol === 'dueño') setTimeout(() => registrarHistorialCostos().catch(e => console.error('historial de costos', e)), 8000);
+    { const t = document.getElementById('ini-t-ml'); if(t) t.style.display = rol === 'dueño' ? '' : 'none'; }
   } catch(e){ mostrarLogin('No se pudo verificar la cuenta: ' + escaparHtml(e.message), true); }
 });
 function pintarUsuarioEnCabecera(){
@@ -9794,6 +9812,59 @@ async function agregarUsuario(){
 async function quitarUsuario(mail){
   if(!confirm(`¿Quitarle el acceso a ${mail}?`)) return;
   try{ await db.collection('usuarios').doc(mail).delete(); abrirUsuarios(); } catch(e){ alert('No se pudo quitar: ' + e.message); }
+}
+
+// ===== Resultados de Mercado Libre (pagina aparte) e historial de costos =====
+// historial_costos: { sku, fecha 'AAAA-MM-DD', costo, desglose } — un registro cada vez que cambia el costo de un SKU.
+// config/costos_ultimo guarda el ultimo costo de cada SKU para no leer todo el historial.
+function costoActualSku(S){
+  const c = costosDeSku(S); if(!c) return null;
+  const x = c.porTela.find(y => y.total != null); if(!x) return null;
+  return { costo: Math.round(x.total * 100) / 100, desglose: { tela: x.tela, metros: x.metros, costoTela: Math.round(x.costoTela * 100) / 100, confeccion: x.confeccion, insumos: x.insumos } };
+}
+let registrandoCostos = null;
+async function registrarHistorialCostos(){
+  if(!esDueno()) return 0;
+  if(registrandoCostos) return registrandoCostos;
+  registrandoCostos = (async () => {
+    if(tablaConsumo === null) await cargarTablaConsumo();
+    if(telasDatos === null) await cargarTelas();
+    if(fabricacion === null) await cargarFabricacion();
+    if(fichasArticulos === null) await cargarFichasArticulos();
+    if(typeof aviosDatos !== 'undefined' && aviosDatos === null) await cargarAvios();
+    const ref = db.collection('config').doc('costos_ultimo');
+    const prev = await ref.get(); const ult = prev.exists ? (prev.data().c || {}) : {};
+    const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const nuevos = [];
+    skusQueFabrico().forEach(S => {
+      const a = costoActualSku(S); if(!a) return;
+      if(ult[S] == null || Math.abs(ult[S] - a.costo) >= 1){ nuevos.push({ sku: S, fecha: hoy, costo: a.costo, desglose: a.desglose }); ult[S] = a.costo; }
+    });
+    for(let i = 0; i < nuevos.length; i += 400){ const b = db.batch(); nuevos.slice(i, i + 400).forEach(x => b.set(db.collection('historial_costos').doc(), x)); await b.commit(); }
+    if(nuevos.length) await ref.set({ c: ult, actualizado: new Date().toISOString() });
+    return nuevos.length;
+  })();
+  try{ return await registrandoCostos; } finally { registrandoCostos = null; }
+}
+// nombres de producto para la pagina de resultados: SKU base -> "Producto · medida"
+function mapaNombresSku(){
+  const m = {};
+  CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => {
+    const s = String(v.sku || '').toUpperCase(); if(!s) return;
+    const med = String(v.desc || '').split(' — ')[0].trim();
+    m[s] = p.nombre + (med && med.length <= 40 ? ' · ' + med : '');
+  })));
+  return m;
+}
+async function abrirResultadosML(){
+  if(!esDueno()){ alert('Solo el dueño puede ver los resultados de Mercado Libre.'); return; }
+  const t = document.getElementById('pub-titulo'); if(t) t.textContent = '📈 Resultados ML';
+  document.getElementById('pub-cont').innerHTML = '<p class="empty-msg">Actualizando costos y nombres…</p>';
+  document.getElementById('pub-modal').style.display = 'block';
+  try{ await registrarHistorialCostos(); } catch(e){ console.error('historial de costos', e); }
+  try{ await idbGuardar('nombres_sku', mapaNombresSku()); } catch(e){}
+  cerrarPublicar();
+  location.href = 'resultados-ml.html';
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -17342,7 +17413,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v193';
+const APP_VERSION = '2026-10-02-v194';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
