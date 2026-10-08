@@ -1584,7 +1584,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v189</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v190</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1673,6 +1673,7 @@ a.grilla-celda{display:block;}
           <div style="display:flex;gap:6px;margin-top:8px;">
             <button type="button" class="btn-mini" style="flex:1;" onclick="nuevoArticuloAC()">+ Nuevo artículo</button>
             <button type="button" class="btn-mini" style="flex:1;" onclick="abrirGeneradorFundaColchon()">🛏️ Funda de colchón</button>
+            <button type="button" class="btn-mini" style="flex:1;" onclick="abrirMinimosTodos()">📐 Mínimos para todos</button>
             <button type="button" class="btn-mini" style="flex:1;" onclick="verDuplicadosAC()">🧹 Duplicados</button>
           </div>
           <div id="ac-duplicados"></div>
@@ -8981,6 +8982,7 @@ window.addEventListener('load', () => {
   conDeshacer('guardarPreciosTelas', 'Precios de telas guardados', ['telas']);
   conDeshacer('guardarStock', 'Stock guardado', ['stock']);
   conDeshacer('guardarConfeccion', 'Costos de confección guardados', ['tabla']);
+  conDeshacer('aplicarMinimosTodos', 'Mínimos aplicados', ['tabla']);
   conDeshacer('guardarReventa', 'Descripciones guardadas', ['reventa'], () => Object.keys(rvPend).filter(k => k.startsWith('v:')).map(k => k.slice(2)).concat(productosReventa().filter(x => rvPend['p:' + x.p._editKey]).flatMap(x => x.p.variantes.map(v => v.sku))));
   conDeshacer('aplicarPfMasivo', 'Cambios aplicados a los SKU', ['fabricacion', 'tabla', 'stock']);
   conDeshacer('borrarSkusPf', 'SKU borrados', ['fabricacion', 'tabla', 'stock'], () => [...pfSel]);
@@ -9615,6 +9617,57 @@ function difWhatsApp(){
   const lineas = difSkus.map(x => `• ${x.p.nombre}`);
   const txt = `¡Ingresó mercadería nueva! 🎉\n\n${lineas.join('\n')}\n\nMirá el catálogo y armá tu pedido:\nhttps://danielsaccal.github.io/pedido-onlinetextil/cliente/\n\nOnLineTextil · Mayorista y minorista · Envíos a todo el país`;
   window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+}
+
+// ===== Minimos tolerados para todos los articulos, por tipo de pieza =====
+function tiposDePieza(){
+  const m = new Map();
+  Object.values(tablaConsumo.instrucciones || {}).forEach(porAncho => Object.values(porAncho || {}).forEach(g => (g && g.piezas || []).forEach(p => {
+    const k = normBusqueda(String(p.nombre || '').trim()); if(!k) return;
+    const x = m.get(k) || { nombre: String(p.nombre).trim(), n: 0, arts: new Set() }; x.n++; m.set(k, x);
+  })));
+  Object.entries(tablaConsumo.instrucciones || {}).forEach(([a, porAncho]) => Object.values(porAncho || {}).forEach(g => (g && g.piezas || []).forEach(p => { const x = m.get(normBusqueda(String(p.nombre || '').trim())); if(x) x.arts.add(a); })));
+  return [...m.entries()].map(([k, x]) => ({ k, nombre: x.nombre, arts: x.arts.size })).sort((a, b) => b.arts - a.arts);
+}
+function abrirMinimosTodos(){
+  const tipos = tiposDePieza();
+  window.__tiposPieza = tipos;
+  const t = document.getElementById('pub-titulo'); if(t) t.textContent = '📐 Mínimos para todos';
+  document.getElementById('pub-cont').innerHTML = `
+    <p class="note" style="text-align:left;margin:0 0 10px;">Cuánto se puede achicar cada tipo de pieza, <b>en cm</b>. Se aplica a todos los artículos y juegos que la tengan (ej: Plana: ancho 10 y largo 20 → una plana de 240 × 260 queda con mínimos 230 × 240). Lo vacío no se toca.</p>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 74px 74px;gap:6px;font-size:0.72rem;color:#8A8072;margin-bottom:4px;"><span>Pieza</span><span>Ancho −cm</span><span>Largo −cm</span></div>
+    <div style="max-height:50vh;overflow-y:auto;">${tipos.map((x, i) => `<div style="display:grid;grid-template-columns:minmax(0,1fr) 74px 74px;gap:6px;align-items:center;padding:4px 0;border-top:1px solid var(--line);">
+      <span style="font-size:0.88rem;">${escaparHtml(x.nombre)} <span class="note">(${x.arts} artículo${x.arts === 1 ? '' : 's'})</span></span>
+      <input type="number" min="0" step="0.5" id="mt-a-${i}" placeholder="—" style="padding:6px;">
+      <input type="number" min="0" step="0.5" id="mt-l-${i}" placeholder="—" style="padding:6px;"></div>`).join('')}</div>
+    <label style="display:flex;gap:6px;align-items:center;font-size:0.82rem;margin:10px 0;"><input type="checkbox" id="mt-borrar"> Si un casillero queda en 0, quitar el mínimo que tenga</label>
+    <div style="display:flex;gap:8px;"><button class="btn btn-gold" style="flex:1;" onclick="aplicarMinimosTodos()">Aplicar a todos</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`;
+  document.getElementById('pub-modal').style.display = 'block';
+}
+async function aplicarMinimosTodos(){
+  const tipos = window.__tiposPieza || [], borrar = document.getElementById('mt-borrar').checked;
+  const reglas = {};
+  tipos.forEach((x, i) => { const a = document.getElementById('mt-a-' + i).value, l = document.getElementById('mt-l-' + i).value; if(a !== '' || l !== '') reglas[x.k] = { a: a === '' ? null : +a, l: l === '' ? null : +l }; });
+  if(!Object.keys(reglas).length){ alert('No completaste ninguna pieza.'); return; }
+  const arts = new Set(); let piezas = 0;
+  Object.entries(tablaConsumo.instrucciones || {}).forEach(([art, porAncho]) => Object.entries(porAncho || {}).forEach(([k, g]) => {
+    let cambio = false;
+    (g && g.piezas || []).forEach(p => {
+      const r = reglas[normBusqueda(String(p.nombre || '').trim())]; if(!r) return;
+      const m = minsPieza(p); let na = m.a, nl = m.l;
+      if(r.a !== null) na = r.a > 0 ? Math.max(1, +p.ancho - r.a) : (borrar ? 0 : m.a);
+      if(r.l !== null) nl = r.l > 0 ? Math.max(1, +p.largo - r.l) : (borrar ? 0 : m.l);
+      if(na === m.a && nl === m.l) return;
+      delete p.anchoMin; delete p.largoMin; delete p.minLado;
+      if(na || nl) Object.assign(p, { anchoMin: na || 0, largoMin: nl || 0, minLado: 'ambos' });
+      cambio = true; piezas++;
+    });
+    if(cambio){ arts.add(art); const c = calcularCorte(g.piezas, parseFloat(k)); if(!c.avisos.length){ g.consumo = c.metros; tablaConsumo.articulos = tablaConsumo.articulos || {}; tablaConsumo.articulos[art] = tablaConsumo.articulos[art] || {}; tablaConsumo.articulos[art][k] = c.metros; } }
+  }));
+  if(!piezas){ alert('No había nada para cambiar.'); return; }
+  if(!confirm(`Se actualizan ${piezas} piezas en ${arts.size} artículos. ¿Guardar?`)){ await cargarTablaConsumo(); return; }
+  try{ await guardarTablaYConsumo(); cerrarPublicar(); renderListaAC(); if(acArticulo) abrirArticuloAC(acArticulo); alert('Listo: mínimos aplicados.'); }
+  catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -17163,7 +17216,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v189';
+const APP_VERSION = '2026-10-02-v190';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
