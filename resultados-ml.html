@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ventas Mercado Libre – OnLineTextil</title>
+<meta name="theme-color" content="#3D2B4E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<style>
+/* Mismo sistema visual que la app de pedidos OnLineTextil */
+:root{
+  --purple:#3D2B4E; --purple-dark:#2A1D36; --gold:#F5D470; --gold-dark:#DFB94A;
+  --bg:#F5F3EF; --surface:#FFFFFF; --ink:#2A2320; --muted:#8A8072; --label:#8A6D3B; --line:#DCD4C4; --alt:#FAF8F4;
+  --indigo:#3D2B4E; --indigo-soft:#F5F3EF;
+  --good:#3D7A2E; --good-soft:#E3EDDA; --warn:#8A4A12; --warn-soft:#F7E2CC; --bad:#A6432F; --bad-soft:#F3DDD7;
+  --head-ink:#F5F3EF;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --purple:#D9C9EA; --purple-dark:#1F1628; --gold:#F5D470; --gold-dark:#DFB94A;
+  --bg:#1A1620; --surface:#241E2C; --ink:#EEE8E0; --muted:#A79D90; --label:#D6B97A; --line:#3B3345; --alt:#2A2333;
+  --indigo:#D9C9EA; --indigo-soft:#2E2638;
+  --good:#8FCB7A; --good-soft:#243522; --warn:#E8A86A; --warn-soft:#3A2A1C; --bad:#EE9A86; --bad-soft:#3D2420;
+  --head-ink:#F5F3EF; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --purple:#D9C9EA; --purple-dark:#1F1628; --gold:#F5D470; --gold-dark:#DFB94A;
+  --bg:#1A1620; --surface:#241E2C; --ink:#EEE8E0; --muted:#A79D90; --label:#D6B97A; --line:#3B3345; --alt:#2A2333;
+  --indigo:#D9C9EA; --indigo-soft:#2E2638;
+  --good:#8FCB7A; --good-soft:#243522; --warn:#E8A86A; --warn-soft:#3A2A1C; --bad:#EE9A86; --bad-soft:#3D2420;
+  --head-ink:#F5F3EF; color-scheme:dark;}
+:root{box-sizing:border-box;padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Work Sans",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:"Fraunces",Georgia,serif;color:var(--purple);letter-spacing:-.01em}
+.mono,.n,.totals b,table.ventas>tbody>tr:not(.d)>td:not(:nth-child(2)),table.dh td:not(:first-child),.saldo b,.hrow em,tr.d table td:not(:first-child){font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+/* Encabezado violeta con guarda dorada, como la app */
+header.top{background:#3D2B4E;color:var(--head-ink);padding:calc(26px + env(safe-area-inset-top,0px)) 16px 24px;text-align:center;position:relative}
+header.top::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:6px;background-image:repeating-linear-gradient(90deg,var(--gold) 0 10px,transparent 10px 20px)}
+header.top h1{color:#F5F3EF;font-size:1.7rem;margin:0 0 4px;font-weight:600}
+header.top .sub{margin:0;font-size:.82rem;opacity:.85;letter-spacing:.04em;text-transform:uppercase;color:#F5F3EF}
+.load{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:16px}
+.load select{background:rgba(245,243,239,.12);color:#F5F3EF;border:1.5px solid rgba(245,243,239,.45);border-radius:8px;padding:10px 12px;font:inherit;font-weight:600;min-height:44px}
+.load select option{color:#2A2320}
+
+main{max-width:960px;margin:0 auto;padding:22px 16px 60px}
+h2{font-size:1.15rem;font-weight:600;margin:0 0 12px}
+.sec{font-family:"Work Sans",sans-serif;font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:26px 0 10px}
+
+select,input[type=search],input[type=number]{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-height:44px}
+select:focus,input:focus{outline:2px solid var(--gold-dark);outline-offset:1px;background:var(--surface)}
+.btn{font-family:"Work Sans",sans-serif;font-weight:600;font-size:.9rem;border:none;border-radius:8px;padding:11px 18px;min-height:44px;cursor:pointer;background:var(--gold);color:#2A1D36;display:inline-flex;align-items:center;transition:transform .15s ease,background .15s ease}
+.btn:hover{background:var(--gold-dark)}
+.btn:active{transform:scale(.97)}
+.btn.ghost{background:transparent;color:var(--purple);border:1.5px solid var(--purple)}
+.btn.ghost:hover{background:var(--purple);color:var(--surface)}
+.btn.outline{background:transparent;color:#F5F3EF;border:1.5px solid rgba(245,243,239,.7)}
+.btn.outline:hover{background:rgba(245,243,239,.15)}
+.btn-mini{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 12px;font:500 .8rem "Work Sans",sans-serif;cursor:pointer;color:var(--ink)}
+.btn-mini:hover{background:var(--surface);border-color:var(--purple)}
+.btn:focus-visible,.btn-mini:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--gold-dark);outline-offset:2px}
+input[type=file]{display:none}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+.files{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:.82rem;background:var(--surface);color:var(--purple);border:1px solid var(--line);border-radius:16px;padding:6px 12px;display:inline-flex;gap:6px;align-items:center}
+.chip .meta{color:var(--muted)}
+.chip button{border:0;background:none;color:var(--muted);cursor:pointer;font:inherit;padding:0 2px}
+
+/* Resumen: tarjetas tipo "ini-tile" */
+.totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.totals>div{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.totals span{display:block;color:var(--muted);font-size:.78rem;margin-bottom:4px}
+.totals b{font-size:clamp(1rem,2.1vw,1.2rem);font-weight:600;color:var(--purple);white-space:nowrap}
+.totals>div.key{background:#3D2B4E;border-color:#3D2B4E}
+.totals>div.key span{color:#E8DFC8}.totals>div.key b{color:var(--gold);font-size:clamp(1.05rem,2.3vw,1.35rem)}
+.totals b.neg{color:var(--bad)}
+
+/* Buscador fijo arriba, como en la app */
+.search-wrap{position:sticky;top:0;z-index:5;background:var(--bg);padding:12px 0 8px;margin:6px 0 4px}
+.search-wrap input{width:100%;font-size:1rem;background:var(--surface);padding:13px 14px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.filters select{flex:1 1 150px;background:var(--surface)}
+@media (max-width:640px){.search-wrap{position:static}.filters select{flex:1 1 calc(50% - 8px);min-width:0}.totals{grid-template-columns:1fr 1fr}.totals>div.key{grid-column:1/-1;order:-1}}
+details.more-f{margin-top:8px}
+details.more-f>summary,details.zd>summary,details.box>summary{cursor:pointer;color:var(--purple);font-weight:600;font-size:.88rem;list-style:none;display:inline-flex;gap:6px;align-items:center}
+details>summary::-webkit-details-marker{display:none}
+details>summary::before{content:"▸";transition:transform .15s}
+details[open]>summary::before{transform:rotate(90deg)}
+details.more-f .filters{margin-top:10px}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:760px){.grid2{grid-template-columns:1fr}}
+.hrow{display:grid;grid-template-columns:120px 1fr 96px;gap:8px;align-items:center;font-size:.84rem;margin:6px 0}
+.hrow .bar{height:12px;background:var(--bg);border-radius:6px;overflow:hidden}
+.hrow .bar i{display:block;height:100%;border-radius:6px}
+.hrow em{font-style:normal;text-align:right;color:var(--muted);font-size:.8rem}
+
+/* Tablas: misma lógica que .ml-tabla */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table.ventas{width:100%;border-collapse:collapse;font-size:.86rem;min-width:640px}
+table.ventas th{position:sticky;top:0;background:var(--bg);color:var(--muted);text-align:right;font-weight:600;font-size:.68rem;letter-spacing:.03em;text-transform:uppercase;padding:9px 10px;white-space:nowrap;border-bottom:1px solid var(--line)}
+table.ventas th:nth-child(1),table.ventas th:nth-child(2){text-align:left}
+table.ventas td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;font-size:.84rem}
+table.ventas td:nth-child(1),table.ventas td:nth-child(2){text-align:left}
+tr.v{cursor:pointer}tr.v:nth-of-type(4n+1){background:var(--alt)}tr.v:hover{background:var(--bg)}
+tr.v:focus-visible,tr.g:focus-visible{outline:3px solid var(--gold-dark);outline-offset:-3px}
+.base{font-weight:600;color:var(--purple);font-family:"Work Sans",sans-serif}
+.var{color:var(--muted);font-size:.74rem;display:block;font-family:"Work Sans",sans-serif;white-space:normal}
+td.pct{font-weight:700;font-size:.92rem}
+.pct.lo{color:var(--bad)}.pct.mid{color:var(--warn)}.pct.hi{color:var(--good)}
+tr.d{display:none}tr.d.open{display:table-row}
+tr.d>td{text-align:left;white-space:normal;background:var(--bg);border-top:1px dashed var(--line);padding:14px 16px;font-family:"Work Sans",sans-serif}
+tr.d table{width:100%;max-width:560px;border-collapse:collapse;font-size:.84rem;margin-top:8px}
+tr.d table td{padding:5px 0;border-bottom:1px dashed var(--line)}
+tr.d table td:not(:first-child){text-align:right;font-family:"IBM Plex Mono",monospace;padding-left:12px}
+tr.sub td{color:var(--muted)}
+tr.d tr.sum td,.detail tr.sum td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0;color:var(--purple)}
+tr.g{background:var(--bg);cursor:pointer}
+tr.g td{font-weight:600;border-top:2px solid var(--line)}
+tr.g td.rng{font-size:.8rem}
+table.anual{min-width:760px}
+table.anual tr.tot td{font-weight:700;border-top:2px solid var(--ink);background:var(--bg);color:var(--purple)}
+
+/* Estados como los "estado-pedido" de la app */
+.tag{display:inline-block;font-size:.7rem;font-weight:700;border-radius:14px;padding:3px 9px;margin:2px 4px 0 0;background:#EDE7F3;color:#3D2B4E}
+.tag.warn{background:#EFE0A8;color:#7A6420}
+.tag.bad{background:#E0B8B0;color:#7A2E1E}
+.meta{color:var(--muted);font-size:.8rem}
+.neg{color:var(--bad)}.pos{color:var(--good)}
+.note{font-size:.8rem;color:var(--muted);margin:8px 0 0}
+.more{display:flex;margin:14px auto 0}
+
+/* Resumen del SKU: "Lo que entra / Lo que sale" */
+.skusum{background:var(--surface);border:2px solid var(--purple);border-radius:14px;padding:16px 18px;margin:8px 0 14px}
+.skusum h3{margin:0 0 2px;font-size:1.3rem}
+.skusum .inc{color:var(--muted);font-size:.8rem;margin:0 0 12px}
+.dhw{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:640px){.dhw{grid-template-columns:1fr}}
+table.dh{width:100%;border-collapse:collapse;font-size:.86rem;align-self:start}
+table.dh th{text-align:left;padding:8px 10px;background:var(--bg);color:var(--purple);font-family:"Fraunces",serif;font-weight:600;font-size:.95rem;border-bottom:2px solid var(--gold)}
+table.dh th.r{text-align:right;font-family:"Work Sans",sans-serif;font-size:.68rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);white-space:nowrap}
+table.dh th small{display:block;font-weight:400;font-size:.62rem;text-transform:none;letter-spacing:0}
+table.dh td{padding:6px 10px;border-bottom:1px dashed var(--line)}
+table.dh td:not(:first-child){text-align:right;white-space:nowrap}
+table.dh td.pu{color:var(--muted)}
+table.dh tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0;color:var(--purple)}
+.saldo{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px;padding:14px 16px;border-radius:10px;background:#3D2B4E;color:#F5F3EF}
+.saldo b{font-size:1.4rem;color:var(--gold)}
+.saldo .sv{text-align:right}.saldo .sv em{display:block;font-style:normal;font-size:.78rem;color:#E8DFC8;font-family:"Work Sans",sans-serif}
+.mpbox{margin:12px 0 0;padding:10px 12px;border-radius:8px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--gold);font-size:.84rem}
+
+/* Resumen mensual: recibí / pagué / me quedó */
+.res-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.res-head h2{margin:0;font-size:1.1rem}
+.resumen{padding:14px 16px}
+.res-strip{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:8px;margin:6px 0 8px}
+.res-strip>div{border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--bg)}
+.res-strip span{display:block;font-size:.74rem;color:var(--muted)}
+.res-strip b{font-family:"IBM Plex Mono",monospace;font-size:clamp(.9rem,2vw,1.05rem);white-space:nowrap}
+.res-strip .q{background:#3D2B4E;border-color:#3D2B4E}
+.res-strip .q span{color:#E8DFC8}.res-strip .q b{color:var(--gold)}
+.res-strip small{font-size:.8rem;color:#F5F3EF}
+@media (max-width:520px){.res-strip{grid-template-columns:1fr 1fr}.res-strip .q{grid-column:1/-1}}
+details.res-det>summary{cursor:pointer;color:var(--purple);font-weight:600;font-size:.88rem;list-style:none;display:inline-flex;gap:6px;align-items:center}
+details.res-det[open]>summary{margin-bottom:10px}
+.res-head select{background:var(--surface)}
+.res-cta{display:block;color:var(--muted);font-size:.8rem;margin:0 0 12px}
+table.res{width:100%;border-collapse:collapse;font-size:.95rem}
+table.res td{padding:9px 4px;border-bottom:1px dashed var(--line)}
+table.res td.m{text-align:right;white-space:nowrap;font-family:"IBM Plex Mono",monospace;font-weight:500}
+table.res td.p{text-align:right;white-space:nowrap;font-family:"IBM Plex Mono",monospace;color:var(--muted);font-size:.82rem;width:72px}
+table.res tr.in td.m{color:var(--good)}
+table.res tr.out td.m{color:var(--bad)}
+table.res tr.grp td{padding-top:16px;border-bottom:1px solid var(--line);font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+table.res td small{display:block;color:var(--muted);font-size:.74rem}
+.res-fin{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-top:16px;padding:16px 18px;border-radius:12px;background:#3D2B4E;color:#F5F3EF}
+.res-fin span{font-size:1rem}
+.res-fin .v{text-align:right}
+.res-fin b{display:block;font-family:"IBM Plex Mono",monospace;font-size:clamp(1.3rem,4vw,1.7rem);color:var(--gold);white-space:nowrap}
+.res-fin em{font-style:normal;font-size:.9rem;color:#E8DFC8}
+.res-fin em strong{font-family:"IBM Plex Mono",monospace;color:#F5F3EF;font-size:1.05rem}
+
+/* Ajustes */
+.cad{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px}
+.cad label{display:flex;flex-direction:column;font-size:.82rem;font-weight:600;color:var(--label);gap:2px}
+.cad small{font-weight:400;color:var(--muted);font-size:.74rem}
+.cad input{margin-top:4px;font-family:"IBM Plex Mono",monospace;text-align:right}
+details.zd{margin-top:14px}
+details.box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+
+.empty{text-align:center;padding:44px 18px;color:var(--muted)}
+.empty b{display:block;color:var(--purple);font:600 1.2rem "Fraunces",serif;margin-bottom:6px}
+.err{background:var(--bad-soft);color:var(--ink);border-radius:10px;padding:12px 14px;margin-bottom:14px;display:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div style="display:flex;gap:8px;justify-content:center;margin-bottom:6px;"><a href="./" style="color:#fff;border:1px solid rgba(255,255,255,.45);border-radius:10px;padding:5px 12px;text-decoration:none;font-size:.85rem;">← Volver a la app</a></div>
+  <h1>Resultados Mercado Libre</h1>
+  <p class="sub" id="periodo">Cuánto le queda de cada venta</p>
+  <div class="load">
+    <select id="cuenta" aria-label="Cuenta">
+      <option>Alberto</option><option>Rita</option>
+    </select>
+    <label class="btn" for="file">Cargar reporte del mes</label>
+    <input type="file" id="file" accept=".xlsx,.xls">
+  </div>
+</header>
+<main>
+<div class="err" id="err" role="status"></div>
+<div id="cargando" class="panel" style="text-align:center;padding:24px;">Cargando…</div>
+
+<section id="empty" class="panel empty">
+  <b>Cargue el reporte de conciliación de Mercado Libre</b>
+  Elija la cuenta y suba el Excel "Reporte de conciliación por ventas" tal como lo descarga de ML. Cada mes queda guardado.
+</section>
+
+<div id="app" hidden>
+  <section class="panel resumen" id="resumen">
+    <div class="res-head">
+      <h2 id="resTit">Resumen</h2>
+      <select id="resMes" aria-label="Mes del resumen"></select>
+    </div>
+    <div id="resBody"></div>
+  </section>
+  <div hidden><b id="tVend"></b><b id="tAcr"></b><b id="tCad"></b><b id="tNeto"></b><b id="tN"></b><p id="tNote"></p></div>
+
+  <div class="search-wrap">
+    <input type="search" id="fSku" placeholder="Buscar SKU, nombre (ej. lienzo) o N.º de operación" aria-label="Buscar">
+    <div class="filters">
+      <select id="fMes" aria-label="Mes"></select>
+      <select id="fCuenta" aria-label="Cuenta"></select>
+      <select id="fLog" aria-label="Logística">
+        <option value="">Logística: todas</option><option>Full</option><option>Flex</option><option value="Colecta">Colecta (correo)</option>
+      </select>
+      <select id="fFlex" aria-label="Reintegro Flex" hidden><option value="">Reintegro Flex: todos</option></select>
+      <select id="fVista" aria-label="Vista">
+        <option value="venta">Venta por venta</option>
+        <option value="sku">Agrupado por SKU</option>
+      </select>
+    </div>
+    <details class="more-f"><summary>Más filtros</summary>
+      <div class="filters">
+        <select id="fTipo" aria-label="Tipo">
+          <option value="ventas">Ventas pagadas</option>
+          <option value="todo">Todas las operaciones</option>
+        </select>
+        <select id="fOrden" aria-label="Orden">
+          <option value="fecha">Más recientes</option>
+          <option value="pctAsc">% más bajo primero</option>
+          <option value="pctDesc">% más alto primero</option>
+        </select>
+        <button class="btn-mini" id="csv">Descargar CSV</button>
+      </div>
+    </details>
+  </div>
+
+  <div id="skuSum" class="skusum" hidden></div>
+  <p class="note" id="count"></p>
+  <div class="tw"><table class="ventas"><thead><tr>
+    <th id="thFecha">Fecha</th><th>SKU</th><th>Unid.</th><th>Precio c/desc.</th><th>Le queda</th><th>Por unidad</th><th>%</th><th>Costo</th><th>Ganancia</th>
+  </tr></thead><tbody id="list"></tbody></table></div>
+  <button class="btn ghost more" id="more" hidden>Ver más</button>
+
+  <p class="sec">Mes por mes</p>
+  <section class="panel" id="anual">
+    <div class="tw"><table class="ventas anual"><thead><tr><th>Mes</th><th>Ventas</th><th>Unidades</th><th>Vendido c/desc.</th><th>Acreditado ML</th><th>Cadete</th><th>Le queda</th><th>% le queda</th></tr></thead><tbody id="anualBody"></tbody></table></div>
+    <div id="anualBars" style="margin-top:12px"></div>
+    <p class="note" id="anualNote"></p>
+  </section>
+
+  <p class="sec">Gráficos</p>
+  <div class="grid2">
+    <section class="panel">
+      <h2>Ventas según % que le queda</h2>
+      <div id="hist"></div>
+    </section>
+    <section class="panel">
+      <h2>Dónde se fue la plata</h2>
+      <div id="conc"></div>
+    </section>
+  </div>
+
+  <p class="sec">Ajustes</p>
+  <details class="box"><summary>Costo del cadete por envío Flex</summary>
+    <div class="cad" id="cadForm"></div>
+    <details class="zd"><summary>Ver o corregir qué zona es cada monto que paga ML</summary>
+      <div id="cadMap" style="max-width:520px;margin-top:8px"></div>
+      <p class="note">Se asigna solo: en cada mes, los 4 montos más frecuentes son las 4 zonas, de menor a mayor. Los montos poco frecuentes van a la zona más parecida. Si alguno no corresponde, cámbielo acá.</p>
+    </details>
+    <p class="note">Se descuenta una vez por envío, según la zona que indica el monto que paga ML. Si un envío lleva varias ventas, el costo va a la primera. Las ventas canceladas y las que no tienen zona no llevan costo.</p>
+  </details>
+</div>
+
+<details class="box" id="filesPanel" hidden><summary>Meses guardados</summary>
+  <div class="files" id="files" style="margin-top:12px"></div>
+  <p class="note">Cada mes queda guardado en este navegador. Si vuelve a subir el mismo mes de la misma cuenta, se reemplaza.</p>
+</details>
+</main>
+
+<script>
+firebase.initializeApp({ apiKey: "AIzaSyCE0N4d-Hn_1S0X1B_LsiEvFtX-93LWn3A", authDomain: "catalogo-onlinetextil.firebaseapp.com", projectId: "catalogo-onlinetextil", storageBucket: "catalogo-onlinetextil.firebasestorage.app", messagingSenderId: "380063692818", appId: "1:380063692818:web:9d3bcfee44bf36c3d780cb" });
+const db = firebase.firestore();
+try{ db.settings({ ignoreUndefinedProperties: true }); }catch(e){}
+const STORE='ventasML.v1';
+let DATA=[];      // {file, cuenta, rows:[]}
+let shown=200;
+const $=id=>document.getElementById(id);
+const fmt=n=>(n<0?'-':'')+'$ '+Math.abs(n).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0});
+const fmt2=n=>(n<0?'-':'')+'$ '+Math.abs(n).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const pctf=p=>(p*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+' %';
+
+function num(v){
+  if(v==null||v==='')return 0;
+  if(typeof v==='number')return v;
+  let s=String(v).trim().replace(/[$\s]/g,'');
+  if(/,\d{1,2}$/.test(s)) s=s.replace(/\./g,'').replace(',','.');
+  const n=parseFloat(s); return isNaN(n)?0:n;
+}
+const CAT={'Cargo por vender':'vender','Anulación del cargo por vender':'vender',
+'Costo por unidad vendida':'unidad','Anulación del costo por unidad vendida':'unidad',
+'Costo por ofrecer cuotas':'cuotas','Anulación del costo por ofrecer cuotas':'cuotas',
+'Cargo por envíos de Mercado Libre':'envio','Anulación del cargo por envíos de Mercado Libre':'envio',
+'Cargo por Envíos Flex':'envio','Anulación del cargo por Mercado Envíos Flex':'envio',
+'Cargo por servicio de colecta Full':'full','Cargo por servicio de almacenamiento Full':'full','Cargo por stock antiguo en Full':'full',
+'Cargo por campaña de publicidad de Product Ads':'ads'};
+function parseCargos(d){
+  const out={vender:0,unidad:0,cuotas:0,envio:0,full:0,ads:0,otros:0,flexBon:0,flexCargo:0,envML:0};
+  if(!d)return out;
+  const blocks=String(d).match(/\{Cargo \d+[\s\S]*?\}/g)||[];
+  for(const b of blocks){
+    const nm=(b.match(/Nombre del cargo : ([^;]+);/)||[])[1]; if(!nm)continue;
+    const name=nm.trim();
+    const val=num((b.match(/Monto neto: ([\-\d\.,]+);/)||[])[1]);
+    const neg=name.startsWith('Anulación')||name.startsWith('Bonif');
+    out[CAT[name]||'otros']+=neg?-val:val;
+    if(name==='Anulación del cargo por Mercado Envíos Flex')out.flexBon+=val;
+    if(name==='Cargo por Envíos Flex')out.flexCargo+=val;
+    if(name==='Cargo por envíos de Mercado Libre')out.envML+=val;
+    if(name==='Anulación del cargo por envíos de Mercado Libre')out.envML-=val;
+  }
+  return out;
+}
+// "AC253 x 3" = 3 unidades de AC253. También "KA131Fx2", "FEL2305 x 04" y "TOA171C x 3 BLANCO" (variante al final).
+function splitSku(s){
+  const m=String(s||'').trim().match(/^(\S+?)\s*[xX]\s*(\d+)(?:\s+(.+))?$/);
+  if(!m)return {base:String(s||'').trim(),mult:1,variante:''};
+  return {base:m[1].toUpperCase(),mult:parseInt(m[2],10)||1,variante:(m[3]||'').trim()};
+}
+const LOG={'me2 - fulfillment':'Full','me2 - self_service':'Flex','me2 - xd_drop_off':'Colecta'};
+
+function parseWorkbook(wb,cuenta,file){
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+  const hi=aoa.findIndex(r=>r.some(c=>String(c).trim()==='Fecha de la operación'));
+  if(hi<0)throw new Error('El archivo no tiene el formato del reporte de conciliación de ML. Falta la columna "Fecha de la operación".');
+  const H=aoa[hi].map(h=>String(h).trim());
+  const col=name=>{const i=H.findIndex(h=>h.startsWith(name)); if(i<0)throw new Error('Falta la columna "'+name+'" en el reporte.'); return i;};
+  const C={fecha:col('Fecha de la operación'),op:col('N.º de la operación'),tipo:col('Tipo de operación'),estado:col('Estado de la operación'),
+    sku:col('SKU'),pub:col('Tipo de publicación'),cant:col('Cantidad de productos'),valor:col('Valor del producto'),
+    ec:col('Envío pagado por el comprador'),cc:col('Costo por ofrecer cuotas pagado'),bruto:col('Monto bruto (='),
+    ret:col('Monto total de retenciones'),pos:col('Monto total de cargos pospagos'),neto:col('Monto neto después'),
+    det:col('Detalles de cargos'),envNum:col('Número del envío'),metodo:col('Método de envío'),paq:H.findIndex(h=>h.startsWith('Número del paquete')),pago:H.findIndex(h=>h.startsWith('Detalles del pago'))};
+  const raw=aoa.slice(hi+1).filter(r=>String(r[C.tipo]).trim()!=='');
+  // reintegros Flex en filas "Envío"
+  const envMap={};
+  const pre=raw.map(r=>{const p=parseCargos(r[C.det]);return {r,p};});
+  for(const {r,p} of pre){ if(String(r[C.tipo]).trim()==='Envío'){const k=String(r[C.envNum]);envMap[k]=envMap[k]||{b:0,c:0};envMap[k].b+=p.flexBon;envMap[k].c+=p.flexCargo;} }
+  const seenEnv=new Set(); const rows=[];
+  for(const {r,p} of pre){
+    const tipoOp=String(r[C.tipo]).trim(), estado=String(r[C.estado]||'').trim();
+    const bruto=num(r[C.bruto]), ec=num(r[C.ec]), cc=num(r[C.cc]), pos=num(r[C.pos]);
+    const log=LOG[String(r[C.metodo]).trim()]||'';
+    const isVenta=tipoOp==='Venta';
+    let tipo=tipoOp;
+    if(isVenta&&estado&&estado!=='Pagado'&&estado!=='Entregado')tipo='Venta ('+estado.toLowerCase()+')';
+    const pagoTxt=C.pago>=0?String(r[C.pago]||''):'';
+    const mp=(pagoTxt.match(/ID: (\d+)/)||[])[1]||'', mpFecha=(pagoTxt.match(/Pagado: ([\d-]+)/)||[])[1]||'', mpMedio=((pagoTxt.match(/Medio de pago: ([^;]+);/)||[])[1]||'').trim();
+    const o={cuenta,file,mp,mpFecha,mpMedio,envNum:String(r[C.envNum]||''),paq:C.paq>=0?String(r[C.paq]||''):'',fecha:String(r[C.fecha]),op:String(r[C.op]),tipo,estado,sku:String(r[C.sku]||'').trim(),
+      pubT:String(r[C.pub]||'').replace('Clássico','Clásica'),cant:num(r[C.cant])||null,log,
+      psd:isVenta&&bruto>0?num(r[C.valor]):null, pcd:isVenta?bruto-ec-cc:null,
+      vender:-p.vender,unidad:-p.unidad,cuotas:-p.cuotas,envio:ec+cc-p.envio,full:-p.full,ads:-p.ads,otros:-p.otros,
+      envIn:ec+cc+p.flexBon,envOut:-(p.envML+p.flexCargo),ret:num(r[C.ret]),acred:num(r[C.neto])-pos,excl:false,flex:'',flexMonto:null,nota:''};
+    if(tipoOp==='Pago de facturas'){o.excl=true;o.acred=0;o.otros=0;o.nota='Pago de factura ML por '+fmt2(Math.abs(pos))+'. Paga cargos ya listados; no se suma.';}
+    else if(!isVenta&&pos!==0)o.nota='Cargo facturado aparte, no descontado de una venta.';
+    o.pct=o.pcd>0?o.acred/o.pcd:null;
+    const sp=splitSku(o.sku); o.skuBase=sp.base; o.mult=sp.mult; o.variante=sp.variante;
+    o.unid=o.cant?o.cant*o.mult:null;
+    o.pUnit=o.unid&&o.pcd>0?o.pcd/o.unid:null; o.aUnit=o.unid&&o.pcd>0?o.acred/o.unid:null;
+    // Flex
+    if(tipoOp==='Envío'&&log==='Flex'){o.flex='Reintegro en fila aparte';o.flexMonto=p.flexBon-p.flexCargo;}
+    if(isVenta&&log==='Flex'){
+      const k=String(r[C.envNum]); const first=!seenEnv.has(k); seenEnv.add(k);
+      if(estado!=='Pagado'){o.flex='Cancelada o devuelta';}
+      else{
+        let b=p.flexBon,f=p.flexCargo; if(first&&envMap[k]){b+=envMap[k].b;f+=envMap[k].c;}
+        if(ec>0){o.flex='Paga comprador';o.flexMonto=ec;o.zb=ec;}
+        else if(b>=2500){o.flex='Reintegro completo '+fmt(b);o.flexMonto=b-f;o.zb=b;}
+        else if(b>0){o.flex='Reintegro 10 %';o.flexMonto=b-f;o.zb=Math.round(b*10);}
+        else if(f>0){o.flex='Cargo Flex en contra';o.flexMonto=-f;}
+        else if(envMap[k]||!first){o.flex='Reintegro en otra venta del envío';}
+        else{o.flex='Sin reintegro';}
+      }
+    }
+    rows.push(o);
+  }
+  return rows;
+}
+
+const ZONAS=[['caba','CABA'],['z1','Provincia zona 1'],['z2','Provincia zona 2'],['lej','Provincia alejada']];
+const ZK='ventasML.zonas.v2';
+let ZCOST={caba:2804,z1:5008,z2:5008,lej:7375};
+let AMTZ={4990:'caba',6990:'z1',8990:'z2',10490:'lej'};
+let AUTO={};   // montos asignados automáticamente, a revisar
+async function cargarZonas(){
+  try{const d=await db.collection('config').doc('ml_zonas').get();
+    if(d.exists){const s=d.data();Object.assign(ZCOST,s.cost||{});AMTZ=Object.assign({},s.amt||AMTZ);AUTO=s.auto||{};}
+    else{const s=JSON.parse(localStorage.getItem(ZK)||'null');if(s){Object.assign(ZCOST,s.cost||{});Object.assign(AMTZ,s.amt||{});AUTO=s.auto||{};saveZ();}}
+  }catch(e){}}
+function saveZ(){db.collection('config').doc('ml_zonas').set(JSON.parse(JSON.stringify({cost:ZCOST,amt:AMTZ,auto:AUTO}))).catch(()=>{});}
+function fixRow(o){
+  // versiones anteriores tomaban como "10 %" cualquier reintegro menor a $4.990
+  if(o.flex==='Reintegro 10 %'&&o.flexMonto>=2500){o.flex='Reintegro completo '+fmt(o.flexMonto);o.zb=Math.round(o.flexMonto);}
+}
+// Asignación automática: en cada mes, los 4 montos más frecuentes son las 4 zonas (de menor a mayor);
+// los montos poco frecuentes van a la zona del monto principal más cercano.
+
+function autoZonas(){
+  let changed=false;
+  for(const d of DATA){
+    const cnt={};d.rows.forEach(o=>{if(o.zb)cnt[o.zb]=(cnt[o.zb]||0)+1;});
+    const am=Object.keys(cnt).map(Number);
+    if(!am.some(m=>!AMTZ[m]))continue;
+    const main=am.sort((a,b)=>cnt[b]-cnt[a]).slice(0,4).sort((a,b)=>a-b);
+    for(const m of am){
+      if(AMTZ[m])continue;
+      let z;
+      const i=main.indexOf(m);
+      if(i>=0)z=ZONAS[Math.min(i,ZONAS.length-1)][0];
+      else{const near=main.reduce((x,y)=>Math.abs(y-m)<Math.abs(x-m)?y:x);z=AMTZ[near]||ZONAS[Math.min(main.indexOf(near),3)][0];}
+      AMTZ[m]=z;AUTO[m]=1;changed=true;
+    }
+  }
+  if(changed)saveZ();
+}
+function applyCadete(){
+  applyCadeteBase();aplicarCostos();
+}
+function applyCadeteBase(){
+  for(const d of DATA)for(const o of d.rows)fixRow(o);
+  autoZonas();
+  for(const d of DATA)for(const o of d.rows){
+    o.cad=o.zb?-(+ZCOST[AMTZ[o.zb]]||0):0;
+    o.neto=o.acred+o.cad;
+    o.pct=o.pcd>0?o.neto/o.pcd:null;
+    o.aUnit=o.unid&&o.pcd>0?o.neto/o.unid:null;
+  }
+}
+function renderCad(){
+  const cnt={};for(const d of DATA)for(const o of d.rows)if(o.zb&&o.cad)cnt[o.zb]=(cnt[o.zb]||0)+1;
+  const used=Object.keys(cnt).map(Number).sort((a,b)=>a-b);
+  $('cadForm').innerHTML=ZONAS.map(([k,z])=>`<label>${z}<small>Costo del cadete</small><input type="number" min="0" step="1" inputmode="numeric" data-z="${k}" value="${ZCOST[k]??0}"></label>`).join('');
+  $('cadMap').innerHTML=used.length?`<table class="dh"><thead><tr><th>ML paga</th><th>Envíos</th><th>Zona</th></tr></thead><tbody>`+
+    used.map(m=>`<tr><td>${fmt(m)}</td><td>${cnt[m]}</td><td><select data-m="${m}" aria-label="Zona para ${fmt(m)}">${ZONAS.map(([k,z])=>`<option value="${k}" ${AMTZ[m]===k?'selected':''}>${z}</option>`).join('')}</select></td></tr>`).join('')+
+    `</tbody></table>`:'';
+  $('cadForm').querySelectorAll('input').forEach(i=>i.addEventListener('change',()=>{ZCOST[i.dataset.z]=Math.max(0,+i.value||0);saveZ();applyCadete();draw();}));
+  $('cadMap').querySelectorAll('select').forEach(s=>s.addEventListener('change',()=>{AMTZ[s.dataset.m]=s.value;delete AUTO[s.dataset.m];saveZ();applyCadete();renderCad();draw();}));
+}
+let NAMES={};   // SKU base -> nombre, desde el catalogo de la app
+let COSTOS={};  // SKU base -> [{fecha:'AAAA-MM-DD', costo}] (historial de costos de la app)
+function idbApp(clave){return new Promise(res=>{try{const r=indexedDB.open('onlinetextil',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');
+  r.onsuccess=()=>{try{const g=r.result.transaction('kv').objectStore('kv').get(clave);g.onsuccess=()=>res(g.result);g.onerror=()=>res(null);}catch(e){res(null);}};r.onerror=()=>res(null);}catch(e){res(null);}});}
+const fechaISO=f=>{const [d,m,y]=String(f||'').split('/');return y?`${y}-${m}-${d}`:'';};
+// costo unitario a la fecha de la venta: ultimo registro <= fecha; si no hay, el primero posterior
+function costoUnit(base,fecha){const h=COSTOS[String(base||'').toUpperCase()];if(!h||!h.length)return null;const f=fechaISO(fecha);
+  let c=null;for(const x of h){if(x.fecha<=f)c=x.costo;else break;}return c!=null?c:h[0].costo;}
+function aplicarCostos(){for(const d of DATA)for(const o of d.rows){
+  const esVenta=o.tipo==='Venta'&&o.pcd>0;const cu=esVenta&&o.unid?costoUnit(o.skuBase,o.fecha):null;
+  o.costo=cu!=null?cu*o.unid:null;o.gan=o.costo!=null?o.neto-o.costo:null;o.ganPct=o.gan!=null&&o.pcd>0?o.gan/o.pcd:null;}}
+const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+function searchQ(){const raw=$('fSku').value.trim(), qd=raw.replace(/[#\s.\-]/g,'');return {raw,q:norm(raw),qd,isNum:/^\d{8,}$/.test(qd)};}
+if(false)$('names').addEventListener('change',async ev=>{
+  const f=ev.target.files[0]; if(!f)return; showErr('');
+  try{
+    const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
+    const aoa=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false,defval:''});
+    let hi=aoa.findIndex(r=>r.some(c=>/^(sku|c[oó]digo)/i.test(String(c).trim())));
+    let cs=0,cn=1;
+    if(hi>=0){const H=aoa[hi].map(c=>String(c).trim());cs=H.findIndex(c=>/^(sku|c[oó]digo)/i.test(c));
+      cn=H.findIndex((c,i)=>i!==cs&&/nombre|descrip|t[ií]tulo|producto|art[ií]culo/i.test(c)); if(cn<0)cn=cs===0?1:0;}
+    let n=0;
+    for(const r of aoa.slice(hi+1)){const s=String(r[cs]||'').trim(), nm=String(r[cn]||'').trim(); if(!s||!nm)continue; NAMES[splitSku(s).base.toUpperCase()]=nm; n++;}
+    if(!n)throw new Error('No encontré pares SKU / nombre. El archivo debe tener una columna "SKU" y otra "Nombre" o "Descripción".');
+    try{localStorage.setItem(NAMES_KEY,JSON.stringify(NAMES));}catch(e){}
+    showErr(''); render(); alertOk(n+' nombres de producto cargados.');
+  }catch(e){showErr(e.message||'No se pudo leer el archivo de nombres.');}
+  ev.target.value='';
+});
+function alertOk(m){const e=$('err');e.textContent=m;e.style.display='block';e.style.background='var(--good-soft)';setTimeout(()=>{e.style.display='none';e.style.background='';},4000);}
+const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const mesTxt=p=>{const [y,m]=p.split('-');return MESES[+m-1].replace(/^./,c=>c.toUpperCase())+' '+y;};
+function periodoDe(rows){const c={};rows.forEach(o=>{const f=String(o.fecha).split('/');if(f.length===3){const k=f[2]+'-'+f[1];c[k]=(c[k]||0)+1;}});
+  return Object.keys(c).sort((a,b)=>c[b]-c[a])[0]||'sin-fecha';}
+const IDB={db:null,
+  open(){return new Promise((res,rej)=>{if(!window.indexedDB)return rej(new Error('sin IndexedDB'));const r=indexedDB.open('ventasML',1);
+    r.onupgradeneeded=()=>r.result.createObjectStore('meses',{keyPath:'id'});r.onsuccess=()=>{this.db=r.result;res();};r.onerror=()=>rej(r.error);});},
+  tx(mode,fn){return new Promise((res,rej)=>{if(!this.db)return rej(new Error('sin base'));const t=this.db.transaction('meses',mode);const st=t.objectStore('meses');const q=fn(st);
+    t.oncomplete=()=>res(q&&q.result);t.onerror=()=>rej(t.error);});},
+  all(){return this.tx('readonly',s=>s.getAll());}, put(o){return this.tx('readwrite',s=>s.put(o));}, del(id){return this.tx('readwrite',s=>s.delete(id));}};
+const BLOQUE=300;
+const idMes=d=>(d.cuenta+'_'+d.periodo).replace(/[\/\s]/g,'-');
+async function borrarBloques(id){const s=await db.collection('mlMeses').doc(id).collection('bloques').get();for(let i=0;i<s.docs.length;i+=400){const b=db.batch();s.docs.slice(i,i+400).forEach(x=>b.delete(x.ref));await b.commit();}}
+async function saveEntry(d){
+  try{
+    const id=idMes(d); const ref=db.collection('mlMeses').doc(id);
+    await borrarBloques(id);
+    const filas=JSON.parse(JSON.stringify(d.rows));
+    const n=Math.ceil(filas.length/BLOQUE);
+    for(let i=0;i<n;i+=10){const b=db.batch();for(let j=i;j<Math.min(n,i+10);j++)b.set(ref.collection('bloques').doc(String(j).padStart(3,'0')),{rows:filas.slice(j*BLOQUE,(j+1)*BLOQUE)});await b.commit();}
+    await ref.set({cuenta:d.cuenta,periodo:d.periodo,file:d.file||'',n:filas.length,bloques:n,actualizado:new Date().toISOString()});
+  }catch(e){showErr('No se pudo guardar este mes en la base: '+e.message);}
+}
+async function borrarMes(idViejo){const d=DATA.find(x=>x.id===idViejo)||{};const id=d.cuenta?idMes(d):idViejo;await borrarBloques(id);await db.collection('mlMeses').doc(id).delete();}
+function normEntry(d){
+  d.rows.forEach(o=>{
+    if(o.zb===undefined&&o.flexMonto!=null){if(/^Reintegro completo|^Paga comprador/.test(o.flex))o.zb=Math.round(o.flexMonto);else if(o.flex==='Reintegro 10 %')o.zb=Math.round(o.flexMonto*10);}
+    if(o.skuBase===undefined){const sp=splitSku(o.sku);o.skuBase=sp.base;o.mult=sp.mult;o.variante=sp.variante;
+      o.unid=o.cant?o.cant*o.mult:null;o.pUnit=o.unid&&o.pcd>0?o.pcd/o.unid:null;}
+  });
+  if(!d.periodo)d.periodo=periodoDe(d.rows);
+  d.id=d.cuenta+'|'+d.periodo;
+  d.rows.forEach(o=>o.periodo=d.periodo);
+  return d;
+}
+async function load(){
+  DATA=[];
+  try{
+    const ms=await db.collection('mlMeses').get();
+    for(const m of ms.docs){const x=m.data();const bs=await m.ref.collection('bloques').get();
+      const rows=bs.docs.sort((a,b)=>a.id.localeCompare(b.id)).flatMap(b=>b.data().rows||[]);
+      DATA.push({file:x.file,cuenta:x.cuenta,periodo:x.periodo,rows});}
+  }catch(e){showErr('No se pudieron leer los meses guardados: '+e.message);}
+  DATA.forEach(normEntry);
+  // meses que estaban guardados solo en este navegador (version anterior): se suben a la base
+  try{await IDB.open();const viejos=(await IDB.all())||[];for(const d of viejos){normEntry(d);if(!DATA.some(x=>x.id===d.id)){DATA.push(d);await saveEntry(d);}}}catch(e){}
+  // datos de la versión anterior (guardados de otra forma): se pasan a la base por mes
+  try{const s=localStorage.getItem(STORE);if(s){const old=JSON.parse(s)||[];
+    for(const d of old){normEntry(d);if(!DATA.some(x=>x.id===d.id)){DATA.push(d);await IDB.put(d);}}
+    if(IDB.db)localStorage.removeItem(STORE);}}catch(e){}
+  DATA.forEach(normEntry);
+  DATA.sort((a,b)=>a.periodo.localeCompare(b.periodo));
+}
+function showErr(m){const e=$('err');e.textContent=m;e.style.display=m?'block':'none';}
+
+$('file').addEventListener('change',async ev=>{
+  const f=ev.target.files[0]; if(!f)return; showErr('');
+  try{
+    const buf=await f.arrayBuffer(); const wb=XLSX.read(buf,{type:'array'});
+    const cuenta=$('cuenta').value; const rows=parseWorkbook(wb,cuenta,f.name);
+    const d=normEntry({file:f.name,cuenta,rows});
+    const existed=DATA.some(x=>x.id===d.id);
+    DATA=DATA.filter(x=>x.id!==d.id); DATA.push(d); DATA.sort((a,b)=>a.periodo.localeCompare(b.periodo));
+    await saveEntry(d); shown=200; render();
+    alertOk(mesTxt(d.periodo)+' de '+cuenta+(existed?' reemplazado con el reporte nuevo.':' guardado.'));
+  }catch(e){showErr(e.message||'No se pudo leer el archivo.');}
+  ev.target.value='';
+});
+
+function allRows(){return DATA.flatMap(d=>d.rows);}
+function filtered(sinMes){
+  const fm=sinMes?'':$('fMes').value;
+  const fc=$('fCuenta').value, ft=$('fTipo').value, fl=$('fLog').value, ff=$('fFlex').value, {raw,q,qd,isNum}=searchQ();
+  let r=allRows().filter(o=>(!fm||o.periodo===fm)&&(!fc||o.cuenta===fc)&&(isNum||ft==='todo'||(o.tipo==='Venta'&&o.pcd>0))&&(!fl||o.log===fl)&&(!ff||o.flex===ff)
+    &&(!raw||(isNum?(o.op===qd||o.envNum===qd||o.paq===qd||o.mp===qd||o.op.includes(qd))
+      :(norm(o.sku).includes(q)||norm(o.skuBase).includes(q)||norm(NAMES[o.skuBase]).includes(q)))));
+  const ord=$('fOrden').value, d=s=>{const [a,b,c]=s.split('/');return c+b+a;};
+  if(ord==='fecha')r.sort((a,b)=>d(b.fecha).localeCompare(d(a.fecha)));
+  else r.sort((a,b)=>{const x=a.pct??(ord==='pctAsc'?9:-9),y=b.pct??(ord==='pctAsc'?9:-9);return ord==='pctAsc'?x-y:y-x;});
+  return r;
+}
+function cls(p){return p==null?'':p<0.55?'lo':p<0.7?'mid':'hi';}
+
+function render(){
+  const has=DATA.length>0;
+  $('empty').hidden=has; $('app').hidden=!has; $('filesPanel').hidden=!has;
+  $('files').innerHTML=DATA.map(d=>`<span class="chip">${d.cuenta} · ${d.periodo==='sin-fecha'?d.file:mesTxt(d.periodo)} <span class="meta">(${d.rows.length.toLocaleString('es-AR')} op.)</span><button aria-label="Quitar ${mesTxt(d.periodo)}" data-id="${d.id}">✕</button></span>`).join('');
+  $('files').querySelectorAll('button').forEach(b=>b.onclick=async()=>{
+    if(!b.dataset.ok){b.dataset.ok='1';b.textContent='Quitar este mes';b.style.color='var(--bad)';b.style.fontWeight='600';setTimeout(()=>{if(b.isConnected){delete b.dataset.ok;b.textContent='✕';b.style.color='';b.style.fontWeight='';}},4000);return;}
+    try{await borrarMes(b.dataset.id);}catch(e){showErr('No se pudo borrar: '+e.message);return;}DATA=DATA.filter(x=>x.id!==b.dataset.id);try{await IDB.del(b.dataset.id);}catch(e){}render();});
+  if(!has)return;
+  applyCadete(); renderCad();
+  // filtros dinámicos
+  const ps=[...new Set(DATA.map(d=>d.periodo))].sort().reverse();
+  const fmS=$('fMes'), mv=fmS.value; fmS.innerHTML='<option value="">Todos los meses</option>'+ps.map(p=>`<option value="${p}" ${p===mv?'selected':''}>${p==='sin-fecha'?'Sin fecha':mesTxt(p)}</option>`).join('');
+  const ctas=[...new Set(DATA.map(d=>d.cuenta))];
+  const fc=$('fCuenta'), cv=fc.value; fc.innerHTML='<option value="">Todas las cuentas</option>'+ctas.map(c=>`<option ${c===cv?'selected':''}>${c}</option>`).join('');
+  const fx=[...new Set(allRows().map(o=>o.flex).filter(Boolean))].sort();
+  const ff=$('fFlex'), fv=ff.value; ff.innerHTML='<option value="">Reintegro Flex: todos</option>'+fx.map(c=>`<option ${c===fv?'selected':''}>${c}</option>`).join('');
+  const fechas=allRows().map(o=>o.fecha).filter(Boolean).map(s=>s.split('/').reverse().join('-')).sort();
+  if(fechas.length)$('periodo').textContent='Del '+fechas[0].split('-').reverse().join('/')+' al '+fechas[fechas.length-1].split('-').reverse().join('/');
+  draw();
+}
+
+function draw(){
+  const r=filtered();
+  const ventas=r.filter(o=>o.tipo==='Venta'&&o.pcd>0);
+  const inc=r.filter(o=>!o.excl);
+  const sum=k=>inc.reduce((a,o)=>a+(o[k]||0),0);
+  $('tVend').textContent=fmt(sum('pcd')); $('tAcr').textContent=fmt(sum('acred')); $('tCad').textContent=fmt(sum('cad')); $('tNeto').textContent=fmt(sum('neto')); $('tN').textContent=ventas.length.toLocaleString('es-AR');
+  $('tNote').textContent=$('fTipo').value==='ventas'?'Solo ventas cobradas. No incluye cancelaciones, devoluciones ni cargos que ML cobra aparte (Full, publicidad, percepciones). Para verlos: Más filtros → Tipo → "Todas las operaciones".':'Incluye cargos sueltos y reversos. El pago de factura de ML no se suma porque paga cargos ya listados.';
+  // histograma
+  const B=[['Menos de 50 %',0,.5],['50 a 60 %',.5,.6],['60 a 70 %',.6,.7],['70 a 80 %',.7,.8],['80 a 100 %',.8,1],['Más de 100 %',1,99]];
+  const cnt=B.map(b=>ventas.filter(o=>o.pct>=b[1]&&o.pct<b[2]).length), mx=Math.max(1,...cnt);
+  const col=i=>i<1?'var(--bad)':i<3?'var(--warn)':i<5?'var(--good)':'var(--indigo)';
+  $('hist').innerHTML=B.map((b,i)=>`<div class="hrow"><span>${b[0]}</span><div class="bar"><i style="width:${cnt[i]/mx*100}%;background:${col(i)}"></i></div><em>${cnt[i]}</em></div>`).join('')
+    +'<p class="note">% = lo que le queda (ya descontado el cadete) sobre el precio con descuento.</p>';
+  // conceptos
+  const K=[['Cargo por vender','vender'],['Costo por unidad','unidad'],['Cuotas','cuotas'],['Envío (neto)','envio'],['Full','full'],['Publicidad','ads'],['Otros','otros'],['Retenciones','ret'],['Cadete Flex','cad']];
+  const vals=K.map(k=>sum(k[1])), m2=Math.max(1,...vals.map(Math.abs));
+  $('conc').innerHTML=K.map((k,i)=>vals[i]===0?'':`<div class="hrow"><span>${k[0]}</span><div class="bar"><i style="width:${Math.abs(vals[i])/m2*100}%;background:${vals[i]<0?'var(--bad)':'var(--good)'}"></i></div><em class="${vals[i]<0?'neg':'pos'}">${fmt(vals[i])}</em></div>`).join('')
+    +'<p class="note">En rojo lo que se descuenta; en verde lo que suma (por ejemplo, reintegros Flex).</p>';
+  // resumen del SKU buscado
+  renderSkuSum(r);
+  renderAnual();
+  renderResumen();
+  // lista
+  $('count').textContent=r.length.toLocaleString('es-AR')+' operaciones';
+  renderList(r);
+  const sq=searchQ();
+  if(sq.isNum&&r.length&&r.length<=5)$('list').querySelectorAll('tr.d').forEach(x=>x.classList.add('open'));
+  if(sq.isNum)$('count').textContent=r.length?r.length+' operación'+(r.length>1?'es':'')+' encontrada'+(r.length>1?'s':'')+' (se muestran todas, sin importar el filtro de tipo).':'No hay ninguna operación con ese número en los reportes cargados.';
+}
+
+function renderResumen(){
+  const sel=$('resMes'), ps=[...new Set(DATA.map(d=>d.periodo))].sort().reverse();
+  const cur=sel.value&&ps.includes(sel.value)||sel.value==='todo'?sel.value:(ps[0]||'');
+  sel.innerHTML=ps.map(p=>`<option value="${p}" ${p===cur?'selected':''}>${p==='sin-fecha'?'Sin fecha':mesTxt(p)}</option>`).join('')+(ps.length>1?`<option value="todo" ${cur==='todo'?'selected':''}>Todos los meses</option>`:'');
+  const fc=$('fCuenta').value;
+  // todas las operaciones del mes (ventas, devoluciones, cargos sueltos); el pago de factura no se suma
+  const r=allRows().filter(o=>!o.excl&&(cur==='todo'||o.periodo===cur)&&(!fc||o.cuenta===fc));
+  const S=f=>r.reduce((a,o)=>a+(f(o)||0),0);
+  const vs=r.filter(o=>o.tipo==='Venta'&&o.pcd>0);
+  const recibi=vs.reduce((a,o)=>a+o.pcd,0);
+  const desc=vs.reduce((a,o)=>a+((o.psd||0)-o.pcd),0);
+  const eIn=o=>o.envIn!==undefined?o.envIn:Math.max(o.envio||0,0), eOut=o=>o.envOut!==undefined?o.envOut:Math.min(o.envio||0,0);
+  const L={
+    envIn:S(eIn), dev:S(o=>o.pcd)-recibi,
+    vender:S(o=>o.vender), unidad:S(o=>o.unidad), cuotas:S(o=>o.cuotas),
+    envOut:S(eOut), cad:S(o=>o.cad), full:S(o=>o.full), ads:S(o=>o.ads), imp:S(o=>o.ret)+S(o=>o.otros)};
+  const quedo=S(o=>o.neto);
+  const pc=v=>recibi>0?(v/recibi*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+' %':'';
+  const row=(lbl,v,cls,sub)=>Math.round(v)===0?'':`<tr class="${cls}"><td>${lbl}${sub?`<small>${sub}</small>`:''}</td><td class="m">${fmt(v)}</td><td class="p">${pc(v)}</td></tr>`;
+  $('resTit').textContent=cur==='todo'?'Resumen de todos los meses':'Resumen de '+(cur==='sin-fecha'?'sin fecha':mesTxt(cur).toLowerCase());
+  const entro=recibi+L.envIn, pague=entro-quedo;
+  const wasOpen=!!(document.querySelector('#resBody details')||{}).open;
+  $('resBody').innerHTML=`<div class="res-strip">
+    <div><span>Entró</span><b class="pos">${fmt(entro)}</b></div>
+    <div><span>Pagué</span><b class="neg">${fmt(-pague)}</b></div>
+    <div class="q"><span>Me quedó</span><b>${fmt(quedo)} <small>${pc(quedo)}</small></b></div>
+  </div>
+  ${(()=>{const cc=vs.filter(o=>o.costo!=null);if(!cc.length)return '<p class="note">Costo y ganancia: los SKU de estas ventas todavía no tienen costo cargado en la app.</p>';
+    const costo=cc.reduce((a,o)=>a+o.costo,0),qc=cc.reduce((a,o)=>a+o.neto,0),rc=cc.reduce((a,o)=>a+o.pcd,0),g=qc-costo;
+    return `<div class="res-strip" style="margin-top:8px;"><div><span>Costo de lo vendido</span><b class="neg">${fmt(-costo)}</b></div><div class="q"><span>Ganancia</span><b>${fmt(g)} <small>${rc>0?(g/rc*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+' %':''}</small></b></div></div>
+    <p class="note">Sobre ${cc.length.toLocaleString('es-AR')} de ${vs.length.toLocaleString('es-AR')} ventas (las que tienen costo). Costo a la fecha de cada venta.</p>`;})()}
+  <details class="res-det" ${wasOpen?'open':''}><summary>Ver detalle</summary>
+  <span class="res-cta">${vs.length.toLocaleString('es-AR')} ventas${fc?' · cuenta '+fc:' · todas las cuentas'} · incluye todo lo que ML cobró en el mes</span>
+  <table class="res">
+    <tr class="grp"><td>Lo que entró</td><td></td><td class="p">% s/ ventas</td></tr>
+    ${row('Recibí por ventas',recibi,'in',desc>0?'Ya descontados '+fmt(desc)+' de descuentos de campaña':'')}
+    ${row('Envíos que me pagaron',L.envIn,'in','Reintegros Flex de ML y envíos que pagó el comprador')}
+    <tr class="grp"><td>Lo que pagué</td><td></td><td></td></tr>
+    ${row('Devoluciones y cancelaciones',L.dev,'out')}
+    ${row('Comisión de ML',L.vender,'out','Cargo por vender')}
+    ${row('Costo por unidad vendida',L.unidad,'out')}
+    ${row('Cuotas sin interés',L.cuotas,'out')}
+    ${row('Envíos pagados a ML',L.envOut,'out')}
+    ${row('Cadete Flex',L.cad,'out')}
+    ${row('Full',L.full,'out','Colecta, almacenamiento y stock antiguo')}
+    ${row('Publicidad',L.ads,'out','Product Ads')}
+    ${row('Impuestos',L.imp,'out','Retenciones y percepciones')}
+  </table>
+  <div class="res-fin"><span>Me quedó</span><div class="v"><b>${fmt(quedo)}</b><em><strong>${pc(quedo)}</strong> de lo recibido por ventas</em></div></div>
+  </details>`;
+}
+function renderAnual(){
+  const r=filtered(true).filter(o=>!o.excl);
+  const M={};
+  for(const o of r){const k=o.periodo;M[k]=M[k]||{n:0,u:0,pcd:0,acr:0,cad:0,neto:0};const m=M[k];
+    if(o.tipo==='Venta'&&o.pcd>0){m.n++;m.u+=o.unid||0;}
+    m.pcd+=o.pcd||0;m.acr+=o.acred;m.cad+=o.cad||0;m.neto+=o.neto;}
+  const ks=Object.keys(M).sort();
+  const years=[...new Set(ks.map(k=>k.slice(0,4)))];
+  let html='';
+  for(const y of years){
+    const yk=ks.filter(k=>k.startsWith(y)); const T={n:0,u:0,pcd:0,acr:0,cad:0,neto:0};
+    for(const k of yk){const m=M[k];for(const f in T)T[f]+=m[f];
+      html+=`<tr><td>${k==='sin-fecha'?'Sin fecha':mesTxt(k)}</td><td>${m.n.toLocaleString('es-AR')}</td><td>${m.u.toLocaleString('es-AR')}</td><td>${fmt(m.pcd)}</td><td>${fmt(m.acr)}</td><td class="neg">${fmt(m.cad)}</td><td><b>${fmt(m.neto)}</b></td><td>${m.pcd>0?pctf(m.neto/m.pcd):'–'}</td></tr>`;}
+    if(yk.length>1&&y!=='sin-')html+=`<tr class="tot"><td>Total ${y}</td><td>${T.n.toLocaleString('es-AR')}</td><td>${T.u.toLocaleString('es-AR')}</td><td>${fmt(T.pcd)}</td><td>${fmt(T.acr)}</td><td class="neg">${fmt(T.cad)}</td><td><b>${fmt(T.neto)}</b></td><td>${T.pcd>0?pctf(T.neto/T.pcd):'–'}</td></tr>`;
+  }
+  $('anualBody').innerHTML=html;
+  const mx=Math.max(1,...ks.map(k=>M[k].neto));
+  $('anualBars').innerHTML=ks.length>1?ks.map(k=>`<div class="hrow"><span>${k==='sin-fecha'?'Sin fecha':mesTxt(k)}</span><div class="bar"><i style="width:${Math.max(0,M[k].neto)/mx*100}%;background:var(--indigo)"></i></div><em>${fmt(M[k].neto)}</em></div>`).join(''):'';
+  const f=[$('fCuenta').value&&'cuenta '+$('fCuenta').value,$('fLog').value&&'solo '+$('fLog').value,$('fSku').value.trim()&&!searchQ().isNum&&'búsqueda "'+$('fSku').value.trim()+'"'].filter(Boolean);
+  $('anualNote').textContent=(ks.length<2?'Cargue más meses para comparar. ':'')+'El % del mes es lo que le quedó sobre lo vendido en ese mes, todas las ventas juntas.'+(f.length?' Filtrado por '+f.join(', ')+'.':'');
+}
+function renderSkuSum(r){
+  const box=$('skuSum'), q=$('fSku').value.trim().toUpperCase();
+  if(!q||searchQ().isNum){box.hidden=true;return;}
+  const exact=r.filter(o=>o.skuBase===q);
+  const rows=(exact.length?exact:r).filter(o=>!o.excl&&o.sku);
+  if(!rows.length){box.hidden=false;box.innerHTML='<h3>'+q+'</h3><p class="inc">No hay operaciones con ese SKU para los filtros elegidos.</p>';return;}
+  const S=k=>rows.reduce((a,o)=>a+(o[k]||0),0);
+  // datos guardados antes de esta versión: separar envío según su signo
+  const eIn=o=>o.envIn!==undefined?o.envIn:Math.max(o.envio||0,0), eOut=o=>o.envOut!==undefined?o.envOut:Math.min(o.envio||0,0);
+  const vs=rows.filter(o=>o.tipo==='Venta'&&o.pcd>0);
+  const psd=vs.reduce((a,o)=>a+(o.psd||0),0), pcdV=vs.reduce((a,o)=>a+o.pcd,0);
+  const skus=[...new Set(rows.map(o=>o.skuBase))];
+  const items=[['Precio sin descuento',psd],['Descuentos de campaña',pcdV-psd],['Reversos y devoluciones',S('pcd')-pcdV],
+    ['Cargo por vender (comisión)',S('vender')],['Costo por unidad vendida',S('unidad')],['Cuotas',S('cuotas')],
+    ['Envíos cobrados (reintegro ML y comprador)',rows.reduce((a,o)=>a+eIn(o),0)],['Envíos pagados a ML',rows.reduce((a,o)=>a+eOut(o),0)],
+    ['Cadete Flex',S('cad')],['Full',S('full')],['Publicidad',S('ads')],['Otros',S('otros')],['Retenciones',S('ret')]];
+  const R=v=>Math.round(v*100)/100;
+  const haber=items.filter(x=>R(x[1])>0), debe=items.filter(x=>R(x[1])<0).map(x=>[x[0],-x[1]]);
+  const tH=haber.reduce((a,x)=>a+x[1],0), tD=debe.reduce((a,x)=>a+x[1],0);
+  const U=vs.reduce((a,o)=>a+(o.unid||0),0), pu=v=>U?fmt(v/U):'';
+  const tbl=(title,arr,tot)=>`<table class="dh"><thead><tr><th>${title}</th><th class="r">Total</th><th class="r">Por unidad<small>promedio</small></th></tr></thead><tbody>
+    ${arr.map(x=>`<tr><td>${x[0]}</td><td>${fmt(x[1])}</td><td class="pu">${pu(x[1])}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td>Total</td><td>${fmt(tot)}</td><td>${pu(tot)}</td></tr></tfoot></table>`;
+  box.hidden=false;
+  const nm=k=>NAMES[k]?`${k} <span class="var" style="display:inline">${NAMES[k]}</span>`:k;
+  box.innerHTML=`<h3>${exact.length?nm(q):skus.map(nm).join(', ')}</h3>
+    <p class="inc">${vs.length.toLocaleString('es-AR')} ventas · ${vs.reduce((a,o)=>a+(o.unid||0),0).toLocaleString('es-AR')} unidades${$('fTipo').value==='todo'?' · incluye reversos y cargos':''}${$('fCuenta').value?' · cuenta '+$('fCuenta').value:''}${$('fLog').value?' · solo '+$('fLog').value:''}</p>
+    <div class="dhw">${tbl('Lo que entra',haber,tH)}${tbl('Lo que sale',debe,tD)}</div>
+    <div class="saldo"><span>Le queda (entra − sale)</span><span class="sv"><b>${fmt(tH-tD)}</b>${U?`<em>${pu(tH-tD)} por unidad (promedio de ${U.toLocaleString('es-AR')})</em>`:''}</span></div>
+    <p class="inc">Acreditado por ML, antes del cadete: ${fmt(S('acred'))}${U?' · '+pu(S('acred'))+' por unidad':''}</p>`;
+}
+function bindKey(el,fn){el.onclick=fn;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fn();}};}
+function bindSales(rows){rows.forEach(el=>bindKey(el,()=>el.nextElementSibling.classList.toggle('open')));}
+function renderList(r){
+  const tb=$('list');
+  if($('fVista').value!=='sku'){
+    $('thFecha').textContent='Fecha';
+    tb.innerHTML=r.slice(0,shown).map(card).join('');
+    $('more').hidden=r.length<=shown;
+    bindSales(tb.querySelectorAll('tr.v'));
+    return;
+  }
+  $('thFecha').textContent='Ventas / Fecha';
+  const G=new Map();
+  for(const o of r){const k=o.sku?o.skuBase:'Sin SKU (cargos sueltos)';if(!G.has(k))G.set(k,[]);G.get(k).push(o);}
+  const gs=[...G.entries()].map(([k,a])=>{
+    const inc=a.filter(o=>!o.excl), vs=a.filter(o=>o.tipo==='Venta'&&o.pcd>0), ps=a.map(o=>o.pct).filter(p=>p!=null);
+    const conC=vs.filter(o=>o.costo!=null);
+    return {k,a,n:vs.length,unid:vs.reduce((s,o)=>s+(o.unid||0),0),pcd:inc.reduce((s,o)=>s+(o.pcd||0),0),acred:inc.reduce((s,o)=>s+o.neto,0),
+      costo:conC.length?conC.reduce((s,o)=>s+o.costo,0):null,gan:conC.length?conC.reduce((s,o)=>s+o.gan,0):null,parcial:conC.length&&conC.length<vs.length,
+      min:ps.length?Math.min(...ps):null,max:ps.length?Math.max(...ps):null};});
+  const ord=$('fOrden').value;
+  if(ord==='fecha')gs.sort((a,b)=>b.pcd-a.pcd);
+  else if(ord==='pctAsc')gs.sort((a,b)=>(a.min??9)-(b.min??9));
+  else gs.sort((a,b)=>(b.max??-9)-(a.max??-9));
+  $('count').textContent=gs.length.toLocaleString('es-AR')+' SKU · '+r.length.toLocaleString('es-AR')+' operaciones. El % del SKU muestra la venta más baja y la más alta, no un promedio.';
+  tb.innerHTML=gs.map((g,i)=>`<tr class="g" tabindex="0" data-i="${i}"><td>${g.n} venta${g.n===1?'':'s'}</td><td><span class="base">▸ ${g.k}</span></td>
+    <td>${g.unid||''}</td><td>${fmt(g.pcd)}</td><td>${fmt(g.acred)}</td><td></td>
+    <td class="rng">${g.min==null?'–':g.min===g.max?pctf(g.min):pctf(g.min)+' a '+pctf(g.max)}</td>
+    <td>${g.costo!=null?fmt(g.costo)+(g.parcial?' *':''):g.n?'<span class="meta">sin costo</span>':''}</td><td class="${g.gan<0?'neg':''}">${g.gan!=null?fmt(g.gan)+(g.parcial?' *':''):''}</td></tr>`).join('');
+  $('more').hidden=true;
+  tb.querySelectorAll('tr.g').forEach(el=>bindKey(el,()=>toggleGroup(el,gs[+el.dataset.i])));
+}
+function toggleGroup(el,g){
+  const lbl=el.querySelector('.base');
+  if(el.dataset.open){
+    let n=el.nextElementSibling; while(n&&!n.classList.contains('g')){const x=n.nextElementSibling;n.remove();n=x;}
+    delete el.dataset.open; lbl.textContent='▸ '+g.k; return;
+  }
+  el.insertAdjacentHTML('afterend',g.a.map(card).join(''));
+  el.dataset.open='1'; lbl.textContent='▾ '+g.k;
+  const rows=[]; let n=el.nextElementSibling; while(n&&!n.classList.contains('g')){if(n.classList.contains('v'))rows.push(n);n=n.nextElementSibling;}
+  bindSales(rows);
+}
+function card(o){
+  const tags=[o.log&&`<span class="tag">${o.log}</span>`,o.pubT&&`<span class="tag">${o.pubT}</span>`,
+    o.flex&&`<span class="tag ${/10 %|en contra|Sin reintegro/.test(o.flex)?'bad':'warn'}">${o.flex}</span>`,
+    o.tipo!=='Venta'&&`<span class="tag bad">${o.tipo}</span>`].filter(Boolean).join('');
+  const L=[['Precio con descuento',o.pcd],['Cargo por vender',o.vender],['Costo por unidad',o.unidad],['Cuotas',o.cuotas],['Envío (neto)',o.envio],
+    ['Full',o.full],['Publicidad',o.ads],['Otros',o.otros],['Retenciones',o.ret]].filter(x=>x[1]);
+  const L2=o.cad?[['Acreditado por ML',o.acred,'sub'],['Costo cadete Flex',o.cad]]:[];
+  const per=v=>o.pcd>0?(v/o.pcd*100).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}):'';
+  const u=v=>o.unid&&o.pcd>0?fmt2(v/o.unid):'';
+  const det=`<div>${tags}</div><table><tr><td></td><td class="meta">Monto</td><td class="meta">Por unidad</td><td class="meta">De cada $100</td></tr>`+
+    L.map(x=>`<tr><td>${x[0]}</td><td class="${x[1]<0?'neg':''}">${fmt2(x[1])}</td><td>${u(x[1])}</td><td>${per(x[1])}</td></tr>`).join('')+
+    L2.map(x=>`<tr class="${x[2]||''}"><td>${x[0]}</td><td class="${x[1]<0?'neg':''}">${fmt2(x[1])}</td><td>${u(x[1])}</td><td>${per(x[1])}</td></tr>`).join('')+
+    `<tr class="sum"><td>Le queda</td><td>${fmt2(o.neto)}</td><td>${u(o.neto)}</td><td>${per(o.neto)}</td></tr>`+
+    (o.costo!=null?`<tr><td>Costo (${fmt2(o.costo/o.unid)} c/u a la fecha)</td><td class="neg">${fmt2(-o.costo)}</td><td>${u(-o.costo)}</td><td>${per(-o.costo)}</td></tr><tr class="sum"><td>Ganancia</td><td>${fmt2(o.gan)}</td><td>${u(o.gan)}</td><td>${per(o.gan)}</td></tr>`:o.tipo==='Venta'&&o.pcd>0?'<tr><td colspan="4" class="meta">Este SKU no tiene costo cargado en la app.</td></tr>':'')+`</table>`+
+    `${o.mp?`<p class="mpbox">Para buscar en Mercado Pago: <b>ID de pago ${o.mp}</b>${o.mpFecha?' · pagado el '+o.mpFecha.split('-').reverse().join('/'):''}${o.mpMedio&&o.mpMedio!=='-'?' · '+o.mpMedio:''}<br>Monto que debería figurar acreditado: <b>${fmt2(o.acred)}</b></p>`:''}<p class="note">Operación ${o.op} · ${o.cuenta}${o.cant?' · Publicación: '+o.sku+(o.cant>1?' × '+o.cant:''):''}${o.psd?' · Precio sin descuento '+fmt2(o.psd):''}${o.flexMonto!=null?' · Monto envío Flex '+fmt2(o.flexMonto):''}${o.nota?'<br>'+o.nota:''}</p>`;
+  const skuCell=o.sku?`<span class="base">${o.skuBase}</span>${NAMES[o.skuBase]?`<span class="var">${NAMES[o.skuBase]}</span>`:''}${o.variante?`<span class="var">${o.variante}</span>`:''}`:`<span class="base">${o.tipo}</span>`;
+  return `<tr class="v" tabindex="0"><td>${o.fecha}</td><td>${skuCell}</td><td>${o.unid??''}</td>
+    <td>${o.pcd!=null?fmt(o.pcd):''}</td><td>${fmt(o.neto)}</td><td>${o.aUnit!=null?fmt(o.aUnit):''}</td>
+    <td class="pct ${cls(o.pct)}">${o.pct==null?'–':pctf(o.pct)}</td>
+    <td>${o.tipo==='Venta'&&o.pcd>0?(o.costo!=null?fmt(o.costo):'<span class="meta">sin costo</span>'):''}</td>
+    <td class="${o.gan!=null&&o.gan<0?'neg':''}">${o.gan!=null?fmt(o.gan)+` <small class="meta">${pctf(o.ganPct)}</small>`:''}</td></tr>
+    <tr class="d"><td colspan="9">${det}</td></tr>`;
+}
+
+// El detalle de reintegro solo tiene sentido con Flex: aparece al elegir Flex y se limpia al salir
+$('fLog').addEventListener('change',()=>{const f=$('fLog').value==='Flex';$('fFlex').hidden=!f;if(!f)$('fFlex').value='';});
+$('resMes').addEventListener('change',renderResumen);
+['fMes','fCuenta','fTipo','fLog','fFlex','fOrden','fVista'].forEach(id=>$(id).addEventListener('change',()=>{shown=200;draw();}));
+$('fSku').addEventListener('input',()=>{shown=200;draw();});
+$('more').onclick=()=>{shown+=200;draw();};
+$('csv').onclick=()=>{
+  const H=['Cuenta','Fecha','N.º de operación','Tipo','SKU publicación','SKU','Variante','Unidades','Precio por unidad','Le queda por unidad','Logística','Publicación','Precio sin descuento','Precio con descuento','Cargo por vender','Costo por unidad','Cuotas','Envío (neto)','Full','Publicidad','Otros','Retenciones','Acreditado ML','Costo cadete Flex','Le queda','% le queda','Costo','Ganancia','Flex – tipo','Flex – monto envío','Nota'];
+  const n=v=>v==null||v===''?'':String(Math.round(v*100)/100).replace('.',',');
+  const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
+  const lines=[H.map(q).join(';')].concat(filtered().map(o=>[q(o.cuenta),q(o.fecha),q(o.op),q(o.tipo),q(o.sku),q(o.skuBase),q(o.variante),n(o.unid),n(o.pUnit),n(o.aUnit),q(o.log),q(o.pubT),n(o.psd),n(o.pcd),n(o.vender),n(o.unidad),n(o.cuotas),n(o.envio),n(o.full),n(o.ads),n(o.otros),n(o.ret),n(o.acred),n(o.cad),n(o.neto),o.pct==null?'':n(o.pct*100),n(o.costo),n(o.gan),q(o.flex),n(o.flexMonto),q(o.nota)].join(';')));
+  const text='\ufeff'+lines.join('\n');
+  if(DL){DL.save({filename:'ventas-ml.csv',data:text}).catch(e=>{if(e&&e.code!=='declined')showErr('No se pudo descargar el CSV ('+(e.code||'error')+').');});return;}
+  const blob=new Blob([text],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ventas-ml.csv';a.click();
+};
+// Descarga: dentro de claude.ai usa la capacidad "downloads"; fuera (en su propia app) usa un enlace normal.
+let DL=null;
+if(window.claude&&window.claude.use){$('csv').hidden=true;window.claude.use('downloads').then(d=>{DL=d;$('csv').hidden=!d;}).catch(()=>{});}
+
+firebase.auth().onAuthStateChanged(async u=>{
+  if(!u){location.replace('./');return;}
+  try{const d=await db.collection('usuarios').doc(String(u.email).toLowerCase()).get();
+    if(!d.exists||d.data().rol!=='dueño'){$('cargando').textContent='Solo el dueño puede ver los resultados de Mercado Libre.';return;}}catch(e){}
+  NAMES=(await idbApp('nombres_sku'))||{};
+  try{const s=await db.collection('historial_costos').get();const m={};s.docs.forEach(x=>{const v=x.data();const k=String(v.sku||'').toUpperCase();(m[k]=m[k]||[]).push({fecha:v.fecha,costo:+v.costo});});
+    Object.values(m).forEach(a=>a.sort((x,y)=>x.fecha.localeCompare(y.fecha)));COSTOS=m;}catch(e){}
+  await cargarZonas();
+  await load();
+  $('cargando').hidden=true;
+  render();
+});
+</script>
+</body>
+</html>
