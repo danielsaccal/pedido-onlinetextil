@@ -232,6 +232,22 @@ details.box{background:var(--surface);border:1px solid var(--line);border-radius
     </div>
     <div id="resBody"></div>
   </section>
+  <section class="panel" id="ranking">
+    <div class="res-head" style="flex-wrap:wrap;gap:8px;">
+      <h2>🏆 Ranking de productos</h2>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <select id="rkMes" aria-label="Mes"></select>
+        <select id="rkGrupo" aria-label="Agrupar"><option value="prod">Por producto</option><option value="sku">Por SKU</option></select>
+        <select id="rkOrden" aria-label="Ordenar">
+          <option value="neta">Ganancia neta ($)</option><option value="netaP">Rentabilidad neta (%)</option>
+          <option value="bruta">Ganancia bruta ($)</option><option value="brutaP">Rentabilidad bruta (%)</option>
+          <option value="unid">Unidades vendidas</option><option value="vend">Facturación</option>
+        </select>
+        <select id="rkVer" aria-label="Mostrar"><option value="20">Top 20</option><option value="peores">Los 20 peores</option><option value="todo">Todos</option></select>
+      </div>
+    </div>
+    <div id="rkBody"></div>
+  </section>
   <div hidden><b id="tVend"></b><b id="tAcr"></b><b id="tCad"></b><b id="tNeto"></b><b id="tN"></b><p id="tNote"></p></div>
 
   <div class="search-wrap">
@@ -632,6 +648,7 @@ function draw(){
   renderSkuSum(r);
   renderAnual();
   renderResumen();
+  renderRanking();
   // lista
   $('count').textContent=r.length.toLocaleString('es-AR')+' operaciones';
   renderList(r);
@@ -743,6 +760,53 @@ function renderSkuSum(r){
     <div class="saldo"><span>Le queda (entra − sale)</span><span class="sv"><b>${fmt(tH-tD)}</b>${U?`<em>${pu(tH-tD)} por unidad (promedio de ${U.toLocaleString('es-AR')})</em>`:''}</span></div>
     <p class="inc">Acreditado por ML, antes del cadete: ${fmt(S('acred'))}${U?' · '+pu(S('acred'))+' por unidad':''}</p>`;
 }
+// ===== Ranking de productos por rentabilidad =====
+// Bruta = precio de venta − costo de fabricación. Neta = lo que me quedó (después de ML y cadete) − costo.
+function nombreProducto(base){const n=NAMES[base];return n?n.split(' · ')[0]:base;}
+function renderRanking(){
+  const sel=$('rkMes'), ps=[...new Set(DATA.map(d=>d.periodo))].sort().reverse();
+  const cur=sel.value&&(ps.includes(sel.value)||sel.value==='todo')?sel.value:(ps[0]||'');
+  sel.innerHTML=ps.map(p=>`<option value="${p}" ${p===cur?'selected':''}>${p==='sin-fecha'?'Sin fecha':mesTxt(p)}</option>`).join('')+(ps.length>1?`<option value="todo" ${cur==='todo'?'selected':''}>Todos los meses</option>`:'');
+  const fc=$('fCuenta').value, porProd=$('rkGrupo').value==='prod';
+  const vs=allRows().filter(o=>!o.excl&&o.tipo==='Venta'&&o.pcd>0&&o.skuBase&&(cur==='todo'||o.periodo===cur)&&(!fc||o.cuenta===fc));
+  const G=new Map();
+  for(const o of vs){
+    const k=porProd?nombreProducto(o.skuBase):o.skuBase;
+    const g=G.get(k)||{k,skus:new Set(),n:0,unid:0,vend:0,quedo:0,costo:0,vendC:0,quedoC:0,nC:0};
+    g.skus.add(o.skuBase);g.n++;g.unid+=o.unid||0;g.vend+=o.pcd;g.quedo+=o.neto||0;
+    if(o.costo!=null){g.costo+=o.costo;g.vendC+=o.pcd;g.quedoC+=o.neto||0;g.nC++;}
+    G.set(k,g);
+  }
+  const gs=[...G.values()].map(g=>{const con=g.nC>0;
+    return {...g,con,parcial:con&&g.nC<g.n,bruta:con?g.vendC-g.costo:null,neta:con?g.quedoC-g.costo:null,
+      brutaP:con&&g.vendC>0?(g.vendC-g.costo)/g.vendC:null,netaP:con&&g.vendC>0?(g.quedoC-g.costo)/g.vendC:null};});
+  const ord=$('rkOrden').value, ver=$('rkVer').value;
+  const val=g=>ord==='unid'?g.unid:ord==='vend'?g.vend:g[ord];
+  const conV=gs.filter(g=>val(g)!=null), sinV=gs.filter(g=>val(g)==null);
+  conV.sort((a,b)=>ver==='peores'?val(a)-val(b):val(b)-val(a));
+  let lista=ver==='todo'?conV.concat(sinV):conV.slice(0,20);
+  // cifras generales
+  const conC=gs.filter(g=>g.con);
+  const tN=conC.reduce((a,g)=>a+g.neta,0), tB=conC.reduce((a,g)=>a+g.bruta,0), tV=conC.reduce((a,g)=>a+g.vendC,0);
+  const pierden=conC.filter(g=>g.neta<0);
+  const mejor=conC.slice().sort((a,b)=>b.neta-a.neta)[0], peor=conC.slice().sort((a,b)=>a.netaP-b.netaP)[0];
+  const pf=p=>p==null?'–':pctf(p);
+  const nm=g=>porProd?`<b>${g.k}</b><small class="meta" style="display:block;">${[...g.skus].slice(0,4).join(', ')}${g.skus.size>4?'…':''}</small>`:`<b>${g.k}</b><small class="meta" style="display:block;">${NAMES[g.k]||''}</small>`;
+  $('rkBody').innerHTML=!gs.length?'<p class="note">No hay ventas en este período.</p>':`
+    <div class="res-strip">
+      <div><span>Ganancia bruta</span><b class="pos">${fmt(tB)} <small style="color:#6B6258;">${tV>0?pctf(tB/tV):''}</small></b></div>
+      <div class="q"><span>Ganancia neta</span><b>${fmt(tN)} <small>${tV>0?pctf(tN/tV):''}</small></b></div>
+      <div><span>${porProd?'Productos':'SKU'} que pierden plata</span><b class="${pierden.length?'neg':'pos'}">${pierden.length}</b></div>
+    </div>
+    <p class="note">${mejor?`Más ganancia: <b>${mejor.k}</b> (${fmt(mejor.neta)}). `:''}${peor&&peor!==mejor?`Menor rentabilidad: <b>${peor.k}</b> (${pf(peor.netaP)}). `:''}${gs.length-conC.length?`${gs.length-conC.length} ${porProd?(gs.length-conC.length===1?'producto':'productos'):'SKU'} sin costo cargado (no ${gs.length-conC.length===1?'entra':'entran'} en la ganancia).`:''}</p>
+    <div class="tw"><table class="ventas"><thead><tr><th>#</th><th>${porProd?'Producto':'SKU'}</th><th>Unid.</th><th>Facturación</th><th>Me quedó</th><th>Costo</th><th>Bruta</th><th>Neta</th></tr></thead><tbody>
+    ${lista.map((g,i)=>`<tr><td>${i+1}</td><td>${nm(g)}</td><td>${g.unid.toLocaleString('es-AR')}</td><td>${fmt(g.vend)}</td><td>${fmt(g.quedo)}</td>
+      <td>${g.con?fmt(g.costo)+(g.parcial?' *':''):'<span class="meta">sin costo</span>'}</td>
+      <td class="${g.bruta<0?'neg':''}">${g.con?fmt(g.bruta)+`<small class="meta" style="display:block;">${pf(g.brutaP)}</small>`:''}</td>
+      <td class="${g.neta<0?'neg':''}">${g.con?`<b>${fmt(g.neta)}</b><small class="meta" style="display:block;">${pf(g.netaP)}</small>`:''}</td></tr>`).join('')}
+    </tbody></table></div>
+    <p class="note"><b>Bruta</b> = precio de venta − costo de fabricación. <b>Neta</b> = lo que me quedó después de Mercado Libre y el cadete − costo. % sobre la facturación.${gs.some(g=>g.parcial)?' * Parte de las ventas no tiene costo; la ganancia se calcula solo sobre las que sí.':''}</p>`;
+}
 function bindKey(el,fn){el.onclick=fn;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fn();}};}
 function bindSales(rows){rows.forEach(el=>bindKey(el,()=>el.nextElementSibling.classList.toggle('open')));}
 function renderList(r){
@@ -813,6 +877,7 @@ function card(o){
 // El detalle de reintegro solo tiene sentido con Flex: aparece al elegir Flex y se limpia al salir
 $('fLog').addEventListener('change',()=>{const f=$('fLog').value==='Flex';$('fFlex').hidden=!f;if(!f)$('fFlex').value='';});
 $('resMes').addEventListener('change',renderResumen);
+['rkMes','rkGrupo','rkOrden','rkVer'].forEach(id=>$(id).addEventListener('change',renderRanking));
 ['fMes','fCuenta','fTipo','fLog','fFlex','fOrden','fVista'].forEach(id=>$(id).addEventListener('change',()=>{shown=200;draw();}));
 $('fSku').addEventListener('input',()=>{shown=200;draw();});
 $('more').onclick=()=>{shown+=200;draw();};
