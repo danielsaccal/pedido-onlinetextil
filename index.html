@@ -1584,7 +1584,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v187</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v188</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -4897,7 +4897,12 @@ function leerConsumoActualOT(){
     if(c) rs.push({ articulo: v.startsWith('ficha:') ? nombreFicha(v.slice(6)) : v, fichaSku: v.startsWith('ficha:') ? v.slice(6) : undefined, anchoUsado: w, cantidad: cant, consumo: c, metrosConsumidos: cant * c });
   });
   try{ aprovecharSobrasOrden(rs); } catch(e){}
-  const usados = personal + rs.reduce((s, r) => s + r.metrosConsumidos, 0);
+  let usados = personal + rs.reduce((s, r) => s + r.metrosConsumidos, 0);
+  // si todavia no se cargo el reparto "para stock" en la orden, se toma el reparto
+  if(!rs.length && !personal && typeof repartoItems !== 'undefined' && repartoItems.length){
+    const d = calcularRepartoDatos();
+    if(d.listo){ usados = d.usado; ancho = d.W; }
+  }
   return { usados: Math.round(usados * 100) / 100, ancho };
 }
 
@@ -5534,7 +5539,7 @@ function calcularReparto(){
     </table></div>
     ${d.modo === 'porcentaje' ? `<p class="note" style="margin:4px 0;">Suma de porcentajes: ${repartoItems.reduce((s, x) => s + (+x.pct || 0), 0)} %</p>` : ''}
     ${aviso ? `<p class="note" style="color:#A6432F;margin-top:6px;">${aviso}</p>` : `<p class="note" style="margin-top:6px;">Usa ≈ ${fmtMetros(d.usado)} m de ${fmtMetros(d.total)} m · sobran ≈ ${fmtMetros(d.total - d.usado)} m</p>
-      <button type="button" class="btn btn-gold" style="margin-top:6px;" onclick="cargarRepartoEnOrden()">Cargar en la orden</button>`}`;
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;"><button type="button" class="btn btn-gold" style="width:auto;" onclick="cargarRepartoEnOrden()">Cargar en la orden</button>${d.total - d.usado > 0.05 ? `<button type="button" class="btn btn-ghost" style="width:auto;" onclick="sugerirRemanenteOT(); document.getElementById('ot-remanente') && document.getElementById('ot-remanente').scrollIntoView({behavior:'smooth'})">♻️ ¿Qué hago con lo que sobra?</button>` : ''}</div>`}`;
 }
 function cargarRepartoEnOrden(){
   const d = calcularRepartoDatos();
@@ -17130,7 +17135,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v187';
+const APP_VERSION = '2026-10-02-v188';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
