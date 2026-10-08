@@ -1584,7 +1584,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v188</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v189</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -3657,32 +3657,47 @@ function calcularCorte(piezas, W){
   return mejor;
 }
 // piezas con ancho minimo: se achican lo justo para que entren N exactas en el ancho de la tela (sin desperdicio)
-// que lado de la pieza tiene minimo: el elegido, o (piezas viejas) el que esta por encima del minimo, el mas chico
-function ladoMinPieza(p){
-  if(!p || !(p.anchoMin > 0)) return '';
-  if(p.minLado) return p.minLado;
-  const a = +p.ancho, l = +p.largo, m = +p.anchoMin;
-  if(a > m && l > m) return l < a ? 'largo' : 'ancho';
-  return l > m ? 'largo' : 'ancho';
+// minimos de una pieza: { a: ancho minimo, l: largo minimo } (acepta el formato viejo de un solo minimo)
+function minsPieza(p){
+  if(!p) return { a: 0, l: 0 };
+  if(p.minLado === 'ambos') return { a: +p.anchoMin || 0, l: +p.largoMin || 0 };
+  if(!(p.anchoMin > 0)) return { a: 0, l: +p.largoMin || 0 };
+  let lado = p.minLado;
+  if(!lado){ const A = +p.ancho, L = +p.largo, m = +p.anchoMin; lado = (A > m && L > m) ? (L < A ? 'largo' : 'ancho') : (L > m ? 'largo' : 'ancho'); }
+  return lado === 'largo' ? { a: 0, l: +p.anchoMin } : { a: +p.anchoMin, l: 0 };
 }
+function ladoMinPieza(p){ const m = minsPieza(p); return m.l && !m.a ? 'largo' : m.a ? 'ancho' : ''; }
+// piezas con minimo: se achican lo justo para que entren N exactas en el ancho de la tela (sin desperdicio)
 function ajustarAnchoFlexible(piezas, W){
-  if(!piezas.some(p => p.anchoMin > 0)) return piezas;
+  if(!(W > 0) || !piezas.some(p => { const m = minsPieza(p); return m.a > 0 || m.l > 0; })) return piezas;
   return piezas.map(p => {
-    const min = +p.anchoMin;
-    if(!(min > 0) || !(W > 0)) return p;
-    // el lado que se puede achicar es el que esta por encima del minimo (si los dos, el mas chico: ej 200x140 con min 120 -> el 140)
-    const lado = ladoMinPieza(p) === 'largo' ? { v: +p.largo, otro: +p.ancho } : { v: +p.ancho, otro: +p.largo };
-    if(!(lado.v > min)) return p;
-    if(Math.abs(W % lado.v) < 0.5) return { ...p, ancho: lado.v, largo: lado.otro, girar: false };
-    for(let n = Math.ceil(W / lado.v); n <= Math.floor(W / min); n++){
-      const a = Math.floor(W / n * 10) / 10;
-      if(a <= lado.v && a >= min) return { ...p, ancho: a, largo: lado.otro, girar: false, achicar: false, ajustadoDe: lado.v };
-    }
-    return p;
+    const m = minsPieza(p);
+    if(!(m.a > 0) && !(m.l > 0)) return p;
+    const ops = [{ across: +p.ancho, along: +p.largo, min: m.a, rot: false }];
+    if(p.girar !== false) ops.push({ across: +p.largo, along: +p.ancho, min: m.l, rot: true });
+    let mejor = null;
+    ops.forEach(o => {
+      if(!(o.across > 0)) return;
+      const minimo = o.min > 0 && o.min < o.across ? o.min : o.across;
+      for(let n = Math.max(1, Math.ceil(W / o.across - 1e-9)); n <= Math.floor(W / minimo + 1e-9); n++){
+        const a = Math.min(o.across, Math.floor(W / n * 10) / 10);
+        if(a >= minimo - 1e-9){ const cons = o.along / n; if(!mejor || cons < mejor.cons - 1e-9) mejor = { ...o, a, n, cons }; break; }
+      }
+    });
+    if(!mejor) return p;
+    return { ...p, ancho: mejor.a, largo: mejor.along, girar: false, achicar: false, ajustadoDe: mejor.across, rotado: mejor.rot };
   });
 }
-function calcularCorteBase(piezas, W){
-  piezas = ajustarAnchoFlexible(piezas, W);
+function calcularCorteBase(piezas, W, sinAjuste){
+  // con minimos: se prueba achicando y sin achicar, y se queda con lo que menos tela usa
+  if(!sinAjuste && piezas.some(p => { const m = minsPieza(p); return m.a > 0 || m.l > 0; })){
+    const aj = ajustarAnchoFlexible(piezas, W);
+    const sin = piezas.map(p => { const q = { ...p }; delete q.anchoMin; delete q.largoMin; delete q.minLado; return q; });
+    const r1 = calcularCorteBase(aj, W, true), r2 = calcularCorteBase(sin, W, true);
+    if(r1.avisos.length && !r2.avisos.length) return r2;
+    if(r2.avisos.length && !r1.avisos.length) return r1;
+    return r1.metros <= r2.metros + 1e-9 ? r1 : r2;
+  }
   const girables = piezas.map((p, i) => i).filter(i => puedeGirar(piezas[i]) && Math.abs(piezas[i].ancho - piezas[i].largo) > 0.01);
   if(!girables.length || girables.length > 6) return calcularCorteFijo(piezas, W);
   let mejor = null;
@@ -4667,8 +4682,8 @@ function agregarPiezaAC(p){
   fila.style.cssText = 'display:grid;grid-template-columns:minmax(0,1.6fr) 66px 66px 44px 44px 32px 24px;gap:5px;margin-bottom:5px;align-items:center;';
   fila.innerHTML = `
     <input type="text" class="ac-p-nombre" value="${escapeAttr(p.nombre||'')}" placeholder="Plana" oninput="calcularAC()">
-    <div style="display:flex;flex-direction:column;gap:3px;"><input type="number" step="0.1" class="ac-p-ancho" value="${p.ancho||''}" placeholder="250" oninput="calcularAC()"><input type="number" step="0.1" class="ac-p-amin" value="${ladoMinPieza(p) === 'ancho' ? p.anchoMin : ''}" placeholder="ancho mín." title="Ancho mínimo (opcional): hasta cuánto se puede achicar el ancho para aprovechar la tela" oninput="calcularAC()" style="font-size:0.72rem;padding:4px 5px;"></div>
-    <div style="display:flex;flex-direction:column;gap:3px;"><input type="number" step="0.1" class="ac-p-largo" value="${p.largo||''}" placeholder="275" oninput="calcularAC()"><input type="number" step="0.1" class="ac-p-lmin" value="${ladoMinPieza(p) === 'largo' ? p.anchoMin : ''}" placeholder="largo mín." title="Largo mínimo (opcional): hasta cuánto se puede achicar el largo para aprovechar la tela" oninput="calcularAC()" style="font-size:0.72rem;padding:4px 5px;"></div>
+    <div style="display:flex;flex-direction:column;gap:3px;"><input type="number" step="0.1" class="ac-p-ancho" value="${p.ancho||''}" placeholder="250" oninput="calcularAC()"><input type="number" step="0.1" class="ac-p-amin" value="${minsPieza(p).a || ''}" placeholder="ancho mín." title="Ancho mínimo (opcional): hasta cuánto se puede achicar el ancho para aprovechar la tela" oninput="calcularAC()" style="font-size:0.72rem;padding:4px 5px;"></div>
+    <div style="display:flex;flex-direction:column;gap:3px;"><input type="number" step="0.1" class="ac-p-largo" value="${p.largo||''}" placeholder="275" oninput="calcularAC()"><input type="number" step="0.1" class="ac-p-lmin" value="${minsPieza(p).l || ''}" placeholder="largo mín." title="Largo mínimo (opcional): hasta cuánto se puede achicar el largo para aprovechar la tela" oninput="calcularAC()" style="font-size:0.72rem;padding:4px 5px;"></div>
     <input type="number" min="1" class="ac-p-cant" value="${p.cantidad||1}" oninput="calcularAC()">
     <input type="number" min="1" class="ac-p-tapas" value="${p.partes||1}" oninput="calcularAC()">
     <input type="checkbox" class="ac-p-girar" ${puedeGirar(p) ? 'checked' : ''} onchange="calcularAC()" title="Se puede girar si ahorra tela" style="width:18px;height:18px;justify-self:center;">
@@ -4680,7 +4695,7 @@ function leerPiezasAC(){
   return [...document.querySelectorAll('.ac-pieza')].map(f => ({
     nombre: f.querySelector('.ac-p-nombre').value.trim(),
     ancho: parseFloat(f.querySelector('.ac-p-ancho').value),
-    ...(parseFloat(f.querySelector('.ac-p-amin').value) > 0 ? { anchoMin: parseFloat(f.querySelector('.ac-p-amin').value), minLado: 'ancho' } : parseFloat(f.querySelector('.ac-p-lmin').value) > 0 ? { anchoMin: parseFloat(f.querySelector('.ac-p-lmin').value), minLado: 'largo' } : {}),
+    ...((parseFloat(f.querySelector('.ac-p-amin').value) > 0 || parseFloat(f.querySelector('.ac-p-lmin').value) > 0) ? { anchoMin: parseFloat(f.querySelector('.ac-p-amin').value) || 0, largoMin: parseFloat(f.querySelector('.ac-p-lmin').value) || 0, minLado: 'ambos' } : {}),
     largo: parseFloat(f.querySelector('.ac-p-largo').value),
     cantidad: Math.max(1, parseInt(f.querySelector('.ac-p-cant').value, 10) || 1),
     partes: Math.max(1, parseInt(f.querySelector('.ac-p-tapas').value, 10) || 1),
@@ -6947,7 +6962,7 @@ function descripcionAutomaticaProducto(producto, categoria){
 function medidasAdaptadas(piezas, anchos){
   const res = piezas.map(p => ({ a: p.ancho, l: p.largo }));
   // ancho flexible (ancho minimo): la medida final es la que se corta en esa tela
-  (anchos || []).slice(0, 1).forEach(W => { ajustarAnchoFlexible(piezas, W).forEach((q, i) => { if(q.ajustadoDe){ const p0 = piezas[i]; res[i] = Math.abs(p0.largo - q.ajustadoDe) < 0.01 && Math.abs(p0.ancho - q.largo) < 0.01 ? { a: q.largo, l: q.ancho } : { a: q.ancho, l: q.largo }; } }); });
+  (anchos || []).slice(0, 1).forEach(W => { ajustarAnchoFlexible(piezas, W).forEach((q, i) => { if(q.ajustadoDe) res[i] = q.rotado ? { a: q.largo, l: q.ancho } : { a: q.ancho, l: q.largo }; }); });
   (anchos || []).forEach(W => {
     if(!(W > 0)) return;
     let c; try{ c = calcularCorte(piezas, W); } catch(e){ return; }
@@ -9635,9 +9650,22 @@ function cargarPiezasDelJuego(articulo, ancho, piezas){
     if(!p.nombre.trim() || vistos.has(clave)) return;
     vistos.add(clave);
     const nombre = articuloDePieza(p.nombre.trim(), medida, articulo);
-    const suelta = [{ nombre: p.nombre.trim(), ancho: p.ancho, largo: p.largo, cantidad: 1, partes: p.partes || 1, girar: p.girar }];
+    const mm = minsPieza(p);
+    const minimos = (mm.a || mm.l) ? { anchoMin: mm.a, largoMin: mm.l, minLado: 'ambos' } : {};
+    const suelta = [{ nombre: p.nombre.trim(), ancho: p.ancho, largo: p.largo, cantidad: 1, partes: p.partes || 1, girar: p.girar, ...minimos }];
     const previa = (tablaConsumo.instrucciones[nombre] || {})[ancho];
-    if(previa && !previa.auto){ hechos.push(`${nombre}: ya tenía una instrucción cargada a mano en ${ancho} cm, no la toqué.`); return; }
+    // los minimos tolerados del juego pasan a la pieza suelta en todos sus anchos (aunque este cargada a mano)
+    {
+      let cambio = false;
+      Object.entries(tablaConsumo.instrucciones[nombre] || {}).forEach(([k, g]) => { if(k === String(ancho) && !(previa && !previa.auto)) return; (g && g.piezas || []).forEach(q => { if(String(q.nombre || '').trim().toLowerCase() === clave){ const antes = JSON.stringify(minsPieza(q)); delete q.anchoMin; delete q.largoMin; delete q.minLado; Object.assign(q, minimos); if(JSON.stringify(minsPieza(q)) !== antes) cambio = true; } }); });
+      if(cambio){ Object.keys(tablaConsumo.instrucciones[nombre]).forEach(k => { const g = tablaConsumo.instrucciones[nombre][k]; if(g && g.piezas){ const c = calcularCorte(g.piezas, parseFloat(k)); if(!c.avisos.length){ g.consumo = c.metros; tablaConsumo.articulos[nombre] = tablaConsumo.articulos[nombre] || {}; tablaConsumo.articulos[nombre][k] = c.metros; } } }); if(previa && !previa.auto) hechos.push(`${nombre}: mínimos actualizados`); }
+    }
+    if(previa && !previa.auto){
+      let cambio = false;
+      Object.values(tablaConsumo.instrucciones[nombre] || {}).forEach(g => (g && g.piezas || []).forEach(q => { if(String(q.nombre || '').trim().toLowerCase() === clave){ const antes = JSON.stringify(minsPieza(q)); delete q.anchoMin; delete q.largoMin; delete q.minLado; Object.assign(q, minimos); if(JSON.stringify(minsPieza(q)) !== antes) cambio = true; } }));
+      if(cambio){ Object.keys(tablaConsumo.instrucciones[nombre]).forEach(k => { const g = tablaConsumo.instrucciones[nombre][k]; if(g && g.piezas){ const c = calcularCorte(g.piezas, parseFloat(k)); if(!c.avisos.length){ g.consumo = c.metros; tablaConsumo.articulos[nombre] = tablaConsumo.articulos[nombre] || {}; tablaConsumo.articulos[nombre][k] = c.metros; } } }); hechos.push(`${nombre}: mínimos actualizados`); }
+      return;
+    }
     // si ya existe otro articulo con exactamente la misma pieza (ej: la funda del 2 1/2 es igual a la del 1 1/2), no se crea aparte
     if(!tablaConsumo.instrucciones[nombre]){ const igual = articuloConMismaPieza(suelta[0], nombre); if(igual) return; }
     const corte = calcularCorte(suelta, parseFloat(ancho));
@@ -17135,7 +17163,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v188';
+const APP_VERSION = '2026-10-02-v189';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
