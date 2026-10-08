@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5/build/mp4-muxer.min.js"></script>
 <style>
   :root{ --v:#3d1466; --vo:#1c0733; --vc:#5b2a86; --d:#f4c430; --cream:#F4F1EC; --line:#E3DCD2; }
@@ -657,7 +658,8 @@ try{ new IntersectionObserver(es => { const v = es[0].isIntersecting; $('mini').
 pintarGuias(); pintarEscenas(); pintarVentajas();
 if(typeof VideoEncoder === 'undefined') $('aviso').style.display = 'block';
 Promise.all(['600', '700', '800', '900'].map(w => document.fonts.load(`${w} 40px Montserrat`))).catch(() => {}).then(() => document.fonts.ready).then(() => act()).then(() => cargarAuto());
-cargarListaPlantillas();
+// necesita la sesion iniciada en la app
+firebase.auth().onAuthStateChanged(u => { if(u) cargarListaPlantillas(); else location.replace('./'); });
 </script>
 </body>
 </html>
