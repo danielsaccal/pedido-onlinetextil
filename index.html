@@ -425,6 +425,11 @@ a.grilla-celda{display:block;}
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script>
+  // los links de catalogo para clientes (rubro / descuento) van al catalogo publico, que no pide sesion
+  (function(){ const q = new URLSearchParams(location.search); if(q.get('rubro') || q.get('descuento')) location.replace('cliente/' + location.search); })();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -1584,7 +1589,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v191</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v192</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1909,6 +1914,14 @@ a.grilla-celda{display:block;}
     <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;padding:16px 18px;box-shadow:0 10px 40px rgba(0,0,0,.25);">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><b id="pub-titulo" style="font-size:1.1rem;color:var(--purple);">📸 Publicar en el catálogo</b><button type="button" onclick="cerrarPublicar()" style="border:1px solid var(--line);border-radius:10px;background:#fff;font-size:0.9rem;cursor:pointer;color:var(--purple);padding:6px 12px;">✕ Cerrar</button></div>
       <div id="pub-cont"></div>
+    </div>
+  </div>
+  <div id="login" style="display:none;position:fixed;inset:0;z-index:20000;background:linear-gradient(160deg,#3d1466,#1c0733);align-items:center;justify-content:center;padding:20px;">
+    <div style="background:#fff;border-radius:18px;padding:26px 22px;max-width:360px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.35);">
+      <div style="font-size:1.8rem;font-weight:800;color:#3d1466;">OnLine<span style="color:#d9a915;">Textil</span></div>
+      <p id="login-msg" style="color:#6B6258;font-size:0.92rem;margin:10px 0 18px;">Ingresá con tu cuenta de Google para usar la app.</p>
+      <button type="button" id="login-btn" onclick="ingresarConGoogle()" style="width:100%;padding:12px;border-radius:12px;border:1px solid #ddd;background:#fff;font-size:1rem;font-weight:700;cursor:pointer;display:flex;gap:10px;align-items:center;justify-content:center;"><span style="font-size:1.2rem;">🔑</span> Ingresar con Google</button>
+      <button type="button" id="login-salir" onclick="salirSesion()" style="display:none;margin-top:10px;background:none;border:none;color:#8A8072;cursor:pointer;text-decoration:underline;">Usar otra cuenta</button>
     </div>
   </div>
   <div id="dlg-modal" style="display:none;position:fixed;inset:0;background:rgba(30,20,40,.45);z-index:10000;align-items:center;justify-content:center;padding:16px;">
@@ -5621,7 +5634,7 @@ const GRUPOS_INICIO = {
     [['📦 Historial de órdenes', 'abrirHistorialOT()'], ['🗂️ Historial de entregas', 'abrirHistorialEntregas()'], ['🔎 ¿Cuándo hice este SKU?', 'abrirHistorialSku()']],
   ] },
   h: { lado: 'int', titulo: 'Finanzas', items: [['💰 Ventas Mercado Libre', 'abrirVentasML()'], ['🧮 Calculadora de costos', 'abrirCalculadoraCostos()']] },
-  i: { lado: 'int', titulo: 'Configuración', items: [['📖 Palabras de la app', 'abrirGlosario()'], ['📝 Listas y opciones', 'abrirListas()'], ['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['🔔 Avisos push', 'abrirConfigPush()'], ['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']] },
+  i: { lado: 'int', titulo: 'Configuración', items: [['👥 Usuarios', 'abrirUsuarios()'], ['📖 Palabras de la app', 'abrirGlosario()'], ['📝 Listas y opciones', 'abrirListas()'], ['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['🔔 Avisos push', 'abrirConfigPush()'], ['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']] },
 };
 let grupoInicioAbierto = null;
 function irInicio(){
@@ -9708,6 +9721,81 @@ function propagarMinimosJuegos(){
   return [...cambiados];
 }
 
+// ===== Inicio de sesion (Google) y roles =====
+// usuarios/{mail}: { rol: 'dueño' | 'colaborador' }. El dueño inicial es fijo; los demas los agrega el dueño.
+const DUENO_INICIAL = 'danielsaccal@gmail.com';
+const auth = firebase.auth();
+let usuarioActual = null, rolActual = null;
+let resolverSesion; const sesionLista = new Promise(r => resolverSesion = r);
+function esDueno(){ return rolActual === 'dueño'; }
+function mostrarLogin(msg, conSalir){
+  const l = document.getElementById('login'); l.style.display = 'flex';
+  document.getElementById('login-msg').innerHTML = msg || 'Ingresá con tu cuenta de Google para usar la app.';
+  document.getElementById('login-salir').style.display = conSalir ? 'inline-block' : 'none';
+  document.getElementById('login-btn').style.display = conSalir ? 'none' : 'flex';
+}
+async function ingresarConGoogle(){
+  const prov = new firebase.auth.GoogleAuthProvider(); prov.setCustomParameters({ prompt: 'select_account' });
+  try{ await auth.signInWithPopup(prov); }
+  catch(e){
+    if(['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/cancelled-popup-request'].includes(e.code)) await auth.signInWithRedirect(prov);
+    else if(e.code !== 'auth/popup-closed-by-user') mostrarLogin('No se pudo ingresar: ' + escaparHtml(e.message));
+  }
+}
+async function salirSesion(){ await auth.signOut(); location.reload(); }
+auth.onAuthStateChanged(async u => {
+  if(!u){ mostrarLogin(); return; }
+  const mail = String(u.email || '').toLowerCase();
+  try{
+    const ref = db.collection('usuarios').doc(mail);
+    let d = await ref.get();
+    let rol = d.exists ? d.data().rol : null;
+    if(!rol && mail === DUENO_INICIAL){ rol = 'dueño'; await ref.set({ rol, nombre: u.displayName || '', alta: new Date().toISOString() }, { merge: true }); }
+    if(!rol){ mostrarLogin(`La cuenta <b>${escaparHtml(mail)}</b> no tiene acceso.<br>Pedile al dueño que te agregue.`, true); return; }
+    usuarioActual = u; rolActual = rol;
+    ref.set({ ultimoIngreso: new Date().toISOString(), uid: u.uid, nombre: u.displayName || '' }, { merge: true }).catch(() => {});
+    document.getElementById('login').style.display = 'none';
+    pintarUsuarioEnCabecera();
+    resolverSesion(u);
+  } catch(e){ mostrarLogin('No se pudo verificar la cuenta: ' + escaparHtml(e.message), true); }
+});
+function pintarUsuarioEnCabecera(){
+  let b = document.getElementById('btn-usuario');
+  if(!b){ const ref = document.getElementById('btn-atras'); if(!ref) return; b = document.createElement('button'); b.id = 'btn-usuario'; b.className = 'menu-toggle'; b.style.marginLeft = '6px'; ref.parentNode.appendChild(b); }
+  b.textContent = (rolActual === 'dueño' ? '👑 ' : '👤 ') + (usuarioActual.displayName || usuarioActual.email).split(' ')[0];
+  b.title = usuarioActual.email + ' · ' + rolActual + ' · tocar para salir';
+  b.onclick = async () => { if(await elegirOpcion('Sesión', usuarioActual.email + ' (' + rolActual + ')', [{ t: 'Salir de la cuenta', v: 'salir', estilo: 'rojo' }]) === 'salir') salirSesion(); };
+}
+// ----- Usuarios (solo el dueño) -----
+async function abrirUsuarios(){
+  if(!esDueno()){ alert('Solo el dueño puede ver los usuarios.'); return; }
+  const t = document.getElementById('pub-titulo'); if(t) t.textContent = '👥 Usuarios';
+  document.getElementById('pub-cont').innerHTML = '<p class="empty-msg">Cargando…</p>';
+  document.getElementById('pub-modal').style.display = 'block';
+  const s = await db.collection('usuarios').get();
+  const us = s.docs.map(d => ({ mail: d.id, ...d.data() }));
+  document.getElementById('pub-cont').innerHTML = `
+    <div style="display:grid;gap:6px;margin-bottom:12px;">${us.map(u => `<div style="display:flex;gap:8px;align-items:center;background:var(--cream);border-radius:10px;padding:8px 10px;">
+      <div style="flex:1;"><b>${escaparHtml(u.mail)}</b><div class="note" style="text-align:left;margin:0;">${escaparHtml(u.rol)}${u.ultimoIngreso ? ' · último ingreso ' + new Date(u.ultimoIngreso).toLocaleDateString('es-AR') : ' · todavía no ingresó'}</div></div>
+      ${u.mail === DUENO_INICIAL ? '' : `<button type="button" class="btn-mini" onclick="quitarUsuario('${escapeAttr(u.mail)}')">✕ Quitar</button>`}</div>`).join('')}</div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;">
+      <input id="us-mail" type="email" placeholder="mail de Google" style="padding:10px;border:1px solid var(--line);border-radius:10px;">
+      <select id="us-rol" style="padding:10px;border:1px solid var(--line);border-radius:10px;"><option value="colaborador">colaborador</option><option value="dueño">dueño</option></select>
+      <button type="button" class="btn-mini" onclick="agregarUsuario()">+ Agregar</button>
+    </div>
+    <p class="note" style="text-align:left;margin-top:8px;">El colaborador usa la app pero no ve costos ni resultados de Mercado Libre.</p>`;
+}
+async function agregarUsuario(){
+  const mail = document.getElementById('us-mail').value.trim().toLowerCase(), rol = document.getElementById('us-rol').value;
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){ alert('Escribí un mail válido.'); return; }
+  try{ await db.collection('usuarios').doc(mail).set({ rol, alta: new Date().toISOString() }, { merge: true }); abrirUsuarios(); }
+  catch(e){ alert('No se pudo agregar: ' + e.message); }
+}
+async function quitarUsuario(mail){
+  if(!confirm(`¿Quitarle el acceso a ${mail}?`)) return;
+  try{ await db.collection('usuarios').doc(mail).delete(); abrirUsuarios(); } catch(e){ alert('No se pudo quitar: ' + e.message); }
+}
+
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -11920,7 +12008,7 @@ function copiarLinkDescuento(){
 function abrirCompartirRubro(){
   mostrarPaso('step-compartir-rubro');
   const cont = document.getElementById('rubros-lista');
-  const baseUrl = location.origin + location.pathname;
+  const baseUrl = location.origin + location.pathname.replace(/index\.html$/, '').replace(/\/?$/, '/') + 'cliente/';
   cont.innerHTML = CATALOGO.map(cat => {
     const link = baseUrl + '?rubro=' + encodeURIComponent(cat.categoria);
     const mensaje = `Catálogo de ${cat.categoria.toLowerCase()} — OnLineTextil:\n${link}`;
@@ -17239,7 +17327,7 @@ function irAFormatoGrafico(){
 <script>
 etiquetarProductosEstaticos();
 revisarRegresoDeInstagram();
-cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancarios(), cargarPerfilIG()])).then(() => {
+sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancarios(), cargarPerfilIG()])).then(() => {
   return cargarProductosEliminados();
 }).then(() => {
   return cargarProductosEditados();
@@ -17254,7 +17342,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v191';
+const APP_VERSION = '2026-10-02-v192';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
