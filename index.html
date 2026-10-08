@@ -1584,7 +1584,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v190</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v191</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -4599,6 +4599,7 @@ async function abrirArticulosCortes(){
   tablaConsumo.instrucciones = tablaConsumo.instrucciones || {};
   await completarPiezasDeJuegosGuardados();
   await rearmarPiezasSueltas();
+  try{ const cam = propagarMinimosJuegos(); if(cam.length) await guardarTablaYConsumo(); } catch(e){ console.error('minimos juegos', e); }
   if(!window.__limpiezaOfrecida){ window.__limpiezaOfrecida = true; setTimeout(async () => { await normalizarFundas5085(); await limpiarPiezasRepetidas(true); }, 300); }
   document.getElementById('ac-buscar').value = '';
   acArticulo = null;
@@ -4835,6 +4836,7 @@ async function guardarAC(){
   const enTabla = tablaConsumo.articulos[a][W];
   if(enTabla === undefined || enTabla === null || enTabla === '') tablaConsumo.articulos[a][W] = corte.metros;
   const derivadas = cargarPiezasDelJuego(a, String(W), piezas);
+  try{ propagarMinimosJuegos().forEach(n => { if(!derivadas.some(d => d.startsWith(n))) derivadas.push(`${n}: mínimos actualizados`); }); } catch(e){}
   try{
     await guardarTablaYConsumo();
     if(empaquePendiente) await guardarEmpaqueAC(true);
@@ -9666,8 +9668,44 @@ async function aplicarMinimosTodos(){
   }));
   if(!piezas){ alert('No había nada para cambiar.'); return; }
   if(!confirm(`Se actualizan ${piezas} piezas en ${arts.size} artículos. ¿Guardar?`)){ await cargarTablaConsumo(); return; }
-  try{ await guardarTablaYConsumo(); cerrarPublicar(); renderListaAC(); if(acArticulo) abrirArticuloAC(acArticulo); alert('Listo: mínimos aplicados.'); }
+  try{ propagarMinimosJuegos(); await guardarTablaYConsumo(); cerrarPublicar(); renderListaAC(); if(acArticulo) abrirArticuloAC(acArticulo); alert('Listo: mínimos aplicados.'); }
   catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+
+// ===== Los minimos de cada juego pasan a sus piezas sueltas (Plana, Ajustable, Funda… de esa medida) =====
+// Coincide por nombre de pieza; si el articulo suelto tiene una sola pieza (ej: "Corte de tela"), se usa esa.
+function propagarMinimosJuegos(){
+  const I = (tablaConsumo && tablaConsumo.instrucciones) || {};
+  const cambiados = new Set();
+  Object.keys(I).forEach(juego => {
+    const medida = medidaDelJuego(juego); if(!medida) return;
+    const g = Object.values(I[juego] || {}).find(x => x && x.piezas && x.piezas.length); if(!g) return;
+    g.piezas.forEach(p => {
+      const mm = minsPieza(p);
+      const destino = articuloDePieza(String(p.nombre || '').trim(), medida, juego);
+      if(!destino || destino === juego || !I[destino]) return;
+      const clave = normBusqueda(String(p.nombre || '').trim());
+      Object.entries(I[destino]).forEach(([k, gd]) => {
+        const ps = (gd && gd.piezas) || []; if(!ps.length) return;
+        const nombresDistintos = new Set(ps.map(q => normBusqueda(String(q.nombre || '').trim())));
+        ps.forEach(q => {
+          const coincide = normBusqueda(String(q.nombre || '').trim()) === clave || nombresDistintos.size === 1;
+          if(!coincide) return;
+          const antes = JSON.stringify(minsPieza(q));
+          // el minimo se traduce a la medida de la pieza suelta: lo que se puede achicar (en cm) es lo mismo
+          const da = mm.a ? Math.max(0, +p.ancho - mm.a) : 0, dl = mm.l ? Math.max(0, +p.largo - mm.l) : 0;
+          // si la pieza suelta esta cargada al reves (ancho/largo cambiados), se cruzan
+          const cruz = Math.abs(+q.ancho - +p.largo) < 1 && Math.abs(+q.largo - +p.ancho) < 1 && Math.abs(+q.ancho - +p.ancho) >= 1;
+          const na = (cruz ? dl : da) ? Math.max(1, +q.ancho - (cruz ? dl : da)) : 0;
+          const nl = (cruz ? da : dl) ? Math.max(1, +q.largo - (cruz ? da : dl)) : 0;
+          delete q.anchoMin; delete q.largoMin; delete q.minLado;
+          if(na || nl) Object.assign(q, { anchoMin: na, largoMin: nl, minLado: 'ambos' });
+          if(JSON.stringify(minsPieza(q)) !== antes){ cambiados.add(destino); const c = calcularCorte(ps, parseFloat(k)); if(!c.avisos.length){ gd.consumo = c.metros; tablaConsumo.articulos[destino] = tablaConsumo.articulos[destino] || {}; tablaConsumo.articulos[destino][k] = c.metros; } }
+        });
+      });
+    });
+  });
+  return [...cambiados];
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -17216,7 +17254,7 @@ cargarCategoriasCfg().then(() => Promise.all([cargarFotosOverride(), cargarProdu
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v190';
+const APP_VERSION = '2026-10-02-v191';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
