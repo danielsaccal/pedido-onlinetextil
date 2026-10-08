@@ -232,6 +232,13 @@ details.box{background:var(--surface);border:1px solid var(--line);border-radius
     </div>
     <div id="resBody"></div>
   </section>
+  <section class="panel" id="desglose">
+    <div class="res-head" style="flex-wrap:wrap;gap:8px;">
+      <h2>🚚 Envíos, Full y publicidad</h2>
+      <select id="dsMes" aria-label="Mes"></select>
+    </div>
+    <div id="dsBody"></div>
+  </section>
   <section class="panel" id="ranking">
     <div class="res-head" style="flex-wrap:wrap;gap:8px;">
       <h2>🏆 Ranking de productos</h2>
@@ -350,7 +357,7 @@ const CAT={'Cargo por vender':'vender','Anulación del cargo por vender':'vender
 'Cargo por servicio de colecta Full':'full','Cargo por servicio de almacenamiento Full':'full','Cargo por stock antiguo en Full':'full',
 'Cargo por campaña de publicidad de Product Ads':'ads'};
 function parseCargos(d){
-  const out={vender:0,unidad:0,cuotas:0,envio:0,full:0,ads:0,otros:0,flexBon:0,flexCargo:0,envML:0};
+  const out={vender:0,unidad:0,cuotas:0,envio:0,full:0,ads:0,otros:0,flexBon:0,flexCargo:0,envML:0,det:{}};
   if(!d)return out;
   const blocks=String(d).match(/\{Cargo \d+[\s\S]*?\}/g)||[];
   for(const b of blocks){
@@ -359,6 +366,7 @@ function parseCargos(d){
     const val=num((b.match(/Monto neto: ([\-\d\.,]+);/)||[])[1]);
     const neg=name.startsWith('Anulación')||name.startsWith('Bonif');
     out[CAT[name]||'otros']+=neg?-val:val;
+    out.det[name]=(out.det[name]||0)+(neg?-val:val);
     if(name==='Anulación del cargo por Mercado Envíos Flex')out.flexBon+=val;
     if(name==='Cargo por Envíos Flex')out.flexCargo+=val;
     if(name==='Cargo por envíos de Mercado Libre')out.envML+=val;
@@ -405,7 +413,8 @@ function parseWorkbook(wb,cuenta,file){
       pubT:String(r[C.pub]||'').replace('Clássico','Clásica'),cant:num(r[C.cant])||null,log,
       psd:isVenta&&bruto>0?num(r[C.valor]):null, pcd:isVenta?bruto-ec-cc:null,
       vender:-p.vender,unidad:-p.unidad,cuotas:-p.cuotas,envio:ec+cc-p.envio,full:-p.full,ads:-p.ads,otros:-p.otros,
-      envIn:ec+cc+p.flexBon,envOut:-(p.envML+p.flexCargo),ret:num(r[C.ret]),acred:num(r[C.neto])-pos,excl:false,flex:'',flexMonto:null,nota:''};
+      envIn:ec+cc+p.flexBon,envOut:-(p.envML+p.flexCargo),ret:num(r[C.ret]),acred:num(r[C.neto])-pos,excl:false,flex:'',flexMonto:null,nota:'',
+      ec, cd:Object.fromEntries(Object.entries(p.det).filter(([k,v])=>Math.abs(v)>0.004).map(([k,v])=>[k,Math.round(v*100)/100]))};
     if(tipoOp==='Pago de facturas'){o.excl=true;o.acred=0;o.otros=0;o.nota='Pago de factura ML por '+fmt2(Math.abs(pos))+'. Paga cargos ya listados; no se suma.';}
     else if(!isVenta&&pos!==0)o.nota='Cargo facturado aparte, no descontado de una venta.';
     o.pct=o.pcd>0?o.acred/o.pcd:null;
@@ -649,6 +658,7 @@ function draw(){
   renderAnual();
   renderResumen();
   renderRanking();
+  renderDesglose();
   // lista
   $('count').textContent=r.length.toLocaleString('es-AR')+' operaciones';
   renderList(r);
@@ -759,6 +769,66 @@ function renderSkuSum(r){
     <div class="dhw">${tbl('Lo que entra',haber,tH)}${tbl('Lo que sale',debe,tD)}</div>
     <div class="saldo"><span>Le queda (entra − sale)</span><span class="sv"><b>${fmt(tH-tD)}</b>${U?`<em>${pu(tH-tD)} por unidad (promedio de ${U.toLocaleString('es-AR')})</em>`:''}</span></div>
     <p class="inc">Acreditado por ML, antes del cadete: ${fmt(S('acred'))}${U?' · '+pu(S('acred'))+' por unidad':''}</p>`;
+}
+// ===== Desglose de envios (Flex, correo), Full y publicidad =====
+function renderDesglose(){
+  const sel=$('dsMes'), ps=[...new Set(DATA.map(d=>d.periodo))].sort().reverse();
+  const cur=sel.value&&(ps.includes(sel.value)||sel.value==='todo')?sel.value:(ps[0]||'');
+  sel.innerHTML=ps.map(p=>`<option value="${p}" ${p===cur?'selected':''}>${p==='sin-fecha'?'Sin fecha':mesTxt(p)}</option>`).join('')+(ps.length>1?`<option value="todo" ${cur==='todo'?'selected':''}>Todos los meses</option>`:'');
+  const fc=$('fCuenta').value;
+  const r=allRows().filter(o=>!o.excl&&(cur==='todo'||o.periodo===cur)&&(!fc||o.cuenta===fc));
+  const sinDet=r.filter(o=>!o.cd).length;
+  // suma por nombre de cargo dentro de un grupo de operaciones (positivo = me cobraron, negativo = me devolvieron)
+  const porNombre=(rows,filtro)=>{const m={};rows.forEach(o=>Object.entries(o.cd||{}).forEach(([k,v])=>{if(filtro(k)){const x=m[k]||{n:0,v:0};x.n++;x.v+=v;m[k]=x;}}));return m;};
+  const ventasDe=log=>r.filter(o=>o.tipo==='Venta'&&o.pcd>0&&o.log===log);
+  const linea=(txt,v,n,sub)=>Math.round(v)===0?'':`<tr><td>${txt}${sub?`<small class="meta" style="display:block;">${sub}</small>`:''}</td><td class="meta" style="text-align:right;">${n?n.toLocaleString('es-AR'):''}</td><td style="text-align:right;" class="${v<0?'neg':'pos'}">${fmt(v)}</td></tr>`;
+  const bloque=(tit,filas,total,pie)=>`<div style="margin-bottom:14px;"><h3 style="margin:0 0 6px;font-size:1rem;">${tit}</h3>
+    <table class="dh" style="width:100%;"><thead><tr><th>Concepto</th><th class="r">Operaciones</th><th class="r">Monto</th></tr></thead><tbody>${filas.join('')||'<tr><td colspan="3" class="meta">Sin movimientos.</td></tr>'}</tbody>
+    <tfoot><tr><td>Total</td><td></td><td style="text-align:right;" class="${total<0?'neg':'pos'}"><b>${fmt(total)}</b></td></tr></tfoot></table>${pie?`<p class="note">${pie}</p>`:''}</div>`;
+  // Flex
+  const vf=ventasDe('Flex'), rf=r.filter(o=>o.log==='Flex');
+  const fx=porNombre(rf,k=>/Flex/i.test(k));
+  const fCargo=-Object.entries(fx).filter(([k])=>!/^Anulaci|^Bonif/.test(k)).reduce((a,[,x])=>a+x.v,0);
+  const fReint=-Object.entries(fx).filter(([k])=>/^Anulaci|^Bonif/.test(k)).reduce((a,[,x])=>a+x.v,0);
+  const fComp=vf.reduce((a,o)=>a+(o.ec||0),0), fCad=rf.reduce((a,o)=>a+(o.cad||0),0);
+  const envF=new Set(vf.map(o=>o.envNum).filter(Boolean)).size;
+  const totF=fCargo+fReint+fComp+fCad;
+  const flex=bloque('🛵 Envíos Flex',[
+    linea('Cargos por envío Flex',fCargo,Object.entries(fx).filter(([k])=>!/^Anulaci|^Bonif/.test(k)).reduce((a,[,x])=>a+x.n,0)),
+    linea('Reintegros de Mercado Libre',fReint,Object.entries(fx).filter(([k])=>/^Anulaci|^Bonif/.test(k)).reduce((a,[,x])=>a+x.n,0),'Anulación del cargo por Mercado Envíos Flex'),
+    linea('Envío pagado por el comprador',fComp,vf.filter(o=>o.ec>0).length),
+    linea('Cadete',fCad,rf.filter(o=>o.cad).length,'Según la zona de cada envío')],totF,
+    envF?`${envF.toLocaleString('es-AR')} ${envF===1?'envío':'envíos'} Flex · resultado por envío: <b>${fmt(totF/envF)}</b>`:'');
+  // correo / colecta (Mercado Envios, no Flex ni Full)
+  const rc=r.filter(o=>o.log!=='Flex'&&o.log!=='Full');
+  const cx=porNombre(rc,k=>/env[ií]os? de Mercado Libre|Mercado Env[ií]os/i.test(k)&&!/Flex/i.test(k));
+  const vc=rc.filter(o=>o.tipo==='Venta'&&o.pcd>0);
+  const cCargo=-Object.entries(cx).filter(([k])=>!/^Anulaci|^Bonif/.test(k)).reduce((a,[,x])=>a+x.v,0);
+  const cAnul=-Object.entries(cx).filter(([k])=>/^Anulaci|^Bonif/.test(k)).reduce((a,[,x])=>a+x.v,0);
+  const cComp=vc.reduce((a,o)=>a+(o.ec||0),0), envC=new Set(vc.map(o=>o.envNum).filter(Boolean)).size;
+  const totC=cCargo+cAnul+cComp;
+  const correo=bloque('📦 Envíos por correo (Mercado Envíos / colecta)',[
+    linea('Cargos por envío',cCargo,Object.entries(cx).filter(([k])=>!/^Anulaci|^Bonif/.test(k)).reduce((a,[,x])=>a+x.n,0)),
+    linea('Anulaciones y bonificaciones',cAnul,Object.entries(cx).filter(([k])=>/^Anulaci|^Bonif/.test(k)).reduce((a,[,x])=>a+x.n,0)),
+    linea('Envío pagado por el comprador',cComp,vc.filter(o=>o.ec>0).length)],totC,
+    envC?`${envC.toLocaleString('es-AR')} ${envC===1?'envío':'envíos'} · resultado por envío: <b>${fmt(totC/envC)}</b>`:'');
+  // Full
+  const fu=porNombre(r,k=>/Full/i.test(k));
+  const rFull=r.filter(o=>o.log==='Full');
+  const envFull=porNombre(rFull,k=>/env[ií]os? de Mercado Libre/i.test(k));
+  const vFull=rFull.filter(o=>o.tipo==='Venta'&&o.pcd>0), compFull=vFull.reduce((a,o)=>a+(o.ec||0),0);
+  const filasFull=Object.entries(fu).sort((a,b)=>b[1].v-a[1].v).map(([k,x])=>linea(k,-x.v,x.n))
+    .concat(Object.entries(envFull).map(([k,x])=>linea(k+' (ventas Full)',-x.v,x.n)))
+    .concat([linea('Envío pagado por el comprador (ventas Full)',compFull,vFull.filter(o=>o.ec>0).length)]);
+  const totFull=-Object.values(fu).reduce((a,x)=>a+x.v,0)-Object.values(envFull).reduce((a,x)=>a+x.v,0)+compFull;
+  const full=bloque('🏬 Full (colecta, almacenamiento, retiros, stock antiguo)',filasFull,totFull,vFull.length?`${vFull.length.toLocaleString('es-AR')} ${vFull.length===1?'venta':'ventas'} por Full`:'');
+  // Publicidad
+  const ad=porNombre(r,k=>/publicidad|Product Ads|Ads\b/i.test(k));
+  const totAd=-Object.values(ad).reduce((a,x)=>a+x.v,0);
+  const vend=r.filter(o=>o.tipo==='Venta'&&o.pcd>0).reduce((a,o)=>a+o.pcd,0);
+  const pub=bloque('📣 Publicidad',Object.entries(ad).map(([k,x])=>linea(k,-x.v,x.n)),totAd,vend>0&&totAd?`Es el ${pctf(-totAd/vend)} de lo facturado en el período.`:'');
+  $('dsBody').innerHTML=(sinDet?`<p class="note" style="background:#FFF4D6;padding:8px 10px;border-radius:10px;">⚠️ ${sinDet.toLocaleString('es-AR')} operaciones se cargaron antes de este detalle. Volvé a subir el reporte de ese mes para verlas desglosadas (se reemplaza solo).</p>`:'')+
+    `<div class="grid2">${flex}${correo}</div><div class="grid2">${full}${pub}</div><p class="note">En verde lo que entra (reintegros, envío pagado por el comprador); en rojo lo que se paga. Respeta el filtro de cuenta.</p>`;
 }
 // ===== Ranking de productos por rentabilidad =====
 // Bruta = precio de venta − costo de fabricación. Neta = lo que me quedó (después de ML y cadete) − costo.
@@ -878,6 +948,7 @@ function card(o){
 $('fLog').addEventListener('change',()=>{const f=$('fLog').value==='Flex';$('fFlex').hidden=!f;if(!f)$('fFlex').value='';});
 $('resMes').addEventListener('change',renderResumen);
 ['rkMes','rkGrupo','rkOrden','rkVer'].forEach(id=>$(id).addEventListener('change',renderRanking));
+$('dsMes').addEventListener('change',renderDesglose);
 ['fMes','fCuenta','fTipo','fLog','fFlex','fOrden','fVista'].forEach(id=>$(id).addEventListener('change',()=>{shown=200;draw();}));
 $('fSku').addEventListener('input',()=>{shown=200;draw();});
 $('more').onclick=()=>{shown+=200;draw();};
