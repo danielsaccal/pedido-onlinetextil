@@ -1589,7 +1589,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v195</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v196</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -9539,7 +9539,7 @@ function abrirCrearVideo(){
   document.getElementById('pub-cont').innerHTML = `
     <p class="note" style="text-align:left;margin:0 0 10px;">¿Cómo querés armarlo?</p>
     <div style="display:grid;gap:8px;">
-      <button type="button" class="btn btn-ghost" style="text-align:left;" onclick="cerrarPublicar(); location.href='videos.html'">✍️ <b>Manual</b><br><span class="note">Subís las fotos y escribís cada escena.</span></button>
+      <button type="button" class="btn btn-ghost" style="text-align:left;" onclick="cerrarPublicar(); location.href='videos.html?v=' + Date.now()">✍️ <b>Manual</b><br><span class="note">Subís las fotos y escribís cada escena.</span></button>
       <button type="button" class="btn btn-ghost" style="text-align:left;" onclick="videoPorCategoria()">🗂️ <b>Automático: una categoría completa</b><br><span class="note">Toma los productos de la categoría con sus fotos.</span></button>
       <button type="button" class="btn btn-ghost" style="text-align:left;" onclick="videoPorProductos()">🏷️ <b>Automático: elegir productos</b><br><span class="note">Buscás y tildás los productos que querés mostrar.</span></button>
     </div>`;
@@ -9600,7 +9600,7 @@ async function generarVideoAuto(modo){
   }
   try{
     await idbGuardar('video_auto', { escenas, nombre, apertura, prods, oferta: desc ? `${desc}% OFF` : '', fecha: Date.now() });
-    cerrarPublicar(); location.href = 'videos.html?auto=1';
+    cerrarPublicar(); location.href = 'videos.html?auto=1&v=' + Date.now();
   } catch(e){ alert('No se pudo preparar el video: ' + e.message); }
 }
 
@@ -9641,7 +9641,7 @@ async function difVideo(){
   const cats = [...new Set(difSkus.map(x => CATALOGO[x.ci].categoria))];
   try{
     await idbGuardar('video_auto', { escenas, nombre: 'Nuevo ingreso', apertura: 'Nuevo ingreso', prods: cats.join(' • '), oferta: '', fecha: Date.now() });
-    cerrarPublicar(); location.href = 'videos.html?auto=1';
+    cerrarPublicar(); location.href = 'videos.html?auto=1&v=' + Date.now();
   } catch(e){ alert('No se pudo preparar el video: ' + e.message); }
 }
 function difWhatsApp(){
@@ -9872,7 +9872,7 @@ async function abrirResultadosML(){
   try{ await registrarHistorialCostos(); } catch(e){ console.error('historial de costos', e); }
   try{ await idbGuardar('nombres_sku', mapaNombresSku()); } catch(e){}
   cerrarPublicar();
-  location.href = 'resultados-ml.html';
+  location.href = 'resultados-ml.html?v=' + Date.now();
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -17421,7 +17421,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v195';
+const APP_VERSION = '2026-10-02-v196';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
