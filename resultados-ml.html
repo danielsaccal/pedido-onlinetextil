@@ -554,7 +554,7 @@ function costoUnit(base,fecha){const h=COSTOS[String(base||'').toUpperCase()];if
   let c=null;for(const x of h){if(x.fecha<=f)c=x.costo;else break;}return c!=null?c:h[0].costo;}
 function aplicarCostos(){for(const d of DATA)for(const o of d.rows){
   const esVenta=o.tipo==='Venta'&&o.pcd>0;const cu=esVenta&&o.unid?costoUnit(o.skuBase,o.fecha):null;
-  o.costo=cu!=null?cu*o.unid:null;o.gan=o.costo!=null?o.neto-o.costo:null;o.ganPct=o.gan!=null&&o.pcd>0?o.gan/o.pcd:null;}}
+  o.costo=cu!=null?cu*o.unid:null;o.gan=o.costo!=null?o.neto-o.costo:null;o.ganPct=o.gan!=null&&o.costo>0?o.gan/o.costo:null;}}
 const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 function searchQ(){const raw=$('fSku').value.trim(), qd=raw.replace(/[#\s.\-]/g,'');return {raw,q:norm(raw),qd,isNum:/^\d{8,}$/.test(qd)};}
 if(false)$('names').addEventListener('change',async ev=>{
@@ -748,7 +748,7 @@ function renderResumen(){
   </div>
   ${(()=>{const cc=vs.filter(o=>o.costo!=null);if(!cc.length)return '<p class="note">Costo y ganancia: los SKU de estas ventas todavía no tienen costo cargado en la app.</p>';
     const costo=cc.reduce((a,o)=>a+o.costo,0),qc=cc.reduce((a,o)=>a+o.neto,0),rc=cc.reduce((a,o)=>a+o.pcd,0),g=qc-costo;
-    return `<div class="res-strip" style="margin-top:8px;"><div><span>Costo de lo vendido</span><b class="neg">${fmt(-costo)}</b></div><div class="q"><span>Ganancia</span><b>${fmt(g)} <small>${rc>0?(g/rc*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+' %':''}</small></b></div></div>
+    return `<div class="res-strip" style="margin-top:8px;"><div><span>Costo de lo vendido</span><b class="neg">${fmt(-costo)}</b></div><div class="q"><span>Ganancia <small style="font-weight:500;">(% sobre el costo)</small></span><b>${fmt(g)} <small>${costo>0?(g/costo*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+' %':''}</small></b></div></div>
     <p class="note">Sobre ${cc.length.toLocaleString('es-AR')} de ${vs.length.toLocaleString('es-AR')} ventas (las que tienen costo). Costo a la fecha de cada venta.</p>`;})()}
   <details class="res-det" ${wasOpen?'open':''}><summary>Ver detalle</summary>
   <span class="res-cta">${vs.length.toLocaleString('es-AR')} ventas${fc?' · cuenta '+fc:' · todas las cuentas'} · incluye todo lo que ML cobró en el mes</span>
@@ -824,7 +824,7 @@ function renderSkuSum(r){
       const Uc=cc.reduce((a,o)=>a+(o.unid||0),0),C=cc.reduce((a,o)=>a+o.costo,0),Q=cc.reduce((a,o)=>a+(o.neto||0),0),V=cc.reduce((a,o)=>a+o.pcd,0),G=Q-C;
       const cu=Uc?C/Uc:0,qu=Uc?Q/Uc:0,gu=Uc?G/Uc:0;
       return `<div class="saldo" style="background:#F4F1EC;color:#2B2233;margin-top:8px;"><span>Costo real del producto<small style="display:block;font-weight:500;color:#8A8072;">tela + confección + insumos, a la fecha de cada venta</small></span><span class="sv"><b style="color:#A6432F;">${fmt(cu)}</b><em style="color:#6B6258;">${fmt(C)} en total</em></span></div>
-        <div class="saldo" style="margin-top:8px;background:${G<0?'#A6432F':'#2F7A47'};"><span>Ganancia por unidad<small style="display:block;font-weight:500;opacity:.85;">le queda − costo</small></span><span class="sv"><b style="color:#fff;">${fmt(gu)}</b><em>${fmt(G)} en total · ${V>0?pctf(G/V):''} sobre lo vendido</em></span></div>
+        <div class="saldo" style="margin-top:8px;background:${G<0?'#A6432F':'#2F7A47'};"><span>Ganancia por unidad<small style="display:block;font-weight:500;opacity:.85;">le queda − costo (el % es sobre el costo)</small></span><span class="sv"><b style="color:#fff;">${fmt(gu)}</b><em>${fmt(G)} en total · ${C>0?pctf(G/C):''} sobre el costo</em></span></div>
         ${cc.length<vs.length?`<p class="inc">Sobre ${cc.length} de ${vs.length} ventas (las que tienen costo).</p>`:''}`;})()}
     <p class="inc">Acreditado por ML, antes del cadete: ${fmt(S('acred'))}${U?' · '+pu(S('acred'))+' por unidad':''}</p>`;
 }
@@ -907,7 +907,7 @@ function renderRanking(){
   }
   const gs=[...G.values()].map(g=>{const con=g.nC>0;
     return {...g,con,parcial:con&&g.nC<g.n,bruta:con?g.vendC-g.costo:null,neta:con?g.quedoC-g.costo:null,
-      brutaP:con&&g.vendC>0?(g.vendC-g.costo)/g.vendC:null,netaP:con&&g.vendC>0?(g.quedoC-g.costo)/g.vendC:null};});
+      brutaP:con&&g.costo>0?(g.vendC-g.costo)/g.costo:null,netaP:con&&g.costo>0?(g.quedoC-g.costo)/g.costo:null};});
   const ord=$('rkOrden').value, ver=$('rkVer').value;
   const val=g=>ord==='unid'?g.unid:ord==='vend'?g.vend:g[ord];
   const conV=gs.filter(g=>val(g)!=null), sinV=gs.filter(g=>val(g)==null);
@@ -915,7 +915,7 @@ function renderRanking(){
   let lista=ver==='todo'?conV.concat(sinV):conV.slice(0,20);
   // cifras generales
   const conC=gs.filter(g=>g.con);
-  const tN=conC.reduce((a,g)=>a+g.neta,0), tB=conC.reduce((a,g)=>a+g.bruta,0), tV=conC.reduce((a,g)=>a+g.vendC,0);
+  const tN=conC.reduce((a,g)=>a+g.neta,0), tB=conC.reduce((a,g)=>a+g.bruta,0), tV=conC.reduce((a,g)=>a+g.costo,0);
   const pierden=conC.filter(g=>g.neta<0);
   const mejor=conC.slice().sort((a,b)=>b.neta-a.neta)[0], peor=conC.slice().sort((a,b)=>a.netaP-b.netaP)[0];
   const pf=p=>p==null?'–':pctf(p);
@@ -933,7 +933,7 @@ function renderRanking(){
       <td class="${g.bruta<0?'neg':''}">${g.con?fmt(g.bruta)+`<small class="meta" style="display:block;">${pf(g.brutaP)}</small>`:''}</td>
       <td class="${g.neta<0?'neg':''}">${g.con?`<b>${fmt(g.neta)}</b><small class="meta" style="display:block;">${pf(g.netaP)}</small>`:''}</td></tr>`).join('')}
     </tbody></table></div>
-    <p class="note"><b>Bruta</b> = precio de venta − costo de fabricación. <b>Neta</b> = lo que me quedó después de Mercado Libre y el cadete − costo. % sobre la facturación.${gs.some(g=>g.parcial)?' * Parte de las ventas no tiene costo; la ganancia se calcula solo sobre las que sí.':''}</p>`;
+    <p class="note"><b>Bruta</b> = precio de venta − costo de fabricación. <b>Neta</b> = lo que me quedó después de Mercado Libre y el cadete − costo. % sobre el costo (si el costo es $ 100 y ganás $ 11, es 11 %).${gs.some(g=>g.parcial)?' * Parte de las ventas no tiene costo; la ganancia se calcula solo sobre las que sí.':''}</p>`;
 }
 function bindKey(el,fn){el.onclick=fn;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fn();}};}
 function bindSales(rows){rows.forEach(el=>bindKey(el,()=>el.nextElementSibling.classList.toggle('open')));}
