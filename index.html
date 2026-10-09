@@ -1589,7 +1589,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v208</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v209</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -9853,6 +9853,25 @@ async function quitarUsuario(mail){
 // ===== Resultados de Mercado Libre (pagina aparte) e historial de costos =====
 // historial_costos: { sku, fecha 'AAAA-MM-DD', costo, desglose } — un registro cada vez que cambia el costo de un SKU.
 // config/costos_ultimo guarda el ultimo costo de cada SKU para no leer todo el historial.
+// por qué un SKU no tiene costo (para avisarlo en Resultados ML)
+function motivoSinCosto(S){
+  S = String(S).toUpperCase();
+  const vinc = fabricacion && fabricacion.vinculos[S];
+  const art = articuloDeSku(S);
+  if(!art && !vinc) return 'No figura como fabricado ni tiene costo de reventa: si lo comprás hecho, cargalo en Costos de reventa; si lo fabricás, asignale artículo de corte y tela en Productos que fabrico.';
+  if(!art) return 'Falta el artículo de corte (Productos que fabrico → ⚠️ Completar).';
+  if(!piezasDeArticuloAny(art)) return `El artículo "${art}" no tiene piezas cargadas (Artículos y cortes).`;
+  const cal = calidadDeSku(S);
+  if(!cal) return 'Falta la tela (Productos que fabrico → ⚠️ Completar).';
+  const telas = Object.keys(telasDatos.telas || {}).filter(c => telaCumpleCalidad(telasDatos.telas[c], cal));
+  if(!telas.length) return `No hay ningún código de tela cargado de la calidad "${String(cal).split('||')[0]}" (pantalla Telas).`;
+  const conPrecio = telas.filter(c => precioMetroTela(c) != null);
+  if(!conPrecio.length) return `La tela ${telas.slice(0, 3).join(', ')} no tiene precio (pantalla Telas).`;
+  const piezas = piezasDeArticuloAny(art);
+  const entra = conPrecio.some(c => { try{ return !calcularCorte(piezas, +telasDatos.telas[c].ancho).avisos.length; } catch(e){ return false; } });
+  if(!entra) return `Las piezas de "${art}" no entran en el ancho de ${conPrecio.slice(0, 3).map(c => c + ' (' + telasDatos.telas[c].ancho + ' cm)').join(', ')}.`;
+  return 'No se pudo calcular el costo.';
+}
 function costoActualSku(S){
   const c = costosDeSku(S); if(!c) return null;
   const x = c.porTela.find(y => y.total != null); if(!x) return null;
@@ -9925,6 +9944,8 @@ async function abrirResultadosML(){
   document.getElementById('pub-modal').style.display = 'block';
   try{ await registrarHistorialCostos(); } catch(e){ console.error('historial de costos', e); }
   try{ if(tablaConsumo === null) await cargarTablaConsumo(); if(fabricacion === null) await cargarFabricacion(); await idbGuardar('nombres_sku', mapaNombresSku()); } catch(e){}
+  try{ const mot = {}; const todos = new Set(skusQueFabrico()); CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => todos.add(String(v.sku).toUpperCase()))));
+    todos.forEach(S => { if(costoUnidadSku(S) == null) mot[S] = motivoSinCosto(S); }); await idbGuardar('motivos_sin_costo', mot); } catch(e){ console.error(e); }
   cerrarPublicar();
   location.href = 'resultados-ml.html?v=' + Date.now();
 }
@@ -17655,7 +17676,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v208';
+const APP_VERSION = '2026-10-02-v209';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
