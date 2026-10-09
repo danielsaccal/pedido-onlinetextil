@@ -966,11 +966,12 @@ function card(o){
     o.tipo!=='Venta'&&`<span class="tag bad">${o.tipo}</span>`,
     !o.rep&&o.flex==='Reintegro en otra venta del envío'&&`<span class="tag bad" title="La otra venta de este envío no está en los reportes cargados o fue cancelada">⚠️ No se encontró la otra venta del envío ${o.envNum}</span>`,
     o.rep&&`<span class="tag" style="background:#E3F0FF;color:#1F4E8C;">🔀 Envío compartido entre ${o.rep.n} productos · le toca el ${pctf(o.rep.sh)}</span>`].filter(Boolean).join('');
-  const L=[['Precio con descuento',o.pcd],['Cargo por vender',o.vender],['Costo por unidad',o.unidad],['Cuotas',o.cuotas],['Envío (neto)',o.envio],
-    [`Reintegro Flex de ML <small class="meta">(vino en la fila del envío ${o.envNum})</small>`,o.reintAparte||0],
+  // envio compartido: se muestra solo la parte del reintegro que le toca a este producto
+  const R=o.rep, envioV=R&&R.lead?(o.envio||0)-(R.F-(o.reintAparte||0)):o.envio;
+  const L=[['Precio con descuento',o.pcd],['Cargo por vender',o.vender],['Costo por unidad',o.unidad],['Cuotas',o.cuotas],['Envío (neto)',Math.abs(envioV)<0.005?0:envioV],
+    R?[`🔀 Reintegro Flex de ML <small class="meta">(su parte: ${pctf(R.sh)} de ${fmt2(R.F)} del envío ${o.envNum})</small>`,R.F*R.sh]:[`Reintegro Flex de ML <small class="meta">(vino en la fila del envío ${o.envNum})</small>`,o.reintAparte||0],
     ['Full',o.full],['Publicidad',o.ads],['Otros',o.otros],['Retenciones',o.ret]].filter(x=>x[1]);
-  if(o.rep&&Math.round(o.ajEnv||0))L.push([`🔀 Reparto del envío compartido <small class="meta">(${o.rep.lead?'el reintegro vino en esta venta; se reparte con '+(o.rep.n===2?'la otra':'las otras '+(o.rep.n-1)):'parte del reintegro de '+fmt2(o.rep.F)+' que vino en otra venta del envío'})</small>`,o.ajEnv]);
-  const L2=o.cad?[['Acreditado por ML',o.acred+(o.ajEnv||0),'sub'],[o.rep?`Costo cadete Flex <small class="meta">(${pctf(o.rep.sh)} de ${fmt2(-o.rep.T)})</small>`:'Costo cadete Flex',o.cad]]:[];
+  const L2=o.cad?[['Acreditado por ML',o.acred+(o.ajEnv||0),'sub'],[o.rep?`🔀 Costo cadete Flex <small class="meta">(su parte: ${pctf(o.rep.sh)} de ${fmt2(-o.rep.T)})</small>`:'Costo cadete Flex',o.cad]]:[];
   const per=v=>o.pcd>0?(v/o.pcd*100).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}):'';
   const u=v=>o.unid&&o.pcd>0?fmt2(v/o.unid):'';
   const det=`<div>${tags}</div><table><tr><td></td><td class="meta">Monto</td><td class="meta">Por unidad</td><td class="meta">De cada $100</td></tr>`+
