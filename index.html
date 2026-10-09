@@ -1589,7 +1589,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v196</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v197</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2150,6 +2150,21 @@ a.grilla-celda{display:block;}
       </div>
       <div id="cf-lista"></div>
       <div id="cf-guardar" style="display:none;position:sticky;bottom:10px;z-index:5;margin-top:10px;"><button type="button" onclick="guardarConfeccion()" style="width:100%;padding:12px;border:none;border-radius:12px;background:#3D9A5B;color:#fff;font-weight:700;font-size:0.95rem;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.15);">💾 Guardar</button></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-costos-reventa">
+    <div class="form-card" style="max-width:900px;">
+      <h2>Costos de reventa</h2>
+      <p class="note" style="text-align:left;margin-bottom:10px;">Lo que pagás por cada producto que comprás hecho. Se usa para la ganancia en <b>Resultados ML</b> y para ver el margen. Guardá con el botón verde.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <input id="cr-buscar" placeholder="🔍 Producto o SKU" oninput="renderCostosReventa()" style="flex:2;min-width:180px;padding:10px;border:1px solid var(--line);border-radius:12px;">
+        <select id="cr-cat" onchange="renderCostosReventa()" style="flex:1;min-width:150px;padding:10px;border:1px solid var(--line);border-radius:12px;"></select>
+        <label style="display:inline-flex;gap:6px;align-items:center;font-size:0.82rem;"><input type="checkbox" id="cr-sin" onchange="renderCostosReventa()"> Solo sin costo</label>
+      </div>
+      <div id="cr-lista"></div>
+      <div id="cr-guardar" style="display:none;position:sticky;bottom:10px;z-index:5;margin-top:10px;"><button type="button" onclick="guardarCostosReventa()" style="width:100%;padding:12px;border:none;border-radius:12px;background:#3D9A5B;color:#fff;font-weight:700;font-size:0.95rem;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.15);">💾 Guardar</button></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
   </div>
@@ -5625,7 +5640,7 @@ const GRUPOS_INICIO = {
     [['🖼️ Nuevo ingreso (flyers)', 'abrirNuevoIngreso()'], ['📣 Anuncios y promociones', 'abrirAnuncio()']],
   ] },
   d: { lado: 'int', titulo: 'Ventas', items: [['📋 Historial de pedidos', 'abrirHistorial()'], ['🤖 Pedido con IA (texto libre)', 'abrirPedidoIA()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()'], ['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
-  f: { lado: 'int', titulo: 'Catálogo', items: [['🗂️ Ordenar categorías', 'abrirCategorias()'], ['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['📷 Fotos de productos', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
+  f: { lado: 'int', titulo: 'Catálogo', items: [['💲 Costos de reventa', 'abrirCostosReventa()'], ['🗂️ Ordenar categorías', 'abrirCategorias()'], ['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['📷 Fotos de productos', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
   g: { lado: 'int', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas'], columnas: [
     [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()'], ['💰 Costos de confección', 'abrirConfeccion()']],
     [['📊 Stock y prioridades', 'abrirStock()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📋 Nueva orden de trabajo', 'abrirAsistenteOT()']],
@@ -8906,6 +8921,7 @@ function cambiosSinGuardar(paso){
   if(paso === 'step-stock') return typeof stockPend !== 'undefined' && n(stockPend);
   if(paso === 'step-reventa') return typeof rvPend !== 'undefined' && n(rvPend);
   if(paso === 'step-confeccion') return typeof cfPend !== 'undefined' && n(cfPend);
+  if(paso === 'step-costos-reventa') return typeof crPend !== 'undefined' && n(crPend);
   return false;
 }
 window.addEventListener('beforeunload', e => { const a = document.querySelector('.step.active'); if(a && cambiosSinGuardar(a.id)){ e.preventDefault(); e.returnValue = ''; } });
@@ -9841,6 +9857,12 @@ async function registrarHistorialCostos(){
       const a = costoActualSku(S); if(!a) return;
       if(ult[S] == null || Math.abs(ult[S] - a.costo) >= 1){ nuevos.push({ sku: S, fecha: hoy, costo: a.costo, desglose: a.desglose }); ult[S] = a.costo; }
     });
+    // productos de reventa: costo de compra cargado por el dueño
+    if(costosReventa === null) await cargarCostosReventa();
+    Object.entries(costosReventa || {}).forEach(([S, c]) => {
+      if(fabricados.has(S) || !(c > 0)) return;
+      if(ult[S] == null || Math.abs(ult[S] - c) >= 1){ nuevos.push({ sku: S, fecha: hoy, costo: c, desglose: { reventa: true } }); ult[S] = c; }
+    });
     // telas que tambien se venden como tela (mismo codigo): costo por metro. Solo se usa en Resultados ML.
     Object.keys((telasDatos && telasDatos.telas) || {}).forEach(cod => {
       const S = String(cod).toUpperCase(); if(fabricados.has(S)) return;
@@ -9873,6 +9895,56 @@ async function abrirResultadosML(){
   try{ await idbGuardar('nombres_sku', mapaNombresSku()); } catch(e){}
   cerrarPublicar();
   location.href = 'resultados-ml.html?v=' + Date.now();
+}
+
+// ===== Costos de compra de los productos de reventa (config/costos_reventa: { c: { SKU: costo } }) =====
+let costosReventa = null; const crPend = {};
+async function cargarCostosReventa(){ try{ const d = await db.collection('config').doc('costos_reventa').get(); costosReventa = d.exists ? (d.data().c || {}) : {}; } catch(e){ costosReventa = {}; } }
+async function abrirCostosReventa(){
+  if(!esDueno()){ alert('Solo el dueño puede ver los costos.'); return; }
+  mostrarPaso('step-costos-reventa');
+  if(costosReventa === null) await cargarCostosReventa();
+  const s = document.getElementById('cr-cat'), cats = [...new Set(productosReventa().map(x => x.cat))];
+  s.innerHTML = '<option value="">Todas las categorías</option>' + cats.map(c => `<option>${escaparHtml(c)}</option>`).join('');
+  renderCostosReventa();
+}
+function crValor(s){ return crPend[s] !== undefined ? crPend[s] : (costosReventa[s] != null ? String(costosReventa[s]).replace('.', ',') : ''); }
+function renderCostosReventa(){
+  const q = normBusqueda(document.getElementById('cr-buscar').value), cat = document.getElementById('cr-cat').value, sin = document.getElementById('cr-sin').checked;
+  const prods = productosReventa().filter(x => (!cat || x.cat === cat) && (!q || normBusqueda(x.p.nombre + ' ' + x.p.variantes.map(v => v.sku).join(' ')).includes(q)));
+  window.__crSkus = [];
+  const html = prods.map((x, pi) => {
+    const vs = x.p.variantes.filter(v => !sin || !crValor(String(v.sku).toUpperCase()));
+    if(!vs.length) return '';
+    return `<div style="border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;background:#fff;">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;"><b style="flex:1;">${escaparHtml(x.p.nombre)}</b><span class="note" style="margin:0;">${escaparHtml(x.cat)}</span>
+        <input type="text" inputmode="decimal" placeholder="mismo costo para todas" style="width:150px;padding:6px;border:1px solid var(--line);border-radius:8px;font-size:0.8rem;" onkeydown="if(event.key==='Enter'){crTodo(${pi}, this.value); this.value='';}"><span class="note" style="margin:0;">↵</span></div>
+      ${vs.map(v => { const s = String(v.sku).toUpperCase(); const i = window.__crSkus.push(s) - 1; const pr = parsePrice(v.precio), c = numAr(crValor(s)); const mg = c > 0 && pr > 0 ? (pr - c) / c : null;
+        return `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 110px 120px 70px;gap:6px;align-items:center;padding:4px 0;border-top:1px solid var(--line);font-size:0.85rem;">
+          <b>${escaparHtml(s)}</b><span style="color:#6B6258;">${escaparHtml(v.desc || '')}</span><span style="text-align:right;">${pr ? formatPrice(pr) : ''}</span>
+          <input inputmode="decimal" value="${escapeAttr(crValor(s))}" placeholder="costo" oninput="crCambiar(${i}, this.value)" style="padding:7px;border:1px solid var(--line);border-radius:8px;text-align:right;">
+          <span style="text-align:right;font-weight:700;color:${mg == null ? '#A89E90' : mg < 0.2 ? '#A6432F' : mg < 0.4 ? '#8A6417' : '#2F7A47'};" title="Margen sobre el costo">${mg == null ? '—' : Math.round(mg * 100) + ' %'}</span></div>`; }).join('')}</div>`;
+  }).join('');
+  document.getElementById('cr-lista').innerHTML = html ? `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 110px 120px 70px;gap:6px;font-size:0.72rem;color:#8A8072;padding:0 10px 4px;"><span>SKU</span><span>Descripción</span><span style="text-align:right;">Precio lista</span><span style="text-align:right;">Costo de compra $</span><span style="text-align:right;">Margen</span></div>` + html : '<p class="empty-msg">No hay productos con ese filtro.</p>';
+}
+function crMostrarGuardar(){ const n = Object.keys(crPend).length, b = document.getElementById('cr-guardar'); b.style.display = n ? 'block' : 'none'; b.querySelector('button').textContent = `💾 Guardar (${n} SKU)`; }
+function crCambiar(i, v){ crPend[window.__crSkus[i]] = v; crMostrarGuardar(); }
+function crTodo(pi, v){
+  const q = normBusqueda(document.getElementById('cr-buscar').value), cat = document.getElementById('cr-cat').value;
+  const prods = productosReventa().filter(x => (!cat || x.cat === cat) && (!q || normBusqueda(x.p.nombre + ' ' + x.p.variantes.map(w => w.sku).join(' ')).includes(q)));
+  const x = prods[pi]; if(!x || !v.trim()) return;
+  x.p.variantes.forEach(w => { crPend[String(w.sku).toUpperCase()] = v.trim(); });
+  renderCostosReventa(); crMostrarGuardar();
+}
+async function guardarCostosReventa(){
+  const nuevo = { ...costosReventa };
+  Object.entries(crPend).forEach(([s, v]) => { const n = numAr(v); if(n > 0) nuevo[s] = n; else delete nuevo[s]; });
+  try{
+    await db.collection('config').doc('costos_reventa').set({ c: nuevo, actualizado: new Date().toISOString() });
+    costosReventa = nuevo; Object.keys(crPend).forEach(k => delete crPend[k]);
+    crMostrarGuardar(); renderCostosReventa();
+    registrarHistorialCostos().catch(() => {});
+  } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -17421,7 +17493,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v196';
+const APP_VERSION = '2026-10-02-v197';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
