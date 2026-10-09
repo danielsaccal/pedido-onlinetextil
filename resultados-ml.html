@@ -200,6 +200,13 @@ details.box{background:var(--surface);border:1px solid var(--line);border-radius
 .empty b{display:block;color:var(--purple);font:600 1.2rem "Fraunces",serif;margin-bottom:6px}
 .err{background:var(--bad-soft);color:var(--ink);border-radius:10px;padding:12px 14px;margin-bottom:14px;display:none}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+details.pleg{margin:10px 0}
+details.pleg>summary{list-style:none;cursor:pointer;font-weight:800;font-size:1.02rem;color:var(--ink,#2B2233);background:#fff;border:1px solid var(--line,#E3DCD2);border-radius:14px;padding:13px 16px;display:flex;align-items:center;gap:8px}
+details.pleg>summary::-webkit-details-marker{display:none}
+details.pleg>summary small{font-weight:600;color:#8A8072;font-size:.8rem}
+details.pleg[open]>summary{border-bottom-left-radius:0;border-bottom-right-radius:0;margin-bottom:0}
+details.pleg>.panel,details.pleg>.pleg-body{margin-top:0;border-top-left-radius:0;border-top-right-radius:0}
+details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);border-top:none;border-radius:0 0 14px 14px;padding:12px}
 </style>
 </head>
 <body>
@@ -232,16 +239,16 @@ details.box{background:var(--surface);border:1px solid var(--line);border-radius
     </div>
     <div id="resBody"></div>
   </section>
+  <details class="pleg" data-k="desglose"><summary>🚚 Envíos, Full y publicidad</summary>
   <section class="panel" id="desglose">
     <div class="res-head" style="flex-wrap:wrap;gap:8px;">
-      <h2>🚚 Envíos, Full y publicidad</h2>
       <select id="dsMes" aria-label="Mes"></select>
     </div>
     <div id="dsBody"></div>
-  </section>
+  </section></details>
+  <details class="pleg" data-k="ranking"><summary>🏆 Ranking de productos</summary>
   <section class="panel" id="ranking">
     <div class="res-head" style="flex-wrap:wrap;gap:8px;">
-      <h2>🏆 Ranking de productos</h2>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         <select id="rkMes" aria-label="Mes"></select>
         <select id="rkGrupo" aria-label="Agrupar"><option value="prod">Por producto</option><option value="sku">Por SKU</option></select>
@@ -254,9 +261,10 @@ details.box{background:var(--surface);border:1px solid var(--line);border-radius
       </div>
     </div>
     <div id="rkBody"></div>
-  </section>
+  </section></details>
   <div hidden><b id="tVend"></b><b id="tAcr"></b><b id="tCad"></b><b id="tNeto"></b><b id="tN"></b><p id="tNote"></p></div>
 
+  <details class="pleg" data-k="lista"><summary>📋 Venta por venta <small id="cntResumen"></small></summary><div class="pleg-body">
   <div class="search-wrap">
     <input type="search" id="fSku" placeholder="Buscar SKU, nombre (ej. lienzo) o N.º de operación" aria-label="Buscar">
     <div class="filters">
@@ -293,16 +301,17 @@ details.box{background:var(--surface);border:1px solid var(--line);border-radius
     <th id="thFecha">Fecha</th><th>SKU</th><th>Unid.</th><th>Precio c/desc.</th><th>Le queda</th><th>Por unidad</th><th>%</th><th>Costo</th><th>Ganancia</th>
   </tr></thead><tbody id="list"></tbody></table></div>
   <button class="btn ghost more" id="more" hidden>Ver más</button>
+  </div></details>
 
-  <p class="sec">Mes por mes</p>
+  <details class="pleg" data-k="anual"><summary>📅 Mes por mes</summary>
   <section class="panel" id="anual">
     <div class="tw"><table class="ventas anual"><thead><tr><th>Mes</th><th>Ventas</th><th>Unidades</th><th>Vendido c/desc.</th><th>Acreditado ML</th><th>Cadete</th><th>Le queda</th><th>% le queda</th></tr></thead><tbody id="anualBody"></tbody></table></div>
     <div id="anualBars" style="margin-top:12px"></div>
     <p class="note" id="anualNote"></p>
-  </section>
+  </section></details>
 
-  <p class="sec">Gráficos</p>
-  <div class="grid2">
+  <details class="pleg" data-k="graficos"><summary>📊 Gráficos</summary>
+  <div class="grid2 pleg-body">
     <section class="panel">
       <h2>Ventas según % que le queda</h2>
       <div id="hist"></div>
@@ -311,7 +320,7 @@ details.box{background:var(--surface);border:1px solid var(--line);border-radius
       <h2>Dónde se fue la plata</h2>
       <div id="conc"></div>
     </section>
-  </div>
+  </div></details>
 
   <p class="sec">Ajustes</p>
   <details class="box"><summary>Costo del cadete por envío Flex</summary>
@@ -665,6 +674,7 @@ function draw(){
   renderDesglose();
   // lista
   $('count').textContent=r.length.toLocaleString('es-AR')+' operaciones';
+  {const c=$('cntResumen');if(c)c.textContent='· '+r.length.toLocaleString('es-AR')+' operaciones';}
   renderList(r);
   const sq=searchQ();
   if(sq.isNum&&r.length&&r.length<=5)$('list').querySelectorAll('tr.d').forEach(x=>x.classList.add('open'));
@@ -953,6 +963,8 @@ $('fLog').addEventListener('change',()=>{const f=$('fLog').value==='Flex';$('fFl
 $('resMes').addEventListener('change',renderResumen);
 ['rkMes','rkGrupo','rkOrden','rkVer'].forEach(id=>$(id).addEventListener('change',renderRanking));
 $('dsMes').addEventListener('change',renderDesglose);
+document.querySelectorAll('details.pleg').forEach(d=>{const k='ml.pleg.'+d.dataset.k;try{if(localStorage.getItem(k)==='1')d.open=true;}catch(e){}
+  d.addEventListener('toggle',()=>{try{localStorage.setItem(k,d.open?'1':'0');}catch(e){}});});
 ['fMes','fCuenta','fTipo','fLog','fFlex','fOrden','fVista'].forEach(id=>$(id).addEventListener('change',()=>{shown=200;draw();}));
 $('fSku').addEventListener('input',()=>{shown=200;draw();});
 $('more').onclick=()=>{shown+=200;draw();};
