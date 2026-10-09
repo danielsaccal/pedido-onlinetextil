@@ -497,11 +497,23 @@ function applyCadete(){
 function applyCadeteBase(){
   for(const d of DATA)for(const o of d.rows)fixRow(o);
   autoZonas();
-  for(const d of DATA)for(const o of d.rows){
-    o.cad=o.zb?-(+ZCOST[AMTZ[o.zb]]||0):0;
-    o.neto=o.acred+o.cad;
-    o.pct=o.pcd>0?o.neto/o.pcd:null;
-    o.aUnit=o.unid&&o.pcd>0?o.neto/o.unid:null;
+  for(const d of DATA){
+    for(const o of d.rows){o.cad=o.zb?-(+ZCOST[AMTZ[o.zb]]||0):0;o.ajEnv=0;o.rep=null;}
+    // envio compartido (compra de carrito): el reintegro Flex y el cadete se reparten entre los productos del envio, segun el precio
+    const G={};
+    d.rows.forEach(o=>{if(o.tipo==='Venta'&&o.log==='Flex'&&o.pcd>0&&o.envNum)(G[o.envNum]=G[o.envNum]||[]).push(o);});
+    Object.values(G).forEach(g=>{
+      if(g.length<2)return;
+      const lead=g.find(o=>o.flexMonto!=null)||g[0];
+      const F=lead.flexMonto||0, T=g.reduce((a,o)=>a+(o.cad||0),0), S=g.reduce((a,o)=>a+o.pcd,0);
+      if(!(S>0)||(!F&&!T))return;
+      g.forEach(o=>{const sh=o.pcd/S;o.ajEnv=F*sh-(o===lead?F:0);o.cad=T*sh;o.rep={n:g.length,F,T,sh,lead:o===lead};});
+    });
+    for(const o of d.rows){
+      o.neto=o.acred+(o.ajEnv||0)+o.cad;
+      o.pct=o.pcd>0?o.neto/o.pcd:null;
+      o.aUnit=o.unid&&o.pcd>0?o.neto/o.unid:null;
+    }
   }
 }
 function renderCad(){
@@ -948,11 +960,13 @@ function toggleGroup(el,g){
 function card(o){
   const tags=[o.log&&`<span class="tag">${o.log}</span>`,o.pubT&&`<span class="tag">${o.pubT}</span>`,
     o.flex&&`<span class="tag ${/10 %|en contra|Sin reintegro/.test(o.flex)?'bad':'warn'}">${o.flex}</span>`,
-    o.tipo!=='Venta'&&`<span class="tag bad">${o.tipo}</span>`].filter(Boolean).join('');
+    o.tipo!=='Venta'&&`<span class="tag bad">${o.tipo}</span>`,
+    o.rep&&`<span class="tag" style="background:#E3F0FF;color:#1F4E8C;">🔀 Envío compartido entre ${o.rep.n} productos · le toca el ${pctf(o.rep.sh)}</span>`].filter(Boolean).join('');
   const L=[['Precio con descuento',o.pcd],['Cargo por vender',o.vender],['Costo por unidad',o.unidad],['Cuotas',o.cuotas],['Envío (neto)',o.envio],
     [`Reintegro Flex de ML <small class="meta">(vino en la fila del envío ${o.envNum})</small>`,o.reintAparte||0],
     ['Full',o.full],['Publicidad',o.ads],['Otros',o.otros],['Retenciones',o.ret]].filter(x=>x[1]);
-  const L2=o.cad?[['Acreditado por ML',o.acred,'sub'],['Costo cadete Flex',o.cad]]:[];
+  if(o.rep&&Math.round(o.ajEnv||0))L.push([`🔀 Reparto del envío compartido <small class="meta">(${o.rep.lead?'el reintegro vino en esta venta; se reparte con '+(o.rep.n===2?'la otra':'las otras '+(o.rep.n-1)):'parte del reintegro de '+fmt2(o.rep.F)+' que vino en otra venta del envío'})</small>`,o.ajEnv]);
+  const L2=o.cad?[['Acreditado por ML',o.acred+(o.ajEnv||0),'sub'],[o.rep?`Costo cadete Flex <small class="meta">(${pctf(o.rep.sh)} de ${fmt2(-o.rep.T)})</small>`:'Costo cadete Flex',o.cad]]:[];
   const per=v=>o.pcd>0?(v/o.pcd*100).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}):'';
   const u=v=>o.unid&&o.pcd>0?fmt2(v/o.unid):'';
   const det=`<div>${tags}</div><table><tr><td></td><td class="meta">Monto</td><td class="meta">Por unidad</td><td class="meta">De cada $100</td></tr>`+
@@ -961,7 +975,7 @@ function card(o){
     `<tr class="sum"><td>Le queda</td><td>${fmt2(o.neto)}</td><td>${u(o.neto)}</td><td>${per(o.neto)}</td></tr>`+
     (o.costo!=null?`<tr><td>Costo (${fmt2(o.costo/o.unid)} c/u a la fecha)</td><td class="neg">${fmt2(-o.costo)}</td><td>${u(-o.costo)}</td><td>${per(-o.costo)}</td></tr><tr class="sum"><td>Ganancia</td><td>${fmt2(o.gan)}</td><td>${u(o.gan)}</td><td>${per(o.gan)}</td></tr>`:o.tipo==='Venta'&&o.pcd>0?'<tr><td colspan="4" class="meta">Este SKU no tiene costo cargado en la app.</td></tr>':'')+`</table>`+
     `${o.mp?`<p class="mpbox">Para buscar en Mercado Pago: <b>ID de pago ${o.mp}</b>${o.mpFecha?' · pagado el '+o.mpFecha.split('-').reverse().join('/'):''}${o.mpMedio&&o.mpMedio!=='-'?' · '+o.mpMedio:''}<br>Monto que debería figurar acreditado: <b>${fmt2(o.acred)}</b></p>`:''}<p class="note">Operación ${o.op} · ${o.cuenta}${o.cant?' · Publicación: '+o.sku+(o.cant>1?' × '+o.cant:''):''}${o.psd?' · Precio sin descuento '+fmt2(o.psd):''}${o.flexMonto!=null?' · Monto envío Flex '+fmt2(o.flexMonto):''}${o.nota?'<br>'+o.nota:''}</p>`;
-  const skuCell=o.sku?`<span class="base">${o.skuBase}</span>${NAMES[o.skuBase]?`<span class="var">${NAMES[o.skuBase]}</span>`:''}${o.variante?`<span class="var">${o.variante}</span>`:''}`:`<span class="base">${o.tipo}</span>`;
+  const skuCell=o.sku?`<span class="base">${o.skuBase}${o.rep?' <span title="Envío compartido: el reintegro y el cadete se reparten entre los productos del envío" style="font-size:.72rem;background:#E3F0FF;color:#1F4E8C;border-radius:6px;padding:1px 5px;">🔀 '+o.rep.n+'</span>':''}</span>${NAMES[o.skuBase]?`<span class="var">${NAMES[o.skuBase]}</span>`:''}${o.variante?`<span class="var">${o.variante}</span>`:''}`:`<span class="base">${o.tipo}</span>`;
   return `<tr class="v" tabindex="0"><td>${o.fecha}</td><td>${skuCell}</td><td>${o.unid??''}</td>
     <td>${o.pcd!=null?fmt(o.pcd):''}</td><td>${fmt(o.neto)}</td><td>${o.aUnit!=null?fmt(o.aUnit):''}</td>
     <td class="pct ${cls(o.pct)}">${o.pct==null?'–':pctf(o.pct)}</td>
