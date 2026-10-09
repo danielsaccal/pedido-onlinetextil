@@ -501,10 +501,11 @@ function applyCadete(){
 function marcarRaros(){
   const med=a=>{const s=a.slice().sort((x,y)=>x-y),m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;};
   const porMes={},porSku={};
-  for(const o of allRows()){o.raro=null;if(o.tipo==='Venta'&&o.pcd>0&&o.unid&&o.skuBase){const p=o.pcd/o.unid;(porSku[o.skuBase]=porSku[o.skuBase]||[]).push(p);const k=o.skuBase+'|'+o.periodo;(porMes[k]=porMes[k]||[]).push(p);}}
+  const clave=o=>norm(o.sku||o.skuBase)+'|'+(o.pubT||'');
+  for(const o of allRows()){o.raro=null;if(o.tipo==='Venta'&&o.pcd>0&&o.unid&&o.skuBase){const p=o.pcd/o.unid;(porSku[clave(o)]=porSku[clave(o)]||[]).push(p);const k=clave(o)+'|'+o.periodo;(porMes[k]=porMes[k]||[]).push(p);}}
   for(const o of allRows()){
     if(!(o.tipo==='Venta'&&o.pcd>0&&o.unid&&o.skuBase))continue;
-    const am=porMes[o.skuBase+'|'+o.periodo], at=porSku[o.skuBase];
+    const am=porMes[clave(o)+'|'+o.periodo], at=porSku[clave(o)];
     const base=am&&am.length>=3?am:at; if(!base||base.length<3)continue;
     const m=med(base), p=o.pcd/o.unid;
     if(m>0&&p<m*0.75)o.raro={med:m,pct:1-p/m};
