@@ -1589,7 +1589,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v203</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v204</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -9943,12 +9943,12 @@ function renderCostosReventa(){
     if(!vs.length) return '';
     return `<div style="border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;background:#fff;">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;"><b style="flex:1;">${escaparHtml(x.p.nombre)}</b><span class="note" style="margin:0;">${escaparHtml(x.cat)}</span>
-        <select title="Precio y costo por…" onchange="crUnidad('${escapeAttr(x.p._editKey)}', this.value)" style="padding:5px;border:1px solid var(--line);border-radius:8px;font-size:0.8rem;">${['', 'docena', 'media docena', 'par', 'juego', 'pack'].map(u => `<option value="${u}" ${(unidadesVenta[x.p._editKey] || '') === u ? 'selected' : ''}>${u ? 'por ' + u : 'por unidad'}</option>`).join('')}</select>
+        ${x.p.variantes.every(v => codTela(v.sku)) ? '<span style="font-size:0.8rem;color:#2E5A8C;background:#F2F7FD;border-radius:8px;padding:5px 8px;">🧵 por metro</span>' : ''}<select title="Precio y costo por…" onchange="crUnidad('${escapeAttr(x.p._editKey)}', this.value)" style="padding:5px;border:1px solid var(--line);border-radius:8px;font-size:0.8rem;${x.p.variantes.every(v => codTela(v.sku)) ? 'display:none;' : ''}">${['', 'docena', 'media docena', 'par', 'juego', 'pack'].map(u => `<option value="${u}" ${(unidadesVenta[x.p._editKey] || '') === u ? 'selected' : ''}>${u ? 'por ' + u : 'por unidad'}</option>`).join('')}</select>
         <input type="text" inputmode="decimal" placeholder="mismo costo para todas" style="width:150px;padding:6px;border:1px solid var(--line);border-radius:8px;font-size:0.8rem;" onkeydown="if(event.key==='Enter'){crTodo(${pi}, this.value); this.value='';}"><span class="note" style="margin:0;">↵</span></div>
       ${vs.map(v => { const s = String(v.sku).toUpperCase(); const i = window.__crSkus.push(s) - 1; const pr = parsePrice(v.precio), c = numAr(crValor(s)); const mg = c > 0 && pr > 0 ? (pr - c) / c : null;
         return `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 110px 120px 70px;gap:6px;align-items:center;padding:4px 0;border-top:1px solid var(--line);font-size:0.85rem;">
           <b>${escaparHtml(s)}</b><span style="color:#6B6258;">${escaparHtml(v.desc || '')}</span><span style="text-align:right;">${pr ? formatPrice(pr) + `<small class="meta">${sufijoPrecio(x.p)}</small>` : ''}</span>
-          <div style="position:relative;"><input inputmode="decimal" value="${escapeAttr(crValor(s))}" placeholder="costo" oninput="crCambiar(${i}, this.value)" style="padding:7px;border:1px solid ${codTela(s) ? '#B9D3EE' : 'var(--line)'};border-radius:8px;text-align:right;width:100%;box-sizing:border-box;${codTela(s) ? 'background:#F2F7FD;' : ''}" title="${codTela(s) ? 'Costo por metro de la pantalla Telas (se cambia en los dos lados)' : ''}">${codTela(s) ? '<small style="position:absolute;left:6px;top:-7px;background:#fff;padding:0 3px;font-size:0.62rem;color:#2E5A8C;">🧵 de Telas, por metro</small>' : ''}</div>
+          <div style="position:relative;"><input inputmode="decimal" value="${escapeAttr(crValor(s))}" placeholder="costo" oninput="crCambiar(${i}, this.value)" style="padding:7px;border:1px solid ${codTela(s) ? '#B9D3EE' : 'var(--line)'};border-radius:8px;text-align:right;width:100%;box-sizing:border-box;${codTela(s) ? 'background:#F2F7FD;' : ''}" title="${codTela(s) ? 'Costo por metro de la pantalla Telas (se cambia en los dos lados)' : ''}">${codTela(s) ? '<small style="display:block;text-align:right;font-size:0.66rem;color:#2E5A8C;margin-top:2px;">🧵 de Telas · por metro</small>' : ''}</div>
           <span style="text-align:right;font-weight:700;color:${mg == null ? '#A89E90' : mg < 0.2 ? '#A6432F' : mg < 0.4 ? '#8A6417' : '#2F7A47'};" title="Margen sobre el costo">${mg == null ? '—' : Math.round(mg * 100) + ' %'}</span></div>`; }).join('')}</div>`;
   }).join('');
   document.getElementById('cr-lista').innerHTML = html ? `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 110px 120px 70px;gap:6px;font-size:0.72rem;color:#8A8072;padding:0 10px 4px;"><span>SKU</span><span>Descripción</span><span style="text-align:right;">Precio lista</span><span style="text-align:right;">Costo de compra $</span><span style="text-align:right;">Margen</span></div>` + html : '<p class="empty-msg">No hay productos con ese filtro.</p>';
@@ -17580,7 +17580,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v203';
+const APP_VERSION = '2026-10-02-v204';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
