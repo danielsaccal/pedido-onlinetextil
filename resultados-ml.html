@@ -336,6 +336,18 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
   </details>
 </div>
 
+<details class="box" id="eqPanel"><summary>🔁 Equivalencias de SKU (código en Mercado Libre → código en la app)</summary>
+  <p class="note" style="margin-top:8px;">Si en una publicación de ML el SKU está mal puesto, decile acá a qué código de la app corresponde. Se usa para el nombre, el costo y los rankings; el reporte no se toca. Podés poner un pack: <b>FEL4305 x 12</b>.</p>
+  <div id="eqLista"></div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center;">
+    <input id="eqML" list="eqSinMatch" placeholder="SKU en ML" style="padding:8px;border:1px solid var(--line);border-radius:10px;width:160px;text-transform:uppercase;">
+    <span>→</span>
+    <input id="eqApp" placeholder="SKU en la app (ej: KA131AC o FEL4305 x 12)" style="padding:8px;border:1px solid var(--line);border-radius:10px;flex:1;min-width:200px;text-transform:uppercase;">
+    <button type="button" class="btn" onclick="agregarEquivalencia()">Agregar</button>
+  </div>
+  <datalist id="eqSinMatch"></datalist>
+  <div id="eqSugeridos" style="margin-top:10px;"></div>
+</details>
 <details class="box" id="filesPanel" hidden><summary>Meses guardados</summary>
   <div class="files" id="files" style="margin-top:12px"></div>
   <p class="note">Cada mes queda guardado en este navegador. Si vuelve a subir el mismo mes de la misma cuenta, se reemplaza.</p>
@@ -495,7 +507,7 @@ function autoZonas(){
   if(changed)saveZ();
 }
 function applyCadete(){
-  applyCadeteBase();aplicarCostos();marcarRaros();
+  aplicarEquivalencias();applyCadeteBase();aplicarCostos();marcarRaros();
 }
 // precios raros: venta con precio por unidad 25 % o mas por debajo de lo habitual de ese SKU (mediana del mes; si hay pocas, de todos los meses)
 function marcarRaros(){
@@ -714,6 +726,7 @@ function draw(){
   renderResumen();
   renderRanking();
   renderDesglose();
+  try{renderEquivalencias();}catch(e){console.error(e);}
   // lista
   $('count').textContent=r.length.toLocaleString('es-AR')+' operaciones';
   {const c=$('cntResumen');if(c)c.textContent='· '+r.length.toLocaleString('es-AR')+' operaciones';}
@@ -836,6 +849,35 @@ function renderSkuSum(r){
         ${cc.length<vs.length?`<p class="inc">Sobre ${cc.length} de ${vs.length} ventas (las que tienen costo).</p>`:''}`;})()}
     <p class="inc">Acreditado por ML, antes del cadete: ${fmt(S('acred'))}${U?' · '+pu(S('acred'))+' por unidad':''}</p>`;
 }
+// ===== Equivalencias de SKU: codigo mal puesto en ML -> codigo de la app (config/ml_equivalencias: { m: { ML: 'APP' | 'APP x N' } }) =====
+let EQ={};
+async function cargarEquivalencias(){try{const d=await db.collection('config').doc('ml_equivalencias').get();EQ=d.exists?(d.data().m||{}):{};}catch(e){EQ={};}}
+function guardarEquivalencias(){return db.collection('config').doc('ml_equivalencias').set({m:EQ,actualizado:new Date().toISOString()});}
+function aplicarEquivalencias(){
+  for(const o of allRows()){
+    if(o.skuBaseML===undefined){o.skuBaseML=o.skuBase;o.multML=o.mult||1;}
+    const e=EQ[String(o.skuBaseML||'').toUpperCase()];
+    if(e){const m=String(e).toUpperCase().match(/^(.+?)(?:\s*X\s*(\d+))?$/);o.skuBase=m[1].trim();o.mult=(o.multML||1)*(m[2]?+m[2]:1);o.eqDe=o.skuBaseML;}
+    else{o.skuBase=o.skuBaseML;o.mult=o.multML||1;o.eqDe=null;}
+    o.unid=o.cant?o.cant*o.mult:null;
+  }
+}
+function renderEquivalencias(){
+  const ks=Object.keys(EQ).sort();
+  $('eqLista').innerHTML=ks.length?`<table class="dh" style="width:100%;"><tbody>${ks.map(k=>`<tr><td><b>${k}</b> <span class="meta">(en ML)</span></td><td>→ <b>${EQ[k]}</b> <span class="meta">${NAMES[String(EQ[k]).toUpperCase().split(/\s*X\s*/)[0]]||''}</span></td><td style="text-align:right;"><button type="button" style="padding:4px 10px;border-radius:8px;color:#A6432F;border:1px solid #E3B8AE;background:#fff;cursor:pointer;font-weight:700;" onclick="quitarEquivalencia('${k}')">Quitar</button></td></tr>`).join('')}</tbody></table>`:'<p class="note">Todavía no hay equivalencias.</p>';
+  // SKU de ML que no se encuentran en la app (sin nombre ni costo)
+  const c={};allRows().forEach(o=>{if(o.tipo==='Venta'&&o.pcd>0&&o.skuBaseML&&!EQ[o.skuBaseML]&&!NAMES[o.skuBaseML]&&!COSTOS[o.skuBaseML]){c[o.skuBaseML]=(c[o.skuBaseML]||0)+1;}});
+  const sin=Object.entries(c).sort((a,b)=>b[1]-a[1]);
+  $('eqSinMatch').innerHTML=sin.map(([k])=>`<option value="${k}">`).join('');
+  $('eqSugeridos').innerHTML=sin.length?`<p class="note" style="margin:0 0 4px;"><b>SKU de ML que no están en la app</b> (sin nombre ni costo). Tocá uno para asignarle su código:</p><div style="display:flex;gap:6px;flex-wrap:wrap;">${sin.slice(0,40).map(([k,n])=>`<button type="button" style="padding:4px 10px;font-size:.8rem;border-radius:8px;border:1px solid var(--line);background:#fff;color:#3d1466;cursor:pointer;" onclick="$('eqML').value='${k}';$('eqApp').focus();">${k} <span class="meta">(${n})</span></button>`).join('')}</div>`:'';
+}
+async function agregarEquivalencia(){
+  const a=$('eqML').value.trim().toUpperCase(), b=$('eqApp').value.trim().toUpperCase().replace(/\s+/g,' ');
+  if(!a||!b){showErr('Completá los dos códigos.');return;}
+  EQ[a]=b;try{await guardarEquivalencias();}catch(e){showErr('No se pudo guardar: '+e.message);return;}
+  $('eqML').value='';$('eqApp').value='';render();alertOk('Equivalencia guardada: '+a+' → '+b);
+}
+async function quitarEquivalencia(k){delete EQ[k];try{await guardarEquivalencias();}catch(e){}render();}
 // ===== Desglose de envios (Flex, correo), Full y publicidad =====
 function renderDesglose(){
   const sel=$('dsMes'), ps=[...new Set(DATA.map(d=>d.periodo))].sort().reverse();
@@ -990,6 +1032,7 @@ function card(o){
   const tags=[o.log&&`<span class="tag">${o.log}</span>`,o.pubT&&`<span class="tag">${o.pubT}</span>`,
     o.flex&&`<span class="tag ${/10 %|en contra|Sin reintegro/.test(o.flex)?'bad':'warn'}">${o.flex}</span>`,
     o.tipo!=='Venta'&&`<span class="tag bad">${o.tipo}</span>`,
+    o.eqDe&&`<span class="tag" style="background:#EEE8F7;color:#3d1466;">🔁 En ML figura ${o.eqDe} → tomado como ${o.skuBase}${o.mult>1?' x '+o.mult:''}</span>`,
     o.raro&&`<span class="tag bad">⚠️ Precio ${pctf(o.raro.pct)} por debajo de lo habitual (${fmt2(o.raro.med)} c/u) · revisá precio o descuento de la publicación</span>`,
     !o.rep&&o.flex==='Reintegro en otra venta del envío'&&`<span class="tag bad" title="La otra venta de este envío no está en los reportes cargados o fue cancelada">⚠️ No se encontró la otra venta del envío ${o.envNum}</span>`,
     o.rep&&`<span class="tag" style="background:#E3F0FF;color:#1F4E8C;">🔀 Envío compartido entre ${o.rep.n} productos · le toca el ${pctf(o.rep.sh)}</span>`].filter(Boolean).join('');
@@ -1055,6 +1098,7 @@ firebase.auth().onAuthStateChanged(async u=>{
       m[k]=porDia;});
     COSTOS=m;}catch(e){}
   await cargarZonas();
+  await cargarEquivalencias();
   await load();
   $('cargando').hidden=true;
   render();
