@@ -242,7 +242,7 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
   </section>
   <p class="note" id="rarosAviso" style="display:none;margin:10px 0 0;"></p>
   <details class="pleg" data-k="faltan"><summary>🔍 SKU de ML sin datos en la app <small id="ftCnt"></small></summary><div class="pleg-body">
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;"><select id="ftMes" aria-label="Mes"></select></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;"><select id="ftMes" aria-label="Mes" style="padding:6px 10px;font-size:.85rem;min-height:0;height:auto;width:auto;"></select></div>
     <div id="ftBody"></div>
   </div></details>
   <details class="pleg" data-k="desglose"><summary>🚚 Envíos, Full y publicidad</summary>
@@ -921,14 +921,24 @@ function renderFaltan(){
   const noApp=gs.filter(g=>!g.enApp), sinCosto=gs.filter(g=>g.enApp);
   const tot=vs.reduce((a,o)=>a+o.pcd,0);
   $('ftCnt').textContent=gs.length?'· '+gs.length+' SKU · '+fmt(tot)+' facturado':'';
-  const fila=g=>`<tr><td><b>${g.k}</b>${[...g.ml].some(s=>s&&norm(s)!==norm(g.k))?`<small class="meta" style="display:block;">en ML: ${[...g.ml].slice(0,3).join(', ')}</small>`:''}${g.enApp?`<small class="meta" style="display:block;">${NAMES[g.k]}</small>`:''}${MOTIVOS[g.k]?`<small style="display:block;color:#A6432F;font-size:.76rem;margin-top:2px;">⚠️ ${MOTIVOS[g.k]}</small>`:''}</td>
-    <td style="text-align:right;">${g.n.toLocaleString('es-AR')}</td><td style="text-align:right;">${g.unid.toLocaleString('es-AR')}</td><td style="text-align:right;">${fmt(g.vend)}</td>
-    <td style="text-align:right;">${g.enApp?'':`<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:#3d1466;cursor:pointer;font-size:.8rem;" onclick="document.getElementById('eqPanel').open=true;$('eqML').value='${g.k}';$('eqApp').focus();$('eqPanel').scrollIntoView({behavior:'smooth'});">🔁 Asignar código</button>`}</td></tr>`;
-  const tabla=(tit,arr,nota)=>arr.length?`<h3 style="margin:10px 0 4px;font-size:1rem;">${tit} <small class="meta">(${arr.length})</small></h3><p class="note" style="margin:0 0 6px;">${nota}</p>
-    <div class="tw"><table class="dh" style="width:100%;"><thead><tr><th>SKU</th><th class="r">Ventas</th><th class="r">Unid.</th><th class="r">Facturado</th><th></th></tr></thead><tbody>${arr.map(fila).join('')}</tbody></table></div>`:'';
+  // version compacta: una linea por SKU, con una etiqueta corta de lo que falta (el detalle, al tocarla)
+  const corto=g=>{const m=MOTIVOS[g.k]||'';
+    if(!g.enApp)return['No está en la app','#A6432F','El SKU de ML no coincide con ningún producto de la app. Asignale su código con 🔁 o cargalo en la app.'];
+    if(/Falta la tela/.test(m))return['Falta la tela','#8A6417',m];
+    if(/no tiene precio/.test(m))return['Tela sin precio','#8A6417',m];
+    if(/Falta el artículo/.test(m))return['Falta artículo','#8A6417',m];
+    if(/no tiene piezas/.test(m))return['Artículo sin piezas','#8A6417',m];
+    if(/no entran en el ancho/.test(m))return['No entra en la tela','#8A6417',m];
+    if(/ningún código de tela/.test(m))return['Tela no cargada','#8A6417',m];
+    return['Sin costo','#8A6417',m||'Cargalo en Costos de reventa (si lo comprás hecho) o completalo en Productos que fabrico.'];};
+  const filas=gs.map((g,i)=>{const [t,col,det]=corto(g);
+    return `<tr style="border-bottom:1px solid var(--line,#E3DCD2);">
+      <td style="padding:7px 6px;"><b>${g.k}</b> <span class="meta" style="font-size:.78rem;">${g.enApp?(NAMES[g.k]||'').split(' · ')[0]:''}</span></td>
+      <td style="padding:7px 6px;"><span title="${det.replace(/"/g,'&quot;')}" onclick="this.nextElementSibling.hidden=!this.nextElementSibling.hidden" style="cursor:pointer;font-size:.76rem;font-weight:700;color:${col};background:${col}14;border-radius:999px;padding:2px 9px;white-space:nowrap;">${t} ⓘ</span><div hidden style="font-size:.76rem;color:#6B6258;margin-top:4px;max-width:420px;">${det}</div></td>
+      <td style="padding:7px 6px;text-align:right;white-space:nowrap;" title="${g.n} ventas · ${g.unid} unidades">${fmt(g.vend)}</td>
+      <td style="padding:7px 6px;text-align:right;">${g.enApp?'':`<a href="#" style="font-size:.78rem;" onclick="event.preventDefault();document.getElementById('eqPanel').open=true;$('eqML').value='${g.k}';$('eqApp').focus();$('eqPanel').scrollIntoView({behavior:'smooth'});">🔁 asignar</a>`}</td></tr>`;}).join('');
   $('ftBody').innerHTML=!gs.length?'<p class="note">✓ Todas las ventas de este período tienen su costo.</p>':
-    tabla('❌ No están en la app',noApp,'El SKU de Mercado Libre no coincide con ningún producto de la app. Si está mal puesto en ML, asignale su código con 🔁; si es un producto nuevo, cargalo en la app.')+
-    tabla('💲 Están en la app pero sin costo',sinCosto,'Existen en el catálogo pero no tienen costo. Si lo fabricás: revisá su artículo de corte y tela en <b>Productos que fabrico</b>. Si es de reventa: cargalo en <b>Catálogo → 💲 Costos de reventa</b>.');
+    `<p class="note" style="margin:0 0 6px;">Tocá la etiqueta para ver qué completar.</p><div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;">${filas}</table></div>`;
 }
 // ===== Desglose de envios (Flex, correo), Full y publicidad =====
 function renderDesglose(){
