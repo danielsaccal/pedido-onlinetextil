@@ -300,14 +300,14 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
   <div id="skuSum" class="skusum" hidden></div>
   <p class="note" id="count"></p>
   <div class="tw"><table class="ventas"><thead><tr>
-    <th id="thFecha">Fecha</th><th>SKU</th><th>Unid.</th><th>Precio c/desc.</th><th>Le queda</th><th>Por unidad</th><th>%</th><th>Costo</th><th>Ganancia</th>
+    <th id="thFecha">Fecha</th><th>SKU</th><th>Unid.</th><th>Precio c/desc.</th><th>Le queda</th><th>Por unidad</th><th title="Le queda sobre el precio de venta">%<small style="display:block;font-weight:500;text-transform:none;">s/ precio</small></th><th>Costo</th><th title="Me quedó menos costo; el % es sobre el costo">Ganancia<small style="display:block;font-weight:500;text-transform:none;">% s/ costo</small></th>
   </tr></thead><tbody id="list"></tbody></table></div>
   <button class="btn ghost more" id="more" hidden>Ver más</button>
   </div></details>
 
   <details class="pleg" data-k="anual"><summary>📅 Mes por mes</summary>
   <section class="panel" id="anual">
-    <div class="tw"><table class="ventas anual"><thead><tr><th>Mes</th><th>Ventas</th><th>Unidades</th><th>Vendido c/desc.</th><th>Acreditado ML</th><th>Cadete</th><th>Le queda</th><th>% le queda</th></tr></thead><tbody id="anualBody"></tbody></table></div>
+    <div class="tw"><table class="ventas anual"><thead><tr><th>Mes</th><th>Ventas</th><th>Unidades</th><th>Vendido c/desc.</th><th>Acreditado ML</th><th>Cadete</th><th>Le queda</th><th>% le queda<small style="display:block;font-weight:500;text-transform:none;">s/ lo vendido</small></th></tr></thead><tbody id="anualBody"></tbody></table></div>
     <div id="anualBars" style="margin-top:12px"></div>
     <p class="note" id="anualNote"></p>
   </section></details>
@@ -744,11 +744,11 @@ function renderResumen(){
   $('resBody').innerHTML=`<div class="res-strip">
     <div><span>Entró</span><b class="pos">${fmt(entro)}</b></div>
     <div><span>Pagué</span><b class="neg">${fmt(-pague)}</b></div>
-    <div class="q"><span>Me quedó</span><b>${fmt(quedo)} <small>${pc(quedo)}</small></b></div>
+    <div class="q"><span>Me quedó <small style="font-weight:500;">(% sobre lo recibido por ventas)</small></span><b>${fmt(quedo)} <small>${pc(quedo)}</small></b></div>
   </div>
   ${(()=>{const cc=vs.filter(o=>o.costo!=null);if(!cc.length)return '<p class="note">Costo y ganancia: los SKU de estas ventas todavía no tienen costo cargado en la app.</p>';
     const costo=cc.reduce((a,o)=>a+o.costo,0),qc=cc.reduce((a,o)=>a+o.neto,0),rc=cc.reduce((a,o)=>a+o.pcd,0),g=qc-costo;
-    return `<div class="res-strip" style="margin-top:8px;"><div><span>Costo de lo vendido</span><b class="neg">${fmt(-costo)}</b></div><div class="q"><span>Ganancia <small style="font-weight:500;">(% sobre el costo)</small></span><b>${fmt(g)} <small>${costo>0?(g/costo*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+' %':''}</small></b></div></div>
+    return `<div class="res-strip" style="margin-top:8px;"><div><span>Costo de lo vendido</span><b class="neg">${fmt(-costo)}</b></div><div class="q"><span>Ganancia <small style="font-weight:500;">(me quedó − costo; % sobre el costo)</small></span><b>${fmt(g)} <small>${costo>0?(g/costo*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+' %':''}</small></b></div></div>
     <p class="note">Sobre ${cc.length.toLocaleString('es-AR')} de ${vs.length.toLocaleString('es-AR')} ventas (las que tienen costo). Costo a la fecha de cada venta.</p>`;})()}
   <details class="res-det" ${wasOpen?'open':''}><summary>Ver detalle</summary>
   <span class="res-cta">${vs.length.toLocaleString('es-AR')} ventas${fc?' · cuenta '+fc:' · todas las cuentas'} · incluye todo lo que ML cobró en el mes</span>
@@ -922,12 +922,12 @@ function renderRanking(){
   const nm=g=>porProd?`<b>${g.k}</b><small class="meta" style="display:block;">${[...g.skus].slice(0,4).join(', ')}${g.skus.size>4?'…':''}</small>`:`<b>${g.k}</b><small class="meta" style="display:block;">${NAMES[g.k]||''}</small>`;
   $('rkBody').innerHTML=!gs.length?'<p class="note">No hay ventas en este período.</p>':`
     <div class="res-strip">
-      <div><span>Ganancia bruta</span><b class="pos">${fmt(tB)} <small style="color:#6B6258;">${tV>0?pctf(tB/tV):''}</small></b></div>
-      <div class="q"><span>Ganancia neta</span><b>${fmt(tN)} <small>${tV>0?pctf(tN/tV):''}</small></b></div>
+      <div><span>Ganancia bruta <small style="font-weight:500;">(precio − costo; % sobre el costo)</small></span><b class="pos">${fmt(tB)} <small style="color:#6B6258;">${tV>0?pctf(tB/tV):''}</small></b></div>
+      <div class="q"><span>Ganancia neta <small style="font-weight:500;">(me quedó − costo; % sobre el costo)</small></span><b>${fmt(tN)} <small>${tV>0?pctf(tN/tV):''}</small></b></div>
       <div><span>${porProd?'Productos':'SKU'} que pierden plata</span><b class="${pierden.length?'neg':'pos'}">${pierden.length}</b></div>
     </div>
     <p class="note">${mejor?`Más ganancia: <b>${mejor.k}</b> (${fmt(mejor.neta)}). `:''}${peor&&peor!==mejor?`Menor rentabilidad: <b>${peor.k}</b> (${pf(peor.netaP)}). `:''}${gs.length-conC.length?`${gs.length-conC.length} ${porProd?(gs.length-conC.length===1?'producto':'productos'):'SKU'} sin costo cargado (no ${gs.length-conC.length===1?'entra':'entran'} en la ganancia).`:''}</p>
-    <div class="tw"><table class="ventas"><thead><tr><th>#</th><th>${porProd?'Producto':'SKU'}</th><th>Unid.</th><th>Facturación</th><th>Me quedó</th><th>Costo</th><th>Bruta</th><th>Neta</th></tr></thead><tbody>
+    <div class="tw"><table class="ventas"><thead><tr><th>#</th><th>${porProd?'Producto':'SKU'}</th><th>Unid.</th><th>Facturación</th><th>Me quedó</th><th>Costo</th><th>Bruta<small style="display:block;font-weight:500;text-transform:none;">% s/ costo</small></th><th>Neta<small style="display:block;font-weight:500;text-transform:none;">% s/ costo</small></th></tr></thead><tbody>
     ${lista.map((g,i)=>`<tr><td>${i+1}</td><td>${nm(g)}</td><td>${g.unid.toLocaleString('es-AR')}</td><td>${fmt(g.vend)}</td><td>${fmt(g.quedo)}</td>
       <td>${g.con?fmt(g.costo)+(g.parcial?' *':''):'<span class="meta">sin costo</span>'}</td>
       <td class="${g.bruta<0?'neg':''}">${g.con?fmt(g.bruta)+`<small class="meta" style="display:block;">${pf(g.brutaP)}</small>`:''}</td>
