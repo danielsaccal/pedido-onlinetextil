@@ -1589,7 +1589,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v206</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v207</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -14447,11 +14447,13 @@ function agregarVarianteNP(){
   const row = document.createElement('div');
   row.className = 'edit-item-row-nuevo';
   row.id = id;
-  row.style.cssText = 'display:grid;grid-template-columns:100px 1fr 110px 32px;gap:6px;align-items:center;margin-bottom:6px;';
+  const conCosto = typeof esDueno === 'function' && esDueno();
+  row.style.cssText = `display:grid;grid-template-columns:100px 1fr 110px ${conCosto ? '120px ' : ''}32px;gap:6px;align-items:center;margin-bottom:6px;`;
   row.innerHTML = `
     <input type="text" placeholder="SKU" class="npv-sku">
     <input type="text" placeholder="Descripción (ej: 1 Plaza)" class="npv-desc">
-    <input type="text" placeholder="Precio" class="npv-precio">
+    <input type="text" placeholder="Precio de venta" class="npv-precio">
+    ${conCosto ? '<input type="text" placeholder="Costo (privado)" class="npv-costo" title="Costo de compra: no se muestra en el catálogo, queda en Costos de reventa" style="background:#FFF8E6;border-color:#EBD9A8;">' : ''}
     <button type="button" class="btn-mini" onclick="document.getElementById('${id}').remove();">✕</button>
   `;
   cont.appendChild(row);
@@ -14539,6 +14541,12 @@ async function guardarProductoNuevoInterno(){
       imagenBase64, metros: metros || null,
       creado: new Date().toISOString()
     });
+    // costos de compra (privados): van a Costos de reventa, nunca al catalogo
+    try{
+      const cs = {};
+      document.querySelectorAll('#np-variantes-cont .edit-item-row-nuevo').forEach(row => { const s = row.querySelector('.npv-sku').value.trim().toUpperCase(), c = row.querySelector('.npv-costo'); const n = c ? numAr(c.value) : 0; if(s && n > 0) cs[s] = n; });
+      if(Object.keys(cs).length){ if(costosReventa === null) await cargarCostosReventa(); costosReventa = { ...costosReventa, ...cs }; await db.collection('config').doc('costos_reventa').set({ c: costosReventa, actualizado: new Date().toISOString() }); }
+    } catch(e){ console.error('costos del producto nuevo', e); }
 
     const cat = CATALOGO.find(c => c.categoria === categoria);
     let ci = -1, pi = -1;
@@ -17523,6 +17531,12 @@ async function confirmarAgregarFotoSueltaAlCatalogo(){
       imagenBase64, metros: metros || null,
       creado: new Date().toISOString()
     });
+    // costos de compra (privados): van a Costos de reventa, nunca al catalogo
+    try{
+      const cs = {};
+      document.querySelectorAll('#np-variantes-cont .edit-item-row-nuevo').forEach(row => { const s = row.querySelector('.npv-sku').value.trim().toUpperCase(), c = row.querySelector('.npv-costo'); const n = c ? numAr(c.value) : 0; if(s && n > 0) cs[s] = n; });
+      if(Object.keys(cs).length){ if(costosReventa === null) await cargarCostosReventa(); costosReventa = { ...costosReventa, ...cs }; await db.collection('config').doc('costos_reventa').set({ c: costosReventa, actualizado: new Date().toISOString() }); }
+    } catch(e){ console.error('costos del producto nuevo', e); }
     nuevoProducto._editKey = 'nuevo-' + ref.id;
     nuevoProducto._docId = ref.id;
 
@@ -17639,7 +17653,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v206';
+const APP_VERSION = '2026-10-02-v207';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
