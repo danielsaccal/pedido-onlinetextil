@@ -235,7 +235,8 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
   <section class="panel resumen" id="resumen">
     <div class="res-head">
       <h2 id="resTit">Resumen</h2>
-      <select id="resMes" aria-label="Mes del resumen"></select>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;"><select id="modoCosto" aria-label="Costo" onchange="cambiarModoCosto(this.value)" title="Qué costo usar para la ganancia"><option value="actual">Costo: el actual</option><option value="fecha">Costo: a la fecha de cada venta</option></select>
+      <select id="resMes" aria-label="Mes del resumen"></select></div>
     </div>
     <div id="resBody"></div>
   </section>
@@ -550,8 +551,13 @@ function idbApp(clave){return new Promise(res=>{try{const r=indexedDB.open('onli
   r.onsuccess=()=>{try{const g=r.result.transaction('kv').objectStore('kv').get(clave);g.onsuccess=()=>res(g.result);g.onerror=()=>res(null);}catch(e){res(null);}};r.onerror=()=>res(null);}catch(e){res(null);}});}
 const fechaISO=f=>{const [d,m,y]=String(f||'').split('/');return y?`${y}-${m}-${d}`:'';};
 // costo unitario a la fecha de la venta: ultimo registro <= fecha; si no hay, el primero posterior
-function costoUnit(base,fecha){const h=COSTOS[String(base||'').toUpperCase()];if(!h||!h.length)return null;const f=fechaISO(fecha);
-  let c=null;for(const x of h){if(x.fecha<=f)c=x.costo;else break;}return c!=null?c:h[0].costo;}
+// modo 'actual' (por defecto): siempre el costo vigente hoy. Modo 'fecha': el costo vigente el dia de la venta
+// (y para ventas anteriores al primer registro, el costo actual: el primero cargado puede tener errores ya corregidos).
+let MODO_COSTO=(()=>{try{return localStorage.getItem('ml.modoCosto')||'actual';}catch(e){return 'actual';}})();
+function costoUnit(base,fecha){const h=COSTOS[String(base||'').toUpperCase()];if(!h||!h.length)return null;
+  const actual=h[h.length-1].costo; if(MODO_COSTO==='actual')return actual;
+  const f=fechaISO(fecha);let c=null;for(const x of h){if(x.fecha<=f)c=x.costo;else break;}return c!=null?c:actual;}
+function cambiarModoCosto(v){MODO_COSTO=v;try{localStorage.setItem('ml.modoCosto',v);}catch(e){}aplicarCostos();render();}
 function aplicarCostos(){for(const d of DATA)for(const o of d.rows){
   const esVenta=o.tipo==='Venta'&&o.pcd>0;const cu=esVenta&&o.unid?costoUnit(o.skuBase,o.fecha):null;
   o.costo=cu!=null?cu*o.unid:null;o.gan=o.costo!=null?o.neto-o.costo:null;o.ganPct=o.gan!=null&&o.costo>0?o.gan/o.costo:null;}}
@@ -749,7 +755,7 @@ function renderResumen(){
   ${(()=>{const cc=vs.filter(o=>o.costo!=null);if(!cc.length)return '<p class="note">Costo y ganancia: los SKU de estas ventas todavía no tienen costo cargado en la app.</p>';
     const costo=cc.reduce((a,o)=>a+o.costo,0),qc=cc.reduce((a,o)=>a+o.neto,0),rc=cc.reduce((a,o)=>a+o.pcd,0),g=qc-costo;
     return `<div class="res-strip" style="margin-top:8px;"><div><span>Costo de lo vendido</span><b class="neg">${fmt(-costo)}</b></div><div class="q"><span>Ganancia <small style="font-weight:500;">(me quedó − costo; % sobre el costo)</small></span><b>${fmt(g)} <small>${costo>0?(g/costo*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+' %':''}</small></b></div></div>
-    <p class="note">La ganancia se calcula <b>solo con las ${cc.length.toLocaleString('es-AR')} ventas que tienen costo</b> (de ${vs.length.toLocaleString('es-AR')}): de esas ventas te quedó <b>${fmt(qc)}</b> y su costo es <b>${fmt(costo)}</b>. No se compara con el "Me quedó" de arriba, que incluye todas las ventas y todos los cargos del mes. Costo a la fecha de cada venta.</p>`;})()}
+    <p class="note">La ganancia se calcula <b>solo con las ${cc.length.toLocaleString('es-AR')} ventas que tienen costo</b> (de ${vs.length.toLocaleString('es-AR')}): de esas ventas te quedó <b>${fmt(qc)}</b> y su costo es <b>${fmt(costo)}</b>. No se compara con el "Me quedó" de arriba, que incluye todas las ventas y todos los cargos del mes. ${MODO_COSTO==='actual'?'Con el costo actual de cada producto.':'Con el costo vigente a la fecha de cada venta.'}</p>`;})()}
   <details class="res-det" ${wasOpen?'open':''}><summary>Ver detalle</summary>
   <span class="res-cta">${vs.length.toLocaleString('es-AR')} ventas${fc?' · cuenta '+fc:' · todas las cuentas'} · incluye todo lo que ML cobró en el mes</span>
   <table class="res">
@@ -823,7 +829,7 @@ function renderSkuSum(r){
     ${(()=>{const cc=vs.filter(o=>o.costo!=null);if(!cc.length)return '<p class="inc">Costo real: este SKU no tiene costo cargado en la app (o es de reventa).</p>';
       const Uc=cc.reduce((a,o)=>a+(o.unid||0),0),C=cc.reduce((a,o)=>a+o.costo,0),Q=cc.reduce((a,o)=>a+(o.neto||0),0),V=cc.reduce((a,o)=>a+o.pcd,0),G=Q-C;
       const cu=Uc?C/Uc:0,qu=Uc?Q/Uc:0,gu=Uc?G/Uc:0;
-      return `<div class="saldo" style="background:#F4F1EC;color:#2B2233;margin-top:8px;"><span>Costo real del producto<small style="display:block;font-weight:500;color:#8A8072;">tela + confección + insumos, a la fecha de cada venta</small></span><span class="sv"><b style="color:#A6432F;">${fmt(cu)}</b><em style="color:#6B6258;">${fmt(C)} en total</em></span></div>
+      return `<div class="saldo" style="background:#F4F1EC;color:#2B2233;margin-top:8px;"><span>Costo real del producto<small style="display:block;font-weight:500;color:#8A8072;">${MODO_COSTO==='actual'?'costo actual':'costo a la fecha de cada venta'}</small></span><span class="sv"><b style="color:#A6432F;">${fmt(cu)}</b><em style="color:#6B6258;">${fmt(C)} en total</em></span></div>
         <div class="saldo" style="margin-top:8px;background:${G<0?'#A6432F':'#2F7A47'};"><span>Ganancia por unidad<small style="display:block;font-weight:500;opacity:.85;">le queda − costo (el % es sobre el costo)</small></span><span class="sv"><b style="color:#fff;">${fmt(gu)}</b><em>${fmt(G)} en total · ${C>0?pctf(G/C):''} sobre el costo</em></span></div>
         ${cc.length<vs.length?`<p class="inc">Sobre ${cc.length} de ${vs.length} ventas (las que tienen costo).</p>`:''}`;})()}
     <p class="inc">Acreditado por ML, antes del cadete: ${fmt(S('acred'))}${U?' · '+pu(S('acred'))+' por unidad':''}</p>`;
@@ -997,7 +1003,7 @@ function card(o){
     L.map(x=>`<tr><td>${x[0]}</td><td class="${x[1]<0?'neg':''}">${fmt2(x[1])}</td><td>${u(x[1])}</td><td>${per(x[1])}</td></tr>`).join('')+
     L2.map(x=>`<tr class="${x[2]||''}"><td>${x[0]}</td><td class="${x[1]<0?'neg':''}">${fmt2(x[1])}</td><td>${u(x[1])}</td><td>${per(x[1])}</td></tr>`).join('')+
     `<tr class="sum"><td>Le queda</td><td>${fmt2(o.neto)}</td><td>${u(o.neto)}</td><td>${per(o.neto)}</td></tr>`+
-    (o.costo!=null?`<tr><td>Costo (${fmt2(o.costo/o.unid)} c/u a la fecha)</td><td class="neg">${fmt2(-o.costo)}</td><td>${u(-o.costo)}</td><td>${per(-o.costo)}</td></tr><tr class="sum"><td>Ganancia</td><td>${fmt2(o.gan)}</td><td>${u(o.gan)}</td><td>${per(o.gan)}</td></tr>`:o.tipo==='Venta'&&o.pcd>0?'<tr><td colspan="4" class="meta">Este SKU no tiene costo cargado en la app.</td></tr>':'')+`</table>`+
+    (o.costo!=null?`<tr><td>Costo (${fmt2(o.costo/o.unid)} c/u${MODO_COSTO==='actual'?', actual':' a la fecha'})</td><td class="neg">${fmt2(-o.costo)}</td><td>${u(-o.costo)}</td><td>${per(-o.costo)}</td></tr><tr class="sum"><td>Ganancia</td><td>${fmt2(o.gan)}</td><td>${u(o.gan)}</td><td>${per(o.gan)}</td></tr>`:o.tipo==='Venta'&&o.pcd>0?'<tr><td colspan="4" class="meta">Este SKU no tiene costo cargado en la app.</td></tr>':'')+`</table>`+
     `${o.mp?`<p class="mpbox">Para buscar en Mercado Pago: <b>ID de pago ${o.mp}</b>${o.mpFecha?' · pagado el '+o.mpFecha.split('-').reverse().join('/'):''}${o.mpMedio&&o.mpMedio!=='-'?' · '+o.mpMedio:''}<br>Monto que debería figurar acreditado: <b>${fmt2(o.acred)}</b></p>`:''}<p class="note">Operación ${o.op} · ${o.cuenta}${o.cant?' · Publicación: '+o.sku+(o.cant>1?' × '+o.cant:''):''}${o.psd?' · Precio sin descuento '+fmt2(o.psd):''}${o.flexMonto!=null?' · Monto envío Flex '+fmt2(o.flexMonto):''}${o.nota?'<br>'+o.nota:''}</p>`;
   const skuCell=o.sku?`<span class="base">${o.raro?'<span title="Precio por unidad muy por debajo de lo habitual" style="font-size:.72rem;background:#FDEBE7;color:#A6432F;border-radius:6px;padding:1px 5px;margin-right:4px;">⚠️ precio</span>':''}${o.skuBase}${o.rep?' <span title="Envío compartido: el reintegro y el cadete se reparten entre los productos del envío" style="font-size:.72rem;background:#E3F0FF;color:#1F4E8C;border-radius:6px;padding:1px 5px;">🔀 '+o.rep.n+'</span>':''}</span>${NAMES[o.skuBase]?`<span class="var">${NAMES[o.skuBase]}</span>`:''}${o.variante?`<span class="var">${o.variante}</span>`:''}`:`<span class="base">${o.tipo}</span>`;
   return `<tr class="v" tabindex="0"><td>${o.fecha}</td><td>${skuCell}</td><td>${o.unid??''}</td>
@@ -1037,6 +1043,7 @@ firebase.auth().onAuthStateChanged(async u=>{
   try{const d=await db.collection('usuarios').doc(String(u.email).toLowerCase()).get();
     if(!d.exists||d.data().rol!=='dueño'){$('cargando').textContent='Solo el dueño puede ver los resultados de Mercado Libre.';return;}}catch(e){}
   NAMES=(await idbApp('nombres_sku'))||{};
+  {const s=$('modoCosto');if(s)s.value=MODO_COSTO;}
   try{const s=await db.collection('historial_costos').get();const m={};s.docs.forEach(x=>{const v=x.data();const k=String(v.sku||'').toUpperCase();(m[k]=m[k]||[]).push({fecha:v.fecha,costo:+v.costo,creado:+v.creado||0});});
     let ult={};try{const u=await db.collection('config').doc('costos_ultimo').get();ult=u.exists?(u.data().c||{}):{};}catch(e){}
     // un solo costo por dia: el ultimo cargado; sin hora de carga, el que coincide con el costo actual
