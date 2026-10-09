@@ -433,7 +433,7 @@ function parseWorkbook(wb,cuenta,file){
     // Flex
     if(tipoOp==='Envío'&&log==='Flex'){o.flex='Reintegro en fila aparte';o.flexMonto=p.flexBon-p.flexCargo;}
     if(isVenta&&log==='Flex'){
-      const k=String(r[C.envNum]); const first=!seenEnv.has(k); seenEnv.add(k);
+      const k=String(r[C.envNum]); const first=estado==='Pagado'&&!seenEnv.has(k); if(estado==='Pagado')seenEnv.add(k);
       if(estado!=='Pagado'){o.flex='Cancelada o devuelta';}
       else{
         let b=p.flexBon,f=p.flexCargo;
@@ -497,11 +497,12 @@ function applyCadete(){
 function applyCadeteBase(){
   for(const d of DATA)for(const o of d.rows)fixRow(o);
   autoZonas();
-  for(const d of DATA){
-    for(const o of d.rows){o.cad=o.zb?-(+ZCOST[AMTZ[o.zb]]||0):0;o.ajEnv=0;o.rep=null;}
-    // envio compartido (compra de carrito): el reintegro Flex y el cadete se reparten entre los productos del envio, segun el precio
+  for(const d of DATA)for(const o of d.rows){o.cad=o.zb?-(+ZCOST[AMTZ[o.zb]]||0):0;o.ajEnv=0;o.rep=null;}
+  // envio compartido (compra de carrito): el reintegro Flex y el cadete se reparten entre los productos del envio, segun el precio
+  // (se agrupa por cuenta y numero de envio, aunque las ventas hayan quedado en meses distintos)
+  {
     const G={};
-    d.rows.forEach(o=>{if(o.tipo==='Venta'&&o.log==='Flex'&&o.pcd>0&&o.envNum)(G[o.envNum]=G[o.envNum]||[]).push(o);});
+    for(const d of DATA)d.rows.forEach(o=>{if(o.tipo==='Venta'&&o.log==='Flex'&&o.pcd>0&&o.envNum){const k=o.cuenta+'|'+o.envNum;(G[k]=G[k]||[]).push(o);}});
     Object.values(G).forEach(g=>{
       if(g.length<2)return;
       const lead=g.find(o=>o.flexMonto!=null)||g[0];
@@ -509,6 +510,8 @@ function applyCadeteBase(){
       if(!(S>0)||(!F&&!T))return;
       g.forEach(o=>{const sh=o.pcd/S;o.ajEnv=F*sh-(o===lead?F:0);o.cad=T*sh;o.rep={n:g.length,F,T,sh,lead:o===lead};});
     });
+  }
+  for(const d of DATA){
     for(const o of d.rows){
       o.neto=o.acred+(o.ajEnv||0)+o.cad;
       o.pct=o.pcd>0?o.neto/o.pcd:null;
@@ -961,6 +964,7 @@ function card(o){
   const tags=[o.log&&`<span class="tag">${o.log}</span>`,o.pubT&&`<span class="tag">${o.pubT}</span>`,
     o.flex&&`<span class="tag ${/10 %|en contra|Sin reintegro/.test(o.flex)?'bad':'warn'}">${o.flex}</span>`,
     o.tipo!=='Venta'&&`<span class="tag bad">${o.tipo}</span>`,
+    !o.rep&&o.flex==='Reintegro en otra venta del envío'&&`<span class="tag bad" title="La otra venta de este envío no está en los reportes cargados o fue cancelada">⚠️ No se encontró la otra venta del envío ${o.envNum}</span>`,
     o.rep&&`<span class="tag" style="background:#E3F0FF;color:#1F4E8C;">🔀 Envío compartido entre ${o.rep.n} productos · le toca el ${pctf(o.rep.sh)}</span>`].filter(Boolean).join('');
   const L=[['Precio con descuento',o.pcd],['Cargo por vender',o.vender],['Costo por unidad',o.unidad],['Cuotas',o.cuotas],['Envío (neto)',o.envio],
     [`Reintegro Flex de ML <small class="meta">(vino en la fila del envío ${o.envNum})</small>`,o.reintAparte||0],
