@@ -1589,7 +1589,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v199</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v200</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2163,6 +2163,11 @@ a.grilla-celda{display:block;}
         <select id="cr-cat" onchange="renderCostosReventa()" style="flex:1;min-width:150px;padding:10px;border:1px solid var(--line);border-radius:12px;"></select>
         <label style="display:inline-flex;gap:6px;align-items:center;font-size:0.82rem;"><input type="checkbox" id="cr-sin" onchange="renderCostosReventa()"> Solo sin costo</label>
       </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <button type="button" class="btn-mini" onclick="descargarPlanillaCostos()">📤 Descargar planilla para completar</button>
+        <label class="btn-mini" style="cursor:pointer;">📥 Subir Excel con costos<input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="subirExcelCostos(this)"></label>
+      </div>
+      <div id="cr-import" style="display:none;"></div>
       <div id="cr-lista"></div>
       <div id="cr-guardar" style="display:none;position:sticky;bottom:10px;z-index:5;margin-top:10px;"><button type="button" onclick="guardarCostosReventa()" style="width:100%;padding:12px;border:none;border-radius:12px;background:#3D9A5B;color:#fff;font-weight:700;font-size:0.95rem;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.15);">💾 Guardar</button></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
@@ -9958,6 +9963,48 @@ async function guardarCostosReventa(){
   } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 
+// ----- costos de reventa desde Excel -----
+function descargarPlanillaCostos(){
+  const filas = [['SKU', 'Producto', 'Descripción', 'Precio de lista', 'Precio por', 'Costo de compra']];
+  productosReventa().forEach(x => x.p.variantes.forEach(v => { const s = String(v.sku).toUpperCase(); filas.push([s, x.p.nombre, v.desc || '', parsePrice(v.precio) || '', unidadesVenta[x.p._editKey] || 'unidad', costosReventa[s] != null ? costosReventa[s] : '']); }));
+  const ws = XLSX.utils.aoa_to_sheet(filas); ws['!cols'] = [{ wch: 12 }, { wch: 34 }, { wch: 28 }, { wch: 14 }, { wch: 12 }, { wch: 16 }];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Costos reventa');
+  XLSX.writeFile(wb, 'costos_reventa_onlinetextil.xlsx');
+}
+function subirExcelCostos(inp){
+  const f = inp.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    try{
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+      // encabezado: la primera fila que tenga una columna de SKU/codigo y otra de costo
+      let hi = -1, cs = -1, cc = -1, cu = -1;
+      for(let i = 0; i < Math.min(filas.length, 15) && hi < 0; i++){
+        const hd = filas[i].map(x => normBusqueda(String(x)));
+        const s = hd.findIndex(x => /^sku|codigo|cod\b|articulo/.test(x)), c = hd.findIndex(x => /costo|compra/.test(x));
+        if(s >= 0 && c >= 0){ hi = i; cs = s; cc = c; cu = hd.findIndex(x => /precio por|^por$|unidad/.test(x)); }
+      }
+      if(hi < 0){ alert('No encontré las columnas. La planilla necesita una columna "SKU" y otra "Costo de compra".'); return; }
+      const reventa = new Map(); productosReventa().forEach(x => x.p.variantes.forEach(v => reventa.set(String(v.sku).toUpperCase(), x.p)));
+      let ok = 0; const noEsta = [], unidades = {};
+      filas.slice(hi + 1).forEach(row => {
+        const s = String(row[cs] || '').trim().toUpperCase(); if(!s) return;
+        const c = typeof row[cc] === 'number' ? row[cc] : numAr(row[cc]); if(!(c > 0)) return;
+        const p = reventa.get(s); if(!p){ noEsta.push(s); return; }
+        crPend[s] = String(Math.round(c * 100) / 100).replace('.', ','); ok++;
+        if(cu >= 0){ const u = normBusqueda(String(row[cu] || '')).trim(); const U = { 'docena': 'docena', 'media docena': 'media docena', 'par': 'par', 'juego': 'juego', 'pack': 'pack', 'unidad': '' }[u]; if(U !== undefined) unidades[p._editKey] = U; }
+      });
+      Object.entries(unidades).forEach(([ek, u]) => { if(u) unidadesVenta[ek] = u; else delete unidadesVenta[ek]; });
+      if(Object.keys(unidades).length) db.collection('config').doc('unidades').set({ u: unidadesVenta }).catch(() => {});
+      renderCostosReventa(); crMostrarGuardar();
+      const box = document.getElementById('cr-import'); box.style.display = 'block';
+      box.innerHTML = `<div style="background:#EEF6F0;border-radius:12px;padding:10px 12px;margin-bottom:10px;font-size:0.88rem;">✓ <b>${ok}</b> costos cargados desde el Excel. Revisalos y tocá el <b>botón verde Guardar</b>.${noEsta.length ? `<br><span style="color:#A6432F;">${noEsta.length} SKU no son de reventa o no están en el catálogo: ${escaparHtml(noEsta.slice(0, 12).join(', '))}${noEsta.length > 12 ? '…' : ''}</span>` : ''}</div>`;
+    } catch(err){ alert('No se pudo leer el archivo: ' + err.message); }
+  };
+  r.readAsArrayBuffer(f); inp.value = '';
+}
+
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -17504,7 +17551,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v199';
+const APP_VERSION = '2026-10-02-v200';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
