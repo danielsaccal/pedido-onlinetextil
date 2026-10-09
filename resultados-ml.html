@@ -766,19 +766,41 @@ function renderResumen(){
   $('resTit').textContent=cur==='todo'?'Resumen de todos los meses':'Resumen de '+(cur==='sin-fecha'?'sin fecha':mesTxt(cur).toLowerCase());
   const entro=recibi+L.envIn, pague=entro-quedo;
   const wasOpen=!!(document.querySelector('#resBody details')||{}).open;
-  $('resBody').innerHTML=`<div class="res-strip">
-    <div><span>Entró</span><b class="pos">${fmt(entro)}</b></div>
-    <div><span>Pagué</span><b class="neg">${fmt(-pague)}</b></div>
-    <div class="q"><span>Me quedó <small style="font-weight:500;">(% sobre lo recibido por ventas)</small></span><b>${fmt(quedo)} <small>${pc(quedo)}</small></b></div>
+  // resumen limpio: de lo que entró, a lo que quedó, al resultado (con costo)
+  const cc=vs.filter(o=>o.costo!=null), costo=cc.reduce((a,o)=>a+o.costo,0), sinC=vs.length-cc.length;
+  const res=quedo-costo, rcC=cc.reduce((a,o)=>a+o.pcd,0), gV=cc.reduce((a,o)=>a+o.neto,0)-costo;
+  const pE=v=>entro>0?(v/entro*100).toLocaleString('es-AR',{maximumFractionDigits:0})+' %':'';
+  const L1=(t,v,sub,cls)=>`<div class="rr ${cls||''}"><span>${t}${sub?`<small>${sub}</small>`:''}</span><b>${fmt(v)}</b><em>${pE(Math.abs(v))}</em></div>`;
+  $('resBody').innerHTML=`<style>
+    .rcard{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:18px;align-items:start}
+    @media(max-width:760px){.rcard{grid-template-columns:1fr}}
+    .rr{display:grid;grid-template-columns:minmax(0,1fr) auto 52px;gap:10px;align-items:baseline;padding:9px 0;border-bottom:1px dashed var(--line,#E3DCD2);font-size:.95rem}
+    .rr small{display:block;color:#8A8072;font-size:.74rem;font-weight:400}
+    .rr b{font-family:inherit;font-weight:700}.rr em{font-style:normal;color:#8A8072;font-size:.78rem;text-align:right}
+    .rr.tot{border-bottom:2px solid #3d1466;font-weight:800}.rr.tot b{font-size:1.05rem}
+    .rr.rn b{color:#A6432F}.rr.rp b{color:#2F7A47}
+    .rbig{border-radius:16px;padding:18px;text-align:center}
+    .rbig .t{font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;opacity:.85}
+    .rbig .v{font-size:2.1rem;font-weight:800;margin:4px 0}
+    .rbig .s{font-size:.8rem;opacity:.85;line-height:1.4}
+    .rchips{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+    .rchips span{background:rgba(255,255,255,.18);border-radius:999px;padding:4px 10px;font-size:.78rem}
+  </style>
+  <div class="rcard">
+    <div>
+      ${L1('Entró',entro,'Ventas y envíos cobrados','rp')}
+      ${L1('Mercado Libre',-pague,'Comisión, cuotas, envíos, Full, publicidad, impuestos','rn')}
+      ${L1('Me quedó',quedo,'','tot')}
+      ${cc.length?L1('Costo de lo vendido',-costo,sinC?`${sinC} ${sinC===1?'venta':'ventas'} sin costo cargado`:'','rn'):''}
+      ${cc.length?L1('Resultado',res,'','tot'):''}
+    </div>
+    <div class="rbig" style="background:${!cc.length?'#F4F1EC':res<0?'#A6432F':'#2F7A47'};color:${cc.length?'#fff':'#2B2233'};">
+      <div class="t">${cc.length?'Resultado del mes':'Me quedó'}</div>
+      <div class="v">${fmt(cc.length?res:quedo)}</div>
+      <div class="s">${cc.length?(res<0?'Perdiste plata este mes':'Ganaste plata este mes'):'Cargá los costos para ver la ganancia'}${cc.length&&sinC?' · faltan '+sinC+' costos':''}</div>
+      ${cc.length?`<div class="rchips"><span title="Resultado sobre todo lo que entró">${entro>0?(res/entro*100).toLocaleString('es-AR',{maximumFractionDigits:1}):'–'} % sobre lo que entró</span><span title="Resultado sobre el costo de lo vendido">${costo>0?(res/costo*100).toLocaleString('es-AR',{maximumFractionDigits:1}):'–'} % sobre el costo</span></div>`:''}
+    </div>
   </div>
-  ${(()=>{const cc=vs.filter(o=>o.costo!=null);if(!cc.length)return '<p class="note">Costo y ganancia: los SKU de estas ventas todavía no tienen costo cargado en la app.</p>';
-    const costo=cc.reduce((a,o)=>a+o.costo,0),qc=cc.reduce((a,o)=>a+o.neto,0),rc=cc.reduce((a,o)=>a+o.pcd,0),g=qc-costo;
-    return `<div class="res-strip" style="margin-top:8px;"><div><span>Costo de lo vendido</span><b class="neg">${fmt(-costo)}</b></div><div class="q"><span>Ganancia <small style="font-weight:500;">(me quedó − costo; % sobre el costo)</small></span><b>${fmt(g)} <small>${costo>0?(g/costo*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+' %':''}</small></b></div>
-    <div class="q" style="background:#2F7A47;"><span>Ganancia sobre ingresos <small style="font-weight:500;">(% de lo facturado en esas ventas)</small></span><b>${rc>0?(g/rc*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+' %':'–'} <small>de ${fmt(rc)}</small></b></div></div>
-    ${(()=>{const qv=vs.reduce((a,o)=>a+(o.neto||0),0), otros=quedo-qv, sinC=vs.length-cc.length, res=quedo-costo;
-      return `<div class="res-strip" style="margin-top:8px;"><div style="background:${res<0?'#FDEBE7':'#EEF6F0'};border-color:${res<0?'#E3B8AE':'#BFDCC8'};grid-column:1/-1;"><span><b>Resultado real del mes</b> <small style="font-weight:500;">(me quedó de todo el mes − costo de lo vendido)</small></span><b class="${res<0?'neg':'pos'}" style="font-size:1.3rem;">${fmt(res)}</b>
-        <small style="display:block;color:#6B6258;margin-top:4px;">${fmt(quedo)} − ${fmt(costo)}. Incluye <b>${fmt(otros)}</b> de cargos que no son de una venta puntual (Full, publicidad, devoluciones, impuestos).${sinC?` Faltan los costos de <b>${sinC}</b> ventas: el resultado real es un poco menor.`:''}</small></div></div>`;})()}
-    <p class="note">La ganancia se calcula <b>solo con las ${cc.length.toLocaleString('es-AR')} ventas que tienen costo</b> (de ${vs.length.toLocaleString('es-AR')}): de esas ventas te quedó <b>${fmt(qc)}</b> y su costo es <b>${fmt(costo)}</b>. No se compara con el "Me quedó" de arriba, que incluye todas las ventas y todos los cargos del mes. ${MODO_COSTO==='actual'?'Con el costo actual de cada producto.':'Con el costo vigente a la fecha de cada venta.'}</p>`;})()}
   <details class="res-det" ${wasOpen?'open':''}><summary>Ver detalle</summary>
   <span class="res-cta">${vs.length.toLocaleString('es-AR')} ventas${fc?' · cuenta '+fc:' · todas las cuentas'} · incluye todo lo que ML cobró en el mes</span>
   <table class="res">
