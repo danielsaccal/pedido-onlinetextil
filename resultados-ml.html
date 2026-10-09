@@ -408,7 +408,7 @@ function parseWorkbook(wb,cuenta,file){
   const envMap={};
   const pre=raw.map(r=>{const p=parseCargos(r[C.det]);return {r,p};});
   for(const {r,p} of pre){ if(String(r[C.tipo]).trim()==='Envío'){const k=String(r[C.envNum]);envMap[k]=envMap[k]||{b:0,c:0};envMap[k].b+=p.flexBon;envMap[k].c+=p.flexCargo;} }
-  const seenEnv=new Set(); const rows=[];
+  const seenEnv=new Set(); const rows=[]; const asignados=new Set();
   for(const {r,p} of pre){
     const tipoOp=String(r[C.tipo]).trim(), estado=String(r[C.estado]||'').trim();
     const bruto=num(r[C.bruto]), ec=num(r[C.ec]), cc=num(r[C.cc]), pos=num(r[C.pos]);
@@ -436,7 +436,11 @@ function parseWorkbook(wb,cuenta,file){
       const k=String(r[C.envNum]); const first=!seenEnv.has(k); seenEnv.add(k);
       if(estado!=='Pagado'){o.flex='Cancelada o devuelta';}
       else{
-        let b=p.flexBon,f=p.flexCargo; if(first&&envMap[k]){b+=envMap[k].b;f+=envMap[k].c;}
+        let b=p.flexBon,f=p.flexCargo;
+        if(first&&envMap[k]){b+=envMap[k].b;f+=envMap[k].c;
+          // el reintegro vino en una fila "Envío" aparte: se suma a esta venta (y esa fila queda en 0, para no contarlo dos veces)
+          const x=Math.round((envMap[k].b-envMap[k].c)*100)/100;
+          if(x){o.reintAparte=x;o.acred+=x;o.pct=o.pcd>0?o.acred/o.pcd:null;o.aUnit=o.unid&&o.pcd>0?o.acred/o.unid:null;asignados.add(k);}}
         if(ec>0){o.flex='Paga comprador';o.flexMonto=ec;o.zb=ec;}
         else if(b>=2500){o.flex='Reintegro completo '+fmt(b);o.flexMonto=b-f;o.zb=b;}
         else if(b>0){o.flex='Reintegro 10 %';o.flexMonto=b-f;o.zb=Math.round(b*10);}
@@ -447,6 +451,7 @@ function parseWorkbook(wb,cuenta,file){
     }
     rows.push(o);
   }
+  rows.forEach(o=>{if(o.tipo==='Envío'&&o.log==='Flex'&&asignados.has(o.envNum)&&o.acred){o.nota='Reintegro sumado a la venta del envío '+o.envNum+' ('+fmt2(o.acred)+').';o.acred=0;o.reintMovido=true;}});
   return rows;
 }
 
@@ -945,6 +950,7 @@ function card(o){
     o.flex&&`<span class="tag ${/10 %|en contra|Sin reintegro/.test(o.flex)?'bad':'warn'}">${o.flex}</span>`,
     o.tipo!=='Venta'&&`<span class="tag bad">${o.tipo}</span>`].filter(Boolean).join('');
   const L=[['Precio con descuento',o.pcd],['Cargo por vender',o.vender],['Costo por unidad',o.unidad],['Cuotas',o.cuotas],['Envío (neto)',o.envio],
+    [`Reintegro Flex de ML <small class="meta">(vino en la fila del envío ${o.envNum})</small>`,o.reintAparte||0],
     ['Full',o.full],['Publicidad',o.ads],['Otros',o.otros],['Retenciones',o.ret]].filter(x=>x[1]);
   const L2=o.cad?[['Acreditado por ML',o.acred,'sub'],['Costo cadete Flex',o.cad]]:[];
   const per=v=>o.pcd>0?(v/o.pcd*100).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}):'';
