@@ -1589,7 +1589,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v194</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v195</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -9836,9 +9836,17 @@ async function registrarHistorialCostos(){
     const prev = await ref.get(); const ult = prev.exists ? (prev.data().c || {}) : {};
     const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
     const nuevos = [];
-    skusQueFabrico().forEach(S => {
+    const fabricados = new Set(skusQueFabrico());
+    fabricados.forEach(S => {
       const a = costoActualSku(S); if(!a) return;
       if(ult[S] == null || Math.abs(ult[S] - a.costo) >= 1){ nuevos.push({ sku: S, fecha: hoy, costo: a.costo, desglose: a.desglose }); ult[S] = a.costo; }
+    });
+    // telas que tambien se venden como tela (mismo codigo): costo por metro. Solo se usa en Resultados ML.
+    Object.keys((telasDatos && telasDatos.telas) || {}).forEach(cod => {
+      const S = String(cod).toUpperCase(); if(fabricados.has(S)) return;
+      const pm = precioMetroTela(cod); if(!(pm > 0)) return;
+      const c = Math.round(pm * 100) / 100;
+      if(ult[S] == null || Math.abs(ult[S] - c) >= 1){ nuevos.push({ sku: S, fecha: hoy, costo: c, desglose: { tela: S, porMetro: true } }); ult[S] = c; }
     });
     for(let i = 0; i < nuevos.length; i += 400){ const b = db.batch(); nuevos.slice(i, i + 400).forEach(x => b.set(db.collection('historial_costos').doc(), x)); await b.commit(); }
     if(nuevos.length) await ref.set({ c: ult, actualizado: new Date().toISOString() });
@@ -17413,7 +17421,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v194';
+const APP_VERSION = '2026-10-02-v195';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
