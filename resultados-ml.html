@@ -781,7 +781,13 @@ function renderSkuSum(r){
   box.innerHTML=`<h3>${exact.length?nm(q):skus.map(nm).join(', ')}</h3>
     <p class="inc">${vs.length.toLocaleString('es-AR')} ventas · ${vs.reduce((a,o)=>a+(o.unid||0),0).toLocaleString('es-AR')} unidades${$('fTipo').value==='todo'?' · incluye reversos y cargos':''}${$('fCuenta').value?' · cuenta '+$('fCuenta').value:''}${$('fLog').value?' · solo '+$('fLog').value:''}</p>
     <div class="dhw">${tbl('Lo que entra',haber,tH)}${tbl('Lo que sale',debe,tD)}</div>
-    <div class="saldo"><span>Le queda (entra − sale)</span><span class="sv"><b>${fmt(tH-tD)}</b>${U?`<em>${pu(tH-tD)} por unidad (promedio de ${U.toLocaleString('es-AR')})</em>`:''}</span></div>
+    <div class="saldo"><span>Le queda por unidad<small style="display:block;font-weight:500;opacity:.8;">entra − sale, promedio de ${U.toLocaleString("es-AR")} ${U===1?"unidad":"unidades"}</small></span><span class="sv"><b>${U?pu(tH-tD):fmt(tH-tD)}</b><em>${fmt(tH-tD)} en total</em></span></div>
+    ${(()=>{const cc=vs.filter(o=>o.costo!=null);if(!cc.length)return '<p class="inc">Costo real: este SKU no tiene costo cargado en la app (o es de reventa).</p>';
+      const Uc=cc.reduce((a,o)=>a+(o.unid||0),0),C=cc.reduce((a,o)=>a+o.costo,0),Q=cc.reduce((a,o)=>a+(o.neto||0),0),V=cc.reduce((a,o)=>a+o.pcd,0),G=Q-C;
+      const cu=Uc?C/Uc:0,qu=Uc?Q/Uc:0,gu=Uc?G/Uc:0;
+      return `<div class="saldo" style="background:#F4F1EC;color:#2B2233;margin-top:8px;"><span>Costo real del producto<small style="display:block;font-weight:500;color:#8A8072;">tela + confección + insumos, a la fecha de cada venta</small></span><span class="sv"><b style="color:#A6432F;">${fmt(cu)}</b><em style="color:#6B6258;">${fmt(C)} en total</em></span></div>
+        <div class="saldo" style="margin-top:8px;background:${G<0?'#A6432F':'#2F7A47'};"><span>Ganancia por unidad<small style="display:block;font-weight:500;opacity:.85;">le queda − costo</small></span><span class="sv"><b style="color:#fff;">${fmt(gu)}</b><em>${fmt(G)} en total · ${V>0?pctf(G/V):''} sobre lo vendido</em></span></div>
+        ${cc.length<vs.length?`<p class="inc">Sobre ${cc.length} de ${vs.length} ventas (las que tienen costo).</p>`:''}`;})()}
     <p class="inc">Acreditado por ML, antes del cadete: ${fmt(S('acred'))}${U?' · '+pu(S('acred'))+' por unidad':''}</p>`;
 }
 // ===== Desglose de envios (Flex, correo), Full y publicidad =====
