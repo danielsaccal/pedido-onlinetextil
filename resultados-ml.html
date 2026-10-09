@@ -749,7 +749,7 @@ function renderResumen(){
   ${(()=>{const cc=vs.filter(o=>o.costo!=null);if(!cc.length)return '<p class="note">Costo y ganancia: los SKU de estas ventas todavía no tienen costo cargado en la app.</p>';
     const costo=cc.reduce((a,o)=>a+o.costo,0),qc=cc.reduce((a,o)=>a+o.neto,0),rc=cc.reduce((a,o)=>a+o.pcd,0),g=qc-costo;
     return `<div class="res-strip" style="margin-top:8px;"><div><span>Costo de lo vendido</span><b class="neg">${fmt(-costo)}</b></div><div class="q"><span>Ganancia <small style="font-weight:500;">(me quedó − costo; % sobre el costo)</small></span><b>${fmt(g)} <small>${costo>0?(g/costo*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+' %':''}</small></b></div></div>
-    <p class="note">Sobre ${cc.length.toLocaleString('es-AR')} de ${vs.length.toLocaleString('es-AR')} ventas (las que tienen costo). Costo a la fecha de cada venta.</p>`;})()}
+    <p class="note">La ganancia se calcula <b>solo con las ${cc.length.toLocaleString('es-AR')} ventas que tienen costo</b> (de ${vs.length.toLocaleString('es-AR')}): de esas ventas te quedó <b>${fmt(qc)}</b> y su costo es <b>${fmt(costo)}</b>. No se compara con el "Me quedó" de arriba, que incluye todas las ventas y todos los cargos del mes. Costo a la fecha de cada venta.</p>`;})()}
   <details class="res-det" ${wasOpen?'open':''}><summary>Ver detalle</summary>
   <span class="res-cta">${vs.length.toLocaleString('es-AR')} ventas${fc?' · cuenta '+fc:' · todas las cuentas'} · incluye todo lo que ML cobró en el mes</span>
   <table class="res">
