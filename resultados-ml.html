@@ -241,6 +241,10 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
     <div id="resBody"></div>
   </section>
   <p class="note" id="rarosAviso" style="display:none;margin:10px 0 0;"></p>
+  <details class="pleg" data-k="faltan"><summary>🔍 SKU de ML sin datos en la app <small id="ftCnt"></small></summary><div class="pleg-body">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;"><select id="ftMes" aria-label="Mes"></select></div>
+    <div id="ftBody"></div>
+  </div></details>
   <details class="pleg" data-k="desglose"><summary>🚚 Envíos, Full y publicidad</summary>
   <section class="panel" id="desglose">
     <div class="res-head" style="flex-wrap:wrap;gap:8px;">
@@ -727,6 +731,7 @@ function draw(){
   renderRanking();
   renderDesglose();
   try{renderEquivalencias();}catch(e){console.error(e);}
+  try{renderFaltan();}catch(e){console.error(e);}
   // lista
   $('count').textContent=r.length.toLocaleString('es-AR')+' operaciones';
   {const c=$('cntResumen');if(c)c.textContent='· '+r.length.toLocaleString('es-AR')+' operaciones';}
@@ -878,6 +883,28 @@ async function agregarEquivalencia(){
   $('eqML').value='';$('eqApp').value='';render();alertOk('Equivalencia guardada: '+a+' → '+b);
 }
 async function quitarEquivalencia(k){delete EQ[k];try{await guardarEquivalencias();}catch(e){}render();}
+// ===== SKU de Mercado Libre que no estan en la app o no tienen costo =====
+function renderFaltan(){
+  const sel=$('ftMes'), ps=[...new Set(DATA.map(d=>d.periodo))].sort().reverse();
+  const cur=sel.value&&(ps.includes(sel.value)||sel.value==='todo')?sel.value:(ps[0]||'');
+  sel.innerHTML=ps.map(p=>`<option value="${p}" ${p===cur?'selected':''}>${p==='sin-fecha'?'Sin fecha':mesTxt(p)}</option>`).join('')+(ps.length>1?`<option value="todo" ${cur==='todo'?'selected':''}>Todos los meses</option>`:'');
+  const fc=$('fCuenta').value;
+  const vs=allRows().filter(o=>o.tipo==='Venta'&&o.pcd>0&&o.skuBase&&(cur==='todo'||o.periodo===cur)&&(!fc||o.cuenta===fc)&&o.costo==null);
+  const G={};
+  vs.forEach(o=>{const k=o.skuBase;const g=G[k]||(G[k]={k,ml:new Set(),n:0,unid:0,vend:0,enApp:!!NAMES[k]});g.ml.add(o.sku||o.skuBaseML);g.n++;g.unid+=o.unid||0;g.vend+=o.pcd;});
+  const gs=Object.values(G).sort((a,b)=>b.vend-a.vend);
+  const noApp=gs.filter(g=>!g.enApp), sinCosto=gs.filter(g=>g.enApp);
+  const tot=vs.reduce((a,o)=>a+o.pcd,0);
+  $('ftCnt').textContent=gs.length?'· '+gs.length+' SKU · '+fmt(tot)+' facturado':'';
+  const fila=g=>`<tr><td><b>${g.k}</b>${[...g.ml].some(s=>s&&norm(s)!==norm(g.k))?`<small class="meta" style="display:block;">en ML: ${[...g.ml].slice(0,3).join(', ')}</small>`:''}${g.enApp?`<small class="meta" style="display:block;">${NAMES[g.k]}</small>`:''}</td>
+    <td style="text-align:right;">${g.n.toLocaleString('es-AR')}</td><td style="text-align:right;">${g.unid.toLocaleString('es-AR')}</td><td style="text-align:right;">${fmt(g.vend)}</td>
+    <td style="text-align:right;">${g.enApp?'':`<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:#3d1466;cursor:pointer;font-size:.8rem;" onclick="document.getElementById('eqPanel').open=true;$('eqML').value='${g.k}';$('eqApp').focus();$('eqPanel').scrollIntoView({behavior:'smooth'});">🔁 Asignar código</button>`}</td></tr>`;
+  const tabla=(tit,arr,nota)=>arr.length?`<h3 style="margin:10px 0 4px;font-size:1rem;">${tit} <small class="meta">(${arr.length})</small></h3><p class="note" style="margin:0 0 6px;">${nota}</p>
+    <div class="tw"><table class="dh" style="width:100%;"><thead><tr><th>SKU</th><th class="r">Ventas</th><th class="r">Unid.</th><th class="r">Facturado</th><th></th></tr></thead><tbody>${arr.map(fila).join('')}</tbody></table></div>`:'';
+  $('ftBody').innerHTML=!gs.length?'<p class="note">✓ Todas las ventas de este período tienen su costo.</p>':
+    tabla('❌ No están en la app',noApp,'El SKU de Mercado Libre no coincide con ningún producto de la app. Si está mal puesto en ML, asignale su código con 🔁; si es un producto nuevo, cargalo en la app.')+
+    tabla('💲 Están en la app pero sin costo',sinCosto,'Existen en el catálogo pero no tienen costo. Si lo fabricás: revisá su artículo de corte y tela en <b>Productos que fabrico</b>. Si es de reventa: cargalo en <b>Catálogo → 💲 Costos de reventa</b>.');
+}
 // ===== Desglose de envios (Flex, correo), Full y publicidad =====
 function renderDesglose(){
   const sel=$('dsMes'), ps=[...new Set(DATA.map(d=>d.periodo))].sort().reverse();
@@ -1064,6 +1091,7 @@ $('fLog').addEventListener('change',()=>{const f=$('fLog').value==='Flex';$('fFl
 $('resMes').addEventListener('change',renderResumen);
 ['rkMes','rkGrupo','rkOrden','rkVer'].forEach(id=>$(id).addEventListener('change',renderRanking));
 $('dsMes').addEventListener('change',renderDesglose);
+$('ftMes').addEventListener('change',renderFaltan);
 document.querySelectorAll('details.pleg').forEach(d=>{const k='ml.pleg.'+d.dataset.k;try{if(localStorage.getItem(k)==='1')d.open=true;}catch(e){}
   d.addEventListener('toggle',()=>{try{localStorage.setItem(k,d.open?'1':'0');}catch(e){}});});
 ['fMes','fCuenta','fTipo','fLog','fFlex','fOrden','fVista'].forEach(id=>$(id).addEventListener('change',()=>{shown=200;draw();}));
