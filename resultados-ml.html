@@ -239,6 +239,7 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
     </div>
     <div id="resBody"></div>
   </section>
+  <p class="note" id="rarosAviso" style="display:none;margin:10px 0 0;"></p>
   <details class="pleg" data-k="desglose"><summary>🚚 Envíos, Full y publicidad</summary>
   <section class="panel" id="desglose">
     <div class="res-head" style="flex-wrap:wrap;gap:8px;">
@@ -284,6 +285,7 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
         <select id="fTipo" aria-label="Tipo">
           <option value="ventas">Ventas pagadas</option>
           <option value="todo">Todas las operaciones</option>
+          <option value="raros">⚠️ Precios raros</option>
         </select>
         <select id="fOrden" aria-label="Orden">
           <option value="fecha">Más recientes</option>
@@ -492,7 +494,20 @@ function autoZonas(){
   if(changed)saveZ();
 }
 function applyCadete(){
-  applyCadeteBase();aplicarCostos();
+  applyCadeteBase();aplicarCostos();marcarRaros();
+}
+// precios raros: venta con precio por unidad 25 % o mas por debajo de lo habitual de ese SKU (mediana del mes; si hay pocas, de todos los meses)
+function marcarRaros(){
+  const med=a=>{const s=a.slice().sort((x,y)=>x-y),m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;};
+  const porMes={},porSku={};
+  for(const o of allRows()){o.raro=null;if(o.tipo==='Venta'&&o.pcd>0&&o.unid&&o.skuBase){const p=o.pcd/o.unid;(porSku[o.skuBase]=porSku[o.skuBase]||[]).push(p);const k=o.skuBase+'|'+o.periodo;(porMes[k]=porMes[k]||[]).push(p);}}
+  for(const o of allRows()){
+    if(!(o.tipo==='Venta'&&o.pcd>0&&o.unid&&o.skuBase))continue;
+    const am=porMes[o.skuBase+'|'+o.periodo], at=porSku[o.skuBase];
+    const base=am&&am.length>=3?am:at; if(!base||base.length<3)continue;
+    const m=med(base), p=o.pcd/o.unid;
+    if(m>0&&p<m*0.75)o.raro={med:m,pct:1-p/m};
+  }
 }
 function applyCadeteBase(){
   for(const d of DATA)for(const o of d.rows)fixRow(o);
@@ -637,7 +652,7 @@ function allRows(){return DATA.flatMap(d=>d.rows);}
 function filtered(sinMes){
   const fm=sinMes?'':$('fMes').value;
   const fc=$('fCuenta').value, ft=$('fTipo').value, fl=$('fLog').value, ff=$('fFlex').value, {raw,q,qd,isNum}=searchQ();
-  let r=allRows().filter(o=>(!fm||o.periodo===fm)&&(!fc||o.cuenta===fc)&&(isNum||ft==='todo'||(o.tipo==='Venta'&&o.pcd>0))&&(!fl||o.log===fl)&&(!ff||o.flex===ff)
+  let r=allRows().filter(o=>(!fm||o.periodo===fm)&&(!fc||o.cuenta===fc)&&(isNum||ft==='todo'||(o.tipo==='Venta'&&o.pcd>0&&(ft!=='raros'||o.raro)))&&(!fl||o.log===fl)&&(!ff||o.flex===ff)
     &&(!raw||(isNum?(o.op===qd||o.envNum===qd||o.paq===qd||o.mp===qd||o.op.includes(qd))
       :(norm(o.sku).includes(q)||norm(o.skuBase).includes(q)||norm(NAMES[o.skuBase]).includes(q)))));
   const ord=$('fOrden').value, d=s=>{const [a,b,c]=s.split('/');return c+b+a;};
@@ -695,6 +710,9 @@ function draw(){
   // lista
   $('count').textContent=r.length.toLocaleString('es-AR')+' operaciones';
   {const c=$('cntResumen');if(c)c.textContent='· '+r.length.toLocaleString('es-AR')+' operaciones';}
+  {const nr=allRows().filter(o=>o.raro&&(!$('fMes').value||o.periodo===$('fMes').value)&&(!$('fCuenta').value||o.cuenta===$('fCuenta').value)).length, a=$('rarosAviso'), on=$('fTipo').value==='raros';
+   a.style.display=nr||on?'block':'none';
+   a.innerHTML=on?`Mostrando solo <b>⚠️ precios raros</b> · <a href="#" onclick="event.preventDefault();$('fTipo').value='ventas';render();">ver todas</a>`:`<span style="background:#FDEBE7;color:#A6432F;border-radius:8px;padding:4px 8px;display:inline-block;">⚠️ <b>${nr}</b> ${nr===1?'venta':'ventas'} con precio muy por debajo de lo habitual · <a href="#" style="color:#A6432F;font-weight:700;" onclick="event.preventDefault();$('fTipo').value='raros';document.querySelector('details[data-k=lista]').open=true;render();document.querySelector('details[data-k=lista]').scrollIntoView({behavior:'smooth'});">Ver</a></span>`;}
   renderList(r);
   const sq=searchQ();
   if(sq.isNum&&r.length&&r.length<=5)$('list').querySelectorAll('tr.d').forEach(x=>x.classList.add('open'));
@@ -964,6 +982,7 @@ function card(o){
   const tags=[o.log&&`<span class="tag">${o.log}</span>`,o.pubT&&`<span class="tag">${o.pubT}</span>`,
     o.flex&&`<span class="tag ${/10 %|en contra|Sin reintegro/.test(o.flex)?'bad':'warn'}">${o.flex}</span>`,
     o.tipo!=='Venta'&&`<span class="tag bad">${o.tipo}</span>`,
+    o.raro&&`<span class="tag bad">⚠️ Precio ${pctf(o.raro.pct)} por debajo de lo habitual (${fmt2(o.raro.med)} c/u) · revisá precio o descuento de la publicación</span>`,
     !o.rep&&o.flex==='Reintegro en otra venta del envío'&&`<span class="tag bad" title="La otra venta de este envío no está en los reportes cargados o fue cancelada">⚠️ No se encontró la otra venta del envío ${o.envNum}</span>`,
     o.rep&&`<span class="tag" style="background:#E3F0FF;color:#1F4E8C;">🔀 Envío compartido entre ${o.rep.n} productos · le toca el ${pctf(o.rep.sh)}</span>`].filter(Boolean).join('');
   // envio compartido: se muestra solo la parte del reintegro que le toca a este producto
@@ -980,7 +999,7 @@ function card(o){
     `<tr class="sum"><td>Le queda</td><td>${fmt2(o.neto)}</td><td>${u(o.neto)}</td><td>${per(o.neto)}</td></tr>`+
     (o.costo!=null?`<tr><td>Costo (${fmt2(o.costo/o.unid)} c/u a la fecha)</td><td class="neg">${fmt2(-o.costo)}</td><td>${u(-o.costo)}</td><td>${per(-o.costo)}</td></tr><tr class="sum"><td>Ganancia</td><td>${fmt2(o.gan)}</td><td>${u(o.gan)}</td><td>${per(o.gan)}</td></tr>`:o.tipo==='Venta'&&o.pcd>0?'<tr><td colspan="4" class="meta">Este SKU no tiene costo cargado en la app.</td></tr>':'')+`</table>`+
     `${o.mp?`<p class="mpbox">Para buscar en Mercado Pago: <b>ID de pago ${o.mp}</b>${o.mpFecha?' · pagado el '+o.mpFecha.split('-').reverse().join('/'):''}${o.mpMedio&&o.mpMedio!=='-'?' · '+o.mpMedio:''}<br>Monto que debería figurar acreditado: <b>${fmt2(o.acred)}</b></p>`:''}<p class="note">Operación ${o.op} · ${o.cuenta}${o.cant?' · Publicación: '+o.sku+(o.cant>1?' × '+o.cant:''):''}${o.psd?' · Precio sin descuento '+fmt2(o.psd):''}${o.flexMonto!=null?' · Monto envío Flex '+fmt2(o.flexMonto):''}${o.nota?'<br>'+o.nota:''}</p>`;
-  const skuCell=o.sku?`<span class="base">${o.skuBase}${o.rep?' <span title="Envío compartido: el reintegro y el cadete se reparten entre los productos del envío" style="font-size:.72rem;background:#E3F0FF;color:#1F4E8C;border-radius:6px;padding:1px 5px;">🔀 '+o.rep.n+'</span>':''}</span>${NAMES[o.skuBase]?`<span class="var">${NAMES[o.skuBase]}</span>`:''}${o.variante?`<span class="var">${o.variante}</span>`:''}`:`<span class="base">${o.tipo}</span>`;
+  const skuCell=o.sku?`<span class="base">${o.raro?'<span title="Precio por unidad muy por debajo de lo habitual" style="font-size:.72rem;background:#FDEBE7;color:#A6432F;border-radius:6px;padding:1px 5px;margin-right:4px;">⚠️ precio</span>':''}${o.skuBase}${o.rep?' <span title="Envío compartido: el reintegro y el cadete se reparten entre los productos del envío" style="font-size:.72rem;background:#E3F0FF;color:#1F4E8C;border-radius:6px;padding:1px 5px;">🔀 '+o.rep.n+'</span>':''}</span>${NAMES[o.skuBase]?`<span class="var">${NAMES[o.skuBase]}</span>`:''}${o.variante?`<span class="var">${o.variante}</span>`:''}`:`<span class="base">${o.tipo}</span>`;
   return `<tr class="v" tabindex="0"><td>${o.fecha}</td><td>${skuCell}</td><td>${o.unid??''}</td>
     <td>${o.pcd!=null?fmt(o.pcd):''}</td><td>${fmt(o.neto)}</td><td>${o.aUnit!=null?fmt(o.aUnit):''}</td>
     <td class="pct ${cls(o.pct)}">${o.pct==null?'–':pctf(o.pct)}</td>
