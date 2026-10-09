@@ -1589,7 +1589,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v202</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v203</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2157,7 +2157,7 @@ a.grilla-celda{display:block;}
   <div class="step" id="step-costos-reventa">
     <div class="form-card" style="max-width:900px;">
       <h2>Costos de reventa</h2>
-      <p class="note" style="text-align:left;margin-bottom:10px;">No aparecen lo que fabricás ni las telas (esos costos ya salen de Productos que fabrico y de Telas). Lo que pagás por cada producto que comprás hecho, <b>en la misma unidad que el precio</b> (si el precio es por docena, el costo también). Para Mercado Libre la app lo pasa sola a costo por unidad. Guardá con el botón verde.</p>
+      <p class="note" style="text-align:left;margin-bottom:10px;">No aparece lo que fabricás (su costo se calcula solo). Las <b>telas</b> muestran el costo por metro de la pantalla Telas: si lo cambiás acá, se cambia también allá (y en las confecciones). Lo que pagás por cada producto que comprás hecho, <b>en la misma unidad que el precio</b> (si el precio es por docena, el costo también). Para Mercado Libre la app lo pasa sola a costo por unidad. Guardá con el botón verde.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
         <input id="cr-buscar" placeholder="🔍 Producto o SKU" oninput="renderCostosReventa()" style="flex:2;min-width:180px;padding:10px;border:1px solid var(--line);border-radius:12px;">
         <select id="cr-cat" onchange="renderCostosReventa()" style="flex:1;min-width:150px;padding:10px;border:1px solid var(--line);border-radius:12px;"></select>
@@ -9926,8 +9926,14 @@ async function abrirCostosReventa(){
 }
 // productos de reventa que no son telas propias (las telas toman el costo por metro de la pantalla Telas)
 function esCodigoTela(s){ const t = (telasDatos && telasDatos.telas) || {}; const S = String(s).toUpperCase(); return Object.keys(t).some(k => k.toUpperCase() === S); }
-function productosReventaConCosto(){ return productosReventa().filter(x => !x.p.variantes.every(v => esCodigoTela(v.sku))); }
-function crValor(s){ return crPend[s] !== undefined ? crPend[s] : (costosReventa[s] != null ? String(costosReventa[s]).replace('.', ',') : ''); }
+function productosReventaConCosto(){ return productosReventa(); }
+function codTela(s){ const t = (telasDatos && telasDatos.telas) || {}; const S = String(s).toUpperCase(); return Object.keys(t).find(k => k.toUpperCase() === S) || null; }
+// las telas muestran (y cambian) el costo por metro de la pantalla Telas
+function crValor(s){
+  if(crPend[s] !== undefined) return crPend[s];
+  const ct = codTela(s); if(ct){ const pm = precioMetroTela(ct); return pm > 0 ? String(Math.round(pm * 100) / 100).replace('.', ',') : ''; }
+  return costosReventa[s] != null ? String(costosReventa[s]).replace('.', ',') : '';
+}
 function renderCostosReventa(){
   const q = normBusqueda(document.getElementById('cr-buscar').value), cat = document.getElementById('cr-cat').value, sin = document.getElementById('cr-sin').checked;
   const prods = productosReventaConCosto().filter(x => (!cat || x.cat === cat) && (!q || normBusqueda(x.p.nombre + ' ' + x.p.variantes.map(v => v.sku).join(' ')).includes(q)));
@@ -9942,7 +9948,7 @@ function renderCostosReventa(){
       ${vs.map(v => { const s = String(v.sku).toUpperCase(); const i = window.__crSkus.push(s) - 1; const pr = parsePrice(v.precio), c = numAr(crValor(s)); const mg = c > 0 && pr > 0 ? (pr - c) / c : null;
         return `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 110px 120px 70px;gap:6px;align-items:center;padding:4px 0;border-top:1px solid var(--line);font-size:0.85rem;">
           <b>${escaparHtml(s)}</b><span style="color:#6B6258;">${escaparHtml(v.desc || '')}</span><span style="text-align:right;">${pr ? formatPrice(pr) + `<small class="meta">${sufijoPrecio(x.p)}</small>` : ''}</span>
-          <input inputmode="decimal" value="${escapeAttr(crValor(s))}" placeholder="costo" oninput="crCambiar(${i}, this.value)" style="padding:7px;border:1px solid var(--line);border-radius:8px;text-align:right;">
+          <div style="position:relative;"><input inputmode="decimal" value="${escapeAttr(crValor(s))}" placeholder="costo" oninput="crCambiar(${i}, this.value)" style="padding:7px;border:1px solid ${codTela(s) ? '#B9D3EE' : 'var(--line)'};border-radius:8px;text-align:right;width:100%;box-sizing:border-box;${codTela(s) ? 'background:#F2F7FD;' : ''}" title="${codTela(s) ? 'Costo por metro de la pantalla Telas (se cambia en los dos lados)' : ''}">${codTela(s) ? '<small style="position:absolute;left:6px;top:-7px;background:#fff;padding:0 3px;font-size:0.62rem;color:#2E5A8C;">🧵 de Telas, por metro</small>' : ''}</div>
           <span style="text-align:right;font-weight:700;color:${mg == null ? '#A89E90' : mg < 0.2 ? '#A6432F' : mg < 0.4 ? '#8A6417' : '#2F7A47'};" title="Margen sobre el costo">${mg == null ? '—' : Math.round(mg * 100) + ' %'}</span></div>`; }).join('')}</div>`;
   }).join('');
   document.getElementById('cr-lista').innerHTML = html ? `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 110px 120px 70px;gap:6px;font-size:0.72rem;color:#8A8072;padding:0 10px 4px;"><span>SKU</span><span>Descripción</span><span style="text-align:right;">Precio lista</span><span style="text-align:right;">Costo de compra $</span><span style="text-align:right;">Margen</span></div>` + html : '<p class="empty-msg">No hay productos con ese filtro.</p>';
@@ -9963,8 +9969,22 @@ function crTodo(pi, v){
 }
 async function guardarCostosReventa(){
   const nuevo = { ...costosReventa };
-  Object.entries(crPend).forEach(([s, v]) => { const n = numAr(v); if(n > 0) nuevo[s] = n; else delete nuevo[s]; });
+  const telas = { ...telasDatos.telas }; let cambioTelas = false;
+  Object.entries(crPend).forEach(([s, v]) => {
+    const n = numAr(v), ct = codTela(s);
+    if(ct){
+      if(!(n > 0)) return;
+      const t = { ...telas[ct] }, tc = tipoCambioTelas();
+      const porKg = t.precioUnidad === 'kg' ? ((rendimientoTela(String(ct).toUpperCase()) || {}).mPorKg || 0) : 0;
+      const pesos = porKg ? n * porKg : n;          // lo cargado es por metro; si la tela se compra por kilo, se pasa a kilo
+      if(t.precioUsd > 0 && tc){ t.precioUsd = Math.round(pesos / tc * 100) / 100; t.precio = Math.round(t.precioUsd * tc * 100) / 100; }
+      else t.precio = Math.round(pesos * 100) / 100;
+      telas[ct] = t; cambioTelas = true; return;
+    }
+    if(n > 0) nuevo[s] = n; else delete nuevo[s];
+  });
   try{
+    if(cambioTelas){ await db.collection('config').doc('telas').set(JSON.parse(JSON.stringify({ ...telasDatos, telas }))); telasDatos.telas = telas; try{ sincronizarDescripcionesCatalogo(); } catch(e){} }
     await db.collection('config').doc('costos_reventa').set({ c: nuevo, actualizado: new Date().toISOString() });
     costosReventa = nuevo; Object.keys(crPend).forEach(k => delete crPend[k]);
     crMostrarGuardar(); renderCostosReventa();
@@ -9975,7 +9995,7 @@ async function guardarCostosReventa(){
 // ----- costos de reventa desde Excel -----
 function descargarPlanillaCostos(){
   const filas = [['SKU', 'Producto', 'Descripción', 'Precio de lista', 'Precio por', 'Costo de compra']];
-  productosReventaConCosto().forEach(x => x.p.variantes.forEach(v => { const s = String(v.sku).toUpperCase(); filas.push([s, x.p.nombre, v.desc || '', parsePrice(v.precio) || '', unidadesVenta[x.p._editKey] || 'unidad', costosReventa[s] != null ? costosReventa[s] : '']); }));
+  productosReventaConCosto().forEach(x => x.p.variantes.forEach(v => { const s = String(v.sku).toUpperCase(); filas.push([s, x.p.nombre, v.desc || '', parsePrice(v.precio) || '', codTela(s) ? 'metro (de Telas)' : (unidadesVenta[x.p._editKey] || 'unidad'), crValor(s) ? numAr(crValor(s)) : '']); }));
   const ws = XLSX.utils.aoa_to_sheet(filas); ws['!cols'] = [{ wch: 12 }, { wch: 34 }, { wch: 28 }, { wch: 14 }, { wch: 12 }, { wch: 16 }];
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Costos reventa');
   XLSX.writeFile(wb, 'costos_reventa_onlinetextil.xlsx');
@@ -17560,7 +17580,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v202';
+const APP_VERSION = '2026-10-02-v203';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
