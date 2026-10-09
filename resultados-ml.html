@@ -562,7 +562,7 @@ function renderCad(){
   $('cadForm').querySelectorAll('input').forEach(i=>i.addEventListener('change',()=>{ZCOST[i.dataset.z]=Math.max(0,+i.value||0);saveZ();applyCadete();draw();}));
   $('cadMap').querySelectorAll('select').forEach(s=>s.addEventListener('change',()=>{AMTZ[s.dataset.m]=s.value;delete AUTO[s.dataset.m];saveZ();applyCadete();renderCad();draw();}));
 }
-let NAMES={};   // SKU base -> nombre, desde el catalogo de la app
+let NAMES={}, MOTIVOS={};   // SKU base -> nombre, desde el catalogo de la app
 let COSTOS={};  // SKU base -> [{fecha:'AAAA-MM-DD', costo}] (historial de costos de la app)
 function idbApp(clave){return new Promise(res=>{try{const r=indexedDB.open('onlinetextil',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');
   r.onsuccess=()=>{try{const g=r.result.transaction('kv').objectStore('kv').get(clave);g.onsuccess=()=>res(g.result);g.onerror=()=>res(null);}catch(e){res(null);}};r.onerror=()=>res(null);}catch(e){res(null);}});}
@@ -921,7 +921,7 @@ function renderFaltan(){
   const noApp=gs.filter(g=>!g.enApp), sinCosto=gs.filter(g=>g.enApp);
   const tot=vs.reduce((a,o)=>a+o.pcd,0);
   $('ftCnt').textContent=gs.length?'· '+gs.length+' SKU · '+fmt(tot)+' facturado':'';
-  const fila=g=>`<tr><td><b>${g.k}</b>${[...g.ml].some(s=>s&&norm(s)!==norm(g.k))?`<small class="meta" style="display:block;">en ML: ${[...g.ml].slice(0,3).join(', ')}</small>`:''}${g.enApp?`<small class="meta" style="display:block;">${NAMES[g.k]}</small>`:''}</td>
+  const fila=g=>`<tr><td><b>${g.k}</b>${[...g.ml].some(s=>s&&norm(s)!==norm(g.k))?`<small class="meta" style="display:block;">en ML: ${[...g.ml].slice(0,3).join(', ')}</small>`:''}${g.enApp?`<small class="meta" style="display:block;">${NAMES[g.k]}</small>`:''}${MOTIVOS[g.k]?`<small style="display:block;color:#A6432F;font-size:.76rem;margin-top:2px;">⚠️ ${MOTIVOS[g.k]}</small>`:''}</td>
     <td style="text-align:right;">${g.n.toLocaleString('es-AR')}</td><td style="text-align:right;">${g.unid.toLocaleString('es-AR')}</td><td style="text-align:right;">${fmt(g.vend)}</td>
     <td style="text-align:right;">${g.enApp?'':`<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:#3d1466;cursor:pointer;font-size:.8rem;" onclick="document.getElementById('eqPanel').open=true;$('eqML').value='${g.k}';$('eqApp').focus();$('eqPanel').scrollIntoView({behavior:'smooth'});">🔁 Asignar código</button>`}</td></tr>`;
   const tabla=(tit,arr,nota)=>arr.length?`<h3 style="margin:10px 0 4px;font-size:1rem;">${tit} <small class="meta">(${arr.length})</small></h3><p class="note" style="margin:0 0 6px;">${nota}</p>
@@ -1141,6 +1141,7 @@ firebase.auth().onAuthStateChanged(async u=>{
   try{const d=await db.collection('usuarios').doc(String(u.email).toLowerCase()).get();
     if(!d.exists||d.data().rol!=='dueño'){$('cargando').textContent='Solo el dueño puede ver los resultados de Mercado Libre.';return;}}catch(e){}
   NAMES=(await idbApp('nombres_sku'))||{};
+  MOTIVOS=(await idbApp('motivos_sin_costo'))||{};
   {const s=$('modoCosto');if(s)s.value=MODO_COSTO;}
   try{const s=await db.collection('historial_costos').get();const m={};s.docs.forEach(x=>{const v=x.data();const k=String(v.sku||'').toUpperCase();(m[k]=m[k]||[]).push({fecha:v.fecha,costo:+v.costo,creado:+v.creado||0});});
     let ult={};try{const u=await db.collection('config').doc('costos_ultimo').get();ult=u.exists?(u.data().c||{}):{};}catch(e){}
