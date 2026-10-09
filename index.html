@@ -1589,7 +1589,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v201</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v202</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2157,7 +2157,7 @@ a.grilla-celda{display:block;}
   <div class="step" id="step-costos-reventa">
     <div class="form-card" style="max-width:900px;">
       <h2>Costos de reventa</h2>
-      <p class="note" style="text-align:left;margin-bottom:10px;">Lo que pagás por cada producto que comprás hecho, <b>en la misma unidad que el precio</b> (si el precio es por docena, el costo también). Para Mercado Libre la app lo pasa sola a costo por unidad. Guardá con el botón verde.</p>
+      <p class="note" style="text-align:left;margin-bottom:10px;">No aparecen lo que fabricás ni las telas (esos costos ya salen de Productos que fabrico y de Telas). Lo que pagás por cada producto que comprás hecho, <b>en la misma unidad que el precio</b> (si el precio es por docena, el costo también). Para Mercado Libre la app lo pasa sola a costo por unidad. Guardá con el botón verde.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
         <input id="cr-buscar" placeholder="🔍 Producto o SKU" oninput="renderCostosReventa()" style="flex:2;min-width:180px;padding:10px;border:1px solid var(--line);border-radius:12px;">
         <select id="cr-cat" onchange="renderCostosReventa()" style="flex:1;min-width:150px;padding:10px;border:1px solid var(--line);border-radius:12px;"></select>
@@ -9868,7 +9868,7 @@ async function registrarHistorialCostos(){
     if(costosReventa === null) await cargarCostosReventa();
     const DIV = { 'docena': 12, 'media docena': 6, 'par': 2 };
     Object.entries(costosReventa || {}).forEach(([S, c0]) => {
-      if(fabricados.has(S) || !(c0 > 0)) return;
+      if(fabricados.has(S) || !(c0 > 0) || esCodigoTela(S)) return;
       const r = buscarProductoPorSku(S), u = r ? (unidadesVenta[r.producto._editKey] || '') : '';
       const c = Math.round(c0 / (DIV[u] || 1) * 100) / 100;
       if(ult[S] == null || Math.abs(ult[S] - c) >= 0.5){ nuevos.push({ sku: S, fecha: hoy, costo: c, desglose: { reventa: true, costoCargado: c0, por: u || 'unidad' } }); ult[S] = c; }
@@ -9918,15 +9918,19 @@ async function abrirCostosReventa(){
   if(tablaConsumo === null) await cargarTablaConsumo();
   if(fabricacion === null) await cargarFabricacion();
   if(typeof fichasArticulos !== 'undefined' && fichasArticulos === null) await cargarFichasArticulos();
+  if(telasDatos === null) await cargarTelas();
   if(costosReventa === null) await cargarCostosReventa();
-  const s = document.getElementById('cr-cat'), cats = [...new Set(productosReventa().map(x => x.cat))];
+  const s = document.getElementById('cr-cat'), cats = [...new Set(productosReventaConCosto().map(x => x.cat))];
   s.innerHTML = '<option value="">Todas las categorías</option>' + cats.map(c => `<option>${escaparHtml(c)}</option>`).join('');
   renderCostosReventa();
 }
+// productos de reventa que no son telas propias (las telas toman el costo por metro de la pantalla Telas)
+function esCodigoTela(s){ const t = (telasDatos && telasDatos.telas) || {}; const S = String(s).toUpperCase(); return Object.keys(t).some(k => k.toUpperCase() === S); }
+function productosReventaConCosto(){ return productosReventa().filter(x => !x.p.variantes.every(v => esCodigoTela(v.sku))); }
 function crValor(s){ return crPend[s] !== undefined ? crPend[s] : (costosReventa[s] != null ? String(costosReventa[s]).replace('.', ',') : ''); }
 function renderCostosReventa(){
   const q = normBusqueda(document.getElementById('cr-buscar').value), cat = document.getElementById('cr-cat').value, sin = document.getElementById('cr-sin').checked;
-  const prods = productosReventa().filter(x => (!cat || x.cat === cat) && (!q || normBusqueda(x.p.nombre + ' ' + x.p.variantes.map(v => v.sku).join(' ')).includes(q)));
+  const prods = productosReventaConCosto().filter(x => (!cat || x.cat === cat) && (!q || normBusqueda(x.p.nombre + ' ' + x.p.variantes.map(v => v.sku).join(' ')).includes(q)));
   window.__crSkus = [];
   const html = prods.map((x, pi) => {
     const vs = x.p.variantes.filter(v => !sin || !crValor(String(v.sku).toUpperCase()));
@@ -9952,7 +9956,7 @@ function crMostrarGuardar(){ const n = Object.keys(crPend).length, b = document.
 function crCambiar(i, v){ crPend[window.__crSkus[i]] = v; crMostrarGuardar(); }
 function crTodo(pi, v){
   const q = normBusqueda(document.getElementById('cr-buscar').value), cat = document.getElementById('cr-cat').value;
-  const prods = productosReventa().filter(x => (!cat || x.cat === cat) && (!q || normBusqueda(x.p.nombre + ' ' + x.p.variantes.map(w => w.sku).join(' ')).includes(q)));
+  const prods = productosReventaConCosto().filter(x => (!cat || x.cat === cat) && (!q || normBusqueda(x.p.nombre + ' ' + x.p.variantes.map(w => w.sku).join(' ')).includes(q)));
   const x = prods[pi]; if(!x || !v.trim()) return;
   x.p.variantes.forEach(w => { crPend[String(w.sku).toUpperCase()] = v.trim(); });
   renderCostosReventa(); crMostrarGuardar();
@@ -9971,7 +9975,7 @@ async function guardarCostosReventa(){
 // ----- costos de reventa desde Excel -----
 function descargarPlanillaCostos(){
   const filas = [['SKU', 'Producto', 'Descripción', 'Precio de lista', 'Precio por', 'Costo de compra']];
-  productosReventa().forEach(x => x.p.variantes.forEach(v => { const s = String(v.sku).toUpperCase(); filas.push([s, x.p.nombre, v.desc || '', parsePrice(v.precio) || '', unidadesVenta[x.p._editKey] || 'unidad', costosReventa[s] != null ? costosReventa[s] : '']); }));
+  productosReventaConCosto().forEach(x => x.p.variantes.forEach(v => { const s = String(v.sku).toUpperCase(); filas.push([s, x.p.nombre, v.desc || '', parsePrice(v.precio) || '', unidadesVenta[x.p._editKey] || 'unidad', costosReventa[s] != null ? costosReventa[s] : '']); }));
   const ws = XLSX.utils.aoa_to_sheet(filas); ws['!cols'] = [{ wch: 12 }, { wch: 34 }, { wch: 28 }, { wch: 14 }, { wch: 12 }, { wch: 16 }];
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Costos reventa');
   XLSX.writeFile(wb, 'costos_reventa_onlinetextil.xlsx');
@@ -17556,7 +17560,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v201';
+const APP_VERSION = '2026-10-02-v202';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
