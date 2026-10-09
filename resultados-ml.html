@@ -1037,8 +1037,14 @@ firebase.auth().onAuthStateChanged(async u=>{
   try{const d=await db.collection('usuarios').doc(String(u.email).toLowerCase()).get();
     if(!d.exists||d.data().rol!=='dueño'){$('cargando').textContent='Solo el dueño puede ver los resultados de Mercado Libre.';return;}}catch(e){}
   NAMES=(await idbApp('nombres_sku'))||{};
-  try{const s=await db.collection('historial_costos').get();const m={};s.docs.forEach(x=>{const v=x.data();const k=String(v.sku||'').toUpperCase();(m[k]=m[k]||[]).push({fecha:v.fecha,costo:+v.costo});});
-    Object.values(m).forEach(a=>a.sort((x,y)=>x.fecha.localeCompare(y.fecha)));COSTOS=m;}catch(e){}
+  try{const s=await db.collection('historial_costos').get();const m={};s.docs.forEach(x=>{const v=x.data();const k=String(v.sku||'').toUpperCase();(m[k]=m[k]||[]).push({fecha:v.fecha,costo:+v.costo,creado:+v.creado||0});});
+    let ult={};try{const u=await db.collection('config').doc('costos_ultimo').get();ult=u.exists?(u.data().c||{}):{};}catch(e){}
+    // un solo costo por dia: el ultimo cargado; sin hora de carga, el que coincide con el costo actual
+    Object.entries(m).forEach(([k,a])=>{a.sort((x,y)=>x.fecha.localeCompare(y.fecha)||x.creado-y.creado);
+      const porDia=[];a.forEach(x=>{const prev=porDia[porDia.length-1];if(prev&&prev.fecha===x.fecha){
+        const elegir=(x.creado&&prev.creado)?x:(ult[k]!=null&&Math.abs(x.costo-ult[k])<0.5?x:(ult[k]!=null&&Math.abs(prev.costo-ult[k])<0.5?prev:x));porDia[porDia.length-1]=elegir;}else porDia.push(x);});
+      m[k]=porDia;});
+    COSTOS=m;}catch(e){}
   await cargarZonas();
   await load();
   $('cargando').hidden=true;
