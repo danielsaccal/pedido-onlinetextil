@@ -969,9 +969,9 @@ function card(o){
   // envio compartido: se muestra solo la parte del reintegro que le toca a este producto
   const R=o.rep, envioV=R&&R.lead?(o.envio||0)-(R.F-(o.reintAparte||0)):o.envio;
   const L=[['Precio con descuento',o.pcd],['Cargo por vender',o.vender],['Costo por unidad',o.unidad],['Cuotas',o.cuotas],['Envío (neto)',Math.abs(envioV)<0.005?0:envioV],
-    R?[`🔀 Reintegro Flex de ML <small class="meta">(su parte: ${pctf(R.sh)} de ${fmt2(R.F)} del envío ${o.envNum})</small>`,R.F*R.sh]:[`Reintegro Flex de ML <small class="meta">(vino en la fila del envío ${o.envNum})</small>`,o.reintAparte||0],
+    R?[`🔀 Envío Flex neto, su parte <small class="meta" style="display:block;white-space:normal;max-width:360px;">reintegro ${fmt2(R.F*R.sh)} − cadete ${fmt2(-o.cad)} (le toca el ${pctf(R.sh)} del envío)</small>`,R.F*R.sh+o.cad]:[`Reintegro Flex de ML <small class="meta">(vino en la fila del envío ${o.envNum})</small>`,o.reintAparte||0],
     ['Full',o.full],['Publicidad',o.ads],['Otros',o.otros],['Retenciones',o.ret]].filter(x=>x[1]);
-  const L2=o.cad?[['Acreditado por ML',o.acred+(o.ajEnv||0),'sub'],[o.rep?`🔀 Costo cadete Flex <small class="meta">(su parte: ${pctf(o.rep.sh)} de ${fmt2(-o.rep.T)})</small>`:'Costo cadete Flex',o.cad]]:[];
+  const L2=o.cad&&!R?[['Acreditado por ML',o.acred,'sub'],['Costo cadete Flex',o.cad]]:[];
   const per=v=>o.pcd>0?(v/o.pcd*100).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}):'';
   const u=v=>o.unid&&o.pcd>0?fmt2(v/o.unid):'';
   const det=`<div>${tags}</div><table><tr><td></td><td class="meta">Monto</td><td class="meta">Por unidad</td><td class="meta">De cada $100</td></tr>`+
