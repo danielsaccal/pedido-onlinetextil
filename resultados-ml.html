@@ -1106,12 +1106,19 @@ function card(o){
   const L2=o.cad&&!R?[['Acreditado por ML',o.acred,'sub'],['Costo cadete Flex',o.cad]]:[];
   const per=v=>o.pcd>0?(v/o.pcd*100).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}):'';
   const u=v=>o.unid&&o.pcd>0?fmt2(v/o.unid):'';
-  const det=`<div>${tags}</div><table><tr><td></td><td class="meta">Monto</td><td class="meta">Por unidad</td><td class="meta">De cada $100</td></tr>`+
-    L.map(x=>`<tr><td>${x[0]}</td><td class="${x[1]<0?'neg':''}">${fmt2(x[1])}</td><td>${u(x[1])}</td><td>${per(x[1])}</td></tr>`).join('')+
-    L2.map(x=>`<tr class="${x[2]||''}"><td>${x[0]}</td><td class="${x[1]<0?'neg':''}">${fmt2(x[1])}</td><td>${u(x[1])}</td><td>${per(x[1])}</td></tr>`).join('')+
-    `<tr class="sum"><td>Le queda</td><td>${fmt2(o.neto)}</td><td>${u(o.neto)}</td><td>${per(o.neto)}</td></tr>`+
-    (o.costo!=null?`<tr><td>Costo (${fmt2(o.costo/o.unid)} c/u${MODO_COSTO==='actual'?', actual':' a la fecha'})</td><td class="neg">${fmt2(-o.costo)}</td><td>${u(-o.costo)}</td><td>${per(-o.costo)}</td></tr><tr class="sum"><td>Ganancia</td><td>${fmt2(o.gan)}</td><td>${u(o.gan)}</td><td>${per(o.gan)}</td></tr>`:o.tipo==='Venta'&&o.pcd>0?'<tr><td colspan="4" class="meta">Este SKU no tiene costo cargado en la app.</td></tr>':'')+`</table>`+
-    `${o.mp?`<p class="mpbox">Para buscar en Mercado Pago: <b>ID de pago ${o.mp}</b>${o.mpFecha?' · pagado el '+o.mpFecha.split('-').reverse().join('/'):''}${o.mpMedio&&o.mpMedio!=='-'?' · '+o.mpMedio:''}<br>Monto que debería figurar acreditado: <b>${fmt2(o.acred)}</b></p>`:''}<p class="note">Operación ${o.op} · ${o.cuenta}${o.cant?' · Publicación: '+o.sku+(o.cant>1?' × '+o.cant:''):''}${o.psd?' · Precio sin descuento '+fmt2(o.psd):''}${o.flexMonto!=null?' · Monto envío Flex '+fmt2(o.flexMonto):''}${o.nota?'<br>'+o.nota:''}</p>`;
+  // detalle compacto: concepto y monto (por unidad solo si hay mas de una), y el resultado en chips
+  const uu=v=>o.unid>1&&o.pcd>0?`<small style="display:block;color:#A89E90;font-size:.72rem;">${fmt2(v/o.unid)} c/u</small>`:'';
+  const fila=(t,v,cls)=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px dashed var(--line,#E3DCD2);${cls==='sub'?'color:#8A8072;':''}${cls==='sum'?'font-weight:800;border-bottom:2px solid #3d1466;':''}"><span style="min-width:0;">${t}</span><span style="text-align:right;white-space:nowrap;" class="${v<0?'neg':''}">${fmt2(v)}${uu(v)}</span></div>`;
+  const chip=(t,v,col)=>`<span style="display:inline-flex;flex-direction:column;background:${col}12;border:1px solid ${col}40;border-radius:12px;padding:6px 12px;min-width:110px;"><small style="color:#6B6258;font-size:.72rem;">${t}</small><b style="color:${col};font-size:1rem;">${v}</b></span>`;
+  const det=`<div style="position:sticky;left:0;max-width:min(560px,88vw);white-space:normal;">
+    <div style="margin-bottom:6px;">${tags}</div>
+    ${L.map(x=>fila(x[0],x[1])).join('')}${L2.map(x=>fila(x[0],x[1],x[2])).join('')}${fila('Le queda',o.neto,'sum')}
+    ${o.costo!=null?fila(`Costo <small class="meta">(${fmt2(o.costo/o.unid)} c/u${MODO_COSTO==='actual'?', actual':', a la fecha'})</small>`,-o.costo):''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px;">
+      ${chip('Le queda',fmt(o.neto)+(o.pct!=null?` · ${pctf(o.pct)}`:''),'#3d1466')}
+      ${o.costo!=null?chip('Ganancia',fmt(o.gan)+(o.ganPct!=null?` · ${pctf(o.ganPct)} s/costo`:''),o.gan<0?'#A6432F':'#2F7A47'):(o.tipo==='Venta'&&o.pcd>0?chip('Ganancia','sin costo cargado','#8A8072'):'')}
+    </div>
+    ${o.mp?`<p class="mpbox">Para buscar en Mercado Pago: <b>ID de pago ${o.mp}</b>${o.mpFecha?' · pagado el '+o.mpFecha.split('-').reverse().join('/'):''}${o.mpMedio&&o.mpMedio!=='-'?' · '+o.mpMedio:''}<br>Monto que debería figurar acreditado: <b>${fmt2(o.acred)}</b></p>`:''}<p class="note">Operación ${o.op} · ${o.cuenta}${o.cant?' · Publicación: '+o.sku+(o.cant>1?' × '+o.cant:''):''}${o.psd?' · Precio sin descuento '+fmt2(o.psd):''}${o.flexMonto!=null?' · Monto envío Flex '+fmt2(o.flexMonto):''}${o.nota?'<br>'+o.nota:''}</p></div>`;
   const skuCell=o.sku?`<span class="base">${o.raro?'<span title="Precio por unidad muy por debajo de lo habitual" style="font-size:.72rem;background:#FDEBE7;color:#A6432F;border-radius:6px;padding:1px 5px;margin-right:4px;">⚠️ precio</span>':''}${o.skuBase}${o.rep?' <span title="Envío compartido: el reintegro y el cadete se reparten entre los productos del envío" style="font-size:.72rem;background:#E3F0FF;color:#1F4E8C;border-radius:6px;padding:1px 5px;">🔀 '+o.rep.n+'</span>':''}</span>${NAMES[o.skuBase]?`<span class="var">${NAMES[o.skuBase]}</span>`:''}${o.variante?`<span class="var">${o.variante}</span>`:''}`:`<span class="base">${o.tipo}</span>`;
   return `<tr class="v" tabindex="0"><td>${o.fecha}</td><td>${skuCell}</td><td>${o.unid??''}</td>
     <td>${o.pcd!=null?fmt(o.pcd):''}</td><td>${fmt(o.neto)}</td><td>${o.aUnit!=null?fmt(o.aUnit):''}</td>
