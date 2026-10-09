@@ -1589,7 +1589,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v205</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v206</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2168,6 +2168,19 @@ a.grilla-celda{display:block;}
         <label class="btn-mini" style="cursor:pointer;">📥 Subir Excel con costos<input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="subirExcelCostos(this)"></label>
       </div>
       <div id="cr-import" style="display:none;"></div>
+      <details id="cr-kits" style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;background:#FBF9F4;">
+        <summary style="cursor:pointer;font-weight:700;color:var(--purple);">🧩 Juegos armados con otros SKU <span class="note" id="cr-kits-n" style="margin:0;"></span></summary>
+        <p class="note" style="text-align:left;margin:6px 0;">Ej: <b>GR140J = GR140B + GR140C</b> (toalla + toallón). El costo del juego es la suma de sus partes, y se actualiza solo. Si lleva 2 de algo: <b>GR140B x2 + GR140C</b>.</p>
+        <div id="cr-kits-lista"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center;">
+          <input id="kit-sku" placeholder="SKU del juego" style="width:130px;padding:8px;border:1px solid var(--line);border-radius:10px;text-transform:uppercase;">
+          <span>=</span>
+          <input id="kit-comp" placeholder="GR140B + GR140C" style="flex:1;min-width:180px;padding:8px;border:1px solid var(--line);border-radius:10px;text-transform:uppercase;">
+          <button type="button" class="btn-mini" onclick="agregarKit()">Agregar</button>
+          <button type="button" class="btn-mini" onclick="sugerirKits()" title="Busca juegos que terminan en J y tienen sus partes con el mismo código">✨ Sugerir</button>
+        </div>
+        <div id="cr-kits-sug"></div>
+      </details>
       <div id="cr-lista"></div>
       <div id="cr-guardar" style="display:none;position:sticky;bottom:10px;z-index:5;margin-top:10px;"><button type="button" onclick="guardarCostosReventa()" style="width:100%;padding:12px;border:none;border-radius:12px;background:#3D9A5B;color:#fff;font-weight:700;font-size:0.95rem;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.15);">💾 Guardar</button></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
@@ -9868,10 +9881,16 @@ async function registrarHistorialCostos(){
     if(costosReventa === null) await cargarCostosReventa();
     const DIV = { 'docena': 12, 'media docena': 6, 'par': 2 };
     Object.entries(costosReventa || {}).forEach(([S, c0]) => {
-      if(fabricados.has(S) || !(c0 > 0) || esCodigoTela(S)) return;
+      if(fabricados.has(S) || !(c0 > 0) || esCodigoTela(S) || (kitsDatos && kitsDatos[S])) return;
       const r = buscarProductoPorSku(S), u = r ? (unidadesVenta[r.producto._editKey] || '') : '';
       const c = Math.round(c0 / (DIV[u] || 1) * 100) / 100;
       if(ult[S] == null || Math.abs(ult[S] - c) >= 0.5){ nuevos.push({ sku: S, fecha: hoy, costo: c, desglose: { reventa: true, costoCargado: c0, por: u || 'unidad' } }); ult[S] = c; }
+    });
+    // juegos armados con otros SKU: suma de sus partes
+    if(kitsDatos === null) await cargarKits();
+    Object.keys(kitsDatos || {}).forEach(S => {
+      const c = costoUnidadSku(S); if(!(c > 0)) return;
+      if(ult[S] == null || Math.abs(ult[S] - c) >= 0.5){ nuevos.push({ sku: S, fecha: hoy, costo: c, desglose: { juego: kitsDatos[S] } }); ult[S] = c; }
     });
     // telas que tambien se venden como tela (mismo codigo): costo por metro. Solo se usa en Resultados ML.
     Object.keys((telasDatos && telasDatos.telas) || {}).forEach(cod => {
@@ -9921,6 +9940,8 @@ async function abrirCostosReventa(){
   if(typeof fichasArticulos !== 'undefined' && fichasArticulos === null) await cargarFichasArticulos();
   if(telasDatos === null) await cargarTelas();
   if(costosReventa === null) await cargarCostosReventa();
+  if(kitsDatos === null) await cargarKits();
+  renderKits();
   const s = document.getElementById('cr-cat'), cats = [...new Set(productosReventaConCosto().map(x => x.cat))];
   s.innerHTML = '<option value="">Todas las categorías</option>' + cats.map(c => `<option>${escaparHtml(c)}</option>`).join('');
   renderCostosReventa();
@@ -9946,10 +9967,10 @@ function renderCostosReventa(){
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;"><b style="flex:1;">${escaparHtml(x.p.nombre)}</b><span class="note" style="margin:0;">${escaparHtml(x.cat)}</span>
         ${x.p.variantes.every(v => codTela(v.sku)) ? '<span style="font-size:0.8rem;color:#2E5A8C;background:#F2F7FD;border-radius:8px;padding:5px 8px;">🧵 por metro</span>' : ''}<select title="Precio y costo por…" onchange="crUnidad('${escapeAttr(x.p._editKey)}', this.value)" style="padding:5px;border:1px solid var(--line);border-radius:8px;font-size:0.8rem;${x.p.variantes.every(v => codTela(v.sku)) ? 'display:none;' : ''}">${['', 'docena', 'media docena', 'par', 'juego', 'pack'].map(u => `<option value="${u}" ${(unidadesVenta[x.p._editKey] || '') === u ? 'selected' : ''}>${u ? 'por ' + u : 'por unidad'}</option>`).join('')}</select>
         <input type="text" inputmode="decimal" placeholder="mismo costo para todas" style="width:150px;padding:6px;border:1px solid var(--line);border-radius:8px;font-size:0.8rem;" onkeydown="if(event.key==='Enter'){crTodo(${pi}, this.value); this.value='';}"><span class="note" style="margin:0;">↵</span></div>
-      ${vs.map(v => { const s = String(v.sku).toUpperCase(); const i = window.__crSkus.push(s) - 1; const pr = parsePrice(v.precio), c = numAr(crValor(s)); const mg = c > 0 && pr > 0 ? (pr - c) / c : null;
+      ${vs.map(v => { const s = String(v.sku).toUpperCase(); const i = window.__crSkus.push(s) - 1; const pr = parsePrice(v.precio), c = kitsDatos && kitsDatos[s] ? (costoUnidadSku(s) || 0) * ({ 'docena': 12, 'media docena': 6, 'par': 2 }[unidadesVenta[x.p._editKey]] || 1) : numAr(crValor(s)); const mg = c > 0 && pr > 0 ? (pr - c) / c : null;
         return `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 110px 120px 70px;gap:6px;align-items:center;padding:4px 0;border-top:1px solid var(--line);font-size:0.85rem;">
           <b>${escaparHtml(s)}</b><span style="color:#6B6258;">${escaparHtml(v.desc || '')}</span><span style="text-align:right;">${pr ? formatPrice(pr) + `<small class="meta">${sufijoPrecio(x.p)}</small>` : ''}</span>
-          <div style="position:relative;"><input inputmode="decimal" value="${escapeAttr(crValor(s))}" placeholder="costo" oninput="crCambiar(${i}, this.value)" style="padding:7px;border:1px solid ${codTela(s) ? '#B9D3EE' : 'var(--line)'};border-radius:8px;text-align:right;width:100%;box-sizing:border-box;${codTela(s) ? 'background:#F2F7FD;' : ''}" title="${codTela(s) ? 'Costo por metro de la pantalla Telas (se cambia en los dos lados)' : ''}">${codTela(s) ? '<small style="display:block;text-align:right;font-size:0.66rem;color:#2E5A8C;margin-top:2px;">🧵 de Telas · por metro</small>' : ''}</div>
+          ${kitsDatos && kitsDatos[s] ? `<div style="text-align:right;"><b>${costoUnidadSku(s) != null ? formatPrice(costoUnidadSku(s) * ({ 'docena': 12, 'media docena': 6, 'par': 2 }[unidadesVenta[x.p._editKey]] || 1)) : '—'}</b><small style="display:block;font-size:0.66rem;color:#6B4FA0;">🧩 ${escaparHtml(kitsDatos[s])}</small></div>` : `<div style="position:relative;"><input inputmode="decimal" value="${escapeAttr(crValor(s))}" placeholder="costo" oninput="crCambiar(${i}, this.value)" style="padding:7px;border:1px solid ${codTela(s) ? '#B9D3EE' : 'var(--line)'};border-radius:8px;text-align:right;width:100%;box-sizing:border-box;${codTela(s) ? 'background:#F2F7FD;' : ''}" title="${codTela(s) ? 'Costo por metro de la pantalla Telas (se cambia en los dos lados)' : ''}">${codTela(s) ? '<small style="display:block;text-align:right;font-size:0.66rem;color:#2E5A8C;margin-top:2px;">🧵 de Telas · por metro</small>' : ''}</div>`}
           <span style="text-align:right;font-weight:700;color:${mg == null ? '#A89E90' : mg < 0.2 ? '#A6432F' : mg < 0.4 ? '#8A6417' : '#2F7A47'};" title="Margen sobre el costo">${mg == null ? '—' : Math.round(mg * 100) + ' %'}</span></div>`; }).join('')}</div>`;
   }).join('');
   document.getElementById('cr-lista').innerHTML = html ? `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 110px 120px 70px;gap:6px;font-size:0.72rem;color:#8A8072;padding:0 10px 4px;"><span>SKU</span><span>Descripción</span><span style="text-align:right;">Precio lista</span><span style="text-align:right;">Costo de compra $</span><span style="text-align:right;">Margen</span></div>` + html : '<p class="empty-msg">No hay productos con ese filtro.</p>';
@@ -10034,6 +10055,43 @@ function subirExcelCostos(inp){
   };
   r.readAsArrayBuffer(f); inp.value = '';
 }
+
+// ===== Juegos armados con otros SKU (config/kits: { k: { JUEGO: 'A + B x2' } }) =====
+let kitsDatos = null;
+async function cargarKits(){ try{ const d = await db.collection('config').doc('kits').get(); kitsDatos = d.exists ? (d.data().k || {}) : {}; } catch(e){ kitsDatos = {}; } }
+function partesKit(txt){ return String(txt || '').toUpperCase().split('+').map(s => s.trim()).filter(Boolean).map(s => { const m = s.match(/^(.+?)(?:\s*X\s*(\d+))?$/); return { sku: m[1].trim(), n: m[2] ? +m[2] : 1 }; }); }
+// costo por unidad (la que se vende en ML) de cualquier SKU: fabricado, tela, reventa o juego armado
+function costoUnidadSku(S, prof){
+  S = String(S).toUpperCase(); prof = prof || 0; if(prof > 4) return null;
+  if(kitsDatos && kitsDatos[S]){ let t = 0; for(const p of partesKit(kitsDatos[S])){ const c = costoUnidadSku(p.sku, prof + 1); if(c == null) return null; t += c * p.n; } return Math.round(t * 100) / 100; }
+  if(fabricacion && fabricacion.vinculos[S] && fabricacion.vinculos[S].articulo){ const a = costoActualSku(S); if(a) return a.costo; }
+  const ct = codTela(S); if(ct){ const pm = precioMetroTela(ct); if(pm > 0) return Math.round(pm * 100) / 100; }
+  const c0 = (costosReventa || {})[S]; if(c0 > 0){ const r = buscarProductoPorSku(S), u = r ? (unidadesVenta[r.producto._editKey] || '') : ''; return Math.round(c0 / ({ 'docena': 12, 'media docena': 6, 'par': 2 }[u] || 1) * 100) / 100; }
+  return null;
+}
+function renderKits(){
+  const ks = Object.keys(kitsDatos || {}).sort();
+  document.getElementById('cr-kits-n').textContent = ks.length ? `(${ks.length})` : '';
+  document.getElementById('cr-kits-lista').innerHTML = ks.map(k => { const c = costoUnidadSku(k); const faltan = partesKit(kitsDatos[k]).filter(p => costoUnidadSku(p.sku) == null).map(p => p.sku);
+    return `<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-top:1px solid var(--line);font-size:0.86rem;"><b style="min-width:90px;">${escaparHtml(k)}</b><span style="flex:1;">= ${escaparHtml(kitsDatos[k])}</span>
+      <span style="font-weight:700;${c == null ? 'color:#A89E90;' : ''}">${c != null ? formatPrice(c) : 'falta costo de ' + escaparHtml(faltan.join(', '))}</span>
+      <button type="button" class="btn-mini" onclick="quitarKit('${escapeAttr(k)}')">✕</button></div>`; }).join('') || '<p class="note" style="margin:4px 0;">Todavía no hay juegos armados.</p>';
+}
+async function guardarKits(){ await db.collection('config').doc('kits').set({ k: kitsDatos, actualizado: new Date().toISOString() }); renderKits(); renderCostosReventa(); registrarHistorialCostos().catch(() => {}); }
+async function agregarKit(){
+  const k = document.getElementById('kit-sku').value.trim().toUpperCase(), c = document.getElementById('kit-comp').value.trim().toUpperCase().replace(/\s+/g, ' ');
+  if(!k || !partesKit(c).length){ alert('Completá el SKU del juego y sus partes (ej: GR140B + GR140C).'); return; }
+  kitsDatos[k] = c; try{ await guardarKits(); document.getElementById('kit-sku').value = ''; document.getElementById('kit-comp').value = ''; } catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+async function quitarKit(k){ delete kitsDatos[k]; try{ await guardarKits(); } catch(e){} }
+function sugerirKits(){
+  const todos = new Set(); CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => todos.add(String(v.sku).toUpperCase()))));
+  const sug = [];
+  todos.forEach(s => { if(!/J$/.test(s) || kitsDatos[s]) return; const base = s.slice(0, -1); const partes = [...todos].filter(x => x !== s && x.startsWith(base) && x.length === s.length && /[A-Z]$/.test(x) && !/J$/.test(x)); if(partes.length >= 2) sug.push([s, partes.sort().join(' + ')]); });
+  window.__kitSug = sug;
+  document.getElementById('cr-kits-sug').innerHTML = sug.length ? `<p class="note" style="text-align:left;margin:8px 0 4px;">Posibles juegos (revisá que sean correctos):</p>` + sug.slice(0, 40).map(([k, c], i) => `<div style="display:flex;gap:8px;align-items:center;font-size:0.85rem;padding:3px 0;"><span style="flex:1;"><b>${escaparHtml(k)}</b> = ${escaparHtml(c)}</span><button type="button" class="btn-mini" onclick="usarSugKit(${i})">Usar</button></div>`).join('') : '<p class="note" style="margin:6px 0;">No encontré juegos para sugerir.</p>';
+}
+async function usarSugKit(i){ const [k, c] = window.__kitSug[i]; kitsDatos[k] = c; window.__kitSug.splice(i, 1); try{ await guardarKits(); sugerirKits(); } catch(e){ alert('No se pudo guardar: ' + e.message); } }
 
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
@@ -17581,7 +17639,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v205';
+const APP_VERSION = '2026-10-02-v206';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
