@@ -530,7 +530,7 @@ if(false)$('names').addEventListener('change',async ev=>{
   }catch(e){showErr(e.message||'No se pudo leer el archivo de nombres.');}
   ev.target.value='';
 });
-function alertOk(m){const e=$('err');e.textContent=m;e.style.display='block';e.style.background='var(--good-soft)';setTimeout(()=>{e.style.display='none';e.style.background='';},4000);}
+let _okT=null;function alertOk(m){const e=$('err');e.textContent=m;e.style.display='block';e.style.background='var(--good-soft)';clearTimeout(_okT);_okT=setTimeout(()=>{e.style.display='none';e.style.background='';},/Guardando|Leyendo/.test(m)?60000:6000);}
 const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const mesTxt=p=>{const [y,m]=p.split('-');return MESES[+m-1].replace(/^./,c=>c.toUpperCase())+' '+y;};
 function periodoDe(rows){const c={};rows.forEach(o=>{const f=String(o.fecha).split('/');if(f.length===3){const k=f[2]+'-'+f[1];c[k]=(c[k]||0)+1;}});
@@ -541,7 +541,7 @@ const IDB={db:null,
   tx(mode,fn){return new Promise((res,rej)=>{if(!this.db)return rej(new Error('sin base'));const t=this.db.transaction('meses',mode);const st=t.objectStore('meses');const q=fn(st);
     t.oncomplete=()=>res(q&&q.result);t.onerror=()=>rej(t.error);});},
   all(){return this.tx('readonly',s=>s.getAll());}, put(o){return this.tx('readwrite',s=>s.put(o));}, del(id){return this.tx('readwrite',s=>s.delete(id));}};
-const BLOQUE=300;
+const BLOQUE=150;
 const idMes=d=>(d.cuenta+'_'+d.periodo).replace(/[\/\s]/g,'-');
 async function borrarBloques(id){const s=await db.collection('mlMeses').doc(id).collection('bloques').get();for(let i=0;i<s.docs.length;i+=400){const b=db.batch();s.docs.slice(i,i+400).forEach(x=>b.delete(x.ref));await b.commit();}}
 async function saveEntry(d){
@@ -550,9 +550,10 @@ async function saveEntry(d){
     await borrarBloques(id);
     const filas=JSON.parse(JSON.stringify(d.rows));
     const n=Math.ceil(filas.length/BLOQUE);
-    for(let i=0;i<n;i+=10){const b=db.batch();for(let j=i;j<Math.min(n,i+10);j++)b.set(ref.collection('bloques').doc(String(j).padStart(3,'0')),{rows:filas.slice(j*BLOQUE,(j+1)*BLOQUE)});await b.commit();}
+    for(let i=0;i<n;i+=10){alertOk('Guardando en la base… '+Math.min(100,Math.round(i/n*100))+' %');const b=db.batch();for(let j=i;j<Math.min(n,i+10);j++)b.set(ref.collection('bloques').doc(String(j).padStart(3,'0')),{rows:filas.slice(j*BLOQUE,(j+1)*BLOQUE)});await b.commit();}
     await ref.set({cuenta:d.cuenta,periodo:d.periodo,file:d.file||'',n:filas.length,bloques:n,actualizado:new Date().toISOString()});
-  }catch(e){showErr('No se pudo guardar este mes en la base: '+e.message);}
+    return true;
+  }catch(e){showErr('Se ve en pantalla, pero no se pudo guardar en la base: '+e.message);return false;}
 }
 async function borrarMes(idViejo){const d=DATA.find(x=>x.id===idViejo)||{};const id=d.cuenta?idMes(d):idViejo;await borrarBloques(id);await db.collection('mlMeses').doc(id).delete();}
 function normEntry(d){
@@ -589,14 +590,17 @@ function showErr(m){const e=$('err');e.textContent=m;e.style.display=m?'block':'
 $('file').addEventListener('change',async ev=>{
   const f=ev.target.files[0]; if(!f)return; showErr('');
   try{
+    alertOk('Leyendo '+f.name+'…'); await new Promise(r=>setTimeout(r,30));
     const buf=await f.arrayBuffer(); const wb=XLSX.read(buf,{type:'array'});
     const cuenta=$('cuenta').value; const rows=parseWorkbook(wb,cuenta,f.name);
     const d=normEntry({file:f.name,cuenta,rows});
     const existed=DATA.some(x=>x.id===d.id);
     DATA=DATA.filter(x=>x.id!==d.id); DATA.push(d); DATA.sort((a,b)=>a.periodo.localeCompare(b.periodo));
-    await saveEntry(d); shown=200; render();
-    alertOk(mesTxt(d.periodo)+' de '+cuenta+(existed?' reemplazado con el reporte nuevo.':' guardado.'));
-  }catch(e){showErr(e.message||'No se pudo leer el archivo.');}
+    shown=200; aplicarCostos(); render();
+    alertOk(mesTxt(d.periodo)+' de '+cuenta+': '+rows.length.toLocaleString('es-AR')+' operaciones leídas. Guardando en la base… no cierres la página.');
+    const ok=await saveEntry(d);
+    if(ok) alertOk('✓ '+mesTxt(d.periodo)+' de '+cuenta+(existed?' reemplazado con el reporte nuevo.':' guardado.')+' ('+rows.length.toLocaleString('es-AR')+' operaciones)');
+  }catch(e){showErr('No se pudo leer el archivo: '+(e.message||e));}
   ev.target.value='';
 });
 
