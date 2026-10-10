@@ -310,6 +310,9 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
           <option value="ventas">Ventas pagadas</option>
           <option value="todo">Todas las operaciones</option>
           <option value="raros">⚠️ Precios raros</option>
+          <option value="pierden">🔴 Ventas que pierden plata</option>
+          <option value="bajo20">🟡 Ventas que ganan menos del 20 % s/costo</option>
+          <option value="sobre20">🟢 Ventas que ganan 20 % o más s/costo</option>
         </select>
         <select id="fOrden" aria-label="Orden">
           <option value="fecha">Más recientes</option>
@@ -708,7 +711,7 @@ function allRows(){return DATA.flatMap(d=>d.rows);}
 function filtered(sinMes){
   const fm=sinMes?'':$('fMes').value;
   const fc=$('fCuenta').value, ft=$('fTipo').value, fl=$('fLog').value, ff=$('fFlex').value, {raw,q,qd,isNum}=searchQ();
-  let r=allRows().filter(o=>(!fm||o.periodo===fm)&&(!fc||o.cuenta===fc)&&(isNum||ft==='todo'||(o.tipo==='Venta'&&o.pcd>0&&(ft!=='raros'||o.raro)))&&(!fl||o.log===fl)&&(!ff||o.flex===ff)
+  let r=allRows().filter(o=>(!fm||o.periodo===fm)&&(!fc||o.cuenta===fc)&&(isNum||ft==='todo'||(o.tipo==='Venta'&&o.pcd>0&&(ft!=='raros'||o.raro)&&(ft!=='pierden'||(o.gan!=null&&o.gan<0))&&(ft!=='bajo20'||(o.gan!=null&&o.gan>=0&&o.costo>0&&o.gan/o.costo<0.2))&&(ft!=='sobre20'||(o.gan!=null&&o.gan>=0&&!(o.costo>0&&o.gan/o.costo<0.2)))))&&(!fl||o.log===fl)&&(!ff||o.flex===ff)
     &&(!raw||(isNum?(o.op===qd||o.envNum===qd||o.paq===qd||o.mp===qd||o.op.includes(qd))
       :(norm(o.sku).includes(q)||norm(o.skuBase).includes(q)||norm(NAMES[o.skuBase]).includes(q)))));
   const ord=$('fOrden').value, d=s=>{const [a,b,c]=s.split('/');return c+b+a;};
@@ -832,6 +835,10 @@ function renderResumen(){
       ${cc.length?L1('Costo de lo vendido',-costo,sinC?`${sinC} ${sinC===1?'venta':'ventas'} sin costo cargado`:'','rn'):''}
       ${cc.length?L1('Resultado',res,'','tot'):''}
     </div>
+    ${cc.length?(()=>{const P=cc.filter(o=>o.gan<0),B=cc.filter(o=>o.gan>=0&&o.costo>0&&o.gan/o.costo<0.2),OK=cc.filter(o=>o.gan>=0&&!(o.costo>0&&o.gan/o.costo<0.2));
+      const caja=(col,bg,t,arr,f)=>`<a href="#" onclick="event.preventDefault();verVentasTipo('${f}')" style="text-decoration:none;color:inherit;flex:1;min-width:150px;background:${bg};border:1px solid ${col}55;border-radius:12px;padding:8px 10px;"><div style="font-size:.8rem;color:${col};font-weight:800;">${t}</div><div style="font-size:1.2rem;font-weight:800;">${arr.length.toLocaleString('es-AR')} <small class="meta" style="font-weight:400;">ventas</small></div><small class="meta">${fmt(arr.reduce((a,o)=>a+o.gan,0))} · ver →</small></a>`;
+      return `<div style="grid-column:1/-1;order:9;"><b style="font-size:.9rem;color:#3d1466;">¿Cómo les fue a las ventas?</b> <small class="meta">(ganancia sobre el costo, de las ventas con costo)</small><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
+        ${caja('#A6432F','#FDEBE7','🔴 Pierden plata',P,'pierden')}${caja('#8A6417','#FFF4D6','🟡 Ganan menos del 20 %',B,'bajo20')}${caja('#2F7A47','#EEF6F0','🟢 Ganan 20 % o más',OK,'sobre20')}</div></div>`;})():''}
     <div class="rbig" style="background:${!cc.length?'#F4F1EC':res<0?'#A6432F':'#2F7A47'};color:${cc.length?'#fff':'#2B2233'};">
       <div class="t">${cc.length?'Resultado del mes':'Me quedó'}</div>
       <div class="v">${fmt(cc.length?res:quedo)}</div>
@@ -1081,6 +1088,8 @@ async function refrescarCostos(){
   render();
 }
 window.addEventListener('message',e=>{if(e.data&&e.data.tipo==='ot-costos-actualizados'){const s=$('appModalEstado');if(s)s.textContent='✓ Guardado y actualizado';refrescarCostos();}});
+function verVentasTipo(f){const m=document.querySelector('details[data-k=mas]'),l=document.querySelector('details[data-k=lista]');if(m)m.open=true;if(l)l.open=true;
+  $('fTipo').value=f;$('fMes').value=$('resMes').value==='todo'?'':$('resMes').value;$('fSku').value='';render();setTimeout(()=>l&&l.scrollIntoView({behavior:'smooth',block:'start'}),60);}
 function verFaltantes(){const m=document.querySelector('details[data-k=mas]'),f=document.querySelector('details[data-k=faltan]');if(m)m.open=true;if(f){f.open=true;$('ftMes').value=$('resMes').value;renderFaltan();setTimeout(()=>f.scrollIntoView({behavior:'smooth',block:'start'}),50);}}
 // ===== SKU de Mercado Libre que no estan en la app o no tienen costo =====
 function renderFaltan(){
