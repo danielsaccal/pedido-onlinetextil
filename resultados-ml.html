@@ -235,7 +235,7 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
   <section class="panel resumen" id="resumen">
     <div class="res-head">
       <h2 id="resTit">Resumen</h2>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;"><select id="modoCosto" aria-label="Costo" onchange="cambiarModoCosto(this.value)" title="Qué costo usar para la ganancia"><option value="actual">Costo: el actual</option><option value="fecha">Costo: a la fecha de cada venta</option></select>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;"><select id="resCuenta" aria-label="Cuenta" onchange="$('fCuenta').value=this.value;render();"></select><select id="modoCosto" aria-label="Costo" onchange="cambiarModoCosto(this.value)" title="Qué costo usar para la ganancia"><option value="actual">Costo: el actual</option><option value="fecha">Costo: a la fecha de cada venta</option></select>
       <select id="resMes" aria-label="Mes del resumen"></select></div>
     </div>
     <div id="resBody"></div>
@@ -757,6 +757,7 @@ function renderResumen(){
   const cur=sel.value&&ps.includes(sel.value)||sel.value==='todo'?sel.value:(ps[0]||'');
   sel.innerHTML=ps.map(p=>`<option value="${p}" ${p===cur?'selected':''}>${p==='sin-fecha'?'Sin fecha':mesTxt(p)}</option>`).join('')+(ps.length>1?`<option value="todo" ${cur==='todo'?'selected':''}>Todos los meses</option>`:'');
   const fc=$('fCuenta').value;
+  {const rc=$('resCuenta');const cs=[...new Set(DATA.map(d=>d.cuenta))].sort();rc.innerHTML='<option value="">Todas las cuentas</option>'+cs.map(c=>`<option ${c===fc?'selected':''}>${c}</option>`).join('');rc.value=fc;}
   // todas las operaciones del mes (ventas, devoluciones, cargos sueltos); el pago de factura no se suma
   const r=allRows().filter(o=>!o.excl&&(cur==='todo'||o.periodo===cur)&&(!fc||o.cuenta===fc));
   const S=f=>r.reduce((a,o)=>a+(f(o)||0),0);
@@ -771,7 +772,7 @@ function renderResumen(){
   const quedo=S(o=>o.neto);
   const pc=v=>recibi>0?(v/recibi*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+' %':'';
   const row=(lbl,v,cls,sub)=>Math.round(v)===0?'':`<tr class="${cls}"><td>${lbl}${sub?`<small>${sub}</small>`:''}</td><td class="m">${fmt(v)}</td><td class="p">${pc(v)}</td></tr>`;
-  $('resTit').textContent=cur==='todo'?'Resumen de todos los meses':'Resumen de '+(cur==='sin-fecha'?'sin fecha':mesTxt(cur).toLowerCase());
+  $('resTit').textContent=(cur==='todo'?'Resumen de todos los meses':'Resumen de '+(cur==='sin-fecha'?'sin fecha':mesTxt(cur).toLowerCase()))+(fc?' · '+fc:'');
   const entro=recibi+L.envIn, pague=entro-quedo;
   const wasOpen=!!(document.querySelector('#resBody details')||{}).open;
   // resumen limpio: de lo que entró, a lo que quedó, al resultado (con costo)
