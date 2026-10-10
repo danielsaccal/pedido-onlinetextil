@@ -351,6 +351,7 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
   <p class="note" style="margin-top:8px;">Si en una publicación de ML el SKU está mal puesto, decile acá a qué código de la app corresponde. Se usa para el nombre, el costo y los rankings; el reporte no se toca. Podés poner un pack: <b>FEL4305 x 12</b>.</p>
   <div id="eqLista"></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center;">
+    <select id="eqCuenta" style="padding:8px;border:1px solid var(--line);border-radius:10px;"><option value="">Todas las cuentas</option><option>Alberto</option><option>Rita</option></select>
     <input id="eqML" list="eqSinMatch" placeholder="SKU en ML" style="padding:8px;border:1px solid var(--line);border-radius:10px;width:160px;text-transform:uppercase;">
     <span>→</span>
     <input id="eqApp" placeholder="SKU en la app (ej: KA131AC o FEL4305 x 12)" style="padding:8px;border:1px solid var(--line);border-radius:10px;flex:1;min-width:200px;text-transform:uppercase;">
@@ -908,7 +909,8 @@ function guardarEquivalencias(){return db.collection('config').doc('ml_equivalen
 function aplicarEquivalencias(){
   for(const o of allRows()){
     if(o.skuBaseML===undefined){o.skuBaseML=o.skuBase;o.multML=o.mult||1;}
-    const e=EQ[String(o.skuBaseML||'').toUpperCase()];
+    const sk=String(o.skuBaseML||'').toUpperCase();
+    const e=EQ[String(o.cuenta||'').toUpperCase()+'|'+sk]||EQ[sk];
     if(e){const m=String(e).toUpperCase().match(/^(.+?)(?:\s*X\s*(\d+))?$/);o.skuBase=m[1].trim();o.mult=(o.multML||1)*(m[2]?+m[2]:1);o.eqDe=o.skuBaseML;}
     else{o.skuBase=o.skuBaseML;o.mult=o.multML||1;o.eqDe=null;}
     o.unid=o.cant?o.cant*o.mult:null;
@@ -916,7 +918,7 @@ function aplicarEquivalencias(){
 }
 function renderEquivalencias(){
   const ks=Object.keys(EQ).sort();
-  $('eqLista').innerHTML=ks.length?`<table class="dh" style="width:100%;"><tbody>${ks.map(k=>`<tr><td><b>${k}</b> <span class="meta">(en ML)</span></td><td>→ <b>${EQ[k]}</b> ${(()=>{const b=String(EQ[k]).toUpperCase().split(/\s*X\s*/)[0];const c=COSTOS[b];return `<span class="meta">${NAMES[b]||''}</span> ${c&&c.length?`<span style="color:#2F7A47;font-size:.8rem;">· costo ${fmt(c[c.length-1].costo)}</span>`:'<span style="color:#A6432F;font-size:.8rem;">· sin costo en la app</span>'}`;})()}</td><td style="text-align:right;"><button type="button" style="padding:4px 10px;border-radius:8px;color:#A6432F;border:1px solid #E3B8AE;background:#fff;cursor:pointer;font-weight:700;" onclick="quitarEquivalencia('${k}')">Quitar</button></td></tr>`).join('')}</tbody></table>`:'<p class="note">Todavía no hay equivalencias.</p>';
+  $('eqLista').innerHTML=ks.length?`<table class="dh" style="width:100%;"><tbody>${ks.map(k=>`<tr><td><b>${k.includes('|')?k.split('|')[1]:k}</b> <span class="meta">(en ML${k.includes('|')?', solo '+k.split('|')[0].charAt(0)+k.split('|')[0].slice(1).toLowerCase():''})</span></td><td>→ <b>${EQ[k]}</b> ${(()=>{const b=String(EQ[k]).toUpperCase().split(/\s*X\s*/)[0];const c=COSTOS[b];return `<span class="meta">${NAMES[b]||''}</span> ${c&&c.length?`<span style="color:#2F7A47;font-size:.8rem;">· costo ${fmt(c[c.length-1].costo)}</span>`:'<span style="color:#A6432F;font-size:.8rem;">· sin costo en la app</span>'}`;})()}</td><td style="text-align:right;"><button type="button" style="padding:4px 10px;border-radius:8px;color:#A6432F;border:1px solid #E3B8AE;background:#fff;cursor:pointer;font-weight:700;" onclick="quitarEquivalencia('${k}')">Quitar</button></td></tr>`).join('')}</tbody></table>`:'<p class="note">Todavía no hay equivalencias.</p>';
   // SKU de ML que no se encuentran en la app (sin nombre ni costo)
   const c={};allRows().forEach(o=>{if(o.tipo==='Venta'&&o.pcd>0&&o.skuBaseML&&!EQ[o.skuBaseML]&&!NAMES[o.skuBaseML]&&!COSTOS[o.skuBaseML]){c[o.skuBaseML]=(c[o.skuBaseML]||0)+1;}});
   const sin=Object.entries(c).sort((a,b)=>b[1]-a[1]);
@@ -924,8 +926,10 @@ function renderEquivalencias(){
   $('eqSugeridos').innerHTML=sin.length?`<p class="note" style="margin:0 0 4px;"><b>SKU de ML que no están en la app</b> (sin nombre ni costo). Tocá uno para asignarle su código:</p><div style="display:flex;gap:6px;flex-wrap:wrap;">${sin.slice(0,40).map(([k,n])=>`<button type="button" style="padding:4px 10px;font-size:.8rem;border-radius:8px;border:1px solid var(--line);background:#fff;color:#3d1466;cursor:pointer;" onclick="$('eqML').value='${k}';$('eqApp').focus();">${k} <span class="meta">(${n})</span></button>`).join('')}</div>`:'';
 }
 async function agregarEquivalencia(){
-  const a=$('eqML').value.trim().toUpperCase(), b=$('eqApp').value.trim().toUpperCase().replace(/\s+/g,' ');
-  if(!a||!b){showErr('Completá los dos códigos.');return;}
+  const cta=($('eqCuenta')||{}).value||'';
+  const a0=$('eqML').value.trim().toUpperCase(), b=$('eqApp').value.trim().toUpperCase().replace(/\s+/g,' ');
+  if(!a0||!b){showErr('Completá los dos códigos.');return;}
+  const a=(cta?cta.toUpperCase()+'|':'')+a0;
   EQ[a]=b;try{await guardarEquivalencias();}catch(e){showErr('No se pudo guardar: '+e.message);return;}
   $('eqML').value='';$('eqApp').value='';render();alertOk('Equivalencia guardada: '+a+' → '+b);
 }
@@ -1143,6 +1147,7 @@ function card(o){
   const tags=[o.log&&`<span class="tag">${o.log}</span>`,o.pubT&&`<span class="tag">${o.pubT}</span>`,
     o.flex&&`<span class="tag ${/10 %|en contra|Sin reintegro/.test(o.flex)?'bad':'warn'}">${o.flex}</span>`,
     o.tipo!=='Venta'&&`<span class="tag bad">${o.tipo}</span>`,
+    o.ganPct!=null&&o.ganPct>1.5&&!o.eqDe&&`<span class="tag bad">⚠️ Ganancia muy alta: ¿esta publicación trae más de una unidad? <a href="#" onclick="event.preventDefault();document.getElementById('eqPanel').open=true;$('eqCuenta').value='${o.cuenta}';$('eqML').value='${o.skuBaseML||o.skuBase}';$('eqApp').value='${o.skuBase} x ';$('eqApp').focus();$('eqPanel').scrollIntoView({behavior:'smooth'});">Indicar cuántas</a></span>`,
     o.multTitulo&&`<span class="tag" style="background:#FFF4D6;color:#8A6417;" title="${(o.titulo||'').replace(/"/g,'&quot;')}">📦 ${o.mult} unidades por venta (leído del título)</span>`,
     o.eqDe&&`<span class="tag" style="background:#EEE8F7;color:#3d1466;">🔁 En ML figura ${o.eqDe} → tomado como ${o.skuBase}${o.mult>1?' x '+o.mult:''}</span>`,
     o.raro&&`<span class="tag bad">⚠️ Precio ${pctf(o.raro.pct)} por debajo de lo habitual (${fmt2(o.raro.med)} c/u) · revisá precio o descuento de la publicación</span>`,
