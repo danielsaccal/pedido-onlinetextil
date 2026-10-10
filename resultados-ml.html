@@ -1110,7 +1110,9 @@ function fichaSku(q){
   const G=ventasMes(cur), g=G[q];
   if(!g){box.innerHTML=`<div style="border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px;"><b>${q}</b> <span class="meta">— no tiene ventas en este período${fc?' ('+fc+')':''}.</span></div>`;return;}
   const lista=Object.values(G);
-  const pos=(campo)=>{const s=lista.filter(x=>campo!=='gan'||x.nC).sort((a,b)=>b[campo]-a[campo]);return s.findIndex(x=>x.k===q)+1+' de '+s.length;};
+  lista.forEach(x=>{x.pC=x.costo>0?x.gan/x.costo:null;x.pV=x.vend>0&&x.nC?x.gan/x.vend:null;});
+  const pos=(campo)=>{const s=lista.filter(x=>x[campo]!=null&&(['gan','pC','pV'].indexOf(campo)<0||x.nC)).sort((a,b)=>b[campo]-a[campo]);const i=s.findIndex(x=>x.k===q);return i<0?'–':(i+1)+' de '+s.length;};
+  const totG=lista.filter(x=>x.nC).reduce((a,x)=>a+Math.max(0,x.gan),0), totV=lista.reduce((a,x)=>a+x.vend,0);
   const pcC=g.costo>0?pctf(g.gan/g.costo):'–', pcV=g.vend>0?pctf(g.gan/g.vend):'–';
   const fila=(per)=>{const x=ventasMes(per)[q];if(!x)return '';return `<tr style="border-top:1px solid var(--line);"><td style="padding:6px;">${mesTxt(per)}</td><td style="padding:6px;text-align:right;">${x.unid.toLocaleString('es-AR')}</td><td style="padding:6px;text-align:right;">${fmt(x.vend)}</td><td style="padding:6px;text-align:right;" class="${x.gan<0?'neg':'pos'}">${x.nC?fmt(x.gan):'–'}</td><td style="padding:6px;text-align:right;">${x.costo>0?pctf(x.gan/x.costo):'–'}</td></tr>`;};
   box.innerHTML=`<div style="border:2px solid #5b2a86;border-radius:16px;padding:14px;margin-bottom:12px;background:#FCFAFE;">
@@ -1122,12 +1124,12 @@ function fichaSku(q){
       <div><small class="meta">Costo</small><div style="font-weight:800;font-size:1.1rem;color:#A6432F;">${g.nC?fmt(g.costo):'sin costo'}</div></div>
       <div style="background:${g.gan<0?'#FDEBE7':'#EEF6F0'};border-radius:10px;padding:6px 8px;"><small class="meta">${g.gan<0?'Perdí':'Gané'}</small><div style="font-weight:800;font-size:1.1rem;" class="${g.gan<0?'neg':'pos'}">${g.nC?fmt(g.gan):'–'}</div><small class="meta">${pcC} s/costo · ${pcV} s/ventas</small></div>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.85rem;margin-bottom:8px;">
-      <span style="background:#EEE8F7;border-radius:999px;padding:3px 10px;">🏆 Ganancia: puesto <b>${g.nC?pos('gan'):'–'}</b></span>
-      <span style="background:#EEE8F7;border-radius:999px;padding:3px 10px;">💰 Facturación: puesto <b>${pos('vend')}</b></span>
-      <span style="background:#EEE8F7;border-radius:999px;padding:3px 10px;">📦 Unidades: puesto <b>${pos('unid')}</b></span>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:6px;font-size:.84rem;margin-bottom:8px;">
+      <div style="background:#EEE8F7;border-radius:12px;padding:6px 10px;"><small class="meta" style="display:block;">En pesos</small>🏆 Ganancia: <b>${g.nC?pos('gan'):'–'}</b><br>💰 Facturación: <b>${pos('vend')}</b><br>📦 Unidades: <b>${pos('unid')}</b></div>
+      <div style="background:#E3F0FF;border-radius:12px;padding:6px 10px;"><small class="meta" style="display:block;">En porcentaje</small>📈 Rentabilidad s/costo: <b>${g.nC?pos('pC'):'–'}</b><br>📊 Margen s/ventas: <b>${g.nC?pos('pV'):'–'}</b></div>
+      <div style="background:#EEF6F0;border-radius:12px;padding:6px 10px;"><small class="meta" style="display:block;">Participación</small>De la ganancia total: <b>${g.nC&&totG>0&&g.gan>0?pctf(g.gan/totG):'–'}</b><br>De la facturación total: <b>${totV>0?pctf(g.vend/totV):'–'}</b></div>
     </div>
-    ${ps.length>1?`<details><summary style="cursor:pointer;font-weight:700;color:#3d1466;">Mes por mes</summary><table style="width:100%;border-collapse:collapse;font-size:.88rem;margin-top:6px;"><tr style="color:#8A8072;font-size:.75rem;"><td style="padding:6px;">Mes</td><td style="padding:6px;text-align:right;">Unid.</td><td style="padding:6px;text-align:right;">Facturación</td><td style="padding:6px;text-align:right;">Ganancia</td><td style="padding:6px;text-align:right;">% s/costo</td></tr>${ps.map(fila).join('')}</table></details>`:''}
+    ${ps.length>1?`<details><summary style="cursor:pointer;font-weight:700;color:#3d1466;list-style:none;">📅 Mes por mes ▾</summary><table style="width:100%;border-collapse:collapse;font-size:.88rem;margin-top:6px;"><tr style="color:#8A8072;font-size:.75rem;"><td style="padding:6px;">Mes</td><td style="padding:6px;text-align:right;">Unid.</td><td style="padding:6px;text-align:right;">Facturación</td><td style="padding:6px;text-align:right;">Ganancia</td><td style="padding:6px;text-align:right;">% s/costo</td></tr>${ps.map(fila).join('')}</table></details>`:''}
   </div>`;
 }
 // ===== Ranking de productos por rentabilidad =====
