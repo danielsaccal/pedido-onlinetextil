@@ -1144,6 +1144,14 @@ function fichaSku(q){
   const fila=(per)=>{const x=ventasMes(per)[q];if(!x)return '';return `<tr style="border-top:1px solid var(--line);"><td style="padding:6px;">${mesTxt(per)}</td><td style="padding:6px;text-align:right;">${x.unid.toLocaleString('es-AR')}</td><td style="padding:6px;text-align:right;">${fmt(x.vend)}</td><td style="padding:6px;text-align:right;" class="${x.gan<0?'neg':'pos'}">${x.nC?fmt(x.gan):'–'}</td><td style="padding:6px;text-align:right;">${x.costo>0?pctf(x.gan/x.costo):'–'}</td></tr>`;};
   box.innerHTML=`<div style="border:2px solid #5b2a86;border-radius:16px;padding:14px;margin-bottom:12px;background:#FCFAFE;">
     <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;"><div><b style="font-size:1.15rem;color:#3d1466;">${q}</b> <span class="meta">${NAMES[q]||''}</span></div><span class="meta">${cur==='todo'?'Todos los meses':mesTxt(cur)}${fc?' · '+fc:''}</span></div>
+    ${(()=>{ // en palabras
+      const gu=g.uC?g.gan/g.uC:null, cu=g.uC?g.costo/g.uC:null;
+      const LG=['Flex','Full','Correo'].map(l=>{const x=ventasMes(cur,l)[q];return x&&x.uC?{l,gu:x.gan/x.uC}:null;}).filter(Boolean).sort((a,b)=>b.gu-a.gu);
+      let t=`Vendiste <b>${g.unid.toLocaleString('es-AR')} unidades</b> por <b>${fmt(g.vend)}</b>. Después de Mercado Libre te quedaron <b>${fmt(g.quedo)}</b>.`;
+      if(g.nC)t+=` Te costaron <b>${fmt(g.costo)}</b>${cu!=null?` (${fmt(cu)} cada una)`:''}, así que <b class="${g.gan<0?'neg':'pos'}">${g.gan<0?'perdiste':'ganaste'} ${fmt(Math.abs(g.gan))}</b>${gu!=null?`: <b>${fmt(gu)} por unidad</b>`:''}.`;
+      if(g.costo>0)t+=` Por cada $ 100 de costo ${g.gan<0?'perdés':'ganás'} <b>$ ${Math.abs(Math.round(g.gan/g.costo*100))}</b>.`;
+      if(LG.length>1)t+=` Por unidad, <b>${LG[0].l}</b> te deja ${fmt(LG[0].gu)} y <b>${LG[LG.length-1].l}</b> ${fmt(LG[LG.length-1].gu)}: <b>conviene ${LG[0].l}</b>.`;
+      return `<p style="margin:8px 0 4px;font-size:.98rem;line-height:1.55;background:#fff;border-radius:12px;padding:10px 12px;border:1px solid var(--line);">${t}</p>`;})()}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:10px 0;">
       <div><small class="meta">Unidades</small><div style="font-weight:800;font-size:1.1rem;">${g.unid.toLocaleString('es-AR')}</div>${g.uJ?`<small class="meta">${g.uJ} dentro de juegos</small>`:''}</div>
       <div><small class="meta">Facturación</small><div style="font-weight:800;font-size:1.1rem;">${fmt(g.vend)}</div></div>
@@ -1153,9 +1161,9 @@ function fichaSku(q){
       <div style="background:${g.gan<0?'#FDEBE7':'#EEF6F0'};border-radius:10px;padding:6px 8px;"><small class="meta">${g.gan<0?'Perdí':'Gané'}</small><div style="font-weight:800;font-size:1.1rem;" class="${g.gan<0?'neg':'pos'}">${g.nC?fmt(g.gan):'–'}</div><small class="meta">${pcC} s/costo · ${pcV} s/ventas</small></div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:6px;font-size:.84rem;margin-bottom:8px;">
-      <div style="background:#EEE8F7;border-radius:12px;padding:6px 10px;"><small class="meta" style="display:block;">En pesos</small>🏆 Ganancia: <b>${g.nC?pos('gan'):'–'}</b><br>💰 Facturación: <b>${pos('vend')}</b><br>📦 Unidades: <b>${pos('unid')}</b></div>
-      <div style="background:#E3F0FF;border-radius:12px;padding:6px 10px;"><small class="meta" style="display:block;">En porcentaje</small>📈 Rentabilidad s/costo: <b>${g.nC?pos('pC'):'–'}</b><br>📊 Margen s/ventas: <b>${g.nC?pos('pV'):'–'}</b></div>
-      <div style="background:#EEF6F0;border-radius:12px;padding:6px 10px;"><small class="meta" style="display:block;">Participación</small>De la ganancia total: <b>${g.nC&&totG>0&&g.gan>0?pctf(g.gan/totG):'–'}</b><br>De la facturación total: <b>${totV>0?pctf(g.vend/totV):'–'}</b></div>
+      <div style="background:#EEE8F7;border-radius:12px;padding:6px 10px;"><small class="meta" style="display:block;">Puesto entre todos tus productos (1 = el mejor)</small>🏆 Por ganancia: <b>${g.nC?pos('gan'):'–'}</b><br>💰 Por facturación: <b>${pos('vend')}</b><br>📦 Por unidades: <b>${pos('unid')}</b></div>
+      <div style="background:#E3F0FF;border-radius:12px;padding:6px 10px;"><small class="meta" style="display:block;">Puesto por lo que rinde (1 = el que más rinde)</small>📈 Ganancia sobre el costo: <b>${g.nC?pos('pC'):'–'}</b><br>📊 Ganancia sobre lo vendido: <b>${g.nC?pos('pV'):'–'}</b></div>
+      <div style="background:#EEF6F0;border-radius:12px;padding:6px 10px;"><small class="meta" style="display:block;">Cuánto pesa en tu negocio</small>De la ganancia total: <b>${g.nC&&totG>0&&g.gan>0?pctf(g.gan/totG):'–'}</b><br>De la facturación total: <b>${totV>0?pctf(g.vend/totV):'–'}</b></div>
     </div>
     ${(()=>{ // por logistica: total, Flex, Full, Correo
       const LG=[['','Total'],['Flex','🛵 Flex'],['Full','🏬 Full'],['Correo','📦 Correo']];
@@ -1173,7 +1181,7 @@ function fichaSku(q){
             <td style="padding:6px;min-width:140px;"><div style="display:flex;align-items:center;gap:6px;"><div style="flex:1;height:8px;background:#EEE9F3;border-radius:6px;overflow:hidden;"><div style="width:${r.gu!=null?Math.round(Math.abs(r.gu)/maxU*100):0}%;height:100%;background:${(r.gu||0)<0?'#A6432F':'#2F7A47'};"></div></div><span style="white-space:nowrap;font-size:.8rem;">${r.gu!=null?fmt(r.gu):'–'}</span></div></td>
             <td style="padding:6px;text-align:center;white-space:nowrap;">${r.rG} · ${r.rP}</td></tr>`).join('')}
         </table></div>
-        <p class="note" style="margin:4px 0 0;">Puesto: en ganancia en pesos · en % sobre el costo, entre los SKU vendidos por esa logística.</p></div>`;})()}
+        <p class="note" style="margin:4px 0 0;">"Puesto": primero, su lugar por ganancia en pesos; después, por % sobre el costo. Se compara con los productos que se venden por esa misma logística.</p></div>`;})()}
     ${ps.length>1?`<details><summary style="cursor:pointer;font-weight:700;color:#3d1466;list-style:none;">📅 Mes por mes ▾</summary><table style="width:100%;border-collapse:collapse;font-size:.88rem;margin-top:6px;"><tr style="color:#8A8072;font-size:.75rem;"><td style="padding:6px;">Mes</td><td style="padding:6px;text-align:right;">Unid.</td><td style="padding:6px;text-align:right;">Facturación</td><td style="padding:6px;text-align:right;">Ganancia</td><td style="padding:6px;text-align:right;">% s/costo</td></tr>${ps.map(fila).join('')}</table></details>`:''}
   </div>`;
 }
