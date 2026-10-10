@@ -1026,6 +1026,30 @@ function renderOrigen(){
     </table></div>
     <p class="note" style="margin-top:6px;">El % de ganancia es la participación en la ganancia total. La ganancia es por venta (me quedó − costo), sin los cargos sueltos del mes.${gs.some(g=>g.t==='x')?' "Sin identificar": SKU que no están en la app (ver 🔍).':''}</p>`;
 }
+// accion directa para cada SKU sin costo: emparejar, cargar costo o abrir la pantalla de la app que corresponde
+function accionFaltante(g,t,det){
+  const id='fa-'+g.k.replace(/[^A-Z0-9]/gi,'_'), inp=(ph,fn)=>`<input id="${id}" placeholder="${ph}" style="width:120px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;text-transform:uppercase;" onkeydown="if(event.key==='Enter')${fn}"> <button type="button" style="padding:5px 10px;border-radius:8px;border:none;background:#f4c430;color:#3d1466;font-weight:700;cursor:pointer;font-size:.8rem;" onclick="${fn}">OK</button>`;
+  if(!g.enApp)return inp('código en la app',`emparejarFaltante('${g.k}','${id}')`);
+  if(t==='Sin costo')return inp('costo $ c/u',`costoFaltante('${g.k}','${id}')`);
+  if(/tela sin precio|tela no cargada/i.test(t)){const m=det.match(/La tela ([A-Z0-9]+)/i);return `<a href="./?ir=telas&q=${encodeURIComponent(m?m[1]:'')}" style="font-size:.82rem;font-weight:700;">🧵 Cargar precio en Telas →</a>`;}
+  return `<a href="./?ir=completar&sku=${encodeURIComponent(g.k)}" style="font-size:.82rem;font-weight:700;">✏️ Completar en la app →</a>`;
+}
+async function emparejarFaltante(sku,id){
+  const v=($(id).value||'').trim().toUpperCase(); if(!v)return;
+  EQ[sku]=v; try{await guardarEquivalencias();}catch(e){showErr('No se pudo guardar: '+e.message);return;}
+  render(); alertOk(sku+' → '+v);
+}
+async function costoFaltante(sku,id){
+  const raw=($(id).value||'').trim(); const n=parseFloat(raw.replace(/\./g,'').replace(',','.')); if(!(n>0)){showErr('Escribí el costo por unidad.');return;}
+  const hoy=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+  try{
+    const ref=db.collection('config').doc('costos_reventa'); const d=await ref.get(); const c=d.exists?(d.data().c||{}):{};
+    c[sku]=n; await ref.set({c,actualizado:new Date().toISOString()});
+    await db.collection('historial_costos').add({sku,fecha:hoy,costo:n,desglose:{reventa:true,desde:'resultados-ml'},creado:Date.now()});
+    (COSTOS[sku]=COSTOS[sku]||[]).push({fecha:hoy,costo:n,creado:Date.now()});
+    render(); alertOk('Costo de '+sku+' guardado: '+fmt(n)+' por unidad.');
+  }catch(e){showErr('No se pudo guardar: '+e.message);}
+}
 function verFaltantes(){const m=document.querySelector('details[data-k=mas]'),f=document.querySelector('details[data-k=faltan]');if(m)m.open=true;if(f){f.open=true;$('ftMes').value=$('resMes').value;renderFaltan();setTimeout(()=>f.scrollIntoView({behavior:'smooth',block:'start'}),50);}}
 // ===== SKU de Mercado Libre que no estan en la app o no tienen costo =====
 function renderFaltan(){
@@ -1055,9 +1079,9 @@ function renderFaltan(){
       <td style="padding:7px 6px;"><b>${g.k}</b> <span class="meta" style="font-size:.78rem;">${g.enApp?(NAMES[g.k]||'').split(' · ')[0]:''}</span></td>
       <td style="padding:7px 6px;"><span title="${det.replace(/"/g,'&quot;')}" onclick="this.nextElementSibling.hidden=!this.nextElementSibling.hidden" style="cursor:pointer;font-size:.76rem;font-weight:700;color:${col};background:${col}14;border-radius:999px;padding:2px 9px;white-space:nowrap;">${t} ⓘ</span><div hidden style="font-size:.76rem;color:#6B6258;margin-top:4px;max-width:420px;">${det}</div></td>
       <td style="padding:7px 6px;text-align:right;white-space:nowrap;" title="${g.n} ventas · ${g.unid} unidades">${fmt(g.vend)}</td>
-      <td style="padding:7px 6px;text-align:right;">${g.enApp?'':`<a href="#" style="font-size:.78rem;" onclick="event.preventDefault();document.getElementById('eqPanel').open=true;$('eqML').value='${g.k}';$('eqApp').focus();$('eqPanel').scrollIntoView({behavior:'smooth'});">🔁 asignar</a>`}</td></tr>`;}).join('');
+      <td style="padding:7px 6px;text-align:right;white-space:nowrap;">${accionFaltante(g,t,det)}</td></tr>`;}).join('');
   $('ftBody').innerHTML=!gs.length?'<p class="note">✓ Todas las ventas de este período tienen su costo.</p>':
-    `<p class="note" style="margin:0 0 6px;">Tocá la etiqueta para ver qué completar.</p><div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;">${filas}</table></div>`;
+    `<p class="note" style="margin:0 0 6px;">Completalo desde acá: el código de la app, el costo por unidad, o el link a la pantalla que falta. Tocá la etiqueta para ver el detalle.</p><div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;">${filas}</table></div>`;
 }
 // ===== Desglose de envios (Flex, correo), Full y publicidad =====
 function renderDesglose(){
