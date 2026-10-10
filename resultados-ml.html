@@ -1200,10 +1200,11 @@ function fichaSku(q){
   // ---- ficha grafica ----
   const gu=g.uC?g.gan/g.uC:null, cu=g.uC?g.costo/g.uC:null, act=(COSTOS[q]&&COSTOS[q].length)?COSTOS[q][COSTOS[q].length-1].costo:null;
   const posN=(campo)=>{const s=lista.filter(x=>x[campo]!=null&&(['gan','pC','pV'].indexOf(campo)<0||x.nC)).sort((a,b)=>b[campo]-a[campo]);const i=s.findIndex(x=>x.k===q);return i<0?null:{p:i+1,n:s.length,pct:s.length>1?Math.round((s.length-1-i)/(s.length-1)*100):100};};
-  const medidor=(ic,tit,r)=>{if(!r)return '';const col=r.pct>=66?'#2F7A47':r.pct>=33?'#D9A915':'#A6432F';return `<div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 12px;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="font-size:.85rem;">${ic} ${tit}</span><b style="font-size:1.05rem;">#${r.p}<small class="meta" style="font-weight:400;"> de ${r.n}</small></b></div>
+  const medidor=(ic,tit,expl,valor,r)=>{if(!r)return '';const col=r.pct>=66?'#2F7A47':r.pct>=33?'#D9A915':'#A6432F';return `<div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 12px;">
+      <div style="font-size:.9rem;font-weight:700;">${ic} ${tit}</div><small class="meta" style="display:block;margin-bottom:6px;">${expl}</small>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="font-size:.95rem;">${valor}</span><b style="font-size:1.15rem;color:${col};">puesto ${r.p} <small class="meta" style="font-weight:400;">de ${r.n}</small></b></div>
       <div style="height:10px;background:#EEE9F3;border-radius:6px;margin:6px 0 4px;overflow:hidden;"><div style="width:${r.pct}%;height:100%;background:${col};"></div></div>
-      <small style="color:${col};font-weight:700;">Mejor que el ${r.pct} % de tus productos</small></div>`;};
+      <small style="color:${col};font-weight:700;">${r.p===1?'Es el primero':'Supera a '+(r.n-r.p)+' de '+(r.n-1)+' productos'}</small></div>`;};
   // a donde va cada $100 vendido
   const V=g.vend||1, pML=Math.max(0,(g.vend-g.quedo)/V*100), pC=g.nC?Math.max(0,g.costo/V*100):0, pG=g.nC?g.gan/V*100:0;
   const seg=(w,col,txt)=>w>0.5?`<div title="${txt}" style="width:${w}%;background:${col};color:#fff;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap;">${w>=9?Math.round(w)+' %':''}</div>`:'';
@@ -1236,8 +1237,11 @@ function fichaSku(q){
     </div>
     <b style="font-size:.9rem;color:#3d1466;">¿A dónde va lo que vendiste?</b>
     <div style="margin:6px 0 14px;">${barra}</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin-bottom:14px;">
-      ${g.nC?medidor('🏆','Por ganancia',posN('gan')):''}${g.nC?medidor('📈','Por rentabilidad',posN('pC')):''}${medidor('💰','Por facturación',posN('vend'))}
+    <b style="font-size:.9rem;color:#3d1466;">¿Qué lugar ocupa entre tus productos?</b> <small class="meta">(puesto 1 = el mejor)</small>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin:6px 0 14px;">
+      ${g.nC?medidor('🏆','Plata que dejó','Ganancia en pesos',fmt(g.gan),posN('gan')):''}
+      ${g.nC?medidor('📈','Cuánto rinde','Ganancia en % sobre el costo',g.costo>0?pctf(g.gan/g.costo):'–',posN('pC')):''}
+      ${medidor('💰','Cuánto se vendió','Facturación en pesos',fmt(g.vend),posN('vend'))}
     </div>
     ${graficoLog?`<b style="font-size:.9rem;color:#3d1466;">🚚 Por logística</b><div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin:6px 0 14px;">${graficoLog}</div>`:''}
     ${graficoMes?`<b style="font-size:.9rem;color:#3d1466;">📅 Ganancia mes por mes</b><div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:6px;">${graficoMes}</div>`:''}
