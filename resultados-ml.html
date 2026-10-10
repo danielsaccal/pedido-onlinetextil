@@ -235,12 +235,42 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
   <section class="panel resumen" id="resumen">
     <div class="res-head">
       <h2 id="resTit">Resumen</h2>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;"><select id="resCuenta" aria-label="Cuenta" onchange="$('fCuenta').value=this.value;render();"></select><select id="modoCosto" aria-label="Costo" onchange="cambiarModoCosto(this.value)" title="Qué costo usar para la ganancia"><option value="actual">Costo: el actual</option><option value="fecha">Costo: a la fecha de cada venta</option></select>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;"><select id="resCuenta" aria-label="Cuenta" onchange="$('fCuenta').value=this.value;render();"></select>
       <select id="resMes" aria-label="Mes del resumen"></select></div>
     </div>
     <div id="resBody"></div>
   </section>
   <p class="note" id="rarosAviso" style="display:none;margin:10px 0 0;"></p>
+  <details class="pleg" data-k="glosario"><summary>ⓘ ¿Qué significa cada cosa?</summary><div class="pleg-body" style="font-size:.92rem;line-height:1.55;">
+    <p><b>Ventas:</b> lo que pagaron los clientes por los productos (ya con descuentos).</p>
+    <p><b>Envíos cobrados:</b> lo que Mercado Libre te devuelve por los envíos Flex y lo que pagó el comprador por el envío.</p>
+    <p><b>Mercado Libre:</b> todo lo que te cobró: comisión, cuotas, envíos, Full, publicidad, impuestos y devoluciones.</p>
+    <p><b>Me quedó:</b> lo que te llega a Mercado Pago (entró − Mercado Libre), menos el cadete Flex.</p>
+    <p><b>Costo de lo vendido:</b> lo que te costó lo que vendiste: tela + confección + insumos si lo fabricás, o el costo de compra si es de reventa.</p>
+    <p><b>Resultado del mes:</b> me quedó − costo. <b>Es lo que ganaste o perdiste de verdad.</b></p>
+    <p><b>Ganancia por producto</b> (en la tabla de productos): lo mismo pero producto por producto. No incluye los cargos generales del mes (Full, publicidad), por eso la suma da más que el resultado del mes.</p>
+    <p><b>% sobre el costo:</b> cuánto ganás por cada $ 100 de costo. Ej: costo $ 100 y ganás $ 25 → 25 %.</p>
+  </div></details>
+  <details class="pleg" data-k="ranking" open><summary>🏆 ¿Qué productos me dejan más plata?</summary>
+  <section class="panel" id="ranking">
+    <div class="res-head" style="flex-wrap:wrap;gap:8px;">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <select id="rkMes" aria-label="Mes" style="display:none;"></select>
+        <select id="rkGrupo" aria-label="Agrupar" style="display:none;"><option value="prod">Por producto</option><option value="sku">Por SKU</option><option value="parte">Por SKU (juegos repartidos en sus partes)</option></select>
+        <select id="rkOrden" aria-label="Ordenar">
+          <option value="neta">Ordenar: más ganancia ($)</option><option value="netaP">Ordenar: mejor % sobre el costo</option>
+          <option value="unid">Ordenar: más unidades vendidas</option><option value="vend">Ordenar: más facturación</option>
+        </select>
+        <select id="rkVer" aria-label="Mostrar"><option value="20">Los 20 mejores</option><option value="peores">Los 20 peores</option><option value="todo">Todos</option></select>
+      </div>
+    </div>
+    <input id="rkBuscar" type="search" placeholder="🔍 Escribí un SKU para ver su ficha (ej: GR140C)" oninput="renderRanking()" style="width:100%;box-sizing:border-box;padding:11px 14px;border:1px solid var(--line);border-radius:12px;font-size:1rem;margin:4px 0 10px;text-transform:uppercase;">
+    <div id="rkFicha"></div>
+    <div id="rkBody"></div>
+  </section></details>
+  <div hidden><b id="tVend"></b><b id="tAcr"></b><b id="tCad"></b><b id="tNeto"></b><b id="tN"></b><p id="tNote"></p></div>
+
+  <details class="pleg" data-k="mas"><summary>➕ Más detalles <small>(fabricado vs reventa, envíos y Full, venta por venta, mes por mes, ajustes)</small></summary><div class="pleg-body" style="background:transparent;border:none;padding:4px 0 0;">
   <details class="pleg" data-k="origen"><summary>🏭 Fabricado vs reventa</summary><div class="pleg-body">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
       <select id="ogMes" aria-label="Mes" style="padding:6px 10px;font-size:.85rem;width:auto;"></select>
@@ -259,26 +289,6 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
     </div>
     <div id="dsBody"></div>
   </section></details>
-  <details class="pleg" data-k="ranking"><summary>🏆 Ranking de productos</summary>
-  <section class="panel" id="ranking">
-    <div class="res-head" style="flex-wrap:wrap;gap:8px;">
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <select id="rkMes" aria-label="Mes"></select>
-        <select id="rkGrupo" aria-label="Agrupar"><option value="prod">Por producto</option><option value="sku">Por SKU</option><option value="parte">Por SKU (juegos repartidos en sus partes)</option></select>
-        <select id="rkOrden" aria-label="Ordenar">
-          <option value="neta">Ganancia neta ($)</option><option value="netaP">Rentabilidad neta (%)</option>
-          <option value="bruta">Ganancia bruta ($)</option><option value="brutaP">Rentabilidad bruta (%)</option>
-          <option value="unid">Unidades vendidas</option><option value="vend">Facturación</option>
-        </select>
-        <select id="rkVer" aria-label="Mostrar"><option value="20">Top 20</option><option value="peores">Los 20 peores</option><option value="todo">Todos</option></select>
-      </div>
-    </div>
-    <input id="rkBuscar" type="search" placeholder="🔍 Escribí un SKU para ver su ficha (ej: GR140C)" oninput="renderRanking()" style="width:100%;box-sizing:border-box;padding:11px 14px;border:1px solid var(--line);border-radius:12px;font-size:1rem;margin:4px 0 10px;text-transform:uppercase;">
-    <div id="rkFicha"></div>
-    <div id="rkBody"></div>
-  </section></details>
-  <div hidden><b id="tVend"></b><b id="tAcr"></b><b id="tCad"></b><b id="tNeto"></b><b id="tN"></b><p id="tNote"></p></div>
-
   <details class="pleg" data-k="lista"><summary>📋 Venta por venta <small id="cntResumen"></small></summary><div class="pleg-body">
   <div class="search-wrap">
     <input type="search" id="fSku" placeholder="Buscar SKU, nombre (ej. lienzo) o N.º de operación" aria-label="Buscar">
@@ -339,6 +349,7 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
   </div></details>
 
   <p class="sec">Ajustes</p>
+  <div class="box" style="padding:10px 14px;"><b style="font-size:.9rem;">Costo que se usa para la ganancia:</b> <select id="modoCosto" aria-label="Costo" style="padding:6px 10px;font-size:.85rem;width:auto;margin-left:6px;" onchange="cambiarModoCosto(this.value)" title="Qué costo usar para la ganancia"><option value="actual">Costo: el actual</option><option value="fecha">Costo: a la fecha de cada venta</option></select></div>
   <details class="box"><summary>Costo del cadete por envío Flex</summary>
     <div class="cad" id="cadForm"></div>
     <details class="zd"><summary>Ver o corregir qué zona es cada monto que paga ML</summary>
@@ -366,6 +377,7 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
   <div class="files" id="files" style="margin-top:12px"></div>
   <p class="note">Cada mes queda guardado en este navegador. Si vuelve a subir el mismo mes de la misma cuenta, se reemplaza.</p>
 </details>
+  </div></details>
 </main>
 
 <script>
@@ -1155,7 +1167,7 @@ function fichaSku(q){
 function nombreProducto(base){const n=NAMES[base];return n?n.split(' · ')[0]:base;}
 function renderRanking(){
   const sel=$('rkMes'), ps=[...new Set(DATA.map(d=>d.periodo))].sort().reverse();
-  const cur=sel.value&&(ps.includes(sel.value)||sel.value==='todo')?sel.value:(ps[0]||'');
+  const rm=$('resMes')&&$('resMes').value; const cur=rm&&(ps.includes(rm)||rm==='todo')?rm:(ps[0]||'');
   sel.innerHTML=ps.map(p=>`<option value="${p}" ${p===cur?'selected':''}>${p==='sin-fecha'?'Sin fecha':mesTxt(p)}</option>`).join('')+(ps.length>1?`<option value="todo" ${cur==='todo'?'selected':''}>Todos los meses</option>`:'');
   try{fichaSku(($('rkBuscar')||{value:''}).value);}catch(e){console.error(e);}
   const fc=$('fCuenta').value, porProd=$('rkGrupo').value==='prod', repartir=$('rkGrupo').value==='parte';
@@ -1189,19 +1201,13 @@ function renderRanking(){
   const pf=p=>p==null?'–':pctf(p);
   const nm=g=>porProd?`<b>${g.k}</b><small class="meta" style="display:block;">${[...g.skus].slice(0,4).join(', ')}${g.skus.size>4?'…':''}</small>`:`<b>${g.k}</b><small class="meta" style="display:block;">${NAMES[g.k]||''}</small>`;
   $('rkBody').innerHTML=!gs.length?'<p class="note">No hay ventas en este período.</p>':`
-    <div class="res-strip">
-      <div><span>Ganancia bruta <small style="font-weight:500;">(precio − costo; % sobre el costo)</small></span><b class="pos">${fmt(tB)} <small style="color:#6B6258;">${tV>0?pctf(tB/tV):''}</small></b></div>
-      <div class="q"><span>Ganancia neta <small style="font-weight:500;">(me quedó − costo; % sobre el costo)</small></span><b>${fmt(tN)} <small>${tV>0?pctf(tN/tV):''}</small></b></div>
-      <div><span>${porProd?'Productos':'SKU'} que pierden plata</span><b class="${pierden.length?'neg':'pos'}">${pierden.length}</b></div>
-    </div>
-    <p class="note">${mejor?`Más ganancia: <b>${mejor.k}</b> (${fmt(mejor.neta)}). `:''}${peor&&peor!==mejor?`Menor rentabilidad: <b>${peor.k}</b> (${pf(peor.netaP)}). `:''}${gs.length-conC.length?`${gs.length-conC.length} ${porProd?(gs.length-conC.length===1?'producto':'productos'):'SKU'} sin costo cargado (no ${gs.length-conC.length===1?'entra':'entran'} en la ganancia).`:''}</p>
-    <div class="tw"><table class="ventas"><thead><tr><th>#</th><th>${porProd?'Producto':'SKU'}</th><th>Unid.</th><th>Facturación</th><th>Me quedó</th><th>Costo</th><th>Bruta<small style="display:block;font-weight:500;text-transform:none;">% s/ costo</small></th><th>Neta<small style="display:block;font-weight:500;text-transform:none;">% s/ costo</small></th></tr></thead><tbody>
+    <p class="note" style="margin:0 0 8px;">${mejor?`Más ganancia: <b>${mejor.k}</b> (${fmt(mejor.neta)}). `:''}${pierden.length?`<span class="neg"><b>${pierden.length}</b> ${pierden.length===1?'producto pierde':'productos pierden'} plata.</span> `:''}${gs.length-conC.length?`${gs.length-conC.length} sin costo cargado.`:''}</p>
+    <div class="tw"><table class="ventas"><thead><tr><th>#</th><th>${porProd?'Producto':'SKU'}</th><th>Unid.</th><th>Facturación</th><th>Me quedó</th><th>Costo</th><th>Ganancia<small style="display:block;font-weight:500;text-transform:none;">% s/ costo</small></th></tr></thead><tbody>
     ${lista.map((g,i)=>`<tr><td>${i+1}</td><td>${nm(g)}</td><td>${g.unid.toLocaleString('es-AR')}</td><td>${fmt(g.vend)}</td><td>${fmt(g.quedo)}</td>
       <td>${g.con?fmt(g.costo)+(g.parcial?' *':''):'<span class="meta">sin costo</span>'}</td>
-      <td class="${g.bruta<0?'neg':''}">${g.con?fmt(g.bruta)+`<small class="meta" style="display:block;">${pf(g.brutaP)}</small>`:''}</td>
       <td class="${g.neta<0?'neg':''}">${g.con?`<b>${fmt(g.neta)}</b><small class="meta" style="display:block;">${pf(g.netaP)}</small>`:''}</td></tr>`).join('')}
     </tbody></table></div>
-    <p class="note"><b>Bruta</b> = precio de venta − costo de fabricación. <b>Neta</b> = lo que me quedó después de Mercado Libre y el cadete − costo. % sobre el costo (si el costo es $ 100 y ganás $ 11, es 11 %).${gs.some(g=>g.parcial)?' * Parte de las ventas no tiene costo; la ganancia se calcula solo sobre las que sí.':''}</p>`;
+    <p class="note">Ganancia = lo que te quedó de cada venta − su costo. No incluye los cargos generales del mes (Full, publicidad).${gs.some(g=>g.parcial)?' * Parte de las ventas no tiene costo; la ganancia se calcula solo sobre las que sí.':''}</p>`;
 }
 function bindKey(el,fn){el.onclick=fn;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fn();}};}
 function bindSales(rows){rows.forEach(el=>bindKey(el,()=>el.nextElementSibling.classList.toggle('open')));}
@@ -1288,7 +1294,7 @@ function card(o){
 
 // El detalle de reintegro solo tiene sentido con Flex: aparece al elegir Flex y se limpia al salir
 $('fLog').addEventListener('change',()=>{const f=$('fLog').value==='Flex';$('fFlex').hidden=!f;if(!f)$('fFlex').value='';});
-$('resMes').addEventListener('change',renderResumen);
+$('resMes').addEventListener('change',()=>{renderResumen();renderRanking();});
 ['rkMes','rkGrupo','rkOrden','rkVer'].forEach(id=>$(id).addEventListener('change',renderRanking));
 $('dsMes').addEventListener('change',renderDesglose);
 $('ftMes').addEventListener('change',renderFaltan);
