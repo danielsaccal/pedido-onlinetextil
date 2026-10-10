@@ -1589,7 +1589,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v210</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v211</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -9949,7 +9949,7 @@ async function abrirResultadosML(){
     fab.forEach(S => { if(articuloDeSku(S) || (fabricacion.vinculos[S] && fabricacion.vinculos[S].calidad)) tipo[S] = 'fab'; });
     Object.keys(tipo).forEach(S => { if(codTela(S)) tipo[S] = 'tela'; });
     Object.keys(kitsDatos || {}).forEach(S => { tipo[S] = 'kit'; });
-    await idbGuardar('tipo_sku', tipo); } catch(e){ console.error(e); }
+    await idbGuardar('tipo_sku', tipo); await idbGuardar('kits_sku', kitsDatos || {}); } catch(e){ console.error(e); }
   try{ const mot = {}; const todos = new Set(skusQueFabrico()); CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => todos.add(String(v.sku).toUpperCase()))));
     todos.forEach(S => { if(costoUnidadSku(S) == null) mot[S] = motivoSinCosto(S); }); await idbGuardar('motivos_sin_costo', mot); } catch(e){ console.error(e); }
   cerrarPublicar();
@@ -17682,7 +17682,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v210';
+const APP_VERSION = '2026-10-02-v211';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
