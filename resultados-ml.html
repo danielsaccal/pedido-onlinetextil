@@ -241,6 +241,13 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
     <div id="resBody"></div>
   </section>
   <p class="note" id="rarosAviso" style="display:none;margin:10px 0 0;"></p>
+  <details class="pleg" data-k="origen"><summary>🏭 Fabricado vs reventa</summary><div class="pleg-body">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+      <select id="ogMes" aria-label="Mes" style="padding:6px 10px;font-size:.85rem;width:auto;"></select>
+      <select id="ogLog" aria-label="Logística" style="padding:6px 10px;font-size:.85rem;width:auto;"><option value="">Todo junto</option><option value="Flex">Flex</option><option value="Full">Full</option><option value="Correo">Correo / colecta</option></select>
+    </div>
+    <div id="ogBody"></div>
+  </div></details>
   <details class="pleg" data-k="faltan"><summary>🔍 SKU de ML sin datos en la app <small id="ftCnt"></small></summary><div class="pleg-body">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;"><select id="ftMes" aria-label="Mes" style="padding:6px 10px;font-size:.85rem;min-height:0;height:auto;width:auto;"></select></div>
     <div id="ftBody"></div>
@@ -562,7 +569,7 @@ function renderCad(){
   $('cadForm').querySelectorAll('input').forEach(i=>i.addEventListener('change',()=>{ZCOST[i.dataset.z]=Math.max(0,+i.value||0);saveZ();applyCadete();draw();}));
   $('cadMap').querySelectorAll('select').forEach(s=>s.addEventListener('change',()=>{AMTZ[s.dataset.m]=s.value;delete AUTO[s.dataset.m];saveZ();applyCadete();renderCad();draw();}));
 }
-let NAMES={}, MOTIVOS={};   // SKU base -> nombre, desde el catalogo de la app
+let NAMES={}, MOTIVOS={}, TIPO={};   // SKU base -> nombre, desde el catalogo de la app
 let COSTOS={};  // SKU base -> [{fecha:'AAAA-MM-DD', costo}] (historial de costos de la app)
 function idbApp(clave){return new Promise(res=>{try{const r=indexedDB.open('onlinetextil',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');
   r.onsuccess=()=>{try{const g=r.result.transaction('kv').objectStore('kv').get(clave);g.onsuccess=()=>res(g.result);g.onerror=()=>res(null);}catch(e){res(null);}};r.onerror=()=>res(null);}catch(e){res(null);}});}
@@ -732,6 +739,7 @@ function draw(){
   renderDesglose();
   try{renderEquivalencias();}catch(e){console.error(e);}
   try{renderFaltan();}catch(e){console.error(e);}
+  try{renderOrigen();}catch(e){console.error(e);}
   // lista
   $('count').textContent=r.length.toLocaleString('es-AR')+' operaciones';
   {const c=$('cntResumen');if(c)c.textContent='· '+r.length.toLocaleString('es-AR')+' operaciones';}
@@ -908,6 +916,33 @@ async function agregarEquivalencia(){
   $('eqML').value='';$('eqApp').value='';render();alertOk('Equivalencia guardada: '+a+' → '+b);
 }
 async function quitarEquivalencia(k){delete EQ[k];try{await guardarEquivalencias();}catch(e){}render();}
+// ===== Fabricado vs reventa (y telas, juegos armados), por mes y por logistica =====
+function renderOrigen(){
+  const sel=$('ogMes'), ps=[...new Set(DATA.map(d=>d.periodo))].sort().reverse();
+  const cur=sel.value&&(ps.includes(sel.value)||sel.value==='todo')?sel.value:(ps[0]||'');
+  sel.innerHTML=ps.map(p=>`<option value="${p}" ${p===cur?'selected':''}>${p==='sin-fecha'?'Sin fecha':mesTxt(p)}</option>`).join('')+(ps.length>1?`<option value="todo" ${cur==='todo'?'selected':''}>Todos los meses</option>`:'');
+  const fc=$('fCuenta').value, lg=$('ogLog').value;
+  const logDe=o=>o.log==='Flex'||o.log==='Full'?o.log:'Correo';
+  const vs=allRows().filter(o=>o.tipo==='Venta'&&o.pcd>0&&(cur==='todo'||o.periodo===cur)&&(!fc||o.cuenta===fc)&&(!lg||logDe(o)===lg));
+  const NOM={fab:'🏭 Fabricado',rev:'🛒 Reventa',tela:'🧵 Telas',kit:'🧩 Juegos armados',x:'❓ Sin identificar'};
+  const G={};
+  vs.forEach(o=>{const t=TIPO[String(o.skuBase||'').toUpperCase()]||'x';const g=G[t]||(G[t]={t,n:0,unid:0,vend:0,quedo:0,costo:0,gan:0,nC:0});
+    g.n++;g.unid+=o.unid||0;g.vend+=o.pcd;g.quedo+=o.neto||0;if(o.costo!=null){g.costo+=o.costo;g.gan+=o.gan;g.nC++;}});
+  const gs=['fab','rev','tela','kit','x'].map(t=>G[t]).filter(Boolean);
+  const tV=gs.reduce((a,g)=>a+g.vend,0), tG=gs.reduce((a,g)=>a+Math.max(0,g.gan),0), tGn=gs.reduce((a,g)=>a+g.gan,0);
+  const pc=(v,t)=>t>0?Math.round(v/t*100):0;
+  const barra=(p,col)=>`<div style="height:8px;background:#EEE9F3;border-radius:6px;overflow:hidden;margin-top:3px;"><div style="width:${Math.max(0,Math.min(100,p))}%;height:100%;background:${col};"></div></div>`;
+  $('ogBody').innerHTML=!gs.length?'<p class="note">No hay ventas con este filtro.</p>':`
+    <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.9rem;">
+      <tr style="color:#8A8072;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;"><td style="padding:6px;">Origen</td><td style="padding:6px;">Facturación</td><td style="padding:6px;">Ganancia</td></tr>
+      ${gs.map(g=>`<tr style="border-top:1px solid var(--line,#E3DCD2);">
+        <td style="padding:8px 6px;"><b>${NOM[g.t]}</b><small class="meta" style="display:block;">${g.n.toLocaleString('es-AR')} ventas · ${g.unid.toLocaleString('es-AR')} unid.</small></td>
+        <td style="padding:8px 6px;min-width:150px;"><b>${fmt(g.vend)}</b> <span class="meta">${pc(g.vend,tV)} %</span>${barra(pc(g.vend,tV),'#5b2a86')}</td>
+        <td style="padding:8px 6px;min-width:150px;">${g.nC?`<b class="${g.gan<0?'neg':'pos'}">${fmt(g.gan)}</b> <span class="meta">${g.gan>0&&tG>0?pc(g.gan,tG)+' %':''}${g.costo>0?' · '+pctf(g.gan/g.costo)+' s/costo':''}</span>${barra(g.gan>0?pc(g.gan,tG):0,'#2F7A47')}${g.nC<g.n?`<small class="meta" style="display:block;">${g.n-g.nC} sin costo</small>`:''}`:'<span class="meta">sin costo cargado</span>'}</td></tr>`).join('')}
+      <tr style="border-top:2px solid #3d1466;font-weight:800;"><td style="padding:8px 6px;">Total</td><td style="padding:8px 6px;">${fmt(tV)}</td><td style="padding:8px 6px;" class="${tGn<0?'neg':''}">${fmt(tGn)}</td></tr>
+    </table></div>
+    <p class="note" style="margin-top:6px;">El % de ganancia es la participación en la ganancia total. La ganancia es por venta (me quedó − costo), sin los cargos sueltos del mes.${gs.some(g=>g.t==='x')?' "Sin identificar": SKU que no están en la app (ver 🔍).':''}</p>`;
+}
 // ===== SKU de Mercado Libre que no estan en la app o no tienen costo =====
 function renderFaltan(){
   const sel=$('ftMes'), ps=[...new Set(DATA.map(d=>d.periodo))].sort().reverse();
@@ -1134,6 +1169,7 @@ $('resMes').addEventListener('change',renderResumen);
 ['rkMes','rkGrupo','rkOrden','rkVer'].forEach(id=>$(id).addEventListener('change',renderRanking));
 $('dsMes').addEventListener('change',renderDesglose);
 $('ftMes').addEventListener('change',renderFaltan);
+$('ogMes').addEventListener('change',renderOrigen);$('ogLog').addEventListener('change',renderOrigen);
 document.querySelectorAll('details.pleg').forEach(d=>{const k='ml.pleg.'+d.dataset.k;try{if(localStorage.getItem(k)==='1')d.open=true;}catch(e){}
   d.addEventListener('toggle',()=>{try{localStorage.setItem(k,d.open?'1':'0');}catch(e){}});});
 ['fMes','fCuenta','fTipo','fLog','fFlex','fOrden','fVista'].forEach(id=>$(id).addEventListener('change',()=>{shown=200;draw();}));
@@ -1159,6 +1195,7 @@ firebase.auth().onAuthStateChanged(async u=>{
     if(!d.exists||d.data().rol!=='dueño'){$('cargando').textContent='Solo el dueño puede ver los resultados de Mercado Libre.';return;}}catch(e){}
   NAMES=(await idbApp('nombres_sku'))||{};
   MOTIVOS=(await idbApp('motivos_sin_costo'))||{};
+  TIPO=(await idbApp('tipo_sku'))||{};
   {const s=$('modoCosto');if(s)s.value=MODO_COSTO;}
   try{const s=await db.collection('historial_costos').get();const m={};s.docs.forEach(x=>{const v=x.data();const k=String(v.sku||'').toUpperCase();(m[k]=m[k]||[]).push({fecha:v.fecha,costo:+v.costo,creado:+v.creado||0});});
     let ult={};try{const u=await db.collection('config').doc('costos_ultimo').get();ult=u.exists?(u.data().c||{}):{};}catch(e){}
