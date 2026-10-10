@@ -1030,9 +1030,9 @@ function renderOrigen(){
 function accionFaltante(g,t,det){
   const id='fa-'+g.k.replace(/[^A-Z0-9]/gi,'_'), inp=(ph,fn)=>`<input id="${id}" placeholder="${ph}" style="width:120px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;text-transform:uppercase;" onkeydown="if(event.key==='Enter')${fn}"> <button type="button" style="padding:5px 10px;border-radius:8px;border:none;background:#f4c430;color:#3d1466;font-weight:700;cursor:pointer;font-size:.8rem;" onclick="${fn}">OK</button>`;
   if(!g.enApp)return inp('código en la app',`emparejarFaltante('${g.k}','${id}')`);
-  if(t==='Sin costo')return inp('costo $ c/u',`costoFaltante('${g.k}','${id}')`);
-  if(/tela sin precio|tela no cargada/i.test(t)){const m=det.match(/La tela ([A-Z0-9]+)/i);return `<a href="./?ir=telas&q=${encodeURIComponent(m?m[1]:'')}" style="font-size:.82rem;font-weight:700;">🧵 Cargar precio en Telas →</a>`;}
-  return `<a href="./?ir=completar&sku=${encodeURIComponent(g.k)}" style="font-size:.82rem;font-weight:700;">✏️ Completar en la app →</a>`;
+  if(t==='Sin costo')return inp('costo $ c/u',`costoFaltante('${g.k}','${id}')`)+`<div><a href="#" onclick="event.preventDefault();abrirEnApp('completar','sku','${g.k}')" style="font-size:.74rem;">o lo fabrico: elegir artículo y tela</a></div>`;
+  if(/tela sin precio|tela no cargada/i.test(t)){const m=det.match(/La tela ([A-Z0-9]+)/i);return `<a href="#" onclick="event.preventDefault();abrirEnApp('telas','q','${m?m[1]:''}')" style="font-size:.82rem;font-weight:700;">🧵 Cargar precio de la tela</a>`;}
+  return `<a href="#" onclick="event.preventDefault();abrirEnApp('completar','sku','${g.k}')" style="font-size:.82rem;font-weight:700;">✏️ Completar artículo y tela</a>`;
 }
 async function emparejarFaltante(sku,id){
   const v=($(id).value||'').trim().toUpperCase(); if(!v)return;
@@ -1050,6 +1050,23 @@ async function costoFaltante(sku,id){
     render(); alertOk('Costo de '+sku+' guardado: '+fmt(n)+' por unidad.');
   }catch(e){showErr('No se pudo guardar: '+e.message);}
 }
+// la app adentro de una ventana: se completa sin salir de esta pagina
+function abrirEnApp(ir,param,valor){
+  let m=$('appModal');
+  if(!m){m=document.createElement('div');m.id='appModal';m.style.cssText='position:fixed;inset:0;background:rgba(20,8,35,.6);z-index:300;display:flex;align-items:center;justify-content:center;padding:12px;';
+    m.innerHTML='<div style="background:#fff;border-radius:16px;width:min(1000px,100%);height:min(90vh,900px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.4);"><div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);"><b style="flex:1;color:#3d1466;">Completar en la app</b><span id="appModalEstado" class="meta" style="font-size:.8rem;"></span><button type="button" onclick="cerrarApp()" style="border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 12px;cursor:pointer;font-weight:700;">✕ Listo</button></div><iframe id="appFrame" style="flex:1;border:none;width:100%;"></iframe></div>';
+    document.body.appendChild(m);}
+  m.style.display='flex';$('appModalEstado').textContent='';
+  $('appFrame').src='./?embed=1&ir='+ir+'&'+param+'='+encodeURIComponent(valor)+'&v='+Date.now();
+}
+function cerrarApp(){const m=$('appModal');if(m){m.style.display='none';$('appFrame').src='about:blank';}refrescarCostos();}
+async function refrescarCostos(){
+  try{NAMES=(await idbApp('nombres_sku'))||NAMES;MOTIVOS=(await idbApp('motivos_sin_costo'))||{};TIPO=(await idbApp('tipo_sku'))||TIPO;KITS=(await idbApp('kits_sku'))||KITS;}catch(e){}
+  try{const s=await db.collection('historial_costos').get();const m={};s.docs.forEach(x=>{const v=x.data();const k=String(v.sku||'').toUpperCase();(m[k]=m[k]||[]).push({fecha:v.fecha,costo:+v.costo,creado:+v.creado||0});});
+    Object.values(m).forEach(a=>a.sort((x,y)=>x.fecha.localeCompare(y.fecha)||x.creado-y.creado));COSTOS=m;}catch(e){}
+  render();
+}
+window.addEventListener('message',e=>{if(e.data&&e.data.tipo==='ot-costos-actualizados'){const s=$('appModalEstado');if(s)s.textContent='✓ Guardado y actualizado';refrescarCostos();}});
 function verFaltantes(){const m=document.querySelector('details[data-k=mas]'),f=document.querySelector('details[data-k=faltan]');if(m)m.open=true;if(f){f.open=true;$('ftMes').value=$('resMes').value;renderFaltan();setTimeout(()=>f.scrollIntoView({behavior:'smooth',block:'start'}),50);}}
 // ===== SKU de Mercado Libre que no estan en la app o no tienen costo =====
 function renderFaltan(){
