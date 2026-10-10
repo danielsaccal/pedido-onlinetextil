@@ -835,7 +835,7 @@ function renderResumen(){
     <div class="rbig" style="background:${!cc.length?'#F4F1EC':res<0?'#A6432F':'#2F7A47'};color:${cc.length?'#fff':'#2B2233'};">
       <div class="t">${cc.length?'Resultado del mes':'Me quedó'}</div>
       <div class="v">${fmt(cc.length?res:quedo)}</div>
-      <div class="s">${cc.length?(res<0?'Perdiste plata este mes':'Ganaste plata este mes'):'Cargá los costos para ver la ganancia'}${cc.length&&sinC?' · faltan '+sinC+' costos':''}</div>
+      <div class="s">${cc.length?(res<0?'Perdiste plata este mes':'Ganaste plata este mes'):'Cargá los costos para ver la ganancia'}${cc.length&&sinC?` · <a href="#" style="color:inherit;font-weight:700;text-decoration:underline;" onclick="event.preventDefault();verFaltantes();">faltan ${sinC} costos → ver cuáles</a>`:''}</div>
       ${cc.length?`<div class="rchips"><span title="Resultado sobre todo lo que entró">${entro>0?(res/entro*100).toLocaleString('es-AR',{maximumFractionDigits:1}):'–'} % sobre lo que entró</span><span title="Resultado sobre el costo de lo vendido">${costo>0?(res/costo*100).toLocaleString('es-AR',{maximumFractionDigits:1}):'–'} % sobre el costo</span></div>`:''}
     </div>
   </div>
@@ -1026,6 +1026,7 @@ function renderOrigen(){
     </table></div>
     <p class="note" style="margin-top:6px;">El % de ganancia es la participación en la ganancia total. La ganancia es por venta (me quedó − costo), sin los cargos sueltos del mes.${gs.some(g=>g.t==='x')?' "Sin identificar": SKU que no están en la app (ver 🔍).':''}</p>`;
 }
+function verFaltantes(){const m=document.querySelector('details[data-k=mas]'),f=document.querySelector('details[data-k=faltan]');if(m)m.open=true;if(f){f.open=true;$('ftMes').value=$('resMes').value;renderFaltan();setTimeout(()=>f.scrollIntoView({behavior:'smooth',block:'start'}),50);}}
 // ===== SKU de Mercado Libre que no estan en la app o no tienen costo =====
 function renderFaltan(){
   const sel=$('ftMes'), ps=[...new Set(DATA.map(d=>d.periodo))].sort().reverse();
