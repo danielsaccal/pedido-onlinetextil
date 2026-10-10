@@ -1115,7 +1115,7 @@ function fichaSku(q){
     // por SKU, con los juegos repartidos en sus partes
     const virt=[];base.filter(o=>KITS[String(o.skuBase).toUpperCase()]).forEach(o=>partesKit(KITS[String(o.skuBase).toUpperCase()]).forEach(pt=>{const v=ventasDeParteEnJuegos(pt.sku,[o])[0];if(v)virt.push({skuBase:pt.sku,unid:v.unid,pcd:v.pcd,neto:v.neto,costo:v.costo,gan:v.gan,enJuego:true});}));
     const todas=base.filter(o=>!KITS[String(o.skuBase).toUpperCase()]||String(o.skuBase).toUpperCase()===q).concat(virt.filter(v=>v.skuBase!==q||!KITS[q]));
-    const G={};todas.forEach(o=>{const k=String(o.skuBase).toUpperCase();const g=G[k]||(G[k]={k,unid:0,vend:0,quedo:0,costo:0,gan:0,n:0,nC:0,uJ:0});g.n++;g.unid+=o.unid||0;g.vend+=o.pcd;g.quedo+=o.neto||0;if(o.enJuego)g.uJ+=o.unid||0;if(o.costo!=null){g.costo+=o.costo;g.gan+=o.gan;g.nC++;}});
+    const G={};todas.forEach(o=>{const k=String(o.skuBase).toUpperCase();const g=G[k]||(G[k]={k,unid:0,vend:0,quedo:0,costo:0,gan:0,n:0,nC:0,uJ:0,uC:0});g.n++;g.unid+=o.unid||0;g.vend+=o.pcd;g.quedo+=o.neto||0;if(o.enJuego)g.uJ+=o.unid||0;if(o.costo!=null){g.costo+=o.costo;g.gan+=o.gan;g.nC++;g.uC+=o.unid||0;}});
     return G;
   };
   const ps=[...new Set(DATA.map(d=>d.periodo))].sort();
@@ -1134,7 +1134,8 @@ function fichaSku(q){
       <div><small class="meta">Unidades</small><div style="font-weight:800;font-size:1.1rem;">${g.unid.toLocaleString('es-AR')}</div>${g.uJ?`<small class="meta">${g.uJ} dentro de juegos</small>`:''}</div>
       <div><small class="meta">Facturación</small><div style="font-weight:800;font-size:1.1rem;">${fmt(g.vend)}</div></div>
       <div><small class="meta">Me quedó</small><div style="font-weight:800;font-size:1.1rem;">${fmt(g.quedo)}</div></div>
-      <div><small class="meta">Costo</small><div style="font-weight:800;font-size:1.1rem;color:#A6432F;">${g.nC?fmt(g.costo):'sin costo'}</div></div>
+      <div><small class="meta">Costo</small><div style="font-weight:800;font-size:1.1rem;color:#A6432F;">${g.nC?fmt(g.costo):'sin costo'}</div>${(()=>{const h0=COSTOS[q];const act=h0&&h0.length?h0[h0.length-1].costo:null;const prom=g.uC?g.costo/g.uC:null;
+        return `${act!=null?`<div style="margin-top:4px;background:#FFF4D6;border-radius:8px;padding:3px 8px;display:inline-block;"><small style="color:#8A6417;">Costo por unidad hoy</small> <b style="color:#8A6417;">${fmt(act)}</b></div>`:''}${prom!=null&&act!=null&&Math.abs(prom-act)>=1?`<small class="meta" style="display:block;">promedio en estas ventas: ${fmt(prom)}</small>`:''}`;})()}</div>
       <div style="background:${g.gan<0?'#FDEBE7':'#EEF6F0'};border-radius:10px;padding:6px 8px;"><small class="meta">${g.gan<0?'Perdí':'Gané'}</small><div style="font-weight:800;font-size:1.1rem;" class="${g.gan<0?'neg':'pos'}">${g.nC?fmt(g.gan):'–'}</div><small class="meta">${pcC} s/costo · ${pcV} s/ventas</small></div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:6px;font-size:.84rem;margin-bottom:8px;">
