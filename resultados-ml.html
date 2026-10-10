@@ -264,7 +264,7 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
     <div class="res-head" style="flex-wrap:wrap;gap:8px;">
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         <select id="rkMes" aria-label="Mes"></select>
-        <select id="rkGrupo" aria-label="Agrupar"><option value="prod">Por producto</option><option value="sku">Por SKU</option></select>
+        <select id="rkGrupo" aria-label="Agrupar"><option value="prod">Por producto</option><option value="sku">Por SKU</option><option value="parte">Por SKU (juegos repartidos en sus partes)</option></select>
         <select id="rkOrden" aria-label="Ordenar">
           <option value="neta">Ganancia neta ($)</option><option value="netaP">Rentabilidad neta (%)</option>
           <option value="bruta">Ganancia bruta ($)</option><option value="brutaP">Rentabilidad bruta (%)</option>
@@ -581,7 +581,7 @@ function renderCad(){
   $('cadForm').querySelectorAll('input').forEach(i=>i.addEventListener('change',()=>{ZCOST[i.dataset.z]=Math.max(0,+i.value||0);saveZ();applyCadete();draw();}));
   $('cadMap').querySelectorAll('select').forEach(s=>s.addEventListener('change',()=>{AMTZ[s.dataset.m]=s.value;delete AUTO[s.dataset.m];saveZ();applyCadete();renderCad();draw();}));
 }
-let NAMES={}, MOTIVOS={}, TIPO={};   // SKU base -> nombre, desde el catalogo de la app
+let NAMES={}, MOTIVOS={}, TIPO={}, KITS={};   // SKU base -> nombre, desde el catalogo de la app
 let COSTOS={};  // SKU base -> [{fecha:'AAAA-MM-DD', costo}] (historial de costos de la app)
 function idbApp(clave){return new Promise(res=>{try{const r=indexedDB.open('onlinetextil',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');
   r.onsuccess=()=>{try{const g=r.result.transaction('kv').objectStore('kv').get(clave);g.onsuccess=()=>res(g.result);g.onerror=()=>res(null);}catch(e){res(null);}};r.onerror=()=>res(null);}catch(e){res(null);}});}
@@ -745,6 +745,7 @@ function draw(){
     +'<p class="note">En rojo lo que se descuenta; en verde lo que suma (por ejemplo, reintegros Flex).</p>';
   // resumen del SKU buscado
   renderSkuSum(r);
+  try{agregarJuegosAlSku();}catch(e){console.error(e);}
   renderAnual();
   renderResumen();
   renderRanking();
@@ -934,6 +935,43 @@ async function agregarEquivalencia(){
   $('eqML').value='';$('eqApp').value='';render();alertOk('Equivalencia guardada: '+a+' → '+b);
 }
 async function quitarEquivalencia(k){delete EQ[k];try{await guardarEquivalencias();}catch(e){}render();}
+// ===== Juegos armados: cada venta de un juego se reparte entre sus partes (segun el costo de cada parte) =====
+function partesKit(txt){return String(txt||'').toUpperCase().split('+').map(s=>s.trim()).filter(Boolean).map(s=>{const m=s.match(/^(.+?)(?:\s*X\s*(\d+))?$/);return {sku:m[1].trim(),n:m[2]?+m[2]:1};});}
+// filas "virtuales" de una parte dentro de las ventas de juegos
+function ventasDeParteEnJuegos(parte,rows){
+  parte=String(parte).toUpperCase(); const out=[];
+  rows.forEach(o=>{const txt=KITS[String(o.skuBase||'').toUpperCase()]; if(!txt||!(o.tipo==='Venta'&&o.pcd>0))return;
+    const ps=partesKit(txt), mia=ps.find(x=>x.sku===parte); if(!mia)return;
+    const cs=ps.map(x=>{const c=costoUnit(x.sku,o.fecha);return c!=null?c*x.n:null;});
+    const todos=cs.every(c=>c!=null), tot=todos?cs.reduce((a,c)=>a+c,0):0;
+    const sh=todos&&tot>0?cs[ps.indexOf(mia)]/tot:mia.n/ps.reduce((a,x)=>a+x.n,0);
+    const cu=costoUnit(parte,o.fecha), u=(o.unid||0)*mia.n, costo=cu!=null?cu*u:null, neto=(o.neto||0)*sh;
+    out.push({juego:o.skuBase,fecha:o.fecha,op:o.op,unid:u,pcd:o.pcd*sh,neto,costo,gan:costo!=null?neto-costo:null,sh});});
+  return out;
+}
+function agregarJuegosAlSku(){
+  const box=$('skuSum'), q=$('fSku').value.trim().toUpperCase(); if(!q||searchQ().isNum||box.hidden&&false)return;
+  const fm=$('fMes').value, fc=$('fCuenta').value;
+  const base=allRows().filter(o=>!o.excl&&(!fm||o.periodo===fm)&&(!fc||o.cuenta===fc));
+  const vj=ventasDeParteEnJuegos(q,base); if(!vj.length)return;
+  const S=k=>vj.reduce((a,x)=>a+(x[k]||0),0), U=S('unid'), conC=vj.filter(x=>x.costo!=null);
+  const G=conC.reduce((a,x)=>a+x.gan,0), C=conC.reduce((a,x)=>a+x.costo,0);
+  const juegos=[...new Set(vj.map(x=>x.juego))].join(', ');
+  // suelto (lo que ya muestra la caja) + dentro de juegos
+  const sueltas=base.filter(o=>o.skuBase===q&&o.tipo==='Venta'&&o.pcd>0), Us=sueltas.reduce((a,o)=>a+(o.unid||0),0), Gs=sueltas.filter(o=>o.gan!=null).reduce((a,o)=>a+o.gan,0);
+  if(box.hidden){box.hidden=false;box.innerHTML='<h3>'+q+'</h3>';}
+  box.insertAdjacentHTML('beforeend',`<div style="margin-top:12px;border:1px dashed #B9A8D6;border-radius:14px;padding:12px;background:#FAF7FD;">
+    <b style="color:#3d1466;">🧩 También se vendió dentro de juegos</b> <span class="meta">(${juegos})</span>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin:8px 0;font-size:.92rem;">
+      <span><small class="meta" style="display:block;">Unidades</small><b>${U.toLocaleString('es-AR')}</b></span>
+      <span><small class="meta" style="display:block;">Su parte de lo facturado</small><b>${fmt(S('pcd'))}</b></span>
+      <span><small class="meta" style="display:block;">Le quedó</small><b>${fmt(S('neto'))}</b></span>
+      <span><small class="meta" style="display:block;">Costo</small><b class="neg">${conC.length?fmt(-C):'sin costo'}</b></span>
+      <span><small class="meta" style="display:block;">Ganancia</small><b class="${G<0?'neg':'pos'}">${conC.length?fmt(G)+(C>0?` · ${pctf(G/C)} s/costo`:''):'–'}</b></span>
+    </div>
+    <div style="border-top:1px solid #E3DCF0;padding-top:8px;font-size:.92rem;"><b>Total ${q}</b> (suelto + en juegos): <b>${(Us+U).toLocaleString('es-AR')}</b> unidades · ganancia <b class="${(Gs+G)<0?'neg':'pos'}">${fmt(Gs+G)}</b></div>
+    <p class="note" style="margin:6px 0 0;">En cada juego vendido, la parte de ${q} se calcula según cuánto pesa su costo dentro del juego.</p></div>`);
+}
 // ===== Fabricado vs reventa (y telas, juegos armados), por mes y por logistica =====
 function renderOrigen(){
   const sel=$('ogMes'), ps=[...new Set(DATA.map(d=>d.periodo))].sort().reverse();
@@ -1060,8 +1098,13 @@ function renderRanking(){
   const sel=$('rkMes'), ps=[...new Set(DATA.map(d=>d.periodo))].sort().reverse();
   const cur=sel.value&&(ps.includes(sel.value)||sel.value==='todo')?sel.value:(ps[0]||'');
   sel.innerHTML=ps.map(p=>`<option value="${p}" ${p===cur?'selected':''}>${p==='sin-fecha'?'Sin fecha':mesTxt(p)}</option>`).join('')+(ps.length>1?`<option value="todo" ${cur==='todo'?'selected':''}>Todos los meses</option>`:'');
-  const fc=$('fCuenta').value, porProd=$('rkGrupo').value==='prod';
-  const vs=allRows().filter(o=>!o.excl&&o.tipo==='Venta'&&o.pcd>0&&o.skuBase&&(cur==='todo'||o.periodo===cur)&&(!fc||o.cuenta===fc));
+  const fc=$('fCuenta').value, porProd=$('rkGrupo').value==='prod', repartir=$('rkGrupo').value==='parte';
+  let vs=allRows().filter(o=>!o.excl&&o.tipo==='Venta'&&o.pcd>0&&o.skuBase&&(cur==='todo'||o.periodo===cur)&&(!fc||o.cuenta===fc));
+  if(repartir){
+    const virt=[];
+    vs.filter(o=>KITS[String(o.skuBase).toUpperCase()]).forEach(o=>partesKit(KITS[String(o.skuBase).toUpperCase()]).forEach(pt=>{const v=ventasDeParteEnJuegos(pt.sku,[o])[0];if(v)virt.push({...o,skuBase:pt.sku,unid:v.unid,pcd:v.pcd,neto:v.neto,costo:v.costo,gan:v.gan});}));
+    vs=vs.filter(o=>!KITS[String(o.skuBase).toUpperCase()]).concat(virt);
+  }
   const G=new Map();
   for(const o of vs){
     const k=porProd?nombreProducto(o.skuBase):o.skuBase;
@@ -1216,6 +1259,7 @@ firebase.auth().onAuthStateChanged(async u=>{
   NAMES=(await idbApp('nombres_sku'))||{};
   MOTIVOS=(await idbApp('motivos_sin_costo'))||{};
   TIPO=(await idbApp('tipo_sku'))||{};
+  KITS=(await idbApp('kits_sku'))||{};
   {const s=$('modoCosto');if(s)s.value=MODO_COSTO;}
   try{const s=await db.collection('historial_costos').get();const m={};s.docs.forEach(x=>{const v=x.data();const k=String(v.sku||'').toUpperCase();(m[k]=m[k]||[]).push({fecha:v.fecha,costo:+v.costo,creado:+v.creado||0});});
     let ult={};try{const u=await db.collection('config').doc('costos_ultimo').get();ult=u.exists?(u.data().c||{}):{};}catch(e){}
