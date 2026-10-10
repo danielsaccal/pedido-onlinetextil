@@ -1166,47 +1166,50 @@ function fichaSku(q){
   const totG=lista.filter(x=>x.nC).reduce((a,x)=>a+Math.max(0,x.gan),0), totV=lista.reduce((a,x)=>a+x.vend,0);
   const pcC=g.costo>0?pctf(g.gan/g.costo):'–', pcV=g.vend>0?pctf(g.gan/g.vend):'–';
   const fila=(per)=>{const x=ventasMes(per)[q];if(!x)return '';return `<tr style="border-top:1px solid var(--line);"><td style="padding:6px;">${mesTxt(per)}</td><td style="padding:6px;text-align:right;">${x.unid.toLocaleString('es-AR')}</td><td style="padding:6px;text-align:right;">${fmt(x.vend)}</td><td style="padding:6px;text-align:right;" class="${x.gan<0?'neg':'pos'}">${x.nC?fmt(x.gan):'–'}</td><td style="padding:6px;text-align:right;">${x.costo>0?pctf(x.gan/x.costo):'–'}</td></tr>`;};
-  box.innerHTML=`<div style="border:2px solid #5b2a86;border-radius:16px;padding:14px;margin-bottom:12px;background:#FCFAFE;">
-    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;"><div><b style="font-size:1.15rem;color:#3d1466;">${q}</b> <span class="meta">${NAMES[q]||''}</span></div><span class="meta">${cur==='todo'?'Todos los meses':mesTxt(cur)}${fc?' · '+fc:''}</span></div>
-    ${(()=>{ // en palabras
-      const gu=g.uC?g.gan/g.uC:null, cu=g.uC?g.costo/g.uC:null;
-      const LG=['Flex','Full','Correo'].map(l=>{const x=ventasMes(cur,l)[q];return x&&x.uC?{l,gu:x.gan/x.uC}:null;}).filter(Boolean).sort((a,b)=>b.gu-a.gu);
-      let t=`Vendiste <b>${g.unid.toLocaleString('es-AR')} unidades</b> por <b>${fmt(g.vend)}</b>. Después de Mercado Libre te quedaron <b>${fmt(g.quedo)}</b>.`;
-      if(g.nC)t+=` Te costaron <b>${fmt(g.costo)}</b>${cu!=null?` (${fmt(cu)} cada una)`:''}, así que <b class="${g.gan<0?'neg':'pos'}">${g.gan<0?'perdiste':'ganaste'} ${fmt(Math.abs(g.gan))}</b>${gu!=null?`: <b>${fmt(gu)} por unidad</b>`:''}.`;
-      if(g.costo>0)t+=` Por cada $ 100 de costo ${g.gan<0?'perdés':'ganás'} <b>$ ${Math.abs(Math.round(g.gan/g.costo*100))}</b>.`;
-      if(LG.length>1)t+=` Por unidad, <b>${LG[0].l}</b> te deja ${fmt(LG[0].gu)} y <b>${LG[LG.length-1].l}</b> ${fmt(LG[LG.length-1].gu)}: <b>conviene ${LG[0].l}</b>.`;
-      return `<p style="margin:8px 0 4px;font-size:.98rem;line-height:1.55;background:#fff;border-radius:12px;padding:10px 12px;border:1px solid var(--line);">${t}</p>`;})()}
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:10px 0;">
-      <div><small class="meta">Unidades</small><div style="font-weight:800;font-size:1.1rem;">${g.unid.toLocaleString('es-AR')}</div>${g.uJ?`<small class="meta">${g.uJ} dentro de juegos</small>`:''}</div>
-      <div><small class="meta">Facturación</small><div style="font-weight:800;font-size:1.1rem;">${fmt(g.vend)}</div></div>
-      <div><small class="meta">Me quedó</small><div style="font-weight:800;font-size:1.1rem;">${fmt(g.quedo)}</div></div>
-      <div><small class="meta">Costo</small><div style="font-weight:800;font-size:1.1rem;color:#A6432F;">${g.nC?fmt(g.costo):'sin costo'}</div>${(()=>{const h0=COSTOS[q];const act=h0&&h0.length?h0[h0.length-1].costo:null;const prom=g.uC?g.costo/g.uC:null;
-        return `${act!=null?`<div style="margin-top:4px;background:#FFF4D6;border-radius:8px;padding:3px 8px;display:inline-block;"><small style="color:#8A6417;">Costo por unidad hoy</small> <b style="color:#8A6417;">${fmt(act)}</b></div>`:''}${prom!=null&&act!=null&&Math.abs(prom-act)>=1?`<small class="meta" style="display:block;">promedio en estas ventas: ${fmt(prom)}</small>`:''}`;})()}</div>
-      <div style="background:${g.gan<0?'#FDEBE7':'#EEF6F0'};border-radius:10px;padding:6px 8px;"><small class="meta">${g.gan<0?'Perdí':'Gané'}</small><div style="font-weight:800;font-size:1.1rem;" class="${g.gan<0?'neg':'pos'}">${g.nC?fmt(g.gan):'–'}</div><small class="meta">${pcC} s/costo · ${pcV} s/ventas</small></div>
+  // ---- ficha grafica ----
+  const gu=g.uC?g.gan/g.uC:null, cu=g.uC?g.costo/g.uC:null, act=(COSTOS[q]&&COSTOS[q].length)?COSTOS[q][COSTOS[q].length-1].costo:null;
+  const posN=(campo)=>{const s=lista.filter(x=>x[campo]!=null&&(['gan','pC','pV'].indexOf(campo)<0||x.nC)).sort((a,b)=>b[campo]-a[campo]);const i=s.findIndex(x=>x.k===q);return i<0?null:{p:i+1,n:s.length,pct:s.length>1?Math.round((s.length-1-i)/(s.length-1)*100):100};};
+  const medidor=(ic,tit,r)=>{if(!r)return '';const col=r.pct>=66?'#2F7A47':r.pct>=33?'#D9A915':'#A6432F';return `<div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 12px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="font-size:.85rem;">${ic} ${tit}</span><b style="font-size:1.05rem;">#${r.p}<small class="meta" style="font-weight:400;"> de ${r.n}</small></b></div>
+      <div style="height:10px;background:#EEE9F3;border-radius:6px;margin:6px 0 4px;overflow:hidden;"><div style="width:${r.pct}%;height:100%;background:${col};"></div></div>
+      <small style="color:${col};font-weight:700;">Mejor que el ${r.pct} % de tus productos</small></div>`;};
+  // a donde va cada $100 vendido
+  const V=g.vend||1, pML=Math.max(0,(g.vend-g.quedo)/V*100), pC=g.nC?Math.max(0,g.costo/V*100):0, pG=g.nC?g.gan/V*100:0;
+  const seg=(w,col,txt)=>w>0.5?`<div title="${txt}" style="width:${w}%;background:${col};color:#fff;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap;">${w>=9?Math.round(w)+' %':''}</div>`:'';
+  const barra=`<div style="display:flex;height:34px;border-radius:10px;overflow:hidden;background:#EEE9F3;">${seg(pML,'#8E6BB8','Mercado Libre')}${seg(pC,'#D97A3A','Costo')}${pG>0?seg(pG,'#2F7A47','Ganancia'):''}</div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem;margin-top:6px;">
+      <span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#8E6BB8;"></i> Mercado Libre ${fmt(g.vend-g.quedo)}</span>
+      ${g.nC?`<span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#D97A3A;"></i> Costo ${fmt(g.costo)}</span>`:''}
+      ${g.nC?`<span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${g.gan<0?'#A6432F':'#2F7A47'};"></i> ${g.gan<0?'Pérdida':'Ganancia'} ${fmt(g.gan)}</span>`:''}</div>`;
+  // logistica: barras de ganancia por unidad
+  const LGs=['Flex','Full','Correo'].map(l=>{const x=ventasMes(cur,l)[q];return x&&x.uC?{l,ic:{Flex:'🛵',Full:'🏬',Correo:'📦'}[l],gu:x.gan/x.uC,pc:x.costo>0?x.gan/x.costo:null,u:x.unid}:null;}).filter(Boolean);
+  const maxL=Math.max(1,...LGs.map(x=>Math.abs(x.gu))), mejorL=LGs.slice().sort((a,b)=>b.gu-a.gu)[0];
+  const graficoLog=LGs.length?`<div style="display:flex;gap:14px;align-items:flex-end;height:170px;padding:0 4px;">${LGs.map(x=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
+      <b style="font-size:.95rem;${x.gu<0?'color:#A6432F;':''}">${fmt(x.gu)}</b><small class="meta">${x.pc!=null?pctf(x.pc)+' s/costo':''}</small>
+      <div style="width:70%;max-width:90px;height:${Math.max(6,Math.round(Math.abs(x.gu)/maxL*110))}px;background:${x.gu<0?'#A6432F':x===mejorL&&LGs.length>1?'#2F7A47':'#8FBF9F'};border-radius:8px 8px 0 0;margin-top:4px;"></div>
+      <div style="font-size:.9rem;margin-top:4px;">${x.ic} ${x.l}${x===mejorL&&LGs.length>1?' 👑':''}</div><small class="meta">${x.u} unid.</small></div>`).join('')}</div>
+    <p class="note" style="margin:4px 0 0;text-align:center;">Ganancia por unidad según cómo se envió${LGs.length>1?` · <b>conviene ${mejorL.l}</b>`:''}</p>`:'';
+  // mes por mes: barras de ganancia
+  const MM=ps.map(per=>{const x=ventasMes(per)[q];return x?{per,gan:x.nC?x.gan:0,u:x.unid}:null;}).filter(Boolean);
+  const maxM=Math.max(1,...MM.map(x=>Math.abs(x.gan)));
+  const graficoMes=MM.length>1?`<div style="display:flex;gap:8px;align-items:flex-end;height:120px;">${MM.map(x=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
+      <small style="font-size:.7rem;">${fmt(x.gan)}</small><div style="width:80%;height:${Math.max(4,Math.round(Math.abs(x.gan)/maxM*80))}px;background:${x.gan<0?'#A6432F':'#5b2a86'};border-radius:6px 6px 0 0;"></div><small class="meta" style="font-size:.7rem;">${mesTxt(x.per).slice(0,3)} ${x.per.slice(2,4)}</small></div>`).join('')}</div>`:'';
+  const tarj=(t,v,sub,col)=>`<div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 12px;"><small class="meta">${t}</small><div style="font-weight:800;font-size:1.25rem;${col?'color:'+col+';':''}">${v}</div>${sub?`<small class="meta">${sub}</small>`:''}</div>`;
+  box.innerHTML=`<div style="border:2px solid #5b2a86;border-radius:18px;padding:16px;margin-bottom:12px;background:#FCFAFE;">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;"><div><b style="font-size:1.3rem;color:#3d1466;">${q}</b> <span class="meta">${NAMES[q]||''}</span></div><span class="meta">${cur==='todo'?'Todos los meses':mesTxt(cur)}${fc?' · '+fc:''}</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:12px 0;">
+      ${tarj('📦 Vendiste',g.unid.toLocaleString('es-AR')+' unid.',fmt(g.vend))}
+      ${tarj('🏷️ Costo por unidad',act!=null?fmt(act):'sin costo',cu!=null&&act!=null&&Math.abs(cu-act)>=1?'promedio vendido '+fmt(cu):'','#D97A3A')}
+      ${tarj(g.gan<0?'📉 Perdiste':'💚 Ganaste',g.nC?fmt(g.gan):'–',gu!=null?fmt(gu)+' por unidad':'',g.gan<0?'#A6432F':'#2F7A47')}
+      ${tarj('📈 Rinde',g.costo>0?'$ '+Math.round(g.gan/g.costo*100):'–',g.costo>0?'por cada $ 100 de costo':'',g.gan<0?'#A6432F':'#2F7A47')}
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:6px;font-size:.84rem;margin-bottom:8px;">
-      <div style="background:#EEE8F7;border-radius:12px;padding:6px 10px;"><small class="meta" style="display:block;">Puesto entre todos tus productos (1 = el mejor)</small>🏆 Por ganancia: <b>${g.nC?pos('gan'):'–'}</b><br>💰 Por facturación: <b>${pos('vend')}</b><br>📦 Por unidades: <b>${pos('unid')}</b></div>
-      <div style="background:#E3F0FF;border-radius:12px;padding:6px 10px;"><small class="meta" style="display:block;">Puesto por lo que rinde (1 = el que más rinde)</small>📈 Ganancia sobre el costo: <b>${g.nC?pos('pC'):'–'}</b><br>📊 Ganancia sobre lo vendido: <b>${g.nC?pos('pV'):'–'}</b></div>
-      <div style="background:#EEF6F0;border-radius:12px;padding:6px 10px;"><small class="meta" style="display:block;">Cuánto pesa en tu negocio</small>De la ganancia total: <b>${g.nC&&totG>0&&g.gan>0?pctf(g.gan/totG):'–'}</b><br>De la facturación total: <b>${totV>0?pctf(g.vend/totV):'–'}</b></div>
+    <b style="font-size:.9rem;color:#3d1466;">¿A dónde va lo que vendiste?</b>
+    <div style="margin:6px 0 14px;">${barra}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin-bottom:14px;">
+      ${g.nC?medidor('🏆','Por ganancia',posN('gan')):''}${g.nC?medidor('📈','Por rentabilidad',posN('pC')):''}${medidor('💰','Por facturación',posN('vend'))}
     </div>
-    ${(()=>{ // por logistica: total, Flex, Full, Correo
-      const LG=[['','Total'],['Flex','🛵 Flex'],['Full','🏬 Full'],['Correo','📦 Correo']];
-      const rows=LG.map(([lg,nom])=>{const GG=ventasMes(cur,lg),x=GG[q];if(!x)return null;const L=Object.values(GG);L.forEach(y=>{y.pC=y.costo>0?y.gan/y.costo:null;});
-        const rk=(c)=>{const s=L.filter(y=>y.nC&&y[c]!=null).sort((a,b)=>b[c]-a[c]);const i=s.findIndex(y=>y.k===q);return i<0?'–':(i+1)+'/'+s.length;};
-        return {lg,nom,x,gu:x.nC&&x.unid?x.gan/x.unid:null,pC:x.costo>0?x.gan/x.costo:null,pV:x.vend>0&&x.nC?x.gan/x.vend:null,rG:rk('gan'),rP:rk('pC')};}).filter(Boolean);
-      if(rows.length<2)return '';
-      const maxU=Math.max(...rows.map(r=>Math.abs(r.gu||0)),1);
-      return `<div style="margin:6px 0 10px;"><b style="color:#3d1466;">🚚 Por logística</b>
-        <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.86rem;margin-top:6px;">
-          <tr style="color:#8A8072;font-size:.72rem;text-transform:uppercase;"><td style="padding:5px;"></td><td style="padding:5px;text-align:right;">Unid.</td><td style="padding:5px;text-align:right;">Facturación</td><td style="padding:5px;text-align:right;">Ganancia</td><td style="padding:5px;text-align:right;">% s/costo</td><td style="padding:5px;text-align:right;">% s/ventas</td><td style="padding:5px;">Ganancia por unidad</td><td style="padding:5px;text-align:center;">Puesto $ · %</td></tr>
-          ${rows.map(r=>`<tr style="border-top:1px solid var(--line);${r.lg===''?'font-weight:800;background:#F6F2FB;':''}">
-            <td style="padding:6px;">${r.nom}</td><td style="padding:6px;text-align:right;">${r.x.unid.toLocaleString('es-AR')}</td><td style="padding:6px;text-align:right;">${fmt(r.x.vend)}</td>
-            <td style="padding:6px;text-align:right;" class="${r.x.gan<0?'neg':'pos'}">${r.x.nC?fmt(r.x.gan):'–'}</td><td style="padding:6px;text-align:right;">${r.pC!=null?pctf(r.pC):'–'}</td><td style="padding:6px;text-align:right;">${r.pV!=null?pctf(r.pV):'–'}</td>
-            <td style="padding:6px;min-width:140px;"><div style="display:flex;align-items:center;gap:6px;"><div style="flex:1;height:8px;background:#EEE9F3;border-radius:6px;overflow:hidden;"><div style="width:${r.gu!=null?Math.round(Math.abs(r.gu)/maxU*100):0}%;height:100%;background:${(r.gu||0)<0?'#A6432F':'#2F7A47'};"></div></div><span style="white-space:nowrap;font-size:.8rem;">${r.gu!=null?fmt(r.gu):'–'}</span></div></td>
-            <td style="padding:6px;text-align:center;white-space:nowrap;">${r.rG} · ${r.rP}</td></tr>`).join('')}
-        </table></div>
-        <p class="note" style="margin:4px 0 0;">"Puesto": primero, su lugar por ganancia en pesos; después, por % sobre el costo. Se compara con los productos que se venden por esa misma logística.</p></div>`;})()}
-    ${ps.length>1?`<details><summary style="cursor:pointer;font-weight:700;color:#3d1466;list-style:none;">📅 Mes por mes ▾</summary><table style="width:100%;border-collapse:collapse;font-size:.88rem;margin-top:6px;"><tr style="color:#8A8072;font-size:.75rem;"><td style="padding:6px;">Mes</td><td style="padding:6px;text-align:right;">Unid.</td><td style="padding:6px;text-align:right;">Facturación</td><td style="padding:6px;text-align:right;">Ganancia</td><td style="padding:6px;text-align:right;">% s/costo</td></tr>${ps.map(fila).join('')}</table></details>`:''}
+    ${graficoLog?`<b style="font-size:.9rem;color:#3d1466;">🚚 Por logística</b><div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin:6px 0 14px;">${graficoLog}</div>`:''}
+    ${graficoMes?`<b style="font-size:.9rem;color:#3d1466;">📅 Ganancia mes por mes</b><div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:6px;">${graficoMes}</div>`:''}
   </div>`;
 }
 // ===== Ranking de productos por rentabilidad =====
