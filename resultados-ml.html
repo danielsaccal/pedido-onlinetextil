@@ -935,10 +935,18 @@ function renderEquivalencias(){
   const ks=Object.keys(EQ).sort();
   $('eqLista').innerHTML=ks.length?`<table class="dh" style="width:100%;"><tbody>${ks.map(k=>`<tr><td><b>${k.includes('|')?k.split('|')[1]:k}</b> <span class="meta">(en ML${k.includes('|')?', solo '+k.split('|')[0].charAt(0)+k.split('|')[0].slice(1).toLowerCase():''})</span></td><td>→ <b>${EQ[k]}</b> ${(()=>{const b=String(EQ[k]).toUpperCase().split(/\s*X\s*/)[0];const c=COSTOS[b];return `<span class="meta">${NAMES[b]||''}</span> ${c&&c.length?`<span style="color:#2F7A47;font-size:.8rem;">· costo ${fmt(c[c.length-1].costo)}</span>`:'<span style="color:#A6432F;font-size:.8rem;">· sin costo en la app</span>'}`;})()}</td><td style="text-align:right;"><button type="button" style="padding:4px 10px;border-radius:8px;color:#A6432F;border:1px solid #E3B8AE;background:#fff;cursor:pointer;font-weight:700;" onclick="quitarEquivalencia('${k}')">Quitar</button></td></tr>`).join('')}</tbody></table>`:'<p class="note">Todavía no hay equivalencias.</p>';
   // SKU de ML que no se encuentran en la app (sin nombre ni costo)
-  const c={};allRows().forEach(o=>{if(o.tipo==='Venta'&&o.pcd>0&&o.skuBaseML&&!EQ[o.skuBaseML]&&!NAMES[o.skuBaseML]&&!COSTOS[o.skuBaseML]){c[o.skuBaseML]=(c[o.skuBaseML]||0)+1;}});
+  // los que ya tienen equivalencia (para todas las cuentas o para su cuenta) no se muestran
+  const c={},cta={};allRows().forEach(o=>{const s=String(o.skuBaseML||'').toUpperCase();if(o.tipo==='Venta'&&o.pcd>0&&s&&!EQ[s]&&!EQ[String(o.cuenta||'').toUpperCase()+'|'+s]&&!NAMES[s]&&!COSTOS[s]){c[s]=(c[s]||0)+1;cta[s]=o.cuenta;}});
   const sin=Object.entries(c).sort((a,b)=>b[1]-a[1]);
+  // sugerencia automatica: si el SKU de ML empieza con un codigo de la app (ej: "BARDQ SOLAPAS" -> BARDQ)
+  const codigos=Object.keys(Object.assign({},NAMES,COSTOS)).sort((a,b)=>b.length-a.length);
+  const sugerir=s=>{const t=s.toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();const p=t.split(' ')[0];return codigos.find(k=>k===p)||codigos.find(k=>t.startsWith(k)&&k.length>=4)||null;};
+  window.__eqSug=sin.map(([k])=>[k,sugerir(k),cta[k]]).filter(x=>x[1]);
   $('eqSinMatch').innerHTML=sin.map(([k])=>`<option value="${k}">`).join('');
-  $('eqSugeridos').innerHTML=sin.length?`<p class="note" style="margin:0 0 4px;"><b>SKU de ML que no están en la app</b> (sin nombre ni costo). Tocá uno para asignarle su código:</p><div style="display:flex;gap:6px;flex-wrap:wrap;">${sin.slice(0,40).map(([k,n])=>`<button type="button" style="padding:4px 10px;font-size:.8rem;border-radius:8px;border:1px solid var(--line);background:#fff;color:#3d1466;cursor:pointer;" onclick="$('eqML').value='${k}';$('eqApp').focus();">${k} <span class="meta">(${n})</span></button>`).join('')}</div>`:'';
+  const sugHtml=window.__eqSug.length?`<div style="background:#EEF6F0;border:1px solid #BFDCC8;border-radius:12px;padding:10px;margin-bottom:10px;"><b style="font-size:.9rem;">✨ Encontré ${window.__eqSug.length} que se parecen a un código de la app:</b>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0;">${window.__eqSug.map(([a,b])=>`<span style="font-size:.8rem;background:#fff;border:1px solid #BFDCC8;border-radius:8px;padding:3px 8px;">${a} → <b>${b}</b></span>`).join('')}</div>
+    <button type="button" class="btn" style="padding:6px 12px;" onclick="asignarSugeridos()">Asignar todos</button> <span class="meta" style="font-size:.78rem;">(después podés quitar el que no corresponda)</span></div>`:'';
+  $('eqSugeridos').innerHTML=sugHtml+(sin.length?`<p class="note" style="margin:0 0 4px;"><b>SKU de ML que no están en la app</b> (sin nombre ni costo). Tocá uno para asignarle su código:</p><div style="display:flex;gap:6px;flex-wrap:wrap;">${sin.slice(0,40).map(([k,n])=>`<button type="button" style="padding:4px 10px;font-size:.8rem;border-radius:8px;border:1px solid var(--line);background:#fff;color:#3d1466;cursor:pointer;" onclick="$('eqML').value='${k}';$('eqApp').focus();">${k} <span class="meta">(${n})</span></button>`).join('')}</div>`:'');
 }
 async function agregarEquivalencia(){
   const cta=($('eqCuenta')||{}).value||'';
@@ -947,6 +955,11 @@ async function agregarEquivalencia(){
   const a=(cta?cta.toUpperCase()+'|':'')+a0;
   EQ[a]=b;try{await guardarEquivalencias();}catch(e){showErr('No se pudo guardar: '+e.message);return;}
   $('eqML').value='';$('eqApp').value='';render();alertOk('Equivalencia guardada: '+a+' → '+b);
+}
+async function asignarSugeridos(){
+  (window.__eqSug||[]).forEach(([a,b])=>{EQ[a]=b;});
+  try{await guardarEquivalencias();}catch(e){showErr('No se pudo guardar: '+e.message);return;}
+  render();alertOk('Equivalencias asignadas.');
 }
 async function quitarEquivalencia(k){delete EQ[k];try{await guardarEquivalencias();}catch(e){}render();}
 // ===== Juegos armados: cada venta de un juego se reparte entre sus partes (segun el costo de cada parte) =====
