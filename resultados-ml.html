@@ -1097,8 +1097,9 @@ function renderDesglose(){
 function fichaSku(q){
   q=q.trim().toUpperCase(); const box=$('rkFicha'); if(!q){box.innerHTML='';return;}
   const fc=$('fCuenta').value;
-  const ventasMes=per=>{
-    const base=allRows().filter(o=>!o.excl&&o.tipo==='Venta'&&o.pcd>0&&o.skuBase&&(per==='todo'||o.periodo===per)&&(!fc||o.cuenta===fc));
+  const logDe=o=>o.log==='Flex'||o.log==='Full'?o.log:'Correo';
+  const ventasMes=(per,lg)=>{
+    const base=allRows().filter(o=>!o.excl&&o.tipo==='Venta'&&o.pcd>0&&o.skuBase&&(per==='todo'||o.periodo===per)&&(!fc||o.cuenta===fc)&&(!lg||logDe(o)===lg));
     // por SKU, con los juegos repartidos en sus partes
     const virt=[];base.filter(o=>KITS[String(o.skuBase).toUpperCase()]).forEach(o=>partesKit(KITS[String(o.skuBase).toUpperCase()]).forEach(pt=>{const v=ventasDeParteEnJuegos(pt.sku,[o])[0];if(v)virt.push({skuBase:pt.sku,unid:v.unid,pcd:v.pcd,neto:v.neto,costo:v.costo,gan:v.gan,enJuego:true});}));
     const todas=base.filter(o=>!KITS[String(o.skuBase).toUpperCase()]||String(o.skuBase).toUpperCase()===q).concat(virt.filter(v=>v.skuBase!==q||!KITS[q]));
@@ -1129,6 +1130,23 @@ function fichaSku(q){
       <div style="background:#E3F0FF;border-radius:12px;padding:6px 10px;"><small class="meta" style="display:block;">En porcentaje</small>📈 Rentabilidad s/costo: <b>${g.nC?pos('pC'):'–'}</b><br>📊 Margen s/ventas: <b>${g.nC?pos('pV'):'–'}</b></div>
       <div style="background:#EEF6F0;border-radius:12px;padding:6px 10px;"><small class="meta" style="display:block;">Participación</small>De la ganancia total: <b>${g.nC&&totG>0&&g.gan>0?pctf(g.gan/totG):'–'}</b><br>De la facturación total: <b>${totV>0?pctf(g.vend/totV):'–'}</b></div>
     </div>
+    ${(()=>{ // por logistica: total, Flex, Full, Correo
+      const LG=[['','Total'],['Flex','🛵 Flex'],['Full','🏬 Full'],['Correo','📦 Correo']];
+      const rows=LG.map(([lg,nom])=>{const GG=ventasMes(cur,lg),x=GG[q];if(!x)return null;const L=Object.values(GG);L.forEach(y=>{y.pC=y.costo>0?y.gan/y.costo:null;});
+        const rk=(c)=>{const s=L.filter(y=>y.nC&&y[c]!=null).sort((a,b)=>b[c]-a[c]);const i=s.findIndex(y=>y.k===q);return i<0?'–':(i+1)+'/'+s.length;};
+        return {lg,nom,x,gu:x.nC&&x.unid?x.gan/x.unid:null,pC:x.costo>0?x.gan/x.costo:null,pV:x.vend>0&&x.nC?x.gan/x.vend:null,rG:rk('gan'),rP:rk('pC')};}).filter(Boolean);
+      if(rows.length<2)return '';
+      const maxU=Math.max(...rows.map(r=>Math.abs(r.gu||0)),1);
+      return `<div style="margin:6px 0 10px;"><b style="color:#3d1466;">🚚 Por logística</b>
+        <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.86rem;margin-top:6px;">
+          <tr style="color:#8A8072;font-size:.72rem;text-transform:uppercase;"><td style="padding:5px;"></td><td style="padding:5px;text-align:right;">Unid.</td><td style="padding:5px;text-align:right;">Facturación</td><td style="padding:5px;text-align:right;">Ganancia</td><td style="padding:5px;text-align:right;">% s/costo</td><td style="padding:5px;text-align:right;">% s/ventas</td><td style="padding:5px;">Ganancia por unidad</td><td style="padding:5px;text-align:center;">Puesto $ · %</td></tr>
+          ${rows.map(r=>`<tr style="border-top:1px solid var(--line);${r.lg===''?'font-weight:800;background:#F6F2FB;':''}">
+            <td style="padding:6px;">${r.nom}</td><td style="padding:6px;text-align:right;">${r.x.unid.toLocaleString('es-AR')}</td><td style="padding:6px;text-align:right;">${fmt(r.x.vend)}</td>
+            <td style="padding:6px;text-align:right;" class="${r.x.gan<0?'neg':'pos'}">${r.x.nC?fmt(r.x.gan):'–'}</td><td style="padding:6px;text-align:right;">${r.pC!=null?pctf(r.pC):'–'}</td><td style="padding:6px;text-align:right;">${r.pV!=null?pctf(r.pV):'–'}</td>
+            <td style="padding:6px;min-width:140px;"><div style="display:flex;align-items:center;gap:6px;"><div style="flex:1;height:8px;background:#EEE9F3;border-radius:6px;overflow:hidden;"><div style="width:${r.gu!=null?Math.round(Math.abs(r.gu)/maxU*100):0}%;height:100%;background:${(r.gu||0)<0?'#A6432F':'#2F7A47'};"></div></div><span style="white-space:nowrap;font-size:.8rem;">${r.gu!=null?fmt(r.gu):'–'}</span></div></td>
+            <td style="padding:6px;text-align:center;white-space:nowrap;">${r.rG} · ${r.rP}</td></tr>`).join('')}
+        </table></div>
+        <p class="note" style="margin:4px 0 0;">Puesto: en ganancia en pesos · en % sobre el costo, entre los SKU vendidos por esa logística.</p></div>`;})()}
     ${ps.length>1?`<details><summary style="cursor:pointer;font-weight:700;color:#3d1466;list-style:none;">📅 Mes por mes ▾</summary><table style="width:100%;border-collapse:collapse;font-size:.88rem;margin-top:6px;"><tr style="color:#8A8072;font-size:.75rem;"><td style="padding:6px;">Mes</td><td style="padding:6px;text-align:right;">Unid.</td><td style="padding:6px;text-align:right;">Facturación</td><td style="padding:6px;text-align:right;">Ganancia</td><td style="padding:6px;text-align:right;">% s/costo</td></tr>${ps.map(fila).join('')}</table></details>`:''}
   </div>`;
 }
