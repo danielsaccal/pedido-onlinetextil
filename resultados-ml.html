@@ -919,7 +919,20 @@ function renderSkuSum(r){
 }
 // ===== Equivalencias de SKU: codigo mal puesto en ML -> codigo de la app (config/ml_equivalencias: { m: { ML: 'APP' | 'APP x N' } }) =====
 let EQ={};
-async function cargarEquivalencias(){try{const d=await db.collection('config').doc('ml_equivalencias').get();EQ=d.exists?(d.data().m||{}):{};}catch(e){EQ={};}}
+async function cargarEquivalencias(){try{const d=await db.collection('config').doc('ml_equivalencias').get();EQ=d.exists?(d.data().m||{}):{};}catch(e){EQ={};}
+  try{ // si en "código en la app" se escribio un precio, se convierte en costo de ese SKU
+    const malos=Object.entries(EQ).filter(([k,v])=>/^[\d.,\s$]+$/.test(String(v)));
+    if(malos.length){
+      const hoy=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+      const ref=db.collection('config').doc('costos_reventa');const d2=await ref.get();const c=d2.exists?(d2.data().c||{}):{};
+      for(const [k,v] of malos){const sku=k.includes('|')?k.split('|')[1]:k;const n=parseFloat(String(v).replace(/[$\s]/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',','.'));
+        if(n>0){c[sku]=n;await db.collection('historial_costos').add({sku,fecha:hoy,costo:n,desglose:{reventa:true,desde:'arreglo equivalencia'},creado:Date.now()});(COSTOS[sku]=COSTOS[sku]||[]).push({fecha:hoy,costo:n,creado:Date.now()});}
+        delete EQ[k];}
+      await ref.set({c,actualizado:new Date().toISOString()});await guardarEquivalencias();
+      setTimeout(()=>alertOk('Arreglé '+malos.length+' casos donde se había escrito un precio como código: quedaron como costo.'),1500);
+    }
+  }catch(e){console.error(e);}
+}
 function guardarEquivalencias(){return db.collection('config').doc('ml_equivalencias').set({m:EQ,actualizado:new Date().toISOString()});}
 function aplicarEquivalencias(){
   for(const o of allRows()){
@@ -1029,13 +1042,14 @@ function renderOrigen(){
 // accion directa para cada SKU sin costo: emparejar, cargar costo o abrir la pantalla de la app que corresponde
 function accionFaltante(g,t,det){
   const id='fa-'+g.k.replace(/[^A-Z0-9]/gi,'_'), inp=(ph,fn)=>`<input id="${id}" placeholder="${ph}" style="width:120px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;text-transform:uppercase;" onkeydown="if(event.key==='Enter')${fn}"> <button type="button" style="padding:5px 10px;border-radius:8px;border:none;background:#f4c430;color:#3d1466;font-weight:700;cursor:pointer;font-size:.8rem;" onclick="${fn}">OK</button>`;
-  if(!g.enApp)return inp('código en la app',`emparejarFaltante('${g.k}','${id}')`);
+  if(!g.enApp)return inp('código en la app',`emparejarFaltante('${g.k}','${id}')`)+`<div style="margin-top:4px;"><input id="${id}-c" placeholder="o costo $ c/u" style="width:120px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;" onkeydown="if(event.key==='Enter')costoFaltante('${g.k}','${id}-c')"> <button type="button" style="padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:#3d1466;font-weight:700;cursor:pointer;font-size:.8rem;" onclick="costoFaltante('${g.k}','${id}-c')">OK</button></div>`;
   if(t==='Sin costo')return inp('costo $ c/u',`costoFaltante('${g.k}','${id}')`)+`<div><a href="#" onclick="event.preventDefault();abrirEnApp('completar','sku','${g.k}')" style="font-size:.74rem;">o lo fabrico: elegir artículo y tela</a></div>`;
   if(/tela sin precio|tela no cargada/i.test(t)){const m=det.match(/La tela ([A-Z0-9]+)/i);return `<a href="#" onclick="event.preventDefault();abrirEnApp('telas','q','${m?m[1]:''}')" style="font-size:.82rem;font-weight:700;">🧵 Cargar precio de la tela</a>`;}
   return `<a href="#" onclick="event.preventDefault();abrirEnApp('completar','sku','${g.k}')" style="font-size:.82rem;font-weight:700;">✏️ Completar artículo y tela</a>`;
 }
 async function emparejarFaltante(sku,id){
   const v=($(id).value||'').trim().toUpperCase(); if(!v)return;
+  if(/^[\d.,\s$]+$/.test(v)){ if(confirm('"'+v+'" parece un precio, no un código. ¿Lo guardo como COSTO por unidad de '+sku+'?')){ return costoFaltante(sku,id); } return; }
   EQ[sku]=v; try{await guardarEquivalencias();}catch(e){showErr('No se pudo guardar: '+e.message);return;}
   render(); alertOk(sku+' → '+v);
 }
