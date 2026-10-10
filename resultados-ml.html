@@ -796,7 +796,9 @@ function renderResumen(){
   </style>
   <div class="rcard">
     <div>
-      ${L1('Entró',entro,'Ventas y envíos cobrados','rp')}
+      ${L1('Ventas',recibi,'Precio de los productos (con descuento)','rp')}
+      ${L1('Envíos cobrados',entro-recibi,'Reintegros Flex y lo que pagó el comprador por el envío','rp')}
+      ${L1('Entró',entro,'','tot')}
       ${L1('Mercado Libre',-pague,'Comisión, cuotas, envíos, Full, publicidad, impuestos','rn')}
       ${L1('Me quedó',quedo,'','tot')}
       ${cc.length?L1('Costo de lo vendido',-costo,sinC?`${sinC} ${sinC===1?'venta':'ventas'} sin costo cargado`:'','rn'):''}
