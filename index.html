@@ -421,6 +421,7 @@ a.grilla-celda{display:block;}
 #email-status.err{background:#F5E3DE;color:#A6432F;}
 #email-status.pending{background:var(--cream);color:#6B6258;}
 .error{color:#A6432F;font-size:0.78rem;margin-top:-8px;margin-bottom:10px;display:none;}
+  body.embebido header, body.embebido #barra-cel, body.embebido #btn-atras{ display:none !important; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -1589,7 +1590,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v212</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v213</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -8801,6 +8802,7 @@ async function fcCrear(){
 // ----- Productos que fabrico: vista simple y "Completar" de a un dato -----
 let pfDetalle = false;
 function completarSkuPf(sku){
+  { const t = document.getElementById('pub-titulo'); if(t) t.textContent = '✏️ Completar producto'; }
   const S = String(sku).toUpperCase();
   const art = articuloDeSku(S) || '', cal = calidadDeSku(S) || '';
   const arts = articulosAC().sort((a, b) => a.localeCompare(b, 'es'));
@@ -9937,11 +9939,10 @@ function mapaNombresSku(){
   try{ skusQueFabrico().forEach(S => { if(m[S]) return; const art = articuloDeSku(S); if(!art) return; const q = calidadDeSku(S); m[S] = art + (q ? ' · ' + String(q).split('||')[0].toUpperCase() : '') + ' (sin publicar)'; }); } catch(e){}
   return m;
 }
-async function abrirResultadosML(){
-  if(!esDueno()){ alert('Solo el dueño puede ver los resultados de Mercado Libre.'); return; }
-  const t = document.getElementById('pub-titulo'); if(t) t.textContent = '📈 Resultados ML';
-  document.getElementById('pub-cont').innerHTML = '<p class="empty-msg">Actualizando costos y nombres…</p>';
-  document.getElementById('pub-modal').style.display = 'block';
+// prepara costos, nombres, tipos y motivos para Resultados ML
+async function prepararDatosML(){
+  if(costosReventa === null) await cargarCostosReventa();
+  if(kitsDatos === null) await cargarKits();
   try{ await registrarHistorialCostos(); } catch(e){ console.error('historial de costos', e); }
   try{ if(tablaConsumo === null) await cargarTablaConsumo(); if(fabricacion === null) await cargarFabricacion(); await idbGuardar('nombres_sku', mapaNombresSku()); } catch(e){}
   try{ const tipo = {}; const fab = new Set(skusQueFabrico());
@@ -9952,6 +9953,13 @@ async function abrirResultadosML(){
     await idbGuardar('tipo_sku', tipo); await idbGuardar('kits_sku', kitsDatos || {}); } catch(e){ console.error(e); }
   try{ const mot = {}; const todos = new Set(skusQueFabrico()); CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => todos.add(String(v.sku).toUpperCase()))));
     todos.forEach(S => { if(costoUnidadSku(S) == null) mot[S] = motivoSinCosto(S); }); await idbGuardar('motivos_sin_costo', mot); } catch(e){ console.error(e); }
+}
+async function abrirResultadosML(){
+  if(!esDueno()){ alert('Solo el dueño puede ver los resultados de Mercado Libre.'); return; }
+  const t = document.getElementById('pub-titulo'); if(t) t.textContent = '📈 Resultados ML';
+  document.getElementById('pub-cont').innerHTML = '<p class="empty-msg">Actualizando costos y nombres…</p>';
+  document.getElementById('pub-modal').style.display = 'block';
+  await prepararDatosML();
   cerrarPublicar();
   location.href = 'resultados-ml.html?v=' + Date.now();
 }
@@ -17676,6 +17684,11 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
   renderCatalogo(document.getElementById('buscador').value);
   // links desde Resultados ML: ?ir=completar&sku=X · ?ir=telas&q=X · ?ir=reventa&sku=X
   try{ const q = new URLSearchParams(location.search), ir = q.get('ir');
+    if(q.get('embed') === '1'){
+      window.__embebido = true; document.body.classList.add('embebido');
+      const avisar = async () => { try{ await prepararDatosML(); } catch(e){} try{ parent.postMessage({ tipo: 'ot-costos-actualizados' }, '*'); } catch(e){} };
+      ['guardarCompletarSku', 'guardarPreciosTelas', 'guardarTela', 'guardarAC', 'guardarCostosReventa', 'aplicarPfMasivo'].forEach(n => { const o = window[n]; if(typeof o !== 'function') return; window[n] = async function(...x){ const r = await o.apply(this, x); setTimeout(avisar, 300); return r; }; });
+    }
     if(ir){ history.replaceState(null, '', location.pathname);
       setTimeout(async () => {
         if(ir === 'completar'){ await abrirProductosFabrico(); const b = document.getElementById('pf-buscar'); if(b){ b.value = q.get('sku') || ''; renderProductosFabrico(); } try{ completarSkuPf(String(q.get('sku') || '').toUpperCase()); } catch(e){} }
@@ -17690,7 +17703,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v212';
+const APP_VERSION = '2026-10-02-v213';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
