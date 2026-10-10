@@ -1231,8 +1231,8 @@ function fichaSku(q){
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:12px 0;">
       ${tarj('📦 Vendiste',g.unid.toLocaleString('es-AR')+' unid.',fmt(g.vend))}
       ${tarj('🏷️ Costo por unidad',act!=null?fmt(act):'sin costo',cu!=null&&act!=null&&Math.abs(cu-act)>=1?'promedio vendido '+fmt(cu):'','#D97A3A')}
-      ${tarj(g.gan<0?'📉 Perdiste':'💚 Ganaste',g.nC?fmt(g.gan):'–',gu!=null?fmt(gu)+' por unidad':'',g.gan<0?'#A6432F':'#2F7A47')}
-      ${tarj('📈 Rinde',g.costo>0?'$ '+Math.round(g.gan/g.costo*100):'–',g.costo>0?'por cada $ 100 de costo':'',g.gan<0?'#A6432F':'#2F7A47')}
+      ${tarj(g.gan<0?'📉 Perdiste':'💚 Ganaste',g.nC?fmt(g.gan):'–',gu!=null?fmt(gu)+' por unidad · '+(g.vend>0?pctf(g.gan/g.vend):'')+' de lo vendido':'',g.gan<0?'#A6432F':'#2F7A47')}
+      ${tarj('📈 Ganancia sobre el costo',g.costo>0?pctf(g.gan/g.costo):'–',g.costo>0?`costó ${fmt(g.costo)} y ganaste ${fmt(g.gan)}`:'',g.gan<0?'#A6432F':'#2F7A47')}
     </div>
     <b style="font-size:.9rem;color:#3d1466;">¿A dónde va lo que vendiste?</b>
     <div style="margin:6px 0 14px;">${barra}</div>
