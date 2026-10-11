@@ -1590,7 +1590,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v216</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v217</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5681,8 +5681,11 @@ function aprovechamientoCorte(c, W){
 // Reemplaza el menu "Herramientas": dos bloques (para clientes / administracion interna) y un solo
 // nivel de opciones por icono. Ninguna funcion cambia, solo como se llega a cada una.
 const GRUPOS_INICIO = {
-  a: { lado: 'ext', titulo: 'Armar pedido', items: [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['📷 Escanear etiqueta (SKU)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto').click()"], ['🤖 Buscar por foto (IA)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto-producto').click()"]] },
-  c: { lado: 'ext', titulo: 'Difusión', titulosColumnas: ['Catálogo a clientes', 'Videos', 'Redes y anuncios'], columnas: [
+  a: { lado: 'ext', titulo: 'Armar pedido', titulosColumnas: ['1 · Elegir productos', '2 · Encontrar rápido'], columnas: [
+    [['📚 Catálogo', "irACatalogoDesdeInicio()"]],
+    [['📷 Escanear etiqueta (SKU)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto').click()"], ['🤖 Buscar por foto (IA)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto-producto').click()"]]
+  ] },
+  c: { lado: 'ext', titulo: 'Difusión', titulosColumnas: ['1 · Catálogo a clientes', '2 · Videos', '3 · Redes y anuncios'], columnas: [
     [['🔗 Compartir por rubro', 'abrirCompartirRubro()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()']],
     [['🎬 Crear video promocional', 'abrirCrearVideo()'], ['🎞️ Compartir video de producto', 'abrirCompartirVideoProducto()']],
     [['🖼️ Nuevo ingreso (flyers)', 'abrirNuevoIngreso()'], ['📣 Anuncios y promociones', 'abrirAnuncio()']],
@@ -5693,7 +5696,12 @@ const GRUPOS_INICIO = {
     [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']],
     [['💸 Gastos comerciales', 'abrirGastos()'], ['📈 Resultados Mercado Libre', 'abrirResultadosML()']]
   ] },
-  f: { lado: 'int', titulo: 'Catálogo', items: [['💲 Costos de reventa', 'abrirCostosReventa()'], ['🗂️ Ordenar categorías', 'abrirCategorias()'], ['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['📷 Fotos de productos', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
+  f: { lado: 'int', titulo: 'Catálogo', titulosColumnas: ['1 · Productos', '2 · Fotos y textos', '3 · Precios', '4 · Costos'], columnas: [
+    [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['🗂️ Ordenar categorías', 'abrirCategorias()']],
+    [['📷 Fotos de productos', 'abrirActualizarFoto()'], ['📝 Descripciones de reventa', 'abrirReventa()']],
+    [['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']],
+    [['💲 Costos de reventa', 'abrirCostosReventa()']]
+  ] },
   g: { lado: 'int', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas'], columnas: [
     [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()'], ['💰 Costos de confección', 'abrirConfeccion()']],
     [['📊 Stock y prioridades', 'abrirStock()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📋 Nueva orden de trabajo', 'abrirAsistenteOT()']],
@@ -5701,8 +5709,15 @@ const GRUPOS_INICIO = {
     [['📥 Entregas del taller', 'abrirIngresoTaller()']],
     [['📦 Historial de órdenes', 'abrirHistorialOT()'], ['🗂️ Historial de entregas', 'abrirHistorialEntregas()'], ['🔎 ¿Cuándo hice este SKU?', 'abrirHistorialSku()']],
   ] },
-  h: { lado: 'int', titulo: 'Finanzas', items: [['💰 Ventas Mercado Libre', 'abrirVentasML()'], ['🧮 Calculadora de costos', 'abrirCalculadoraCostos()']] },
-  i: { lado: 'int', titulo: 'Configuración', items: [['👥 Usuarios', 'abrirUsuarios()'], ['📖 Palabras de la app', 'abrirGlosario()'], ['📝 Listas y opciones', 'abrirListas()'], ['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['🔔 Avisos push', 'abrirConfigPush()'], ['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']] },
+  h: { lado: 'int', titulo: 'Finanzas', titulosColumnas: ['1 · Mercado Libre', '2 · Herramientas'], columnas: [
+    [['💰 Ventas Mercado Libre', 'abrirVentasML()']],
+    [['🧮 Calculadora de costos', 'abrirCalculadoraCostos()']]
+  ] },
+  i: { lado: 'int', titulo: 'Configuración', titulosColumnas: ['1 · Cuenta', '2 · Datos de la app', '3 · Pantallas anteriores'], columnas: [
+    [['👥 Usuarios', 'abrirUsuarios()'], ['🔔 Avisos push', 'abrirConfigPush()']],
+    [['📝 Listas y opciones', 'abrirListas()'], ['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['📖 Palabras de la app', 'abrirGlosario()']],
+    [['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']]
+  ] },
 };
 let grupoInicioAbierto = null;
 function irInicio(){
@@ -17823,7 +17838,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v216';
+const APP_VERSION = '2026-10-02-v217';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
