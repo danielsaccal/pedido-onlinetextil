@@ -1590,7 +1590,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v213</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v214</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2184,6 +2184,34 @@ a.grilla-celda{display:block;}
       </details>
       <div id="cr-lista"></div>
       <div id="cr-guardar" style="display:none;position:sticky;bottom:10px;z-index:5;margin-top:10px;"><button type="button" onclick="guardarCostosReventa()" style="width:100%;padding:12px;border:none;border-radius:12px;background:#3D9A5B;color:#fff;font-weight:700;font-size:0.95rem;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.15);">💾 Guardar</button></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-gastos">
+    <div class="form-card" style="max-width:900px;">
+      <h2>Gastos comerciales</h2>
+      <details id="gs-form" open style="border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px;background:#FBF9F4;">
+        <summary style="cursor:pointer;font-weight:800;color:var(--purple);" id="gs-form-tit">➕ Cargar un gasto</summary>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-top:10px;">
+          <div class="field" style="margin:0;"><label>Fecha</label><input type="date" id="gs-fecha"></div>
+          <div class="field" style="margin:0;"><label>Monto $</label><input id="gs-monto" inputmode="decimal" placeholder="Ej: 45.000"></div>
+          <div class="field" style="margin:0;"><label>Concepto</label><input id="gs-concepto" list="gs-conceptos" placeholder="Ej: Fletes"></div>
+          <div class="field" style="margin:0;"><label>Medio de pago</label><input id="gs-medio" list="gs-medios" placeholder="Ej: Transferencia"></div>
+          <div class="field" style="margin:0;grid-column:span 2;"><label>A quién le pagué</label><input id="gs-quien" list="gs-quienes" placeholder="Ej: Transporte Rápido"></div>
+          <div class="field" style="margin:0;grid-column:1/-1;"><label>Detalle (opcional)</label><input id="gs-nota" placeholder="Ej: envío a Corrientes, factura 0001-2345"></div>
+          <div class="field" style="margin:0;grid-column:1/-1;"><label>📎 Comprobante (foto o PDF, opcional)</label><input type="file" id="gs-comp" accept="image/*,application/pdf"></div>
+        </div>
+        <datalist id="gs-conceptos"></datalist><datalist id="gs-medios"></datalist><datalist id="gs-quienes"></datalist>
+        <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="guardarGasto()" id="gs-btn">💾 Guardar gasto</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;display:none;" id="gs-cancelar" onclick="limpiarGasto()">Cancelar</button></div>
+      </details>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <select id="gs-mes" onchange="renderGastos()" style="padding:9px;border:1px solid var(--line);border-radius:10px;"></select>
+        <select id="gs-fconc" onchange="renderGastos()" style="padding:9px;border:1px solid var(--line);border-radius:10px;"></select>
+        <input id="gs-buscar" placeholder="🔍 Buscar" oninput="renderGastos()" style="flex:1;min-width:150px;padding:9px;border:1px solid var(--line);border-radius:10px;">
+      </div>
+      <div id="gs-resumen"></div>
+      <div id="gs-lista"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
   </div>
@@ -5658,7 +5686,7 @@ const GRUPOS_INICIO = {
     [['🎬 Crear video promocional', 'abrirCrearVideo()'], ['🎞️ Compartir video de producto', 'abrirCompartirVideoProducto()']],
     [['🖼️ Nuevo ingreso (flyers)', 'abrirNuevoIngreso()'], ['📣 Anuncios y promociones', 'abrirAnuncio()']],
   ] },
-  d: { lado: 'int', titulo: 'Ventas', items: [['📋 Historial de pedidos', 'abrirHistorial()'], ['🤖 Pedido con IA (texto libre)', 'abrirPedidoIA()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()'], ['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']] },
+  d: { lado: 'int', titulo: 'Ventas', items: [['📋 Historial de pedidos', 'abrirHistorial()'], ['🤖 Pedido con IA (texto libre)', 'abrirPedidoIA()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()'], ['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()'], ['💸 Gastos comerciales', 'abrirGastos()']] },
   f: { lado: 'int', titulo: 'Catálogo', items: [['💲 Costos de reventa', 'abrirCostosReventa()'], ['🗂️ Ordenar categorías', 'abrirCategorias()'], ['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['📷 Fotos de productos', 'abrirActualizarFoto()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']] },
   g: { lado: 'int', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas'], columnas: [
     [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()'], ['💰 Costos de confección', 'abrirConfeccion()']],
@@ -10129,6 +10157,89 @@ function sugerirKits(){
   document.getElementById('cr-kits-sug').innerHTML = sug.length ? `<p class="note" style="text-align:left;margin:8px 0 4px;">Posibles juegos (revisá que sean correctos):</p>` + sug.slice(0, 40).map(([k, c], i) => `<div style="display:flex;gap:8px;align-items:center;font-size:0.85rem;padding:3px 0;"><span style="flex:1;"><b>${escaparHtml(k)}</b> = ${escaparHtml(c)}</span><button type="button" class="btn-mini" onclick="usarSugKit(${i})">Usar</button></div>`).join('') : '<p class="note" style="margin:6px 0;">No encontré juegos para sugerir.</p>';
 }
 async function usarSugKit(i){ const [k, c] = window.__kitSug[i]; kitsDatos[k] = c; window.__kitSug.splice(i, 1); try{ await guardarKits(); sugerirKits(); } catch(e){ alert('No se pudo guardar: ' + e.message); } }
+
+// ===== Gastos comerciales (coleccion "gastos") =====
+let gastos = null, gastoEditando = null;
+const CONCEPTOS_BASE = ['Fletes', 'Insumos', 'Mercadería', 'Servicios', 'Alquiler', 'Sueldos', 'Impuestos', 'Publicidad', 'Mantenimiento', 'Otros'];
+const MEDIOS_BASE = ['Efectivo', 'Transferencia', 'Mercado Pago', 'Tarjeta de débito', 'Tarjeta de crédito', 'Cheque'];
+async function cargarGastos(){ const s = await db.collection('gastos').get(); gastos = s.docs.map(d => ({ _id: d.id, ...d.data() })).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))); }
+async function abrirGastos(){
+  mostrarPaso('step-gastos');
+  document.getElementById('gs-lista').innerHTML = '<p class="empty-msg">Cargando…</p>';
+  try{ await cargarGastos(); } catch(e){ document.getElementById('gs-lista').innerHTML = '<p class="empty-msg">No se pudo cargar: ' + escaparHtml(e.message) + '</p>'; return; }
+  limpiarGasto();
+  const meses = [...new Set(gastos.map(g => String(g.fecha).slice(0, 7)))].sort().reverse();
+  const hoyM = new Date().toISOString().slice(0, 7); if(!meses.includes(hoyM)) meses.unshift(hoyM);
+  document.getElementById('gs-mes').innerHTML = meses.map(m => `<option value="${m}">${new Date(m + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</option>`).join('') + '<option value="">Todos los meses</option>';
+  renderGastos();
+}
+function listasGastos(){
+  const u = (k, base) => [...new Set([...base, ...(gastos || []).map(g => g[k]).filter(Boolean)])].sort((a, b) => a.localeCompare(b, 'es'));
+  document.getElementById('gs-conceptos').innerHTML = u('concepto', CONCEPTOS_BASE).map(x => `<option value="${escapeAttr(x)}">`).join('');
+  document.getElementById('gs-medios').innerHTML = u('medio', MEDIOS_BASE).map(x => `<option value="${escapeAttr(x)}">`).join('');
+  document.getElementById('gs-quienes').innerHTML = u('quien', []).map(x => `<option value="${escapeAttr(x)}">`).join('');
+  const fc = document.getElementById('gs-fconc'), v = fc.value;
+  fc.innerHTML = '<option value="">Todos los conceptos</option>' + u('concepto', []).map(x => `<option ${x === v ? 'selected' : ''}>${escaparHtml(x)}</option>`).join('');
+}
+function limpiarGasto(){
+  gastoEditando = null;
+  document.getElementById('gs-fecha').value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  ['gs-monto', 'gs-concepto', 'gs-medio', 'gs-quien', 'gs-nota', 'gs-comp'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('gs-form-tit').textContent = '➕ Cargar un gasto';
+  document.getElementById('gs-btn').textContent = '💾 Guardar gasto';
+  document.getElementById('gs-cancelar').style.display = 'none';
+  listasGastos();
+}
+function leerComprobante(file){
+  if(!file) return Promise.resolve(null);
+  if(/^image\//.test(file.type)) return fotoRemito(file).then(d => ({ tipo: 'imagen', data: d, nombre: file.name }));
+  return new Promise((res, rej) => { if(file.size > 700000){ rej(new Error('El PDF es muy grande (máximo 700 KB). Sacale una foto o comprimilo.')); return; } const r = new FileReader(); r.onload = () => res({ tipo: 'pdf', data: r.result, nombre: file.name }); r.onerror = rej; r.readAsDataURL(file); });
+}
+async function guardarGasto(){
+  const g = { fecha: document.getElementById('gs-fecha').value, monto: numAr(document.getElementById('gs-monto').value), concepto: document.getElementById('gs-concepto').value.trim(), medio: document.getElementById('gs-medio').value.trim(), quien: document.getElementById('gs-quien').value.trim(), nota: document.getElementById('gs-nota').value.trim() };
+  if(!g.fecha || !(g.monto > 0) || !g.concepto){ alert('Completá fecha, monto y concepto.'); return; }
+  const btn = document.getElementById('gs-btn'); btn.disabled = true; btn.textContent = 'Guardando…';
+  try{
+    const comp = await leerComprobante(document.getElementById('gs-comp').files[0]);
+    if(comp) g.comprobante = comp;
+    g.actualizado = new Date().toISOString(); g.cargadoPor = (usuarioActual && usuarioActual.email) || '';
+    if(gastoEditando) await db.collection('gastos').doc(gastoEditando).set(g, { merge: true });
+    else { g.creado = new Date().toISOString(); await db.collection('gastos').add(g); }
+    await cargarGastos(); limpiarGasto(); renderGastos();
+  } catch(e){ alert('No se pudo guardar: ' + e.message); }
+  btn.disabled = false; if(!gastoEditando) btn.textContent = '💾 Guardar gasto';
+}
+function editarGasto(id){
+  const g = gastos.find(x => x._id === id); if(!g) return;
+  gastoEditando = id;
+  document.getElementById('gs-fecha').value = g.fecha; document.getElementById('gs-monto').value = String(g.monto).replace('.', ',');
+  document.getElementById('gs-concepto').value = g.concepto || ''; document.getElementById('gs-medio').value = g.medio || ''; document.getElementById('gs-quien').value = g.quien || ''; document.getElementById('gs-nota').value = g.nota || '';
+  document.getElementById('gs-form').open = true; document.getElementById('gs-form-tit').textContent = '✏️ Editar gasto'; document.getElementById('gs-btn').textContent = '💾 Guardar cambios'; document.getElementById('gs-cancelar').style.display = 'inline-block';
+  document.getElementById('gs-form').scrollIntoView({ behavior: 'smooth' });
+}
+async function borrarGasto(id){
+  if(!confirm('¿Borrar este gasto?')) return;
+  try{ await db.collection('gastos').doc(id).delete(); gastos = gastos.filter(g => g._id !== id); renderGastos(); } catch(e){ alert('No se pudo borrar: ' + e.message); }
+}
+function verComprobante(id){
+  const g = gastos.find(x => x._id === id); if(!g || !g.comprobante) return;
+  if(g.comprobante.tipo === 'imagen'){ verImagenGrandeAC(g.comprobante.data); return; }
+  const w = window.open(); if(w) w.document.write(`<iframe src="${g.comprobante.data}" style="border:none;width:100%;height:100vh;"></iframe>`);
+}
+function renderGastos(){
+  const mes = document.getElementById('gs-mes').value, fc = document.getElementById('gs-fconc').value, q = normBusqueda(document.getElementById('gs-buscar').value);
+  const L = (gastos || []).filter(g => (!mes || String(g.fecha).startsWith(mes)) && (!fc || g.concepto === fc) && (!q || normBusqueda([g.concepto, g.medio, g.quien, g.nota].join(' ')).includes(q)));
+  const tot = L.reduce((a, g) => a + (+g.monto || 0), 0), por = {};
+  L.forEach(g => { por[g.concepto] = (por[g.concepto] || 0) + (+g.monto || 0); });
+  const max = Math.max(1, ...Object.values(por));
+  document.getElementById('gs-resumen').innerHTML = L.length ? `<div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;"><b>Total</b><b style="font-size:1.3rem;color:#A6432F;">${formatPrice(tot)}</b></div>
+    ${Object.entries(por).sort((a, b) => b[1] - a[1]).map(([c, v]) => `<div style="display:grid;grid-template-columns:120px 1fr 110px;gap:8px;align-items:center;font-size:.85rem;margin-top:6px;"><span>${escaparHtml(c)}</span><div style="height:8px;background:#EEE9F3;border-radius:6px;overflow:hidden;"><div style="width:${Math.round(v / max * 100)}%;height:100%;background:#D97A3A;"></div></div><span style="text-align:right;">${formatPrice(v)} <small class="meta">${Math.round(v / tot * 100)} %</small></span></div>`).join('')}</div>` : '';
+  document.getElementById('gs-lista').innerHTML = L.length ? L.map(g => `<div style="display:grid;grid-template-columns:86px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:12px;margin-bottom:6px;background:#fff;">
+      <span style="font-size:.82rem;color:#6B6258;">${new Date(g.fecha + 'T12:00:00').toLocaleDateString('es-AR')}</span>
+      <div><b>${escaparHtml(g.concepto || '')}</b> <span class="meta">· ${escaparHtml(g.quien || '')}</span><div style="font-size:.78rem;color:#8A8072;">${escaparHtml(g.medio || '')}${g.nota ? ' · ' + escaparHtml(g.nota) : ''}</div></div>
+      <div style="text-align:right;white-space:nowrap;"><b>${formatPrice(+g.monto || 0)}</b><div style="display:flex;gap:4px;justify-content:flex-end;margin-top:4px;">${g.comprobante ? `<button type="button" class="btn-mini" onclick="verComprobante('${g._id}')" title="Ver comprobante">📎</button>` : ''}<button type="button" class="btn-mini" onclick="editarGasto('${g._id}')">✏️</button><button type="button" class="btn-mini" onclick="borrarGasto('${g._id}')">🗑️</button></div></div></div>`).join('') : '<p class="empty-msg">No hay gastos con este filtro.</p>';
+}
 
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
@@ -17703,7 +17814,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v213';
+const APP_VERSION = '2026-10-02-v214';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
