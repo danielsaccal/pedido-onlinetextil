@@ -1590,7 +1590,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v214</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v215</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2201,6 +2201,7 @@ a.grilla-celda{display:block;}
           <div class="field" style="margin:0;grid-column:span 2;"><label>A quién le pagué</label><input id="gs-quien" list="gs-quienes" placeholder="Ej: Transporte Rápido"></div>
           <div class="field" style="margin:0;grid-column:1/-1;"><label>Detalle (opcional)</label><input id="gs-nota" placeholder="Ej: envío a Corrientes, factura 0001-2345"></div>
           <div class="field" style="margin:0;grid-column:1/-1;"><label>📎 Comprobante (foto o PDF, opcional)</label><input type="file" id="gs-comp" accept="image/*,application/pdf"></div>
+          <label style="grid-column:1/-1;display:flex;gap:8px;align-items:flex-start;font-size:.85rem;background:#EEE8F7;border-radius:10px;padding:8px 10px;"><input type="checkbox" id="gs-enml" style="margin-top:3px;"> <span><b>Ya está descontado en Resultados ML</b> (ej: pago a cadetes Flex). Se registra igual, pero no se vuelve a restar en los totales para no contarlo dos veces.</span></label>
         </div>
         <datalist id="gs-conceptos"></datalist><datalist id="gs-medios"></datalist><datalist id="gs-quienes"></datalist>
         <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="guardarGasto()" id="gs-btn">💾 Guardar gasto</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;display:none;" id="gs-cancelar" onclick="limpiarGasto()">Cancelar</button></div>
@@ -10160,7 +10161,7 @@ async function usarSugKit(i){ const [k, c] = window.__kitSug[i]; kitsDatos[k] = 
 
 // ===== Gastos comerciales (coleccion "gastos") =====
 let gastos = null, gastoEditando = null;
-const CONCEPTOS_BASE = ['Fletes', 'Insumos', 'Mercadería', 'Servicios', 'Alquiler', 'Sueldos', 'Impuestos', 'Publicidad', 'Mantenimiento', 'Otros'];
+const CONCEPTOS_BASE = ['Cadetes Flex', 'Fletes', 'Insumos', 'Mercadería', 'Servicios', 'Alquiler', 'Sueldos', 'Impuestos', 'Publicidad', 'Mantenimiento', 'Otros'];
 const MEDIOS_BASE = ['Efectivo', 'Transferencia', 'Mercado Pago', 'Tarjeta de débito', 'Tarjeta de crédito', 'Cheque'];
 async function cargarGastos(){ const s = await db.collection('gastos').get(); gastos = s.docs.map(d => ({ _id: d.id, ...d.data() })).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))); }
 async function abrirGastos(){
@@ -10181,8 +10182,10 @@ function listasGastos(){
   const fc = document.getElementById('gs-fconc'), v = fc.value;
   fc.innerHTML = '<option value="">Todos los conceptos</option>' + u('concepto', []).map(x => `<option ${x === v ? 'selected' : ''}>${escaparHtml(x)}</option>`).join('');
 }
+document.addEventListener('input', e => { if(e.target && e.target.id === 'gs-concepto'){ const c = document.getElementById('gs-enml'); if(c && /cadete|flex/i.test(e.target.value)) c.checked = true; } });
 function limpiarGasto(){
   gastoEditando = null;
+  { const c = document.getElementById('gs-enml'); if(c) c.checked = false; }
   document.getElementById('gs-fecha').value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   ['gs-monto', 'gs-concepto', 'gs-medio', 'gs-quien', 'gs-nota', 'gs-comp'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('gs-form-tit').textContent = '➕ Cargar un gasto';
@@ -10196,7 +10199,7 @@ function leerComprobante(file){
   return new Promise((res, rej) => { if(file.size > 700000){ rej(new Error('El PDF es muy grande (máximo 700 KB). Sacale una foto o comprimilo.')); return; } const r = new FileReader(); r.onload = () => res({ tipo: 'pdf', data: r.result, nombre: file.name }); r.onerror = rej; r.readAsDataURL(file); });
 }
 async function guardarGasto(){
-  const g = { fecha: document.getElementById('gs-fecha').value, monto: numAr(document.getElementById('gs-monto').value), concepto: document.getElementById('gs-concepto').value.trim(), medio: document.getElementById('gs-medio').value.trim(), quien: document.getElementById('gs-quien').value.trim(), nota: document.getElementById('gs-nota').value.trim() };
+  const g = { fecha: document.getElementById('gs-fecha').value, monto: numAr(document.getElementById('gs-monto').value), concepto: document.getElementById('gs-concepto').value.trim(), medio: document.getElementById('gs-medio').value.trim(), quien: document.getElementById('gs-quien').value.trim(), nota: document.getElementById('gs-nota').value.trim(), enML: document.getElementById('gs-enml').checked };
   if(!g.fecha || !(g.monto > 0) || !g.concepto){ alert('Completá fecha, monto y concepto.'); return; }
   const btn = document.getElementById('gs-btn'); btn.disabled = true; btn.textContent = 'Guardando…';
   try{
@@ -10213,7 +10216,7 @@ function editarGasto(id){
   const g = gastos.find(x => x._id === id); if(!g) return;
   gastoEditando = id;
   document.getElementById('gs-fecha').value = g.fecha; document.getElementById('gs-monto').value = String(g.monto).replace('.', ',');
-  document.getElementById('gs-concepto').value = g.concepto || ''; document.getElementById('gs-medio').value = g.medio || ''; document.getElementById('gs-quien').value = g.quien || ''; document.getElementById('gs-nota').value = g.nota || '';
+  document.getElementById('gs-concepto').value = g.concepto || ''; document.getElementById('gs-medio').value = g.medio || ''; document.getElementById('gs-quien').value = g.quien || ''; document.getElementById('gs-nota').value = g.nota || ''; document.getElementById('gs-enml').checked = !!g.enML;
   document.getElementById('gs-form').open = true; document.getElementById('gs-form-tit').textContent = '✏️ Editar gasto'; document.getElementById('gs-btn').textContent = '💾 Guardar cambios'; document.getElementById('gs-cancelar').style.display = 'inline-block';
   document.getElementById('gs-form').scrollIntoView({ behavior: 'smooth' });
 }
@@ -10229,15 +10232,16 @@ function verComprobante(id){
 function renderGastos(){
   const mes = document.getElementById('gs-mes').value, fc = document.getElementById('gs-fconc').value, q = normBusqueda(document.getElementById('gs-buscar').value);
   const L = (gastos || []).filter(g => (!mes || String(g.fecha).startsWith(mes)) && (!fc || g.concepto === fc) && (!q || normBusqueda([g.concepto, g.medio, g.quien, g.nota].join(' ')).includes(q)));
-  const tot = L.reduce((a, g) => a + (+g.monto || 0), 0), por = {};
-  L.forEach(g => { por[g.concepto] = (por[g.concepto] || 0) + (+g.monto || 0); });
+  const tot = L.filter(g => !g.enML).reduce((a, g) => a + (+g.monto || 0), 0), totML = L.filter(g => g.enML).reduce((a, g) => a + (+g.monto || 0), 0), por = {};
+  L.filter(g => !g.enML).forEach(g => { por[g.concepto] = (por[g.concepto] || 0) + (+g.monto || 0); });
   const max = Math.max(1, ...Object.values(por));
   document.getElementById('gs-resumen').innerHTML = L.length ? `<div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px;">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;"><b>Total</b><b style="font-size:1.3rem;color:#A6432F;">${formatPrice(tot)}</b></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;"><b>Total de gastos</b><b style="font-size:1.3rem;color:#A6432F;">${formatPrice(tot)}</b></div>
+    ${totML ? `<div style="font-size:.82rem;color:#5b2a86;margin-top:2px;">+ ${formatPrice(totML)} ya descontados en Resultados ML (cadetes Flex): no se suman acá.</div>` : ''}
     ${Object.entries(por).sort((a, b) => b[1] - a[1]).map(([c, v]) => `<div style="display:grid;grid-template-columns:120px 1fr 110px;gap:8px;align-items:center;font-size:.85rem;margin-top:6px;"><span>${escaparHtml(c)}</span><div style="height:8px;background:#EEE9F3;border-radius:6px;overflow:hidden;"><div style="width:${Math.round(v / max * 100)}%;height:100%;background:#D97A3A;"></div></div><span style="text-align:right;">${formatPrice(v)} <small class="meta">${Math.round(v / tot * 100)} %</small></span></div>`).join('')}</div>` : '';
   document.getElementById('gs-lista').innerHTML = L.length ? L.map(g => `<div style="display:grid;grid-template-columns:86px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:12px;margin-bottom:6px;background:#fff;">
       <span style="font-size:.82rem;color:#6B6258;">${new Date(g.fecha + 'T12:00:00').toLocaleDateString('es-AR')}</span>
-      <div><b>${escaparHtml(g.concepto || '')}</b> <span class="meta">· ${escaparHtml(g.quien || '')}</span><div style="font-size:.78rem;color:#8A8072;">${escaparHtml(g.medio || '')}${g.nota ? ' · ' + escaparHtml(g.nota) : ''}</div></div>
+      <div><b>${escaparHtml(g.concepto || '')}</b> <span class="meta">· ${escaparHtml(g.quien || '')}</span>${g.enML ? ' <span style="font-size:.7rem;background:#EEE8F7;color:#5b2a86;border-radius:999px;padding:1px 7px;">ya en Resultados ML</span>' : ''}<div style="font-size:.78rem;color:#8A8072;">${escaparHtml(g.medio || '')}${g.nota ? ' · ' + escaparHtml(g.nota) : ''}</div></div>
       <div style="text-align:right;white-space:nowrap;"><b>${formatPrice(+g.monto || 0)}</b><div style="display:flex;gap:4px;justify-content:flex-end;margin-top:4px;">${g.comprobante ? `<button type="button" class="btn-mini" onclick="verComprobante('${g._id}')" title="Ver comprobante">📎</button>` : ''}<button type="button" class="btn-mini" onclick="editarGasto('${g._id}')">✏️</button><button type="button" class="btn-mini" onclick="borrarGasto('${g._id}')">🗑️</button></div></div></div>`).join('') : '<p class="empty-msg">No hay gastos con este filtro.</p>';
 }
 
@@ -17814,7 +17818,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v214';
+const APP_VERSION = '2026-10-02-v215';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
