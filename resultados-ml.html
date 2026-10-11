@@ -924,6 +924,24 @@ function renderSkuSum(r){
         ${cc.length<vs.length?`<p class="inc">Sobre ${cc.length} de ${vs.length} ventas (las que tienen costo).</p>`:''}`;})()}
     <p class="inc">Acreditado por ML, antes del cadete: ${fmt(S('acred'))}${U?' · '+pu(S('acred'))+' por unidad':''}</p>`;
 }
+// ===== Parametros de Mercado Libre para el precio sugerido de la app (config/ml_parametros) =====
+function guardarParametrosML(){
+  try{
+    const vs=allRows().filter(o=>o.tipo==='Venta'&&o.pcd>0&&!o.excl);
+    if(vs.length<30)return;
+    const grupo=t=>vs.filter(o=>/premium/i.test(t)?/premium/i.test(o.pubT||''):!/premium/i.test(o.pubT||''));
+    const pct=(arr,f)=>{const P=arr.reduce((a,o)=>a+o.pcd,0);return P>0?-arr.reduce((a,o)=>a+(f(o)||0),0)/P:0;};
+    const cl=grupo('clasica'), pr=grupo('premium');
+    const conFijo=vs.filter(o=>o.unidad<0&&o.unid>0);
+    const porU=conFijo.map(o=>-o.unidad/o.unid).sort((a,b)=>a-b), med=porU.length?porU[Math.floor(porU.length/2)]:0;
+    const hasta=conFijo.length?Math.max(...conFijo.map(o=>o.pcd/o.unid)):0;
+    const envio=-vs.reduce((a,o)=>a+(o.envio||0)+(o.cad||0)+(o.ajEnv||0),0)/vs.length;
+    const P={clasica:{com:pct(cl,o=>o.vender)},premium:{com:pct(pr,o=>o.vender),cuotas:pct(pr,o=>o.cuotas)},
+      retenciones:pct(vs,o=>o.ret),fijo:{monto:Math.round(med),hasta:Math.round(hasta)},envioPorVenta:Math.max(0,Math.round(envio)),ventas:vs.length,actualizado:new Date().toISOString()};
+    if(!cl.length)P.clasica.com=P.premium.com;
+    db.collection('config').doc('ml_parametros').set(JSON.parse(JSON.stringify(P))).catch(()=>{});
+  }catch(e){console.error(e);}
+}
 // ===== Equivalencias de SKU: codigo mal puesto en ML -> codigo de la app (config/ml_equivalencias: { m: { ML: 'APP' | 'APP x N' } }) =====
 let EQ={};
 async function cargarEquivalencias(){try{const d=await db.collection('config').doc('ml_equivalencias').get();EQ=d.exists?(d.data().m||{}):{};}catch(e){EQ={};}
@@ -1434,6 +1452,7 @@ firebase.auth().onAuthStateChanged(async u=>{
   await load();
   $('cargando').hidden=true;
   render();
+  setTimeout(guardarParametrosML,1500);
 });
 </script>
 </body>
