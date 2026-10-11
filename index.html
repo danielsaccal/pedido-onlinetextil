@@ -1590,7 +1590,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v231</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v232</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1690,7 +1690,8 @@ a.grilla-celda{display:block;}
             <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;">
               <strong id="ac-titulo" style="font-size:1.05rem;"></strong>
               <span style="display:flex;gap:6px;">
-                <button type="button" class="btn-mini" onclick="renombrarAC()" title="Renombrar">✏️</button>
+                <button type="button" class="btn-mini" onclick="const d=document.getElementById('ac-mas'); d.open=true; d.scrollIntoView({behavior:'smooth', block:'start'});" title="Editar piezas, anchos, confección y empaque">✏️</button>
+                <button type="button" class="btn-mini" onclick="renombrarAC()" title="Cambiar el nombre">🔤</button>
                 <button type="button" class="btn-mini" onclick="unirArticuloAbiertoAC()" title="Unir con otro artículo">🔀</button>
                 <button type="button" class="btn-mini" onclick="borrarAC()" title="Borrar">🗑️</button>
               </span>
@@ -4750,7 +4751,7 @@ function abrirArticuloAC(a, piezasForzadas){
   if(a !== acArticulo){ if(empaquePendiente) cargarTablaConsumo(); limpiarEmpaquePendiente(); }
   acArticulo = a;
   empaqueOriginalAC = JSON.parse(JSON.stringify(((tablaConsumo && tablaConsumo.empaque) || {})[a] || {}));
-  setTimeout(() => { const d = document.getElementById('ac-mas'); if(d) d.open = !juegosDePiezasAC(a).length; const r = document.getElementById('ac-resumen'); if(r && !juegosDePiezasAC(a).length) r.innerHTML = '<p class="note" style="text-align:left;">Este artículo todavía no tiene piezas: cárguelas en "Ver más".</p>'; }, 0);
+  setTimeout(() => { const d = document.getElementById('ac-mas'); if(d) d.open = true; const r = document.getElementById('ac-resumen'); if(r && !juegosDePiezasAC(a).length) r.innerHTML = '<p class="note" style="text-align:left;">Este artículo todavía no tiene piezas: cárguelas en "Ver más".</p>'; }, 0);
   acAnchoVista = null;
   renderListaAC();
   const grupos = juegosDePiezasAC(a);
@@ -18014,7 +18015,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v231';
+const APP_VERSION = '2026-10-02-v232';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
