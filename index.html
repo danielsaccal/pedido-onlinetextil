@@ -1590,7 +1590,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v221</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v222</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -10367,7 +10367,7 @@ function renderFacturasNuevas(){
     `<div style="border:2px solid ${fa.yaEsta ? '#E3B8AE' : 'var(--gold)'};border-radius:14px;padding:12px;margin-bottom:10px;background:#fff;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;"><b style="flex:1;">Factura ${escaparHtml(fa.tipo)} ${escaparHtml(fa.numero)} · ${escaparHtml(fa.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(fa.cliente)}</span></div>
       ${fa.items.length ? tablaFactura(fa, true) : '<p class="note">No encontré renglones en esta factura.</p>'}
-      ${fa.yaEsta ? '<p class="note" style="color:#A6432F;text-align:left;">Esta factura ya está guardada.</p>' : (fa.items.length ? `<button class="btn btn-gold" style="margin-top:8px;" onclick="guardarFactura(${i})">💾 Guardar esta factura</button>` : '')}
+      ${fa.yaEsta ? `<p class="note" style="color:#A6432F;text-align:left;">Esta factura ya está guardada. <a href="#" onclick="event.preventDefault();borrarFactura('${escapeAttr(String(fa.numero).replace(/\//g, '-'))}')">🗑️ Quitarla de la app</a></p>` : (fa.items.length ? `<button class="btn btn-gold" style="margin-top:8px;" onclick="guardarFactura(${i})">💾 Guardar esta factura</button>` : '')}
     </div>`).join('');
 }
 async function equivFactura(cod, v){
@@ -10383,7 +10383,11 @@ async function guardarFactura(i){
   try{ await db.collection('ventas_facturadas').doc(String(fa.numero).replace(/\//g, '-') || undefined).set(doc); fa.yaEsta = true; (facturas = facturas || []).push(doc); renderFacturasNuevas(); renderFacturas(); }
   catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
-async function borrarFactura(id){ if(!confirm('¿Borrar esta factura de la app? (en TFactura no se toca)')) return; await db.collection('ventas_facturadas').doc(id).delete(); facturas = facturas.filter(f => (f._id || f.numero) !== id); renderFacturas(); }
+async function borrarFactura(id){ if(!confirm('¿Quitar esta factura de la app? (en TFactura no se toca)')) return;
+  try{ await db.collection('ventas_facturadas').doc(id).delete(); } catch(e){ alert('No se pudo borrar: ' + e.message); return; }
+  facturas = facturas.filter(f => (f._id || String(f.numero).replace(/\//g, '-')) !== id);
+  facturasNuevas.forEach(fa => { if(String(fa.numero).replace(/\//g, '-') === id) fa.yaEsta = false; });
+  renderFacturasNuevas(); renderFacturas(); }
 function renderFacturas(){
   const mes = document.getElementById('fc-mes').value;
   const L = (facturas || []).filter(f => !mes || (f.fecha || '').split('/').reverse().slice(0, 2).join('-') === mes).sort((a, b) => String(b.fecha).split('/').reverse().join('').localeCompare(String(a.fecha).split('/').reverse().join('')));
@@ -10392,7 +10396,7 @@ function renderFacturas(){
     <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;"><small class="note">Facturado sin IVA</small><div style="font-weight:800;font-size:1.2rem;">${formatPrice(N)}</div></div>
     <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;"><small class="note">Costo</small><div style="font-weight:800;font-size:1.2rem;color:#D97A3A;">${formatPrice(C)}</div></div>
     <div style="background:${N - C < 0 ? '#FDEBE7' : '#EEF6F0'};border-radius:12px;padding:10px;"><small class="note">Ganancia</small><div style="font-weight:800;font-size:1.2rem;color:${N - C < 0 ? '#A6432F' : '#2F7A47'};">${formatPrice(N - C)}</div><small class="note">${C > 0 ? Math.round((N - C) / C * 100) + ' % sobre el costo' : ''}</small></div></div>` : '';
-  document.getElementById('fc-lista').innerHTML = L.length ? L.map(f => `<details style="border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:6px;background:#fff;"><summary style="cursor:pointer;display:flex;gap:8px;flex-wrap:wrap;"><b style="flex:1;">${escaparHtml(f.tipo || '')} ${escaparHtml(f.numero)} · ${escaparHtml(f.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(f.cliente || '')}</span></summary>${tablaFactura(f, true)}<button class="btn-mini" style="margin-top:6px;" onclick="borrarFactura('${escapeAttr(f._id || f.numero)}')">🗑️ Quitar de la app</button></details>`).join('') : '<p class="empty-msg">Todavía no guardaste facturas.</p>';
+  document.getElementById('fc-lista').innerHTML = L.length ? L.map(f => `<details style="border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:6px;background:#fff;"><summary style="cursor:pointer;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><b style="flex:1;">▸ ${escaparHtml(f.tipo || '')} ${escaparHtml(f.numero)} · ${escaparHtml(f.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(f.cliente || '')}</span><b style="font-size:.9rem;">${formatPrice(f.neto || 0)}</b><button type="button" class="btn-mini" title="Quitar de la app" onclick="event.preventDefault();event.stopPropagation();borrarFactura('${escapeAttr(f._id || f.numero)}')">🗑️</button></summary>${tablaFactura(f, true)}</details>`).join('') : '<p class="empty-msg">Todavía no guardaste facturas.</p>';
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -17968,7 +17972,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v221';
+const APP_VERSION = '2026-10-02-v222';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
