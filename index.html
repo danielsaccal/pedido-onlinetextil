@@ -1590,7 +1590,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v230</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v231</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -10300,8 +10300,16 @@ async function lineasPDF(file){
     tc.items.forEach(it => { if(!it.str.trim()) return; const y = Math.round(it.transform[5] / 3) * 3; (F[y] = F[y] || []).push([it.transform[4], it.str]); });
     paginas.push(Object.keys(F).map(Number).sort((a, b) => b - a).map(y => F[y].sort((a, b) => a[0] - b[0]).map(x => x[1]).join(' ').replace(/\s+/g, ' ').trim()));
   }
-  const orig = paginas.filter(p => !p.some(l => /^(DUPLICADO|TRIPLICADO)$/i.test(l.trim()) || /\bDUPLICADO\b|\bTRIPLICADO\b/.test(l)));
-  return (orig.length ? orig : paginas.slice(0, 1)).flat();
+  // solo las hojas ORIGINALES: con "Hoja X de N" se toman las primeras N (después vienen el duplicado, triplicado…)
+  // cada hoja dice ORIGINAL / DUPLICADO / TRIPLICADO; las hojas sin rótulo siguen a la anterior
+  const copiaDe = p => { for(const l of p){ const m = l.match(/\b(ORIGINAL|DUPLICADO|TRIPLICADO|CUADRUPLICADO)\b/i); if(m) return m[1].toUpperCase(); } return null; };
+  let actual = null, hayRotulos = false; const copias = paginas.map(p => { const c = copiaDe(p); if(c){ actual = c; hayRotulos = true; } return actual; });
+  let orig = hayRotulos ? paginas.filter((p, i) => copias[i] === 'ORIGINAL' || copias[i] === null) : paginas;
+  if(!orig.length) orig = paginas.slice(0, 1);
+  lineasPDF.hojas = { total: paginas.length, originales: orig.length };
+  // cada hoja por separado (para no confundir el renglón de "transporte" de la hoja siguiente)
+  lineasPDF.porHoja = orig;
+  return orig.flat();
 }
 function parsearFactura(L, nombreArchivo){
   const txt = L.join('\n');
@@ -10314,22 +10322,33 @@ function parsearFactura(L, nombreArchivo){
   // total: "Total: $ X"; si no esta, el primer importe con $ del encabezado
   const total = numAR(m(/Total:\s*\$?\s*([\d.,]+)/) || m(/\$\s*([\d.]+,\d{2})/));
   const iCab = L.findIndex(l => /C[óo]digo.*Producto.*Cantidad/i.test(l));
+  const subtotal = numAR(m(/Subtotal\s*\$?\s*([\d.]+,\d{2})/i));
   // cliente: la linea anterior a la direccion, despues de los datos del emisor
   const iCli = L.findIndex(l => /Condici[óo]n de venta/i.test(l));
   let cliente = iCli >= 0 ? L[iCli].replace(/Condici[óo]n de venta.*$/i, '').replace(/^mostrador\s*-\s*/i, '').trim() : '';
   if(!cliente){ const iC = L.findIndex(l => /C\.?U\.?I\.?T\.?\s*:/i.test(l) && /consumidor|responsable|monotributo|exento/i.test(l));
     for(let k = iC - 1; k >= Math.max(0, iC - 4); k--){ const x = L[k].replace(/(Cuenta corriente|Contado.*|\$\s*[\d.,]+|\d{2}\/\d{2}\/\d{4})/gi, '').trim(); if(x && /[a-z]/i.test(x) && !/\(\d{4}\)|\d{3,}\s*-/.test(x)){ cliente = x.replace(/^[^-]+-\s*/, '').trim() || x; break; } } }
-  const items = [], vistos = new Set();
-  for(let i = iCab >= 0 ? iCab + 1 : 0; i < L.length; i++){
-    const l = L[i]; if(iCab >= 0 && /^(Recibimos|Impuesto|Subtotal|Observaciones)/i.test(l)) break;
-    const r = l.match(/^([A-Z0-9][A-Z0-9.\-\/]{1,})\s+(.+?)\s+([\d.]+,\d+)\s+([\d.]+,\d+)\s+([\d.]+,\d+)\s+([\d.]+,\d+)\s+([\d.]+,\d+)$/i);
-    if(!r) continue;
-    const it = { codigo: r[1].toUpperCase(), desc: r[2], cant: numAR(r[3]), precio: numAR(r[4]), bonif: numAR(r[5]), importe: numAR(r[7]) };
-    const k = it.codigo + '|' + it.cant + '|' + it.importe; if(vistos.has(k)) continue; vistos.add(k); items.push(it);
-  }
+  const items = [];
+  const hojas = lineasPDF.porHoja && lineasPDF.porHoja.length ? lineasPDF.porHoja : [L];
+  const reIt = /^([A-Z0-9][A-Z0-9.\-\/]{1,})\s+(.+?)\s+([\d.]+,\d+)\s+([\d.]+,\d+)\s+([\d.]+,\d+)\s+([\d.]+,\d+)\s+([\d.]+,\d+)$/i;
+  let anteriores = new Set();
+  hojas.forEach(H => {
+    const ic = H.findIndex(l => /C[óo]digo.*Producto.*Cantidad/i.test(l)), estaHoja = new Set(); let primero = true;
+    for(let i = ic >= 0 ? ic + 1 : 0; i < H.length; i++){
+      const l = H[i]; if(/^(Recibimos|Impuesto|Subtotal|Observaciones)/i.test(l)) break;
+      const r = l.match(reIt); if(!r) continue;
+      const it = { codigo: r[1].toUpperCase(), desc: r[2], cant: numAR(r[3]), precio: numAR(r[4]), bonif: numAR(r[5]), importe: numAR(r[7]) };
+      const k = it.codigo + '|' + it.cant + '|' + it.importe;
+      // el primer renglón de una hoja que repite uno de la hoja anterior es el "transporte": no se cuenta dos veces
+      if(primero && anteriores.has(k)){ primero = false; continue; }
+      primero = false; estaHoja.add(k); items.push(it);
+    }
+    anteriores = estaHoja;
+  });
   const conIva = /^B$/i.test(tipo);
   items.forEach(it => { it.neto = conIva ? it.importe / 1.21 : it.importe; });
-  return { numero, tipo, fecha, cliente, total, items, archivo: nombreArchivo };
+  const suma = items.reduce((a, x) => a + x.importe, 0);
+  return { numero, tipo, fecha, cliente, total, items, archivo: nombreArchivo, hojas: lineasPDF.hojas, subtotal, controlOk: !subtotal || Math.abs(suma - subtotal) < 1 };
 }
 function skuDeFactura(cod){ const c = String(cod).toUpperCase(); return (fcEquiv && fcEquiv[c]) || c; }
 // en las facturas la cantidad va en la unidad de venta del catalogo (ej: docenas); el costo de la app es por unidad suelta
@@ -10387,6 +10406,8 @@ function renderFacturasNuevas(){
   box.innerHTML = facturasNuevas.map((fa, i) => fa.error ? `<div style="background:#FDEBE7;border-radius:12px;padding:10px;margin-bottom:8px;">❌ ${escaparHtml(fa.archivo)}: ${escaparHtml(fa.error)}</div>` :
     `<div style="border:2px solid ${fa.yaEsta ? '#E3B8AE' : 'var(--gold)'};border-radius:14px;padding:12px;margin-bottom:10px;background:#fff;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;"><b style="flex:1;">Factura ${escaparHtml(fa.tipo)} ${escaparHtml(fa.numero)} · ${escaparHtml(fa.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(fa.cliente)}</span></div>
+      ${fa.controlOk === false ? `<div style="background:#FDEBE7;color:#A6432F;border-radius:10px;padding:6px 10px;font-size:.84rem;margin:4px 0;">⚠️ La suma de los renglones (${formatPrice(fa.items.reduce((a, x) => a + x.importe, 0))}) no coincide con el subtotal de la factura (${formatPrice(fa.subtotal)}). No la guardes y mandame el PDF.</div>` : (fa.subtotal ? `<div style="color:#2F7A47;font-size:.8rem;margin:2px 0;">✓ La suma de los renglones coincide con el subtotal de la factura</div>` : '')}
+      ${fa.hojas ? `<div class="note" style="text-align:left;margin:2px 0 6px;">📄 ${fa.hojas.total} ${fa.hojas.total === 1 ? 'hoja' : 'hojas'} en el PDF · leí ${fa.hojas.originales} ${fa.hojas.originales === 1 ? 'hoja original' : 'hojas originales'}${fa.hojas.total > fa.hojas.originales ? ' (el resto son duplicados)' : ''} · ${fa.items.length} renglones</div>` : ''}
       ${fa.items.length ? tablaFactura(fa, true) : '<p class="note">No encontré renglones en esta factura.</p>'}
       ${fa.yaEsta ? `<p class="note" style="color:#A6432F;text-align:left;">Esta factura ya está guardada. <a href="#" onclick="event.preventDefault();borrarFactura('${escapeAttr(String(fa.numero).replace(/\//g, '-'))}')">🗑️ Quitarla de la app</a></p>` : (fa.items.length ? `<button class="btn btn-gold" style="margin-top:8px;" onclick="guardarFactura(${i})">💾 Guardar esta factura</button>` : '')}
     </div>`).join('');
@@ -17993,7 +18014,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v230';
+const APP_VERSION = '2026-10-02-v231';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
