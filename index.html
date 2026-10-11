@@ -1590,7 +1590,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v232</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v233</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -10294,24 +10294,77 @@ const numAR = s => parseFloat(String(s).replace(/\./g, '').replace(',', '.')) ||
 async function lineasPDF(file){
   await cargarPdfJs();
   const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  lineasPDF.tokens = [];
   try{ const md = await pdf.getMetadata(); lineasPDF.titulo = (md && md.info && md.info.Title) || ''; } catch(e){ lineasPDF.titulo = ''; }
   const paginas = [];
   for(let i = 1; i <= pdf.numPages; i++){
     const tc = await (await pdf.getPage(i)).getTextContent(); const F = {};
-    tc.items.forEach(it => { if(!it.str.trim()) return; const y = Math.round(it.transform[5] / 3) * 3; (F[y] = F[y] || []).push([it.transform[4], it.str]); });
+    const toks = [];
+    tc.items.forEach(it => { if(!it.str.trim()) return; const y = Math.round(it.transform[5] / 3) * 3; (F[y] = F[y] || []).push([it.transform[4], it.str]);
+      it.str.trim().split(/\s+/).forEach((w, j, arr) => { const ancho = (it.width || 0) / Math.max(1, it.str.length); const off = it.str.indexOf(w); toks.push({ s: w, x: it.transform[4] + off * ancho, w: w.length * ancho, y: it.transform[5] }); }); });
     paginas.push(Object.keys(F).map(Number).sort((a, b) => b - a).map(y => F[y].sort((a, b) => a[0] - b[0]).map(x => x[1]).join(' ').replace(/\s+/g, ' ').trim()));
+    (lineasPDF.tokens = lineasPDF.tokens || [])[i - 1] = toks;
   }
   // solo las hojas ORIGINALES: con "Hoja X de N" se toman las primeras N (después vienen el duplicado, triplicado…)
   // cada hoja dice ORIGINAL / DUPLICADO / TRIPLICADO; las hojas sin rótulo siguen a la anterior
   const copiaDe = p => { for(const l of p){ const m = l.match(/\b(ORIGINAL|DUPLICADO|TRIPLICADO|CUADRUPLICADO)\b/i); if(m) return m[1].toUpperCase(); } return null; };
   let actual = null, hayRotulos = false; const copias = paginas.map(p => { const c = copiaDe(p); if(c){ actual = c; hayRotulos = true; } return actual; });
-  let orig = hayRotulos ? paginas.filter((p, i) => copias[i] === 'ORIGINAL' || copias[i] === null) : paginas;
-  if(!orig.length) orig = paginas.slice(0, 1);
+  let idxOrig = paginas.map((p, i) => i).filter(i => !hayRotulos || copias[i] === 'ORIGINAL' || copias[i] === null);
+  if(!idxOrig.length) idxOrig = [0];
+  let orig = idxOrig.map(i => paginas[i]);
+  lineasPDF.tokensOrig = idxOrig.map(i => lineasPDF.tokens[i] || []);
   lineasPDF.hojas = { total: paginas.length, originales: orig.length };
   // cada hoja por separado (para no confundir el renglón de "transporte" de la hoja siguiente)
   lineasPDF.porHoja = orig;
   return orig.flat();
 }
+// Lee los renglones por COLUMNAS usando la posicion de cada palabra: codigo a la izquierda y 5 numeros
+// (cantidad, precio, % bonif., importe bonif., importe). Aunque el PDF tenga renglones encimados, cada numero
+// se asigna al renglon que le corresponde por orden dentro de su columna.
+function renglonesPorColumnas(paginasTok){
+  const esNum = s => /^-?[\d.]+,\d{2,4}$/.test(s);
+  const esCod = s => /^[A-Z0-9][A-Z0-9.\-\/]{1,}$/i.test(s) && /\d/.test(s);
+  // 1. aprender la posicion de las 5 columnas numericas con los renglones "normales"
+  const muestras = [[], [], [], [], []];
+  paginasTok.forEach(T => {
+    const filas = {}; T.forEach(t => { const k = Math.round(t.y); (filas[k] = filas[k] || []).push(t); });
+    Object.values(filas).forEach(f => { const ns = f.filter(t => esNum(t.s)).sort((a, b) => a.x - b.x); if(ns.length >= 5){ ns.slice(-5).forEach((t, c) => muestras[c].push(t.x + t.w)); } });
+  });
+  if(muestras.some(m => m.length < 1)) return null;
+  const med = a => { const s = a.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+  const colX = muestras.map(med);                     // borde derecho de cada columna (los numeros van alineados a la derecha)
+  const tol = Math.max(18, (colX[1] - colX[0]) / 2.5);
+  const colDe = t => { let best = -1, d = 1e9; colX.forEach((cx, c) => { const dd = Math.abs((t.x + t.w) - cx); if(dd < d){ d = dd; best = c; } }); return d <= tol ? best : -1; };
+  const out = []; let prevKeys = new Set(), problemas = 0;
+  paginasTok.forEach(T => {
+    // zona de renglones: desde el primer codigo hasta "Transporte" / "Subtotal" / "Cuota" / "Impuesto"
+    const minX = Math.min(...T.filter(t => esCod(t.s)).map(t => t.x));
+    const codigos = T.filter(t => esCod(t.s) && t.x <= minX + 12 && !esNum(t.s)).sort((a, b) => b.y - a.y);
+    if(!codigos.length) return;
+    const corte = T.filter(t => /^(Transporte|Subtotal|Cuota|Impuesto|Observaciones|Recibimos)/i.test(t.s)).map(t => t.y);
+    const yTop = codigos[0].y + 6, yBot = Math.max(...corte.filter(y => y < codigos[0].y).concat([-1e9]));
+    const zona = T.filter(t => t.y <= yTop && t.y > yBot + 1);
+    const cols = [[], [], [], [], []];
+    zona.forEach(t => { if(!esNum(t.s)) return; const c = colDe(t); if(c >= 0) cols[c].push(t); });
+    cols.forEach(c => c.sort((a, b) => b.y - a.y || a.x - b.x));
+    const n = codigos.length;
+    if(cols.some(c => c.length !== n)) problemas++;
+    const keys = new Set();
+    codigos.forEach((cod, i) => {
+      const v = cols.map(c => c[i] ? numAR(c[i].s) : NaN);
+      // descripcion: palabras del mismo renglon entre el codigo y la primera columna numerica
+      const desc = T.filter(t => Math.abs(t.y - cod.y) < 2.5 && t.x > cod.x + 5 && (t.x + t.w) < colX[0] - 40).sort((a, b) => a.x - b.x).map(t => t.s).join(' ');
+      const it = { codigo: cod.s.replace(/\.$/, '').toUpperCase(), desc, cant: v[0], precio: v[1], bonif: v[2], impBonif: v[3], importe: v[4] };
+      const k = it.codigo + '|' + it.cant + '|' + it.importe;
+      if(i === 0 && prevKeys.has(k)) return;          // renglon de "transporte" repetido de la hoja anterior
+      keys.add(k); out.push(it);
+    });
+    prevKeys = keys;
+  });
+  return { items: out, problemas };
+}
+// control de cada renglon: cantidad x precio - bonificacion = importe
+function renglonOk(it){ if(![it.cant, it.precio, it.importe].every(Number.isFinite)) return false; const esperado = it.cant * it.precio * (1 - (it.bonif || 0) / 100); return Math.abs(esperado - it.importe) <= Math.max(1, it.importe * 0.002); }
 function parsearFactura(L, nombreArchivo){
   const txt = L.join('\n');
   const m = (re) => { const x = txt.match(re); return x ? x[1].trim() : ''; };
@@ -10323,13 +10376,17 @@ function parsearFactura(L, nombreArchivo){
   // total: "Total: $ X"; si no esta, el primer importe con $ del encabezado
   const total = numAR(m(/Total:\s*\$?\s*([\d.,]+)/) || m(/\$\s*([\d.]+,\d{2})/));
   const iCab = L.findIndex(l => /C[óo]digo.*Producto.*Cantidad/i.test(l));
-  const subtotal = numAR(m(/Subtotal\s*\$?\s*([\d.]+,\d{2})/i));
+  let subtotal = numAR(m(/Subtotal\s*\$?\s*([\d.]+,\d{2})/i));
+  if(!subtotal){ // facturas B: el subtotal es el ultimo "$ importe" suelto de la factura (distinto del total)
+    const sueltos = L.map(l => (l.match(/^\$\s*([\d.]+,\d{2})$/) || [])[1]).filter(Boolean).map(numAR).filter(v => Math.abs(v - total) > 1);
+    if(sueltos.length) subtotal = sueltos[sueltos.length - 1]; }
   // cliente: la linea anterior a la direccion, despues de los datos del emisor
   const iCli = L.findIndex(l => /Condici[óo]n de venta/i.test(l));
   let cliente = iCli >= 0 ? L[iCli].replace(/Condici[óo]n de venta.*$/i, '').replace(/^mostrador\s*-\s*/i, '').trim() : '';
   if(!cliente){ const iC = L.findIndex(l => /C\.?U\.?I\.?T\.?\s*:/i.test(l) && /consumidor|responsable|monotributo|exento/i.test(l));
     for(let k = iC - 1; k >= Math.max(0, iC - 4); k--){ const x = L[k].replace(/(Cuenta corriente|Contado.*|\$\s*[\d.,]+|\d{2}\/\d{2}\/\d{4})/gi, '').trim(); if(x && /[a-z]/i.test(x) && !/\(\d{4}\)|\d{3,}\s*-/.test(x)){ cliente = x.replace(/^[^-]+-\s*/, '').trim() || x; break; } } }
-  const items = [];
+  let items = [];
+  const porCol = lineasPDF.tokensOrig && lineasPDF.tokensOrig.length ? renglonesPorColumnas(lineasPDF.tokensOrig) : null;
   const hojas = lineasPDF.porHoja && lineasPDF.porHoja.length ? lineasPDF.porHoja : [L];
   const reIt = /^([A-Z0-9][A-Z0-9.\-\/]{1,})\s+(.+?)\s+([\d.]+,\d+)\s+([\d.]+,\d+)\s+([\d.]+,\d+)\s+([\d.]+,\d+)\s+([\d.]+,\d+)$/i;
   let anteriores = new Set();
@@ -10346,10 +10403,17 @@ function parsearFactura(L, nombreArchivo){
     }
     anteriores = estaHoja;
   });
+  // se usan las dos lecturas (por lineas y por columnas) y se queda con la que cierra mejor
+  if(porCol && porCol.items.length){
+    const puntaje = arr => { const ok = arr.filter(renglonOk).length; const sum = arr.reduce((a, x) => a + (x.importe || 0), 0); return ok * 2 - (arr.length - ok) * 5 + (subtotal && Math.abs(sum - subtotal) < 1 ? 1000 : 0); };
+    if(puntaje(porCol.items) > puntaje(items)) items = porCol.items;
+  }
   const conIva = /^B$/i.test(tipo);
   items.forEach(it => { it.neto = conIva ? it.importe / 1.21 : it.importe; });
   const suma = items.reduce((a, x) => a + x.importe, 0);
-  return { numero, tipo, fecha, cliente, total, items, archivo: nombreArchivo, hojas: lineasPDF.hojas, subtotal, controlOk: !subtotal || Math.abs(suma - subtotal) < 1 };
+  items.forEach(it => { it.ok = renglonOk(it); });
+  const malos = items.filter(it => !it.ok).length;
+  return { numero, tipo, fecha, cliente, total, items, archivo: nombreArchivo, hojas: lineasPDF.hojas, subtotal, malos, controlOk: malos === 0 && (!subtotal || Math.abs(suma - subtotal) < 1) && items.length > 0 };
 }
 function skuDeFactura(cod){ const c = String(cod).toUpperCase(); return (fcEquiv && fcEquiv[c]) || c; }
 // en las facturas la cantidad va en la unidad de venta del catalogo (ej: docenas); el costo de la app es por unidad suelta
@@ -10393,7 +10457,7 @@ function tablaFactura(fa, editable){
   let tN = 0, tC = 0, conC = true;
   const filas = fa.items.map((it, i) => { const c = costoItemFactura(it); const v = it.neto * fx; tN += v; if(c == null) conC = false; else tC += c; const g = c != null ? v - c : null;
     const s = skuDeFactura(it.codigo);
-    return `<tr style="border-top:1px solid var(--line);"><td style="padding:6px;"><b>${escaparHtml(it.codigo)}</b>${s !== it.codigo ? ` <span class="note">→ ${escaparHtml(s)}</span>` : ''}<div class="note" style="text-align:left;margin:0;">${escaparHtml(it.desc)}</div></td>
+    return `<tr style="border-top:1px solid var(--line);${it.ok === false ? 'background:#FDEBE7;' : ''}"><td style="padding:6px;">${it.ok === false ? '⚠️ ' : ''}<b>${escaparHtml(it.codigo)}</b>${s !== it.codigo ? ` <span class="note">→ ${escaparHtml(s)}</span>` : ''}<div class="note" style="text-align:left;margin:0;">${escaparHtml(it.desc)}</div></td>
       <td style="padding:6px;text-align:right;">${it.cant.toLocaleString('es-AR')}${divisorVenta(s) > 1 ? `<div class="note" style="margin:0;">${({ 12: 'docenas', 6: 'medias doc.', 2: 'pares' })[divisorVenta(s)]}</div>` : ''}</td><td style="padding:6px;text-align:right;">${formatPrice(v / (it.cant || 1))}</td>
       <td style="padding:6px;text-align:right;">${c != null ? formatPrice(c / (it.cant || 1)) : (editable ? `<input placeholder="código en la app" style="width:120px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;font-size:.8rem;text-transform:uppercase;" onchange="equivFactura('${escapeAttr(it.codigo)}', this.value)">` : '<span class="note">sin costo</span>')}</td>
       <td style="padding:6px;text-align:right;font-weight:700;color:${g == null ? '#A89E90' : g < 0 ? '#A6432F' : '#2F7A47'};">${g != null ? formatPrice(g) + `<div class="note" style="margin:0;">${c > 0 ? Math.round(g / c * 100) + ' % s/costo' : ''}</div>` : '–'}</td></tr>`; }).join('');
@@ -10407,10 +10471,10 @@ function renderFacturasNuevas(){
   box.innerHTML = facturasNuevas.map((fa, i) => fa.error ? `<div style="background:#FDEBE7;border-radius:12px;padding:10px;margin-bottom:8px;">❌ ${escaparHtml(fa.archivo)}: ${escaparHtml(fa.error)}</div>` :
     `<div style="border:2px solid ${fa.yaEsta ? '#E3B8AE' : 'var(--gold)'};border-radius:14px;padding:12px;margin-bottom:10px;background:#fff;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;"><b style="flex:1;">Factura ${escaparHtml(fa.tipo)} ${escaparHtml(fa.numero)} · ${escaparHtml(fa.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(fa.cliente)}</span></div>
-      ${fa.controlOk === false ? `<div style="background:#FDEBE7;color:#A6432F;border-radius:10px;padding:6px 10px;font-size:.84rem;margin:4px 0;">⚠️ La suma de los renglones (${formatPrice(fa.items.reduce((a, x) => a + x.importe, 0))}) no coincide con el subtotal de la factura (${formatPrice(fa.subtotal)}). No la guardes y mandame el PDF.</div>` : (fa.subtotal ? `<div style="color:#2F7A47;font-size:.8rem;margin:2px 0;">✓ La suma de los renglones coincide con el subtotal de la factura</div>` : '')}
+      ${fa.controlOk === false ? `<div style="background:#FDEBE7;color:#A6432F;border-radius:10px;padding:6px 10px;font-size:.84rem;margin:4px 0;">⚠️ ${fa.malos ? fa.malos + (fa.malos === 1 ? ' renglón no cierra' : ' renglones no cierran') + ' (cantidad × precio − bonificación ≠ importe). ' : ''}${fa.subtotal && Math.abs(fa.items.reduce((a, x) => a + x.importe, 0) - fa.subtotal) >= 1 ? 'La suma de los renglones (' + formatPrice(fa.items.reduce((a, x) => a + x.importe, 0)) + ') no coincide con el subtotal (' + formatPrice(fa.subtotal) + '). ' : ''}No se puede guardar: mandame el PDF.</div>` : `<div style="color:#2F7A47;font-size:.8rem;margin:2px 0;">✓ Todos los renglones cierran (cantidad × precio − bonificación = importe)${fa.subtotal ? ' y la suma coincide con el subtotal' : ''}</div>`}
       ${fa.hojas ? `<div class="note" style="text-align:left;margin:2px 0 6px;">📄 ${fa.hojas.total} ${fa.hojas.total === 1 ? 'hoja' : 'hojas'} en el PDF · leí ${fa.hojas.originales} ${fa.hojas.originales === 1 ? 'hoja original' : 'hojas originales'}${fa.hojas.total > fa.hojas.originales ? ' (el resto son duplicados)' : ''} · ${fa.items.length} renglones</div>` : ''}
       ${fa.items.length ? tablaFactura(fa, true) : '<p class="note">No encontré renglones en esta factura.</p>'}
-      ${fa.yaEsta ? `<p class="note" style="color:#A6432F;text-align:left;">Esta factura ya está guardada. <a href="#" onclick="event.preventDefault();borrarFactura('${escapeAttr(String(fa.numero).replace(/\//g, '-'))}')">🗑️ Quitarla de la app</a></p>` : (fa.items.length ? `<button class="btn btn-gold" style="margin-top:8px;" onclick="guardarFactura(${i})">💾 Guardar esta factura</button>` : '')}
+      ${fa.yaEsta ? `<p class="note" style="color:#A6432F;text-align:left;">Esta factura ya está guardada. <a href="#" onclick="event.preventDefault();borrarFactura('${escapeAttr(String(fa.numero).replace(/\//g, '-'))}')">🗑️ Quitarla de la app</a></p>` : (fa.items.length && fa.controlOk !== false ? `<button class="btn btn-gold" style="margin-top:8px;" onclick="guardarFactura(${i})">💾 Guardar esta factura</button>` : '')}
     </div>`).join('');
 }
 async function equivFactura(cod, v){
@@ -18015,7 +18079,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v232';
+const APP_VERSION = '2026-10-02-v233';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
