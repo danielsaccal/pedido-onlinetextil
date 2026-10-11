@@ -1590,7 +1590,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v220</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v221</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5715,12 +5715,12 @@ const GRUPOS_INICIO = {
     [['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']]
   ] },
   g: { lado: 'int', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas', '💲 Costos'], colorColumnas: { 5: '#2F7A47' }, columnas: [
-    [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()']],
+    [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()'], ['💰 Costos de confección', 'abrirConfeccion()']],
     [['📊 Stock y prioridades', 'abrirStock()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📋 Nueva orden de trabajo', 'abrirAsistenteOT()']],
     [['🚚 Ingreso a los talleres', 'abrirEnviosTela()'], ['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🏭 Productos en producción', 'abrirEnProduccion()']],
     [['📥 Entregas del taller', 'abrirIngresoTaller()']],
     [['📦 Historial de órdenes', 'abrirHistorialOT()'], ['🗂️ Historial de entregas', 'abrirHistorialEntregas()'], ['🔎 ¿Cuándo hice este SKU?', 'abrirHistorialSku()']],
-    [['💰 Costos de confección', 'abrirConfeccion()'], ['💲 Costos de reventa', 'abrirCostosReventa()']],
+    [['💲 Costos de reventa', 'abrirCostosReventa()']],
   ] },
   h: { lado: 'int', titulo: 'Finanzas', titulosColumnas: ['1 · Mercado Libre', '2 · Herramientas'], columnas: [
     [['💰 Ventas Mercado Libre', 'abrirVentasML()']],
@@ -17968,7 +17968,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v220';
+const APP_VERSION = '2026-10-02-v221';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
