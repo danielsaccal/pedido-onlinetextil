@@ -1590,7 +1590,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v227</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v228</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -10373,7 +10373,7 @@ function tablaFactura(fa, editable){
   const G = tN - tC;
   return `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><tr style="color:#8A8072;font-size:.72rem;text-transform:uppercase;"><td style="padding:6px;">Producto</td><td style="padding:6px;text-align:right;">Cant.</td><td style="padding:6px;text-align:right;">Precio c/IVA</td><td style="padding:6px;text-align:right;">Costo c/u</td><td style="padding:6px;text-align:right;">Ganancia</td></tr>${filas}
     <tr style="border-top:2px solid var(--purple);font-weight:800;"><td style="padding:6px;">Total (con IVA)</td><td></td><td style="padding:6px;text-align:right;">${formatPrice(tN)}</td><td style="padding:6px;text-align:right;">${tC ? formatPrice(tC) : '–'}</td><td style="padding:6px;text-align:right;color:${G < 0 ? '#A6432F' : '#2F7A47'};">${tC ? formatPrice(G) + (conC ? '' : ' *') : '–'}<div class="note" style="margin:0;">${tC > 0 ? Math.round(G / tC * 100) + ' % s/costo' : ''}</div></td></tr>
-    <tr style="color:#6B6258;"><td style="padding:4px 6px;" colspan="5">${(()=>{ const bruto = fa.items.reduce((s, x) => s + x.neto, 0) * 1.21, desc = bruto - tN; return desc > 1 ? `Descuento general de la factura: ${formatPrice(desc)} (${Math.round(desc / bruto * 100)} %, ya repartido en cada renglón) · ` : ''; })()}Sin IVA ${formatPrice(tN / 1.21)} · IVA ${formatPrice(tN - tN / 1.21)} · <i>la ganancia se calcula con IVA (los impuestos se van a restar más adelante)</i></td></tr></table></div>${conC ? '' : '<p class="note" style="text-align:left;">* Algún producto no tiene costo: emparejalo con su código de la app.</p>'}`;
+    <tr style="color:#6B6258;"><td style="padding:4px 6px;" colspan="5">${(()=>{ const bruto = fa.items.reduce((s, x) => s + x.neto, 0) * 1.21, desc = bruto - tN; return desc > 1 ? `Descuento general de la factura: ${formatPrice(desc)} (${Math.round(desc / bruto * 100)} %, ya repartido en cada renglón) · ` : ''; })()}${/^B$/i.test(fa.tipo || '') ? `Factura B: el IVA está incluido en el precio (no se desglosa); aprox. ${formatPrice(tN - tN / 1.21)}` : `Sin IVA ${formatPrice(tN / 1.21)} · IVA ${formatPrice(tN - tN / 1.21)}`} · <i>la ganancia se calcula con IVA (los impuestos se van a restar más adelante)</i></td></tr></table></div>${conC ? '' : '<p class="note" style="text-align:left;">* Algún producto no tiene costo: emparejalo con su código de la app.</p>'}`;
 }
 function renderFacturasNuevas(){
   const box = document.getElementById('fc-nuevas');
@@ -17986,7 +17986,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v227';
+const APP_VERSION = '2026-10-02-v228';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
