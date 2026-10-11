@@ -1590,7 +1590,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v223</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v224</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2220,7 +2220,7 @@ a.grilla-celda{display:block;}
   <div class="step" id="step-facturas">
     <div class="form-card" style="max-width:960px;">
       <h2>Ventas facturadas</h2>
-      <p class="note" style="text-align:left;">Subí las facturas de TFactura (PDF). La app lee cada renglón, lo cruza con el costo de cada producto y te muestra la ganancia. Se usa el precio <b>sin IVA</b>.</p>
+      <p class="note" style="text-align:left;">Subí las facturas de TFactura (PDF). La app lee cada renglón, lo cruza con el costo de cada producto y te muestra la ganancia. Por ahora la ganancia se calcula <b>con IVA</b>; los impuestos se van a restar más adelante.</p>
       <label class="btn btn-gold" style="display:block;text-align:center;cursor:pointer;margin:10px 0;">📄 Subir facturas (PDF)<input type="file" id="fc-file" accept="application/pdf" multiple style="display:none;" onchange="leerFacturasPDF(this)"></label>
       <div id="fc-nuevas"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 8px;align-items:center;"><b style="flex:1;color:var(--purple);">Facturas guardadas</b><select id="fc-mes" onchange="renderFacturas()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"></select></div>
@@ -10349,19 +10349,21 @@ async function leerFacturasPDF(inp){
   }
   renderFacturasNuevas();
 }
+// venta con IVA de un renglon: por ahora la ganancia se calcula con IVA (los impuestos se restan mas adelante)
+function factorIvaFactura(fa){ const n = (fa.items || []).reduce((a, x) => a + (x.neto || 0), 0); return fa.total && n > 0 ? fa.total / n : (/^B$/i.test(fa.tipo || '') ? 1.21 : 1.21); }
 function tablaFactura(fa, editable){
+  const fx = factorIvaFactura(fa);
   let tN = 0, tC = 0, conC = true;
-  const filas = fa.items.map((it, i) => { const c = costoItemFactura(it); tN += it.neto; if(c == null) conC = false; else tC += c; const g = c != null ? it.neto - c : null;
+  const filas = fa.items.map((it, i) => { const c = costoItemFactura(it); const v = it.neto * fx; tN += v; if(c == null) conC = false; else tC += c; const g = c != null ? v - c : null;
     const s = skuDeFactura(it.codigo);
     return `<tr style="border-top:1px solid var(--line);"><td style="padding:6px;"><b>${escaparHtml(it.codigo)}</b>${s !== it.codigo ? ` <span class="note">→ ${escaparHtml(s)}</span>` : ''}<div class="note" style="text-align:left;margin:0;">${escaparHtml(it.desc)}</div></td>
-      <td style="padding:6px;text-align:right;">${it.cant.toLocaleString('es-AR')}</td><td style="padding:6px;text-align:right;">${formatPrice(it.neto / (it.cant || 1))}</td>
+      <td style="padding:6px;text-align:right;">${it.cant.toLocaleString('es-AR')}</td><td style="padding:6px;text-align:right;">${formatPrice(v / (it.cant || 1))}</td>
       <td style="padding:6px;text-align:right;">${c != null ? formatPrice(c / (it.cant || 1)) : (editable ? `<input placeholder="código en la app" style="width:120px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;font-size:.8rem;text-transform:uppercase;" onchange="equivFactura('${escapeAttr(it.codigo)}', this.value)">` : '<span class="note">sin costo</span>')}</td>
       <td style="padding:6px;text-align:right;font-weight:700;color:${g == null ? '#A89E90' : g < 0 ? '#A6432F' : '#2F7A47'};">${g != null ? formatPrice(g) + `<div class="note" style="margin:0;">${c > 0 ? Math.round(g / c * 100) + ' % s/costo' : ''}</div>` : '–'}</td></tr>`; }).join('');
   const G = tN - tC;
-  return `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><tr style="color:#8A8072;font-size:.72rem;text-transform:uppercase;"><td style="padding:6px;">Producto</td><td style="padding:6px;text-align:right;">Cant.</td><td style="padding:6px;text-align:right;">Precio s/IVA</td><td style="padding:6px;text-align:right;">Costo c/u</td><td style="padding:6px;text-align:right;">Ganancia</td></tr>${filas}
-    <tr style="border-top:2px solid var(--purple);font-weight:800;"><td style="padding:6px;">Total sin IVA</td><td></td><td style="padding:6px;text-align:right;">${formatPrice(tN)}</td><td style="padding:6px;text-align:right;">${tC ? formatPrice(tC) : '–'}</td><td style="padding:6px;text-align:right;color:${G < 0 ? '#A6432F' : '#2F7A47'};">${tC ? formatPrice(G) + (conC ? '' : ' *') : '–'}<div class="note" style="margin:0;">${tC > 0 ? Math.round(G / tC * 100) + ' % s/costo' : ''}</div></td></tr>
-    ${fa.total ? `<tr style="color:#6B6258;"><td style="padding:4px 6px;">IVA</td><td></td><td style="padding:4px 6px;text-align:right;">${formatPrice(fa.total - tN)}</td><td colspan="2"></td></tr>
-    <tr style="font-weight:800;"><td style="padding:4px 6px;">Total de la factura (con IVA)</td><td></td><td style="padding:4px 6px;text-align:right;">${formatPrice(fa.total)}</td><td colspan="2" style="padding:4px 6px;text-align:right;font-weight:400;" class="note">la ganancia se calcula sin IVA</td></tr>` : ''}</table></div>${conC ? '' : '<p class="note" style="text-align:left;">* Algún producto no tiene costo: emparejalo con su código de la app.</p>'}`;
+  return `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><tr style="color:#8A8072;font-size:.72rem;text-transform:uppercase;"><td style="padding:6px;">Producto</td><td style="padding:6px;text-align:right;">Cant.</td><td style="padding:6px;text-align:right;">Precio c/IVA</td><td style="padding:6px;text-align:right;">Costo c/u</td><td style="padding:6px;text-align:right;">Ganancia</td></tr>${filas}
+    <tr style="border-top:2px solid var(--purple);font-weight:800;"><td style="padding:6px;">Total (con IVA)</td><td></td><td style="padding:6px;text-align:right;">${formatPrice(tN)}</td><td style="padding:6px;text-align:right;">${tC ? formatPrice(tC) : '–'}</td><td style="padding:6px;text-align:right;color:${G < 0 ? '#A6432F' : '#2F7A47'};">${tC ? formatPrice(G) + (conC ? '' : ' *') : '–'}<div class="note" style="margin:0;">${tC > 0 ? Math.round(G / tC * 100) + ' % s/costo' : ''}</div></td></tr>
+    <tr style="color:#6B6258;"><td style="padding:4px 6px;" colspan="5">Sin IVA ${formatPrice(tN / fx)} · IVA ${formatPrice(tN - tN / fx)} · <i>la ganancia se calcula con IVA (los impuestos se van a restar más adelante)</i></td></tr></table></div>${conC ? '' : '<p class="note" style="text-align:left;">* Algún producto no tiene costo: emparejalo con su código de la app.</p>'}`;
 }
 function renderFacturasNuevas(){
   const box = document.getElementById('fc-nuevas');
@@ -10393,11 +10395,11 @@ async function borrarFactura(id){ if(!confirm('¿Quitar esta factura de la app? 
 function renderFacturas(){
   const mes = document.getElementById('fc-mes').value;
   const L = (facturas || []).filter(f => !mes || (f.fecha || '').split('/').reverse().slice(0, 2).join('-') === mes).sort((a, b) => String(b.fecha).split('/').reverse().join('').localeCompare(String(a.fecha).split('/').reverse().join('')));
-  let N = 0, C = 0, T = 0; L.forEach(f => { T += f.total || 0; f.items.forEach(it => { const c = costoItemFactura(it); N += it.neto; if(c != null) C += c; }); });
+  let N = 0, C = 0, T = 0; L.forEach(f => { const fx = factorIvaFactura(f); f.items.forEach(it => { const c = costoItemFactura(it); N += it.neto; T += it.neto * fx; if(c != null) C += c; }); });
   document.getElementById('fc-resumen').innerHTML = L.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px;">
     <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;"><small class="note">Facturado (con IVA)</small><div style="font-weight:800;font-size:1.2rem;">${formatPrice(T)}</div><small class="note">sin IVA ${formatPrice(N)}</small></div>
     <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;"><small class="note">Costo</small><div style="font-weight:800;font-size:1.2rem;color:#D97A3A;">${formatPrice(C)}</div></div>
-    <div style="background:${N - C < 0 ? '#FDEBE7' : '#EEF6F0'};border-radius:12px;padding:10px;"><small class="note">Ganancia</small><div style="font-weight:800;font-size:1.2rem;color:${N - C < 0 ? '#A6432F' : '#2F7A47'};">${formatPrice(N - C)}</div><small class="note">${C > 0 ? Math.round((N - C) / C * 100) + ' % sobre el costo' : ''}</small></div></div>` : '';
+    <div style="background:${T - C < 0 ? '#FDEBE7' : '#EEF6F0'};border-radius:12px;padding:10px;"><small class="note">Ganancia (con IVA)</small><div style="font-weight:800;font-size:1.2rem;color:${T - C < 0 ? '#A6432F' : '#2F7A47'};">${formatPrice(T - C)}</div><small class="note">${C > 0 ? Math.round((T - C) / C * 100) + ' % sobre el costo' : ''}</small></div></div>` : '';
   document.getElementById('fc-lista').innerHTML = L.length ? L.map(f => `<details style="border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:6px;background:#fff;"><summary style="cursor:pointer;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><b style="flex:1;">▸ ${escaparHtml(f.tipo || '')} ${escaparHtml(f.numero)} · ${escaparHtml(f.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(f.cliente || '')}</span><span style="text-align:right;"><b style="font-size:.9rem;">${formatPrice(f.total || (f.neto || 0) * 1.21)}</b><small class="note" style="display:block;margin:0;">sin IVA ${formatPrice(f.neto || 0)}</small></span><button type="button" class="btn-mini" title="Quitar de la app" onclick="event.preventDefault();event.stopPropagation();borrarFactura('${escapeAttr(f._id || f.numero)}')">🗑️</button></summary>${tablaFactura(f, true)}</details>`).join('') : '<p class="empty-msg">Todavía no guardaste facturas.</p>';
 }
 
@@ -17974,7 +17976,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v223';
+const APP_VERSION = '2026-10-02-v224';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
