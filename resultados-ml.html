@@ -271,6 +271,12 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
   <div hidden><b id="tVend"></b><b id="tAcr"></b><b id="tCad"></b><b id="tNeto"></b><b id="tN"></b><p id="tNote"></p></div>
 
   <details class="pleg" data-k="mas"><summary>➕ Más detalles <small>(fabricado vs reventa, envíos y Full, venta por venta, mes por mes, ajustes)</small></summary><div class="pleg-body" style="background:transparent;border:none;padding:4px 0 0;">
+  <details class="pleg" data-k="cuotas"><summary>💳 ¿Qué me deja más: con cuotas o sin cuotas?</summary><div class="pleg-body">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+      <select id="cqOrigen" aria-label="Origen" style="padding:6px 10px;font-size:.85rem;width:auto;"><option value="">Todos los productos</option><option value="fab">🏭 Solo los que fabrico</option><option value="rev">🛒 Solo reventa</option><option value="tela">🧵 Solo telas</option><option value="kit">🧩 Solo juegos armados</option></select>
+    </div>
+    <div id="cqBody"></div>
+  </div></details>
   <details class="pleg" data-k="origen"><summary>🏭 Fabricado vs reventa</summary><div class="pleg-body">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
       <select id="ogMes" aria-label="Mes" style="padding:6px 10px;font-size:.85rem;width:auto;"></select>
@@ -770,6 +776,7 @@ function draw(){
   try{renderEquivalencias();}catch(e){console.error(e);}
   try{renderFaltan();}catch(e){console.error(e);}
   try{renderOrigen();}catch(e){console.error(e);}
+  try{renderCuotas();}catch(e){console.error(e);}
   // lista
   $('count').textContent=r.length.toLocaleString('es-AR')+' operaciones';
   {const c=$('cntResumen');if(c)c.textContent='· '+r.length.toLocaleString('es-AR')+' operaciones';}
@@ -1036,6 +1043,38 @@ function agregarJuegosAlSku(){
     </div>
     <div style="border-top:1px solid #E3DCF0;padding-top:8px;font-size:.92rem;"><b>Total ${q}</b> (suelto + en juegos): <b>${(Us+U).toLocaleString('es-AR')}</b> unidades · ganancia <b class="${(Gs+G)<0?'neg':'pos'}">${fmt(Gs+G)}</b></div>
     <p class="note" style="margin:6px 0 0;">En cada juego vendido, la parte de ${q} se calcula según cuánto pesa su costo dentro del juego.</p></div>`);
+}
+// ===== Con cuotas (Premium) vs sin cuotas (Clasica), mes por mes y por origen =====
+function renderCuotas(){
+  const fc=$('fCuenta').value, og=$('cqOrigen').value;
+  const vs=allRows().filter(o=>o.tipo==='Venta'&&o.pcd>0&&!o.excl&&(!fc||o.cuenta===fc)&&(!og||(TIPO[String(o.skuBase||'').toUpperCase()]||'x')===og));
+  const esCon=o=>/premium/i.test(o.pubT||'');
+  const agg=arr=>{const c=arr.filter(o=>o.costo!=null);const vend=arr.reduce((a,o)=>a+o.pcd,0),quedo=arr.reduce((a,o)=>a+(o.neto||0),0),costo=c.reduce((a,o)=>a+o.costo,0),gan=c.reduce((a,o)=>a+o.gan,0),vC=c.reduce((a,o)=>a+o.pcd,0);
+    return {n:arr.length,unid:arr.reduce((a,o)=>a+(o.unid||0),0),vend,quedo,costo,gan,nC:c.length,pQ:vend>0?quedo/vend:null,pC:costo>0?gan/costo:null,pV:vC>0?gan/vC:null,gv:c.length?gan/c.length:null};};
+  const C=agg(vs.filter(esCon)), S=agg(vs.filter(o=>!esCon(o)));
+  if(!vs.length){$('cqBody').innerHTML='<p class="note">No hay ventas con este filtro.</p>';return;}
+  const tarj=(t,x,col)=>`<div style="flex:1;min-width:240px;background:#fff;border:2px solid ${col};border-radius:14px;padding:12px;">
+    <b style="color:${col};">${t}</b>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;font-size:.88rem;">
+      <div><small class="meta">Ventas</small><div><b>${x.n.toLocaleString('es-AR')}</b> · ${x.unid.toLocaleString('es-AR')} unid.</div></div>
+      <div><small class="meta">Facturación</small><div><b>${fmt(x.vend)}</b></div></div>
+      <div><small class="meta">Te queda después de ML</small><div><b>${x.pQ!=null?pctf(x.pQ):'–'}</b> de cada venta</div></div>
+      <div><small class="meta">Ganancia</small><div><b class="${x.gan<0?'neg':'pos'}">${x.nC?fmt(x.gan):'–'}</b></div></div>
+      <div><small class="meta">Ganancia s/costo</small><div style="font-size:1.15rem;font-weight:800;" class="${x.pC<0?'neg':'pos'}">${x.pC!=null?pctf(x.pC):'–'}</div></div>
+      <div><small class="meta">Ganancia por venta</small><div style="font-size:1.15rem;font-weight:800;">${x.gv!=null?fmt(x.gv):'–'}</div></div>
+    </div></div>`;
+  const mejor=C.pC!=null&&S.pC!=null?(C.pC>S.pC?'con':'sin'):null;
+  // mes por mes
+  const ps=[...new Set(vs.map(o=>o.periodo))].sort();
+  const filas=ps.map(p=>{const c=agg(vs.filter(o=>o.periodo===p&&esCon(o))),s=agg(vs.filter(o=>o.periodo===p&&!esCon(o)));
+    const cel=x=>x.n?`${x.pC!=null?`<b class="${x.pC<0?'neg':'pos'}">${pctf(x.pC)}</b>`:'–'}<small class="meta" style="display:block;">${fmt(x.gan)} · ${x.n} ventas</small>`:'<span class="meta">–</span>';
+    const gana=c.pC!=null&&s.pC!=null?(c.pC>s.pC?'💳 Con cuotas':'💵 Sin cuotas'):'';
+    return `<tr style="border-top:1px solid var(--line);"><td style="padding:6px;">${mesTxt(p)}</td><td style="padding:6px;text-align:right;">${cel(s)}</td><td style="padding:6px;text-align:right;">${cel(c)}</td><td style="padding:6px;text-align:center;font-size:.82rem;">${gana}</td></tr>`;}).join('');
+  $('cqBody').innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;">${tarj('💵 Sin cuotas (Clásica)',S,'#2E5A8C')}${tarj('💳 Con cuotas (Premium)',C,'#5b2a86')}</div>
+    ${mejor?`<p style="margin:10px 0;font-size:.95rem;background:#EEF6F0;border-radius:10px;padding:8px 12px;">👉 En este período ${og?'(con este filtro) ':''}te deja más <b>${mejor==='con'?'💳 con cuotas':'💵 sin cuotas'}</b>: ${pctf(Math.max(C.pC,S.pC))} sobre el costo contra ${pctf(Math.min(C.pC,S.pC))}.</p>`:''}
+    ${ps.length>1?`<b style="font-size:.9rem;color:#3d1466;">Mes por mes</b> <small class="meta">(ganancia sobre el costo)</small>
+    <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;margin-top:6px;"><tr style="color:#8A8072;font-size:.75rem;text-transform:uppercase;"><td style="padding:6px;">Mes</td><td style="padding:6px;text-align:right;">💵 Sin cuotas</td><td style="padding:6px;text-align:right;">💳 Con cuotas</td><td style="padding:6px;text-align:center;">Deja más</td></tr>${filas}</table></div>`:''}
+    <p class="note" style="margin-top:6px;">Ganancia por venta (lo que te quedó − costo), sin los cargos generales del mes. Respeta la cuenta elegida arriba.</p>`;
 }
 // ===== Fabricado vs reventa (y telas, juegos armados), por mes y por logistica =====
 function renderOrigen(){
@@ -1410,7 +1449,7 @@ $('resMes').addEventListener('change',()=>{renderResumen();renderRanking();});
 ['rkMes','rkGrupo','rkOrden','rkVer'].forEach(id=>$(id).addEventListener('change',renderRanking));
 $('dsMes').addEventListener('change',renderDesglose);
 $('ftMes').addEventListener('change',renderFaltan);
-$('ogMes').addEventListener('change',renderOrigen);$('ogLog').addEventListener('change',renderOrigen);
+$('ogMes').addEventListener('change',renderOrigen);$('cqOrigen').addEventListener('change',renderCuotas);$('ogLog').addEventListener('change',renderOrigen);
 document.querySelectorAll('details.pleg').forEach(d=>{const k='ml.pleg.'+d.dataset.k;try{if(localStorage.getItem(k)==='1')d.open=true;}catch(e){}
   d.addEventListener('toggle',()=>{try{localStorage.setItem(k,d.open?'1':'0');}catch(e){}});});
 ['fMes','fCuenta','fTipo','fLog','fFlex','fOrden','fVista'].forEach(id=>$(id).addEventListener('change',()=>{shown=200;draw();}));
