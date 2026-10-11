@@ -1590,7 +1590,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v234</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v235</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2229,6 +2229,10 @@ a.grilla-celda{display:block;}
       <div id="fc-nuevas"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 8px;align-items:center;"><b style="flex:1;color:var(--purple);">Facturas guardadas</b><select id="fc-mes" onchange="renderFacturas()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"></select></div>
       <div id="fc-resumen"></div>
+      <div id="fc-barra" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+        <label style="display:flex;gap:6px;align-items:center;font-size:.85rem;cursor:pointer;"><input type="checkbox" id="fc-todas" onchange="document.querySelectorAll('.fc-sel').forEach(c => c.checked = this.checked); actualizarSelFact();" style="width:18px;height:18px;"> Seleccionar todas</label>
+        <button type="button" id="fc-borrar-sel" class="btn-mini" style="display:none;color:#A6432F;border-color:#E3B8AE;" onclick="borrarFacturasSel()">🗑️ Borrar seleccionadas</button>
+      </div>
       <div id="fc-lista"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
@@ -10494,6 +10498,21 @@ async function guardarFactura(i){
   try{ await db.collection('ventas_facturadas').doc(String(fa.numero).replace(/\//g, '-') || undefined).set(doc); fa.yaEsta = true; (facturas = facturas || []).push(doc); renderFacturasNuevas(); renderFacturas(); }
   catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
+function actualizarSelFact(){
+  const n = document.querySelectorAll('.fc-sel:checked').length, b = document.getElementById('fc-borrar-sel');
+  b.style.display = n ? 'inline-block' : 'none'; b.textContent = `🗑️ Borrar seleccionadas (${n})`;
+  const t = document.getElementById('fc-todas'), tot = document.querySelectorAll('.fc-sel').length; t.checked = n > 0 && n === tot; t.indeterminate = n > 0 && n < tot;
+}
+async function borrarFacturasSel(){
+  const ids = [...document.querySelectorAll('.fc-sel:checked')].map(c => c.value); if(!ids.length) return;
+  if(!confirm(`¿Quitar ${ids.length} ${ids.length === 1 ? 'factura' : 'facturas'} de la app? (en TFactura no se toca)`)) return;
+  try{ for(let i = 0; i < ids.length; i += 400){ const b = db.batch(); ids.slice(i, i + 400).forEach(id => b.delete(db.collection('ventas_facturadas').doc(id))); await b.commit(); } }
+  catch(e){ alert('No se pudieron borrar: ' + e.message); return; }
+  const s = new Set(ids);
+  facturas = facturas.filter(f => !s.has(f._id || String(f.numero).replace(/\//g, '-')));
+  facturasNuevas.forEach(fa => { if(s.has(String(fa.numero).replace(/\//g, '-'))) fa.yaEsta = false; });
+  document.getElementById('fc-todas').checked = false; renderFacturasNuevas(); renderFacturas(); actualizarSelFact();
+}
 async function borrarFactura(id){ if(!confirm('¿Quitar esta factura de la app? (en TFactura no se toca)')) return;
   try{ await db.collection('ventas_facturadas').doc(id).delete(); } catch(e){ alert('No se pudo borrar: ' + e.message); return; }
   facturas = facturas.filter(f => (f._id || String(f.numero).replace(/\//g, '-')) !== id);
@@ -10507,7 +10526,8 @@ function renderFacturas(){
     <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;"><small class="note">Facturado ${fcModoIva === 'con' ? '(con IVA)' : '(sin IVA)'}</small><div style="font-weight:800;font-size:1.2rem;">${formatPrice(T)}</div><small class="note">${fcModoIva === 'con' ? 'sin IVA ' + formatPrice(T / 1.21) : 'con IVA ' + formatPrice(T * 1.21)}</small></div>
     <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;"><small class="note">Costo de los productos</small><div style="font-weight:800;font-size:1.2rem;color:#D97A3A;">${formatPrice(C)}</div><small class="note">sin impuestos ni costos de logística</small></div>
     <div style="background:${T - C < 0 ? '#FDEBE7' : '#EEF6F0'};border-radius:12px;padding:10px;"><small class="note">Ganancia ${fcModoIva === 'con' ? '(con IVA)' : '(sin IVA)'}</small><div style="font-weight:800;font-size:1.2rem;color:${T - C < 0 ? '#A6432F' : '#2F7A47'};">${formatPrice(T - C)}</div><small class="note">${C > 0 ? Math.round((T - C) / C * 100) + ' % sobre el costo' : ''}</small></div></div>` : '';
-  document.getElementById('fc-lista').innerHTML = L.length ? L.map(f => `<details style="border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:6px;background:#fff;"><summary style="cursor:pointer;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><b style="flex:1;">▸ ${escaparHtml(f.tipo || '')} ${escaparHtml(f.numero)} · ${escaparHtml(f.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(f.cliente || '')}</span><span style="text-align:right;"><b style="font-size:.9rem;">${formatPrice(f.total || (f.neto || 0) * 1.21)}</b><small class="note" style="display:block;margin:0;">sin IVA ${formatPrice((f.total || (f.neto || 0) * 1.21) / 1.21)}</small></span><button type="button" class="btn-mini" title="Quitar de la app" onclick="event.preventDefault();event.stopPropagation();borrarFactura('${escapeAttr(f._id || f.numero)}')">🗑️</button></summary>${tablaFactura(f, true)}</details>`).join('') : '<p class="empty-msg">Todavía no guardaste facturas.</p>';
+  setTimeout(() => { const bar = document.getElementById('fc-barra'); if(bar) bar.style.display = L.length ? 'flex' : 'none'; actualizarSelFact(); }, 0);
+  document.getElementById('fc-lista').innerHTML = L.length ? L.map(f => `<details style="border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:6px;background:#fff;"><summary style="cursor:pointer;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><input type="checkbox" class="fc-sel" value="${escapeAttr(f._id || String(f.numero).replace(/\//g, '-'))}" onclick="event.stopPropagation();" onchange="actualizarSelFact()" style="width:18px;height:18px;"><b style="flex:1;">▸ ${escaparHtml(f.tipo || '')} ${escaparHtml(f.numero)} · ${escaparHtml(f.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(f.cliente || '')}</span><span style="text-align:right;"><b style="font-size:.9rem;">${formatPrice(f.total || (f.neto || 0) * 1.21)}</b><small class="note" style="display:block;margin:0;">sin IVA ${formatPrice((f.total || (f.neto || 0) * 1.21) / 1.21)}</small></span><button type="button" class="btn-mini" title="Quitar de la app" onclick="event.preventDefault();event.stopPropagation();borrarFactura('${escapeAttr(f._id || f.numero)}')">🗑️</button></summary>${tablaFactura(f, true)}</details>`).join('') : '<p class="empty-msg">Todavía no guardaste facturas.</p>';
 }
 
 // ===== Precio sugerido minimo en Mercado Libre (con los cargos reales de tus ventas: config/ml_parametros) =====
@@ -18110,7 +18130,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v234';
+const APP_VERSION = '2026-10-02-v235';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
