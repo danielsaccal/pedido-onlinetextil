@@ -1590,7 +1590,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v233</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v234</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2183,6 +2183,7 @@ a.grilla-celda{display:block;}
         </div>
         <div id="cr-kits-sug"></div>
       </details>
+      <p class="note" style="text-align:left;margin:4px 0;">🛒 <b>ML mín.</b>: precio mínimo en Mercado Libre (por unidad) para ganar el % elegido, con los cargos reales de tus ventas. <a href="#" onclick="event.preventDefault();cambiarMargenML()">Cambiar el %</a></p>
       <div id="cr-lista"></div>
       <div id="cr-guardar" style="display:none;position:sticky;bottom:10px;z-index:5;margin-top:10px;"><button type="button" onclick="guardarCostosReventa()" style="width:100%;padding:12px;border:none;border-radius:12px;background:#3D9A5B;color:#fff;font-weight:700;font-size:0.95rem;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.15);">💾 Guardar</button></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
@@ -4692,6 +4693,7 @@ async function abrirArticulosCortes(){
   await completarPiezasDeJuegosGuardados();
   await rearmarPiezasSueltas();
   try{ const cam = propagarMinimosJuegos(); if(cam.length) await guardarTablaYConsumo(); } catch(e){ console.error('minimos juegos', e); }
+  try{ await cargarParametrosML(); } catch(e){}
   if(!window.__limpiezaOfrecida){ window.__limpiezaOfrecida = true; setTimeout(async () => { await normalizarFundas5085(); await limpiarPiezasRepetidas(true); }, 300); }
   document.getElementById('ac-buscar').value = '';
   acArticulo = null;
@@ -8431,7 +8433,7 @@ async function renderProductosAC(){
         <div style="font-size:0.8rem;color:#6B6258;">${q ? escaparHtml(q.etiqueta) : '<span style="color:#A6432F;">sin tela elegida</span>'}</div>
         <div style="margin-top:4px;">${r ? `<span style="font-size:0.72rem;padding:2px 8px;border-radius:8px;background:#EAF6EE;color:#2F7A47;">✓ En catálogo: ${escaparHtml(r.producto.nombre)}</span>` : `<span style="font-size:0.72rem;padding:2px 8px;border-radius:8px;background:#FDF4E2;color:#8A6417;">Sin publicar</span>`}</div></div>
       <div style="text-align:right;font-size:0.78rem;color:#6B6258;">
-        ${x ? `<span style="font-size:0.72rem;">costo</span><b style="display:block;font-size:1.15rem;color:var(--purple);">$ ${formatoPesos(Math.round(x.total))}</b>` : '<span style="font-size:0.75rem;color:#A89E90;">costo sin calcular</span>'}
+        ${x ? `<span style="font-size:0.72rem;">costo</span><b style="display:block;font-size:1.15rem;color:var(--purple);">$ ${formatoPesos(Math.round(x.total))}</b>${htmlPrecioML(x.total)}` : '<span style="font-size:0.75rem;color:#A89E90;">costo sin calcular</span>'}
         <div style="margin-top:4px;display:flex;gap:4px;justify-content:flex-end;">
           ${r ? '' : `<button type="button" class="btn-mini" onclick="abrirPublicar('${escapeAttr(s)}')">📸 Publicar</button>`}
           <button type="button" class="btn-mini" title="Cambiar la tela" onclick="cambiarTelaProductoAC('${escapeAttr(s)}')">✏️</button>
@@ -10044,6 +10046,7 @@ async function abrirCostosReventa(){
   if(telasDatos === null) await cargarTelas();
   if(costosReventa === null) await cargarCostosReventa();
   if(kitsDatos === null) await cargarKits();
+  await cargarParametrosML();
   renderKits();
   const s = document.getElementById('cr-cat'), cats = [...new Set(productosReventaConCosto().map(x => x.cat))];
   s.innerHTML = '<option value="">Todas las categorías</option>' + cats.map(c => `<option>${escaparHtml(c)}</option>`).join('');
@@ -10074,7 +10077,8 @@ function renderCostosReventa(){
         return `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 110px 120px 70px;gap:6px;align-items:center;padding:4px 0;border-top:1px solid var(--line);font-size:0.85rem;">
           <b>${escaparHtml(s)}</b><span style="color:#6B6258;">${escaparHtml(v.desc || '')}</span><span style="text-align:right;">${pr ? formatPrice(pr) + `<small class="meta">${sufijoPrecio(x.p)}</small>` : ''}</span>
           ${kitsDatos && kitsDatos[s] ? `<div style="text-align:right;"><b>${costoUnidadSku(s) != null ? formatPrice(costoUnidadSku(s) * ({ 'docena': 12, 'media docena': 6, 'par': 2 }[unidadesVenta[x.p._editKey]] || 1)) : '—'}</b><small style="display:block;font-size:0.66rem;color:#6B4FA0;">🧩 ${escaparHtml(kitsDatos[s])}</small></div>` : `<div style="position:relative;"><input inputmode="decimal" value="${escapeAttr(crValor(s))}" placeholder="costo" oninput="crCambiar(${i}, this.value)" style="padding:7px;border:1px solid ${codTela(s) ? '#B9D3EE' : 'var(--line)'};border-radius:8px;text-align:right;width:100%;box-sizing:border-box;${codTela(s) ? 'background:#F2F7FD;' : ''}" title="${codTela(s) ? 'Costo por metro de la pantalla Telas (se cambia en los dos lados)' : ''}">${codTela(s) ? '<small style="display:block;text-align:right;font-size:0.66rem;color:#2E5A8C;margin-top:2px;">🧵 de Telas · por metro</small>' : ''}</div>`}
-          <span style="text-align:right;font-weight:700;color:${mg == null ? '#A89E90' : mg < 0.2 ? '#A6432F' : mg < 0.4 ? '#8A6417' : '#2F7A47'};" title="Margen sobre el costo">${mg == null ? '—' : Math.round(mg * 100) + ' %'}</span></div>`; }).join('')}</div>`;
+          <span style="text-align:right;font-weight:700;color:${mg == null ? '#A89E90' : mg < 0.2 ? '#A6432F' : mg < 0.4 ? '#8A6417' : '#2F7A47'};" title="Margen sobre el costo">${mg == null ? '—' : Math.round(mg * 100) + ' %'}</span>
+          <div style="grid-column:2/-1;text-align:right;">${htmlPrecioML(kitsDatos && kitsDatos[s] ? costoUnidadSku(s) : (c > 0 ? c / ({ 'docena': 12, 'media docena': 6, 'par': 2 }[unidadesVenta[x.p._editKey]] || 1) : 0))}</div></div>`; }).join('')}</div>`;
   }).join('');
   document.getElementById('cr-lista').innerHTML = html ? `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 110px 120px 70px;gap:6px;font-size:0.72rem;color:#8A8072;padding:0 10px 4px;"><span>SKU</span><span>Descripción</span><span style="text-align:right;">Precio lista</span><span style="text-align:right;">Costo de compra $</span><span style="text-align:right;">Margen</span></div>` + html : '<p class="empty-msg">No hay productos con ese filtro.</p>';
 }
@@ -10504,6 +10508,32 @@ function renderFacturas(){
     <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;"><small class="note">Costo de los productos</small><div style="font-weight:800;font-size:1.2rem;color:#D97A3A;">${formatPrice(C)}</div><small class="note">sin impuestos ni costos de logística</small></div>
     <div style="background:${T - C < 0 ? '#FDEBE7' : '#EEF6F0'};border-radius:12px;padding:10px;"><small class="note">Ganancia ${fcModoIva === 'con' ? '(con IVA)' : '(sin IVA)'}</small><div style="font-weight:800;font-size:1.2rem;color:${T - C < 0 ? '#A6432F' : '#2F7A47'};">${formatPrice(T - C)}</div><small class="note">${C > 0 ? Math.round((T - C) / C * 100) + ' % sobre el costo' : ''}</small></div></div>` : '';
   document.getElementById('fc-lista').innerHTML = L.length ? L.map(f => `<details style="border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:6px;background:#fff;"><summary style="cursor:pointer;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><b style="flex:1;">▸ ${escaparHtml(f.tipo || '')} ${escaparHtml(f.numero)} · ${escaparHtml(f.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(f.cliente || '')}</span><span style="text-align:right;"><b style="font-size:.9rem;">${formatPrice(f.total || (f.neto || 0) * 1.21)}</b><small class="note" style="display:block;margin:0;">sin IVA ${formatPrice((f.total || (f.neto || 0) * 1.21) / 1.21)}</small></span><button type="button" class="btn-mini" title="Quitar de la app" onclick="event.preventDefault();event.stopPropagation();borrarFactura('${escapeAttr(f._id || f.numero)}')">🗑️</button></summary>${tablaFactura(f, true)}</details>`).join('') : '<p class="empty-msg">Todavía no guardaste facturas.</p>';
+}
+
+// ===== Precio sugerido minimo en Mercado Libre (con los cargos reales de tus ventas: config/ml_parametros) =====
+let mlParam = null;
+async function cargarParametrosML(){ if(mlParam !== null) return mlParam; try{ const d = await db.collection('config').doc('ml_parametros').get(); mlParam = d.exists ? d.data() : false; } catch(e){ mlParam = false; } return mlParam; }
+function margenMinML(){ try{ return +(localStorage.getItem('ml.margenMin') || 30); } catch(e){ return 30; } }
+// precio para que, despues de los cargos de ML y el envio, quede el costo + el margen buscado
+function precioMinML(costo, conCuotas){
+  if(!mlParam || !(costo > 0)) return null;
+  const m = margenMinML() / 100, com = conCuotas ? (mlParam.premium.com + (mlParam.premium.cuotas || 0)) : mlParam.clasica.com;
+  const k = 1 - com - (mlParam.retenciones || 0); if(k <= 0.2) return null;
+  const meta = costo * (1 + m) + (mlParam.envioPorVenta || 0);
+  let P = (meta + (mlParam.fijo.monto || 0)) / k;
+  if(mlParam.fijo.hasta && P > mlParam.fijo.hasta){ const P2 = meta / k; P = P2 > mlParam.fijo.hasta ? P2 : mlParam.fijo.hasta; }
+  return Math.ceil(P / 100) * 100;
+}
+function htmlPrecioML(costoUnidad, mult){
+  const c = (costoUnidad || 0) * (mult || 1); if(!mlParam || !(c > 0)) return '';
+  const a = precioMinML(c, false), b = precioMinML(c, true); if(!a) return '';
+  return `<div style="font-size:.74rem;color:#5b2a86;margin-top:3px;line-height:1.3;" title="Precio mínimo en Mercado Libre para ganar ${margenMinML()} % sobre el costo, después de comisión, cuotas, cargo fijo, envío e impuestos (calculado con tus ventas reales)">🛒 ML mín. (${margenMinML()} %): <b>${formatPrice(a)}</b> sin cuotas · <b>${formatPrice(b)}</b> con cuotas</div>`;
+}
+async function cambiarMargenML(){
+  const v = prompt('¿Qué ganancia mínima querés sobre el costo en Mercado Libre? (%)', margenMinML()); if(v === null) return;
+  const n = parseFloat(String(v).replace(',', '.')); if(!(n >= 0)) return;
+  try{ localStorage.setItem('ml.margenMin', String(n)); } catch(e){}
+  try{ renderCostosReventa(); } catch(e){} try{ if(acArticulo) abrirArticuloAC(acArticulo); } catch(e){}
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -14827,6 +14857,7 @@ async function guardarProductoEditado(){
 }
 
 function abrirNuevoProducto(){
+  cargarParametrosML();
   mostrarPaso('step-nuevo-producto');
   const sel = document.getElementById('np-categoria');
   if(sel.options.length <= 1){
@@ -14866,7 +14897,7 @@ function agregarVarianteNP(){
     <input type="text" placeholder="SKU" class="npv-sku">
     <input type="text" placeholder="Descripción (ej: 1 Plaza)" class="npv-desc">
     <input type="text" placeholder="Precio de venta" class="npv-precio">
-    ${conCosto ? '<input type="text" placeholder="Costo (privado)" class="npv-costo" title="Costo de compra: no se muestra en el catálogo, queda en Costos de reventa" style="background:#FFF8E6;border-color:#EBD9A8;">' : ''}
+    ${conCosto ? '<div><input type="text" placeholder="Costo (privado)" class="npv-costo" title="Costo de compra: no se muestra en el catálogo, queda en Costos de reventa" style="background:#FFF8E6;border-color:#EBD9A8;width:100%;box-sizing:border-box;" oninput="this.nextElementSibling.innerHTML = htmlPrecioML(numAr(this.value))"><div></div></div>' : ''}
     <button type="button" class="btn-mini" onclick="document.getElementById('${id}').remove();">✕</button>
   `;
   cont.appendChild(row);
@@ -18079,7 +18110,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v233';
+const APP_VERSION = '2026-10-02-v234';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
