@@ -1590,7 +1590,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v235</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v236</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -10420,13 +10420,16 @@ function parsearFactura(L, nombreArchivo){
   items.forEach(it => { it.neto = conIva ? it.importe / 1.21 : it.importe; });
   const suma = items.reduce((a, x) => a + x.importe, 0);
   items.forEach(it => { it.ok = renglonOk(it); });
+  // nota de credito: resta (devolucion o descuento posterior)
+  const esNC = /nota\s+de\s+cr[ée]dito/i.test(tit + ' ' + txt.slice(0, 600)) || /^NC[\s_-]/i.test(nombreArchivo || '');
   const malos = items.filter(it => !it.ok).length;
-  return { numero, tipo, fecha, cliente, total, items, archivo: nombreArchivo, hojas: lineasPDF.hojas, subtotal, malos, controlOk: malos === 0 && (!subtotal || Math.abs(suma - subtotal) < 1) && items.length > 0 };
+  return { numero, tipo, fecha, cliente, total, items, archivo: nombreArchivo, hojas: lineasPDF.hojas, subtotal, malos, esNC, devolvieron: true, controlOk: malos === 0 && (!subtotal || Math.abs(suma - subtotal) < 1) && items.length > 0 };
 }
 function skuDeFactura(cod){ const c = String(cod).toUpperCase(); return (fcEquiv && fcEquiv[c]) || c; }
 // en las facturas la cantidad va en la unidad de venta del catalogo (ej: docenas); el costo de la app es por unidad suelta
 function divisorVenta(s){ const r = buscarProductoPorSku(s); return r ? ({ 'docena': 12, 'media docena': 6, 'par': 2 }[unidadesVenta[r.producto._editKey]] || 1) : 1; }
-function costoItemFactura(it){ const s = skuDeFactura(it.codigo); const cu = costoUnidadSku(s); return cu != null ? cu * divisorVenta(s) * it.cant : null; }
+function costoItemFactura(it, fa){ const s = skuDeFactura(it.codigo); const cu = costoUnidadSku(s); if(cu == null) return null; const c = cu * divisorVenta(s) * it.cant; return fa && fa.esNC ? (fa.devolvieron === false ? 0 : -c) : c; }
+function signoFact(fa){ return fa && fa.esNC ? -1 : 1; }
 async function prepararCostosFacturas(){
   if(tablaConsumo === null) await cargarTablaConsumo(); if(telasDatos === null) await cargarTelas(); if(fabricacion === null) await cargarFabricacion();
   if(typeof fichasArticulos !== 'undefined' && fichasArticulos === null) await cargarFichasArticulos();
@@ -10463,11 +10466,11 @@ function factorIvaFactura(fa){ const n = (fa.items || []).reduce((a, x) => a + (
 function tablaFactura(fa, editable){
   const fx = factorIvaFactura(fa);
   let tN = 0, tC = 0, conC = true;
-  const filas = fa.items.map((it, i) => { const c = costoItemFactura(it); const v = it.neto * fx; tN += v; if(c == null) conC = false; else tC += c; const g = c != null ? v - c : null;
+  const filas = fa.items.map((it, i) => { const c = costoItemFactura(it, fa); const v = it.neto * fx * signoFact(fa); tN += v; if(c == null) conC = false; else tC += c; const g = c != null ? v - c : null;
     const s = skuDeFactura(it.codigo);
     return `<tr style="border-top:1px solid var(--line);${it.ok === false ? 'background:#FDEBE7;' : ''}"><td style="padding:6px;">${it.ok === false ? '⚠️ ' : ''}<b>${escaparHtml(it.codigo)}</b>${s !== it.codigo ? ` <span class="note">→ ${escaparHtml(s)}</span>` : ''}<div class="note" style="text-align:left;margin:0;">${escaparHtml(it.desc)}</div></td>
       <td style="padding:6px;text-align:right;">${it.cant.toLocaleString('es-AR')}${divisorVenta(s) > 1 ? `<div class="note" style="margin:0;">${({ 12: 'docenas', 6: 'medias doc.', 2: 'pares' })[divisorVenta(s)]}</div>` : ''}</td><td style="padding:6px;text-align:right;">${formatPrice(v / (it.cant || 1))}</td>
-      <td style="padding:6px;text-align:right;">${c != null ? formatPrice(c / (it.cant || 1)) : (editable ? `<input placeholder="código en la app" style="width:120px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;font-size:.8rem;text-transform:uppercase;" onchange="equivFactura('${escapeAttr(it.codigo)}', this.value)">` : '<span class="note">sin costo</span>')}</td>
+      <td style="padding:6px;text-align:right;">${c != null ? formatPrice(Math.abs(c) / (it.cant || 1)) : (editable ? `<input placeholder="código en la app" style="width:120px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;font-size:.8rem;text-transform:uppercase;" onchange="equivFactura('${escapeAttr(it.codigo)}', this.value)">` : '<span class="note">sin costo</span>')}</td>
       <td style="padding:6px;text-align:right;font-weight:700;color:${g == null ? '#A89E90' : g < 0 ? '#A6432F' : '#2F7A47'};">${g != null ? formatPrice(g) + `<div class="note" style="margin:0;">${c > 0 ? Math.round(g / c * 100) + ' % s/costo' : ''}</div>` : '–'}</td></tr>`; }).join('');
   const G = tN - tC;
   return `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><tr style="color:#8A8072;font-size:.72rem;text-transform:uppercase;"><td style="padding:6px;">Producto</td><td style="padding:6px;text-align:right;">Cant.</td><td style="padding:6px;text-align:right;">Precio ${fcModoIva === 'con' ? 'c/IVA' : 's/IVA'}<div style="text-transform:none;font-size:.68rem;">con descuentos</div></td><td style="padding:6px;text-align:right;">Costo c/u<div style="text-transform:none;font-size:.68rem;">con IVA</div></td><td style="padding:6px;text-align:right;">Ganancia</td></tr>${filas}
@@ -10478,8 +10481,9 @@ function renderFacturasNuevas(){
   const box = document.getElementById('fc-nuevas');
   box.innerHTML = facturasNuevas.map((fa, i) => fa.error ? `<div style="background:#FDEBE7;border-radius:12px;padding:10px;margin-bottom:8px;">❌ ${escaparHtml(fa.archivo)}: ${escaparHtml(fa.error)}</div>` :
     `<div style="border:2px solid ${fa.yaEsta ? '#E3B8AE' : 'var(--gold)'};border-radius:14px;padding:12px;margin-bottom:10px;background:#fff;">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;"><b style="flex:1;">Factura ${escaparHtml(fa.tipo)} ${escaparHtml(fa.numero)} · ${escaparHtml(fa.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(fa.cliente)}</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;"><b style="flex:1;">${fa.esNC ? '<span style="background:#FDEBE7;color:#A6432F;border-radius:6px;padding:1px 6px;">Nota de crédito</span>' : 'Factura'} ${escaparHtml(fa.tipo)} ${escaparHtml(fa.numero)} · ${escaparHtml(fa.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(fa.cliente)}</span></div>
       ${fa.controlOk === false ? `<div style="background:#FDEBE7;color:#A6432F;border-radius:10px;padding:6px 10px;font-size:.84rem;margin:4px 0;">⚠️ ${fa.malos ? fa.malos + (fa.malos === 1 ? ' renglón no cierra' : ' renglones no cierran') + ' (cantidad × precio − bonificación ≠ importe). ' : ''}${fa.subtotal && Math.abs(fa.items.reduce((a, x) => a + x.importe, 0) - fa.subtotal) >= 1 ? 'La suma de los renglones (' + formatPrice(fa.items.reduce((a, x) => a + x.importe, 0)) + ') no coincide con el subtotal (' + formatPrice(fa.subtotal) + '). ' : ''}No se puede guardar: mandame el PDF.</div>` : `<div style="color:#2F7A47;font-size:.8rem;margin:2px 0;">✓ Todos los renglones cierran (cantidad × precio − bonificación = importe)${fa.subtotal ? ' y la suma coincide con el subtotal' : ''}</div>`}
+      ${fa.esNC ? `<label style="display:flex;gap:6px;align-items:center;font-size:.85rem;background:#FFF4D6;border-radius:10px;padding:6px 10px;margin:4px 0;"><input type="checkbox" ${fa.devolvieron !== false ? 'checked' : ''} onchange="facturasNuevas[${i}].devolvieron=this.checked;renderFacturasNuevas();"> Devolvieron la mercadería (si no, es solo un descuento: resta la venta pero no el costo)</label>` : ''}
       ${fa.hojas ? `<div class="note" style="text-align:left;margin:2px 0 6px;">📄 ${fa.hojas.total} ${fa.hojas.total === 1 ? 'hoja' : 'hojas'} en el PDF · leí ${fa.hojas.originales} ${fa.hojas.originales === 1 ? 'hoja original' : 'hojas originales'}${fa.hojas.total > fa.hojas.originales ? ' (el resto son duplicados)' : ''} · ${fa.items.length} renglones</div>` : ''}
       ${fa.items.length ? tablaFactura(fa, true) : '<p class="note">No encontré renglones en esta factura.</p>'}
       ${fa.yaEsta ? `<p class="note" style="color:#A6432F;text-align:left;">Esta factura ya está guardada. <a href="#" onclick="event.preventDefault();borrarFactura('${escapeAttr(String(fa.numero).replace(/\//g, '-'))}')">🗑️ Quitarla de la app</a></p>` : (fa.items.length && fa.controlOk !== false ? `<button class="btn btn-gold" style="margin-top:8px;" onclick="guardarFactura(${i})">💾 Guardar esta factura</button>` : '')}
@@ -10493,8 +10497,8 @@ async function equivFactura(cod, v){
 }
 async function guardarFactura(i){
   const fa = facturasNuevas[i]; if(!fa) return;
-  const items = fa.items.map(it => { const c = costoItemFactura(it); return { ...it, sku: skuDeFactura(it.codigo), costo: c, gan: c != null ? it.neto - c : null }; });
-  const doc = { numero: fa.numero, tipo: fa.tipo, fecha: fa.fecha, cliente: fa.cliente, total: fa.total, items, neto: items.reduce((a, x) => a + x.neto, 0), costo: items.reduce((a, x) => a + (x.costo || 0), 0), archivo: fa.archivo, guardado: new Date().toISOString() };
+  const items = fa.items.map(it => { const c = costoItemFactura(it, fa); return { ...it, sku: skuDeFactura(it.codigo), costo: c, gan: c != null ? it.neto * signoFact(fa) - c : null }; });
+  const doc = { esNC: !!fa.esNC, devolvieron: fa.devolvieron !== false, numero: fa.numero, tipo: fa.tipo, fecha: fa.fecha, cliente: fa.cliente, total: fa.total, items, neto: items.reduce((a, x) => a + x.neto, 0), costo: items.reduce((a, x) => a + (x.costo || 0), 0), archivo: fa.archivo, guardado: new Date().toISOString() };
   try{ await db.collection('ventas_facturadas').doc(String(fa.numero).replace(/\//g, '-') || undefined).set(doc); fa.yaEsta = true; (facturas = facturas || []).push(doc); renderFacturasNuevas(); renderFacturas(); }
   catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
@@ -10521,13 +10525,13 @@ async function borrarFactura(id){ if(!confirm('¿Quitar esta factura de la app? 
 function renderFacturas(){
   const mes = document.getElementById('fc-mes').value;
   const L = (facturas || []).filter(f => !mes || (f.fecha || '').split('/').reverse().slice(0, 2).join('-') === mes).sort((a, b) => String(b.fecha).split('/').reverse().join('').localeCompare(String(a.fecha).split('/').reverse().join('')));
-  let N = 0, C = 0, T = 0; L.forEach(f => { const fx = factorIvaFactura(f); f.items.forEach(it => { const c = costoItemFactura(it); N += it.neto; T += it.neto * fx; if(c != null) C += c; }); });
+  let N = 0, C = 0, T = 0; L.forEach(f => { const fx = factorIvaFactura(f), sg = signoFact(f); f.items.forEach(it => { const c = costoItemFactura(it, f); N += it.neto * sg; T += it.neto * fx * sg; if(c != null) C += c; }); });
   document.getElementById('fc-resumen').innerHTML = L.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px;">
     <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;"><small class="note">Facturado ${fcModoIva === 'con' ? '(con IVA)' : '(sin IVA)'}</small><div style="font-weight:800;font-size:1.2rem;">${formatPrice(T)}</div><small class="note">${fcModoIva === 'con' ? 'sin IVA ' + formatPrice(T / 1.21) : 'con IVA ' + formatPrice(T * 1.21)}</small></div>
     <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;"><small class="note">Costo de los productos</small><div style="font-weight:800;font-size:1.2rem;color:#D97A3A;">${formatPrice(C)}</div><small class="note">sin impuestos ni costos de logística</small></div>
     <div style="background:${T - C < 0 ? '#FDEBE7' : '#EEF6F0'};border-radius:12px;padding:10px;"><small class="note">Ganancia ${fcModoIva === 'con' ? '(con IVA)' : '(sin IVA)'}</small><div style="font-weight:800;font-size:1.2rem;color:${T - C < 0 ? '#A6432F' : '#2F7A47'};">${formatPrice(T - C)}</div><small class="note">${C > 0 ? Math.round((T - C) / C * 100) + ' % sobre el costo' : ''}</small></div></div>` : '';
   setTimeout(() => { const bar = document.getElementById('fc-barra'); if(bar) bar.style.display = L.length ? 'flex' : 'none'; actualizarSelFact(); }, 0);
-  document.getElementById('fc-lista').innerHTML = L.length ? L.map(f => `<details style="border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:6px;background:#fff;"><summary style="cursor:pointer;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><input type="checkbox" class="fc-sel" value="${escapeAttr(f._id || String(f.numero).replace(/\//g, '-'))}" onclick="event.stopPropagation();" onchange="actualizarSelFact()" style="width:18px;height:18px;"><b style="flex:1;">▸ ${escaparHtml(f.tipo || '')} ${escaparHtml(f.numero)} · ${escaparHtml(f.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(f.cliente || '')}</span><span style="text-align:right;"><b style="font-size:.9rem;">${formatPrice(f.total || (f.neto || 0) * 1.21)}</b><small class="note" style="display:block;margin:0;">sin IVA ${formatPrice((f.total || (f.neto || 0) * 1.21) / 1.21)}</small></span><button type="button" class="btn-mini" title="Quitar de la app" onclick="event.preventDefault();event.stopPropagation();borrarFactura('${escapeAttr(f._id || f.numero)}')">🗑️</button></summary>${tablaFactura(f, true)}</details>`).join('') : '<p class="empty-msg">Todavía no guardaste facturas.</p>';
+  document.getElementById('fc-lista').innerHTML = L.length ? L.map(f => `<details style="border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:6px;background:#fff;"><summary style="cursor:pointer;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><input type="checkbox" class="fc-sel" value="${escapeAttr(f._id || String(f.numero).replace(/\//g, '-'))}" onclick="event.stopPropagation();" onchange="actualizarSelFact()" style="width:18px;height:18px;"><b style="flex:1;">▸ ${f.esNC ? '<span style="color:#A6432F;">NC</span> ' : ''}${escaparHtml(f.tipo || '')} ${escaparHtml(f.numero)} · ${escaparHtml(f.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(f.cliente || '')}</span><span style="text-align:right;"><b style="font-size:.9rem;">${formatPrice(f.total || (f.neto || 0) * 1.21)}</b><small class="note" style="display:block;margin:0;">sin IVA ${formatPrice((f.total || (f.neto || 0) * 1.21) / 1.21)}</small></span><button type="button" class="btn-mini" title="Quitar de la app" onclick="event.preventDefault();event.stopPropagation();borrarFactura('${escapeAttr(f._id || f.numero)}')">🗑️</button></summary>${tablaFactura(f, true)}</details>`).join('') : '<p class="empty-msg">Todavía no guardaste facturas.</p>';
 }
 
 // ===== Precio sugerido minimo en Mercado Libre (con los cargos reales de tus ventas: config/ml_parametros) =====
@@ -18130,7 +18134,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v235';
+const APP_VERSION = '2026-10-02-v236';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
