@@ -1595,7 +1595,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v238</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v239</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -10565,6 +10565,34 @@ async function cambiarMargenML(){
   try{ renderCostosReventa(); } catch(e){} try{ if(acArticulo) abrirArticuloAC(acArticulo); } catch(e){}
 }
 
+// ===== "Compartir con la app" (Android): fotos, PDF o texto que llegan desde otra app =====
+try{ if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {}); } catch(e){}
+async function recibirCompartido(){
+  try{
+    const cache = await caches.open('compartidos'); const r = await cache.match('./compartido/indice'); if(!r) return;
+    const ind = await r.json(); await cache.delete('./compartido/indice');
+    const files = [];
+    for(const x of ind.lista || []){ const rr = await cache.match(x.key); if(rr){ const b = await rr.blob(); files.push(new File([b], x.nombre, { type: x.tipo || b.type })); await cache.delete(x.key); } }
+    const pdfs = files.filter(f => /pdf/i.test(f.type) || /\.pdf$/i.test(f.name)), imgs = files.filter(f => /^image\//.test(f.type));
+    const desc = [imgs.length ? imgs.length + (imgs.length === 1 ? ' imagen' : ' imágenes') : '', pdfs.length ? pdfs.length + ' PDF' : '', !files.length && ind.texto ? 'un texto' : ''].filter(Boolean).join(' y ');
+    if(!desc) return;
+    const ops = [];
+    if(imgs.length || ind.texto) ops.push({ t: '🛒 Armar un pedido', v: 'pedido' });
+    if(pdfs.length) ops.push({ t: '🧾 Ventas facturadas (facturas)', v: 'facturas' });
+    if(imgs.length || pdfs.length) ops.push({ t: '💸 Comprobante de un gasto', v: 'gasto' });
+    const v = await elegirOpcion('Recibiste ' + desc, '¿Qué querés hacer?', ops);
+    if(v === 'pedido'){
+      abrirPedidoIA();
+      if(imgs.length){ const dt = new DataTransfer(); dt.items.add(imgs[0]); const inp = document.getElementById('pia-foto'); inp.files = dt.files; leerFotoPedido(inp); }
+      else { document.getElementById('pia-texto').value = ind.texto; analizarPedidoIA(); }
+    } else if(v === 'facturas'){
+      await abrirFacturas(); const dt = new DataTransfer(); pdfs.forEach(f => dt.items.add(f)); const inp = document.getElementById('fc-file'); inp.files = dt.files; leerFacturasPDF(inp);
+    } else if(v === 'gasto'){
+      await abrirGastos(); const dt = new DataTransfer(); dt.items.add((imgs[0] || pdfs[0])); document.getElementById('gs-comp').files = dt.files; document.getElementById('gs-monto').focus();
+    }
+  } catch(e){ console.error('compartido', e); }
+}
+
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -18155,6 +18183,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 }).then(() => {
   asignarMapaFotos(); aplicarMovimientos(); reconstruirFotos();
   renderCatalogo(document.getElementById('buscador').value);
+  if(new URLSearchParams(location.search).get('compartido') === '1'){ history.replaceState(null, '', location.pathname); setTimeout(recibirCompartido, 400); }
   // links desde Resultados ML: ?ir=completar&sku=X · ?ir=telas&q=X · ?ir=reventa&sku=X
   try{ const q = new URLSearchParams(location.search), ir = q.get('ir');
     if(q.get('embed') === '1'){
@@ -18176,7 +18205,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v238';
+const APP_VERSION = '2026-10-02-v239';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
