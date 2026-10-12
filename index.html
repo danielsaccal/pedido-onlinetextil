@@ -1231,10 +1231,12 @@ a.grilla-celda{display:block;}
   <!-- STEP: PEDIDO CON IA (TEXTO LIBRE) -->
   <div class="step" id="step-pedido-ia">
     <div class="form-card">
-      <h2>Pedido con IA (texto libre)</h2>
+      <h2>Pedido con IA</h2>
+      <label class="btn btn-gold" style="display:block;text-align:center;cursor:pointer;margin-bottom:10px;">📷 Escanear o adjuntar una foto del pedido<input type="file" id="pia-foto" accept="image/*" capture="environment" style="display:none;" onchange="leerFotoPedido(this)"></label>
+      <div id="pia-foto-estado" class="note" style="text-align:left;display:none;margin-bottom:8px;"></div>
       <p class="note" style="margin-bottom:14px;">Escriba el pedido como si se lo dijera a alguien. Ej: "pedido para Tarsia de 5 docenas de los repasadores más económicos". Siempre le muestra la previsualización antes de crear nada.</p>
       <div class="field">
-        <textarea id="pia-texto" rows="3" placeholder="Ej: pedido para Tarsia de 5 BAR900" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:'Work Sans';"></textarea>
+        <textarea id="pia-texto" rows="3" placeholder="O escribilo: pedido para Tarsia de 5 BAR900" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:'Work Sans';"></textarea>
         <button type="button" class="btn-mini" id="pia-mic" style="margin-top:6px;" onclick="dictarEnCampo('pia-texto','pia-mic', true)">🎙️ Dictar por voz</button>
       </div>
       <div class="actions"><button class="btn btn-gold" id="pia-btn-analizar" onclick="analizarPedidoIA()">Analizar con IA</button></div>
@@ -1590,7 +1592,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v236</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v237</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5705,7 +5707,7 @@ function aprovechamientoCorte(c, W){
 const GRUPOS_INICIO = {
   a: { lado: 'ext', titulo: 'Armar pedido', titulosColumnas: ['1 · Elegir productos', '2 · Encontrar rápido'], columnas: [
     [['📚 Catálogo', "irACatalogoDesdeInicio()"]],
-    [['📷 Escanear etiqueta (SKU)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto').click()"], ['🤖 Buscar por foto (IA)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto-producto').click()"]]
+    [['📷 Escanear etiqueta (SKU)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto').click()"], ['🤖 Buscar por foto (IA)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto-producto').click()"], ['📄 Pedido desde una foto', "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)"]]
   ] },
   c: { lado: 'ext', titulo: 'Difusión', titulosColumnas: ['1 · Catálogo a clientes', '2 · Videos', '3 · Redes y anuncios'], columnas: [
     [['🔗 Compartir por rubro', 'abrirCompartirRubro()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()']],
@@ -5713,7 +5715,7 @@ const GRUPOS_INICIO = {
     [['🖼️ Nuevo ingreso (flyers)', 'abrirNuevoIngreso()'], ['📣 Anuncios y promociones', 'abrirAnuncio()']],
   ] },
   d: { lado: 'int', titulo: 'Ventas', titulosColumnas: ['1 · Tomar pedidos', '2 · Entregar', '3 · Clientes', '4 · Plata'], columnas: [
-    [['🤖 Pedido con IA (texto libre)', 'abrirPedidoIA()'], ['📋 Historial de pedidos', 'abrirHistorial()']],
+    [['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()'], ['📋 Historial de pedidos', 'abrirHistorial()']],
     [['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']],
     [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']],
     [['🧾 Ventas facturadas', 'abrirFacturas()'], ['💸 Gastos comerciales', 'abrirGastos()'], ['📈 Resultados Mercado Libre', 'abrirResultadosML()']]
@@ -11858,7 +11860,38 @@ async function generarYMostrarVideoIA(cont, formato, descripcionProducto, imagen
   }
 }
 
+// ---------- pedido desde una foto: se lee el texto de la imagen y se interpreta igual que el texto libre ----------
+function cargarTesseract(){
+  if(window.Tesseract) return Promise.resolve();
+  return new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js'; s.onload = res; s.onerror = () => rej(new Error('No se pudo cargar el lector de imágenes')); document.head.appendChild(s); });
+}
+async function leerFotoPedido(inp){
+  const f = inp.files[0]; inp.value = ''; if(!f) return;
+  const est = document.getElementById('pia-foto-estado'); est.style.display = 'block';
+  est.innerHTML = '🔎 Leyendo la imagen… (la primera vez tarda un poco más)';
+  try{
+    await cargarTesseract();
+    const r = await Tesseract.recognize(f, 'spa', { logger: m => { if(m.status === 'recognizing text') est.innerHTML = `🔎 Leyendo la imagen… ${Math.round((m.progress || 0) * 100)} %`; } });
+    const texto = String((r && r.data && r.data.text) || '').replace(/\n{2,}/g, '\n').trim();
+    if(!texto){ est.innerHTML = '⚠️ No pude leer texto en la imagen. Probá con más luz o más cerca.'; return; }
+    document.getElementById('pia-texto').value = texto;
+    est.innerHTML = '✓ Leí la imagen. Revisá el texto si querés y ahora la IA arma el pedido…';
+    pedidoDesdeFoto = true;
+    await analizarPedidoIA();
+  } catch(e){ est.innerHTML = '⚠️ No se pudo leer la imagen: ' + escaparHtml(e.message); }
+}
+let pedidoDesdeFoto = false;
+// elegir el cliente antes de confirmar
+function htmlElegirClienteIA(sugerido){
+  const opts = (clientesAutocomplete || []).map(c => `<option value="${escapeAttr(((c.nombre || '') + ' ' + (c.apellido || '')).trim())}">`).join('');
+  return `<div style="background:#FFF8E6;border:1px solid #EBD9A8;border-radius:12px;padding:10px 12px;margin:10px 0;">
+    <b style="font-size:.95rem;">👤 ¿Para qué cliente es este pedido?</b>
+    <input id="pia-cliente" list="pia-clientes" value="${escapeAttr(sugerido || '')}" placeholder="Escribí el nombre del cliente" style="width:100%;box-sizing:border-box;margin-top:6px;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:1rem;">
+    <datalist id="pia-clientes">${opts}</datalist>
+    <small class="note" style="display:block;text-align:left;margin-top:4px;">Si es un cliente nuevo, escribí el nombre y completás sus datos en el paso siguiente.</small></div>`;
+}
 function abrirPedidoIA(){
+  pedidoDesdeFoto = false; { const e = document.getElementById('pia-foto-estado'); if(e){ e.style.display = 'none'; e.innerHTML = ''; } }
   mostrarPaso('step-pedido-ia');
   document.getElementById('pia-texto').value = '';
   document.getElementById('pia-error').style.display = 'none';
@@ -11950,6 +11983,7 @@ async function analizarPedidoIA(){
 
     const hayValidos = itemsResueltos.some(it => it.match);
     if(hayValidos){
+      html += htmlElegirClienteIA(clienteMatch ? ((clienteMatch.nombre || '') + ' ' + (clienteMatch.apellido || '')).trim() : (datos.cliente || ''));
       html += `<div class="actions"><button class="btn btn-gold" onclick="confirmarPedidoIA()">Confirmar y continuar el pedido</button></div>`;
     } else {
       html += '<p class="error" style="display:block;">Ningún ítem se pudo relacionar con el catálogo. Pruebe reformular el pedido.</p>';
@@ -11966,6 +12000,10 @@ async function analizarPedidoIA(){
 
 function confirmarPedidoIA(){
   if(!pedidoIAPropuesta) return;
+  const nomCli = ((document.getElementById('pia-cliente') || {}).value || '').trim();
+  if(!nomCli){ alert('Elegí para qué cliente es el pedido.'); document.getElementById('pia-cliente').focus(); return; }
+  const elegido = (clientesAutocomplete || []).find(c => ((c.nombre || '') + ' ' + (c.apellido || '')).trim().toLowerCase() === nomCli.toLowerCase()) || buscarClientePorNombreIA(nomCli);
+  pedidoIAPropuesta.clienteMatch = elegido || null;
   const { itemsResueltos, clienteMatch } = pedidoIAPropuesta;
 
   itemsResueltos.forEach(it => {
@@ -11984,6 +12022,7 @@ function confirmarPedidoIA(){
 
   irADatos();
 
+  if(!clienteMatch && nomCli){ const pz = nomCli.split(' '); document.getElementById('f-nombre').value = pz.shift() || ''; document.getElementById('f-apellido').value = pz.join(' '); }
   if(clienteMatch){
     document.getElementById('f-nombre').value = clienteMatch.nombre || '';
     document.getElementById('f-apellido').value = clienteMatch.apellido || '';
@@ -18134,7 +18173,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v236';
+const APP_VERSION = '2026-10-02-v237';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
