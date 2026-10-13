@@ -1595,7 +1595,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v244</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v245</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -9983,6 +9983,8 @@ async function registrarHistorialCostos(){
     const nuevos = [];
     const fabricados = new Set(skusQueFabrico());
     const cambiosCosto = [];
+    if(kitsDatos === null) await cargarKits();
+    if(costosReventa === null) await cargarCostosReventa();
     fabricados.forEach(S => {
       const a = costoActualSku(S); if(!a) return;
       if(ult[S] == null || Math.abs(ult[S] - a.costo) >= 1){ if(ult[S] > 0 && Math.abs(ult[S] - a.costo) / ult[S] >= 0.005) cambiosCosto.push({ sku: S, antes: ult[S], ahora: a.costo }); nuevos.push({ sku: S, fecha: hoy, costo: a.costo, desglose: a.desglose }); ult[S] = a.costo; }
@@ -10657,7 +10659,11 @@ async function importarLinksWeb(inp){
 
 // ===== Cuando cambia el costo de lo que fabricas: proponer el precio nuevo del catalogo, manteniendo el mismo margen =====
 function precioTxt(n){ return Math.round(n * 100) / 100 === Math.round(n) ? formatoPesos(Math.round(n)) + ',00' : (Math.round(n * 100) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function vistosCambiosCosto(){ try{ return JSON.parse(localStorage.getItem('cambiosCostoVistos') || '{}'); } catch(e){ return {}; } }
+function marcarCambiosVistos(fs){ const v = vistosCambiosCosto(); fs.forEach(f => { v[f.sku] = Math.round(f.ahora); }); try{ localStorage.setItem('cambiosCostoVistos', JSON.stringify(v)); } catch(e){} }
 async function proponerPreciosPorCosto(cambios){
+  const vistos = vistosCambiosCosto();
+  cambios = cambios.filter(c => vistos[c.sku] !== Math.round(c.ahora) && !(kitsDatos && kitsDatos[c.sku] && costosReventa && costosReventa[c.sku] && Math.abs(c.antes - c.ahora) < 0.15 * c.antes && false));
   const filas = cambios.map(c => { const r = buscarProductoPorSku(c.sku); if(!r || !r.variante) return null; const pr = parsePrice(r.variante.precio); if(!(pr > 0)) return null;
     const nuevo = Math.ceil(pr * c.ahora / c.antes / 10) * 10; return { ...c, r, pr, nuevo }; }).filter(Boolean);
   if(!filas.length) return;
@@ -10668,10 +10674,11 @@ async function proponerPreciosPorCosto(cambios){
       <input type="checkbox" class="pp-sel" data-i="${i}" checked>
       <span><b>${escaparHtml(f.sku)}</b> <span class="note" style="margin:0;">${escaparHtml(f.r.producto.nombre)}</span><br><small style="color:#6B6258;">costo ${formatPrice(f.antes)} → <b>${formatPrice(f.ahora)}</b> (${f.ahora > f.antes ? '+' : ''}${Math.round((f.ahora / f.antes - 1) * 1000) / 10} %)</small></span>
       <span style="text-align:right;white-space:nowrap;"><small class="note" style="margin:0;">precio ${formatPrice(f.pr)}</small><br><b style="color:var(--purple);">→ ${formatPrice(f.nuevo)}</b></span></label>`).join('')}</div>
-    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="aplicarPreciosPorCosto()">Actualizar precios del catálogo</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Ahora no</button></div>`;
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="aplicarPreciosPorCosto()">Actualizar precios del catálogo</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="marcarCambiosVistos(window.__propPrecios);cerrarPublicar()">Ahora no</button></div>`;
   document.getElementById('pub-modal').style.display = 'block';
 }
 async function aplicarPreciosPorCosto(){
+  marcarCambiosVistos(window.__propPrecios);
   const sel = [...document.querySelectorAll('.pp-sel:checked')].map(c => window.__propPrecios[+c.dataset.i]);
   if(!sel.length){ cerrarPublicar(); return; }
   const porProd = new Map(); sel.forEach(f => { const p = f.r.producto; (porProd.get(p) || porProd.set(p, []).get(p)).push(f); });
@@ -18303,7 +18310,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v244';
+const APP_VERSION = '2026-10-02-v245';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
