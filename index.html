@@ -1595,7 +1595,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v239</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v240</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2243,6 +2243,16 @@ a.grilla-celda{display:block;}
     </div>
   </div>
 
+  <div class="step" id="step-links-web">
+    <div class="form-card" style="max-width:820px;">
+      <h2>Links de la web (Tienda Nube)</h2>
+      <p class="note" style="text-align:left;">Subí el archivo que exporta Tienda Nube (Productos → Exportar → CSV). La app toma el <b>SKU</b> y el <b>Identificador de URL</b> de cada producto y le asigna su link. Cuando cambies algo en la web, lo volvés a subir.</p>
+      <label class="btn btn-gold" style="display:block;text-align:center;cursor:pointer;margin:10px 0;">📥 Subir CSV de Tienda Nube<input type="file" accept=".csv,text/csv" style="display:none;" onchange="importarLinksWeb(this)"></label>
+      <div id="lw-res"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
+    </div>
+  </div>
+
   <div class="step" id="step-datos-bancarios">
     <div class="form-card">
       <h2>Datos bancarios</h2>
@@ -2556,6 +2566,7 @@ function renderCatalogo(filtro){
           <div class="producto-admin-links">
             <span onclick="irAFotoConSku('${escapeAttr(primerSku)}')">📷 Cambiar foto</span>
             <span onclick="irAFlyerConSku('${escapeAttr(primerSku)}')">🖼️ Generar flyer</span>
+            ${linkWebDeProducto(p) ? `<a href="${escapeAttr(linkWebDeProducto(p))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;">🌐 Ver en la web</a><span onclick="event.stopPropagation();navigator.clipboard&&navigator.clipboard.writeText('${escapeAttr(linkWebDeProducto(p))}').then(()=>{this.textContent='✓ Copiado';setTimeout(()=>this.textContent='🔗 Copiar link',1500);})">🔗 Copiar link</span>` : ''}
           </div>
         </div>
       `;
@@ -5725,7 +5736,7 @@ const GRUPOS_INICIO = {
   ] },
   f: { lado: 'int', titulo: 'Catálogo', titulosColumnas: ['1 · Productos', '2 · Fotos y textos', '3 · Precios'], columnas: [
     [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['🗂️ Ordenar categorías', 'abrirCategorias()']],
-    [['📷 Fotos de productos', 'abrirActualizarFoto()'], ['📝 Descripciones de reventa', 'abrirReventa()']],
+    [['📷 Fotos de productos', 'abrirActualizarFoto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['🌐 Links de la web', 'abrirLinksWeb()']],
     [['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']]
   ] },
   g: { lado: 'int', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas', '💲 Costos'], colorColumnas: { 5: '#2F7A47' }, columnas: [
@@ -10591,6 +10602,39 @@ async function recibirCompartido(){
       await abrirGastos(); const dt = new DataTransfer(); dt.items.add((imgs[0] || pdfs[0])); document.getElementById('gs-comp').files = dt.files; document.getElementById('gs-monto').focus();
     }
   } catch(e){ console.error('compartido', e); }
+}
+
+// ===== Links de la web: SKU -> link de Tienda Nube (config/links_web) =====
+let linksWeb = {};
+const DOMINIO_WEB = 'https://www.onlinetextil.com.ar/productos/';
+async function cargarLinksWeb(){ try{ const d = await db.collection('config').doc('links_web').get(); linksWeb = d.exists ? (d.data().m || {}) : {}; } catch(e){ linksWeb = {}; } }
+function linkWebDeSku(s){ return linksWeb[String(s || '').toUpperCase()] || null; }
+function linkWebDeProducto(p){ for(const v of (p.variantes || [])){ const l = linkWebDeSku(v.sku); if(l) return l; } return null; }
+function abrirLinksWeb(){ mostrarPaso('step-links-web'); const n = Object.keys(linksWeb).length; document.getElementById('lw-res').innerHTML = n ? `<p class="note" style="text-align:left;">Hoy hay <b>${n}</b> SKU con link.</p>` : ''; }
+function leerCsvTN(texto){
+  const filas = [], sep = (texto.split('\n')[0].match(/;/g) || []).length >= (texto.split('\n')[0].match(/,/g) || []).length ? ';' : ',';
+  let f = [], c = '', q = false;
+  for(let i = 0; i < texto.length; i++){ const ch = texto[i];
+    if(q){ if(ch === '"'){ if(texto[i + 1] === '"'){ c += '"'; i++; } else q = false; } else c += ch; }
+    else if(ch === '"') q = true; else if(ch === sep){ f.push(c); c = ''; } else if(ch === '\n'){ f.push(c.replace(/\r$/, '')); filas.push(f); f = []; c = ''; } else c += ch; }
+  if(c || f.length){ f.push(c); filas.push(f); }
+  return filas;
+}
+async function importarLinksWeb(inp){
+  const file = inp.files[0]; inp.value = ''; if(!file) return;
+  const buf = await file.arrayBuffer(); let txt = new TextDecoder('utf-8').decode(buf); if(txt.includes('\uFFFD')) txt = new TextDecoder('iso-8859-1').decode(buf);
+  const filas = leerCsvTN(txt); const H = (filas[0] || []).map(x => normBusqueda(x));
+  const iU = H.findIndex(x => /identificador de url/.test(x)), iS = H.findIndex(x => x === 'sku');
+  if(iU < 0 || iS < 0){ alert('No encontré las columnas "Identificador de URL" y "SKU". ¿Es el CSV de productos de Tienda Nube?'); return; }
+  const m = {}; let slug = '';
+  filas.slice(1).forEach(r => { if(r[iU]) slug = r[iU].trim(); const s = String(r[iS] || '').trim().toUpperCase().replace(/\s*X\s*\d+\s*$/, ''); if(s && slug && !m[s]) m[s] = DOMINIO_WEB + slug + '/'; });
+  const app = new Set(); CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => app.add(String(v.sku).toUpperCase()))));
+  const con = [...app].filter(s => m[s]), sin = [...app].filter(s => !m[s]), soloWeb = Object.keys(m).filter(s => !app.has(s));
+  try{ await db.collection('config').doc('links_web').set({ m, actualizado: new Date().toISOString() }); linksWeb = m; } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+  document.getElementById('lw-res').innerHTML = `<div style="background:#EEF6F0;border-radius:12px;padding:10px 12px;margin:8px 0;">✓ <b>${con.length}</b> SKU del catálogo quedaron con su link.</div>
+    ${sin.length ? `<details style="margin:6px 0;"><summary style="cursor:pointer;"><b>${sin.length}</b> SKU del catálogo que no están en la web</summary><p class="note" style="text-align:left;">${sin.map(escaparHtml).join(', ')}</p></details>` : ''}
+    ${soloWeb.length ? `<details style="margin:6px 0;"><summary style="cursor:pointer;"><b>${soloWeb.length}</b> SKU de la web que no están en el catálogo de la app</summary><p class="note" style="text-align:left;">${soloWeb.map(escaparHtml).join(', ')}</p></details>` : ''}`;
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -18183,6 +18227,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 }).then(() => {
   asignarMapaFotos(); aplicarMovimientos(); reconstruirFotos();
   renderCatalogo(document.getElementById('buscador').value);
+  cargarLinksWeb().then(() => { try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){} });
   if(new URLSearchParams(location.search).get('compartido') === '1'){ history.replaceState(null, '', location.pathname); setTimeout(recibirCompartido, 400); }
   // links desde Resultados ML: ?ir=completar&sku=X · ?ir=telas&q=X · ?ir=reventa&sku=X
   try{ const q = new URLSearchParams(location.search), ir = q.get('ir');
@@ -18205,7 +18250,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v239';
+const APP_VERSION = '2026-10-02-v240';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
