@@ -1595,7 +1595,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v245</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v246</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -10307,7 +10307,7 @@ function renderGastos(){
   document.getElementById('gs-resumen').innerHTML = L.length ? `<div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px;">
     <div style="display:flex;justify-content:space-between;align-items:baseline;"><b>Gastos comerciales</b><b style="font-size:1.3rem;color:#A6432F;">${formatPrice(tot)}</b></div>
     ${totML ? `<div style="font-size:.82rem;color:#5b2a86;margin-top:2px;">Además cargaste ${formatPrice(totML)} de cadetes Flex: ya están dentro de los egresos de Mercado Libre, no se suman dos veces.</div>` : ''}
-    ${Object.entries(por).sort((a, b) => b[1] - a[1]).map(([c, v]) => `<div style="display:grid;grid-template-columns:120px 1fr 110px;gap:8px;align-items:center;font-size:.85rem;margin-top:6px;"><span>${escaparHtml(c)}</span><div style="height:8px;background:#EEE9F3;border-radius:6px;overflow:hidden;"><div style="width:${Math.round(v / max * 100)}%;height:100%;background:#D97A3A;"></div></div><span style="text-align:right;">${formatPrice(v)} <small class="meta">${Math.round(v / tot * 100)} %</small></span></div>`).join('')}</div>` : '';
+    ${Object.entries(por).sort((a, b) => b[1] - a[1]).map(([c, v]) => `<div style="display:grid;grid-template-columns:120px 1fr 150px;gap:8px;align-items:center;font-size:.85rem;margin-top:6px;"><span>${escaparHtml(c)}</span><div style="height:8px;background:#EEE9F3;border-radius:6px;overflow:hidden;"><div style="width:${Math.round(v / max * 100)}%;height:100%;background:#D97A3A;"></div></div><span style="text-align:right;">${formatPrice(v)} <small class="meta" style="display:block;">${Math.round(v / tot * 100)} % de los gastos</small></span></div>`).join('')}</div>` : '';
   // egresos de Mercado Libre del mismo mes (vienen de Resultados ML)
   { const ME = mes ? (mlEgresos || {})[mes] : Object.values(mlEgresos || {}).reduce((a, m) => { Object.keys(m).forEach(k => a[k] = (a[k] || 0) + m[k]); return a; }, {});
     const NOM = { comision: 'Comisión por vender', cargoFijo: 'Cargo fijo por unidad', cuotas: 'Cuotas sin interés', envios: 'Envíos pagados a ML', cadete: 'Cadete Flex', full: 'Full (colecta, almacenamiento)', publicidad: 'Publicidad', impuestos: 'Impuestos y retenciones' };
@@ -10315,8 +10315,8 @@ function renderGastos(){
     const maxM = Math.max(1, ...Object.values(ME || {}));
     document.getElementById('gs-resumen').innerHTML += totME ? `<div style="background:#fff;border:1px solid #CDBFE0;border-radius:14px;padding:12px;margin-bottom:10px;">
       <div style="display:flex;justify-content:space-between;align-items:baseline;"><b style="color:#5b2a86;">Egresos de Mercado Libre</b><b style="font-size:1.3rem;color:#5b2a86;">${formatPrice(totME)}</b></div>
-      <small class="note" style="display:block;text-align:left;margin:0 0 4px;">Lo que cobró ML ${mes ? 'en el mes' : 'en total'}, según los reportes cargados en Resultados ML (cuentas Alberto y Rita).</small>
-      ${Object.entries(ME).filter(([k, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div style="display:grid;grid-template-columns:170px 1fr 110px;gap:8px;align-items:center;font-size:.85rem;margin-top:6px;"><span>${NOM[k] || k}</span><div style="height:8px;background:#EEE9F3;border-radius:6px;overflow:hidden;"><div style="width:${Math.round(v / maxM * 100)}%;height:100%;background:#8E6BB8;"></div></div><span style="text-align:right;">${formatPrice(v)} <small class="note">${Math.round(v / totME * 100)} %</small></span></div>`).join('')}</div>
+      <small class="note" style="display:block;text-align:left;margin:0 0 4px;">Lo que cobró ML ${mes ? 'en el mes' : 'en total'}, según los reportes cargados en Resultados ML (cuentas Alberto y Rita). El % de cada línea es sobre el total de egresos de Mercado Libre.</small>
+      ${Object.entries(ME).filter(([k, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div style="display:grid;grid-template-columns:170px 1fr 150px;gap:8px;align-items:center;font-size:.85rem;margin-top:6px;"><span>${NOM[k] || k}</span><div style="height:8px;background:#EEE9F3;border-radius:6px;overflow:hidden;"><div style="width:${Math.round(v / maxM * 100)}%;height:100%;background:#8E6BB8;"></div></div><span style="text-align:right;">${formatPrice(v)} <small class="note" style="display:block;margin:0;">${Math.round(v / totME * 100)} % de los egresos de ML</small></span></div>`).join('')}</div>
       <div style="background:#3D2B4E;color:#fff;border-radius:14px;padding:12px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline;"><b>Total de egresos</b><span><b style="font-size:1.3rem;">${formatPrice(tot + totME)}</b><small style="display:block;opacity:.8;font-size:.75rem;text-align:right;">gastos ${formatPrice(tot)} + Mercado Libre ${formatPrice(totME)}</small></span></div>` :
       (mes ? '<p class="note" style="text-align:left;">No hay reportes de Mercado Libre cargados para este mes (se cargan en Resultados ML).</p>' : ''); }
   { const t = document.getElementById('gs-det-tit'); if(t) t.textContent = `📋 Ver el detalle de los gastos (${L.length})`; }
@@ -18310,7 +18310,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v245';
+const APP_VERSION = '2026-10-02-v246';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
