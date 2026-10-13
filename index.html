@@ -1596,7 +1596,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v248</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v249</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5772,9 +5772,10 @@ function abrirGrupoInicio(k){
   grupoInicioAbierto = k;
   const tl = document.getElementById('ini-t-' + k); if(tl) tl.classList.add('sel');
   const cont = document.getElementById('ini-sub-' + g.lado);
-  const boton = ([t, f]) => { window.__iniItems = window.__iniItems || []; window.__iniItems.push([t, f]); return `<button type="button" onclick="usarItemInicio(${window.__iniItems.length - 1})">${t}</button>`; };
+  const boton = ([t, f]) => { if(!puede(permisoDeGrupo(k)) || !puede(permisoDeAccion(f))) return ''; window.__iniItems = window.__iniItems || []; window.__iniItems.push([t, f]); return `<button type="button" onclick="usarItemInicio(${window.__iniItems.length - 1})">${t}</button>`; };
   cont.innerHTML = `<p style="margin:0 0 10px;font-weight:700;color:var(--purple);">${g.titulo}</p>` + (g.columnas
-    ? `<div class="ini-cols" style="grid-template-columns:repeat(${g.columnas.length},minmax(0,1fr));">${g.columnas.map((col, ci) => { const cc = g.colorColumnas && g.colorColumnas[ci];
+    ? `<div class="ini-cols" style="grid-template-columns:repeat(${g.columnas.filter(col => col.some(([, f]) => puede(permisoDeGrupo(k)) && puede(permisoDeAccion(f)))).length || 1},minmax(0,1fr));">${g.columnas.map((col, ci) => { const cc = g.colorColumnas && g.colorColumnas[ci];
+        if(!col.some(([, f]) => puede(permisoDeGrupo(k)) && puede(permisoDeAccion(f)))) return '';
         return `<div class="ini-col" ${cc ? `style="background:${cc}12;border-radius:12px;padding:6px;margin:-6px 0;"` : ''}>${g.titulosColumnas ? `<div class="ini-col-tit" ${cc ? `style="color:${cc};border-color:${cc};"` : ''}>${g.titulosColumnas[ci]}</div>` : ''}${cc ? col.map(boton).join('').replace(/<button /g, `<button style="background:#fff;border-color:${cc}55;" `) : col.map(boton).join('')}</div>`; }).join('')}</div>`
     : `<div class="ini-sub-btns">${g.items.map(boton).join('')}</div>`);
   cont.style.display = 'block';
@@ -8622,6 +8623,7 @@ async function anpGuardar(){
 // ----- accesos a lo ultimo que se uso (en este equipo) -----
 function usarItemInicio(i){
   const it = (window.__iniItems || [])[i]; if(!it) return;
+  if(!puede(permisoDeAccion(it[1]))){ alert('No tenés permiso para entrar acá. Pedíselo al dueño.'); return; }
   registrarUsoInicio(it[0], it[1]);
   try{ (new Function(it[1]))(); } catch(e){ console.error(e); }
 }
@@ -8634,6 +8636,7 @@ function registrarUsoInicio(t, f){
 function pintarRecientesInicio(){
   let l = [];
   try{ l = JSON.parse(localStorage.getItem('ot_recientes') || '[]'); } catch(e){}
+  l = l.filter(x => typeof puede !== 'function' || puede(permisoDeAccion(x.f)));
   const wrap = document.getElementById('ini-recientes-wrap'); if(!wrap) return;
   if(!l.length){ wrap.style.display = 'none'; return; }
   wrap.style.display = 'block';
@@ -9895,11 +9898,12 @@ auth.onAuthStateChanged(async u => {
     let rol = d.exists ? d.data().rol : null;
     if(!rol && mail === DUENO_INICIAL){ rol = 'dueño'; await ref.set({ rol, nombre: u.displayName || '', alta: new Date().toISOString() }, { merge: true }); }
     if(!rol){ mostrarLogin(`La cuenta <b>${escaparHtml(mail)}</b> no tiene acceso.<br>Pedile al dueño que te agregue.`, true); return; }
-    usuarioActual = u; rolActual = rol;
+    usuarioActual = u; rolActual = rol; permisosActuales = Object.assign({}, PERMISOS_BASE, (d.exists && d.data().permisos) || {});
     ref.set({ ultimoIngreso: new Date().toISOString(), uid: u.uid, nombre: u.displayName || '' }, { merge: true }).catch(() => {});
     document.getElementById('login').style.display = 'none';
     pintarUsuarioEnCabecera();
     resolverSesion(u);
+    setTimeout(aplicarPermisosInicio, 0);
     if(rol === 'dueño') setTimeout(() => registrarHistorialCostos().catch(e => console.error('historial de costos', e)), 8000);
 
   } catch(e){ mostrarLogin('No se pudo verificar la cuenta: ' + escaparHtml(e.message), true); }
@@ -9921,14 +9925,15 @@ async function abrirUsuarios(){
   const us = s.docs.map(d => ({ mail: d.id, ...d.data() }));
   document.getElementById('pub-cont').innerHTML = `
     <div style="display:grid;gap:6px;margin-bottom:12px;">${us.map(u => `<div style="display:flex;gap:8px;align-items:center;background:var(--cream);border-radius:10px;padding:8px 10px;">
-      <div style="flex:1;"><b>${escaparHtml(u.mail)}</b><div class="note" style="text-align:left;margin:0;">${escaparHtml(u.rol)}${u.ultimoIngreso ? ' · último ingreso ' + new Date(u.ultimoIngreso).toLocaleDateString('es-AR') : ' · todavía no ingresó'}</div></div>
+      <div style="flex:1;"><b>${escaparHtml(u.mail)}</b><div class="note" style="text-align:left;margin:0;">${escaparHtml(u.rol)}${u.ultimoIngreso ? ' · último ingreso ' + new Date(u.ultimoIngreso).toLocaleDateString('es-AR') : ' · todavía no ingresó'}</div>
+        ${u.rol === 'colaborador' ? `<details style="margin-top:6px;"><summary style="cursor:pointer;font-size:.85rem;font-weight:700;color:var(--purple);">🔑 Qué puede ver y hacer</summary><div style="display:grid;gap:4px;margin-top:6px;">${PERMISOS.map(([k, t]) => `<label style="display:flex;gap:8px;align-items:center;font-size:.85rem;"><input type="checkbox" ${Object.assign({}, PERMISOS_BASE, u.permisos || {})[k] ? 'checked' : ''} onchange="guardarPermiso('${escapeAttr(u.mail)}', '${k}', this.checked)"> ${t}</label>`).join('')}</div></details>` : ''}</div>
       ${u.mail === DUENO_INICIAL ? '' : `<button type="button" class="btn-mini" onclick="quitarUsuario('${escapeAttr(u.mail)}')">✕ Quitar</button>`}</div>`).join('')}</div>
     <div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;">
       <input id="us-mail" type="email" placeholder="mail de Google" style="padding:10px;border:1px solid var(--line);border-radius:10px;">
       <select id="us-rol" style="padding:10px;border:1px solid var(--line);border-radius:10px;"><option value="colaborador">colaborador</option><option value="dueño">dueño</option></select>
       <button type="button" class="btn-mini" onclick="agregarUsuario()">+ Agregar</button>
     </div>
-    <p class="note" style="text-align:left;margin-top:8px;">El colaborador usa la app pero no ve costos ni resultados de Mercado Libre.</p>`;
+    <p class="note" style="text-align:left;margin-top:8px;">Al agregar un colaborador, arranca con: pedidos, difusión, clientes y producción. Tocá <b>🔑 Qué puede ver y hacer</b> para cambiarlo. El dueño ve todo.</p>`;
 }
 async function agregarUsuario(){
   const mail = document.getElementById('us-mail').value.trim().toLowerCase(), rol = document.getElementById('us-rol').value;
@@ -10705,6 +10710,56 @@ async function aplicarPreciosPorCosto(){
   }
   cerrarPublicar(); try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
   alert(`Listo: ${ok} ${ok === 1 ? 'precio actualizado' : 'precios actualizados'} en el catálogo.`);
+}
+
+// ===== Permisos de colaboradores =====
+const PERMISOS = [
+  ['pedidos', '🛒 Armar pedidos y catálogo para clientes'],
+  ['difusion', '📣 Difusión (flyers, videos, redes)'],
+  ['ventas', '📋 Pedidos, historial y pendientes de entrega'],
+  ['clientes', '👥 Clientes'],
+  ['catalogo', '🏷️ Editar el catálogo (productos, fotos, precios)'],
+  ['produccion', '✂️ Producción (telas, cortes, órdenes, talleres, stock)'],
+  ['gastos', '💸 Gastos comerciales'],
+  ['facturas', '🧾 Ventas facturadas'],
+  ['costos', '💲 Costos (reventa, confección, calculadora)'],
+  ['resultadosML', '📈 Resultados de Mercado Libre'],
+  ['config', '⚙️ Configuración (listas, datos bancarios, avisos)']
+];
+const PERMISOS_BASE = { pedidos: true, difusion: true, ventas: true, clientes: true, produccion: true };
+let permisosActuales = null;
+// que permiso hace falta para cada pantalla
+function permisoDeAccion(f){
+  const s = String(f);
+  if(/abrirUsuarios/.test(s)) return 'dueno';
+  if(/abrirResultadosML/.test(s)) return 'resultadosML';
+  if(/abrirFacturas/.test(s)) return 'facturas';
+  if(/abrirGastos/.test(s)) return 'gastos';
+  if(/abrirCostosReventa|abrirConfeccion|abrirCalculadoraCostos|abrirVentasML/.test(s)) return 'costos';
+  if(/abrirPedidoIA|abrirHistorial\(|abrirPendientesEntrega/.test(s)) return 'ventas';
+  if(/abrirClientes/.test(s)) return 'clientes';
+  if(/irACatalogoDesdeInicio|escaner/.test(s)) return 'pedidos';
+  if(/abrirNuevoProducto|abrirEditarProducto|abrirCategorias|abrirActualizarFoto|abrirReventa|abrirLinksWeb|abrirImportarExcel|abrirAumentoMasivo|abrirHistorialPrecios/.test(s)) return 'catalogo';
+  if(/abrirListas|abrirDatosBancarios|abrirConfigPush|abrirGlosario|abrirTablaConsumo|abrirInstruccionesCorte|abrirFichasArticulos/.test(s)) return 'config';
+  return null;
+}
+function puede(perm){
+  if(!perm || rolActual === 'dueño') return true;
+  if(perm === 'dueno') return false;
+  const P = permisosActuales || PERMISOS_BASE; return !!P[perm];
+}
+function permisoDeGrupo(k){ return { a: 'pedidos', c: 'difusion', g: 'produccion' }[k] || null; }
+function aplicarPermisosInicio(){
+  if(rolActual === 'dueño') return;
+  ['a', 'c', 'd', 'f', 'g'].forEach(k => { const g = GRUPOS_INICIO[k], t = document.getElementById('ini-t-' + k); if(!g || !t) return;
+    const items = g.columnas ? g.columnas.flat() : (g.items || []);
+    const alguno = puede(permisoDeGrupo(k)) && items.some(([, f]) => puede(permisoDeAccion(f)));
+    t.style.display = alguno ? '' : 'none'; });
+}
+// usuarios: permisos de cada colaborador
+async function guardarPermiso(mail, perm, val){
+  try{ const ref = db.collection('usuarios').doc(mail); const d = await ref.get(); const P = Object.assign({}, PERMISOS_BASE, (d.exists && d.data().permisos) || {}); P[perm] = val; await ref.set({ permisos: P }, { merge: true }); }
+  catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -18335,7 +18390,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v248';
+const APP_VERSION = '2026-10-02-v249';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
