@@ -1595,7 +1595,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v242</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v243</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -10228,8 +10228,10 @@ let gastos = null, gastoEditando = null;
 const CONCEPTOS_BASE = ['Cadetes Flex', 'Fletes', 'Insumos', 'Mercadería', 'Servicios', 'Alquiler', 'Sueldos', 'Impuestos', 'Publicidad', 'Mantenimiento', 'Otros'];
 const MEDIOS_BASE = ['Efectivo', 'Transferencia', 'Mercado Pago', 'Tarjeta de débito', 'Tarjeta de crédito', 'Cheque'];
 async function cargarGastos(){ const s = await db.collection('gastos').get(); gastos = s.docs.map(d => ({ _id: d.id, ...d.data() })).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))); }
+let mlEgresos = null;
 async function abrirGastos(){
   mostrarPaso('step-gastos');
+  try{ const d = await db.collection('config').doc('ml_egresos').get(); mlEgresos = d.exists ? (d.data().m || {}) : {}; } catch(e){ mlEgresos = {}; }
   document.getElementById('gs-lista').innerHTML = '<p class="empty-msg">Cargando…</p>';
   try{ await cargarGastos(); } catch(e){ document.getElementById('gs-lista').innerHTML = '<p class="empty-msg">No se pudo cargar: ' + escaparHtml(e.message) + '</p>'; return; }
   limpiarGasto();
@@ -10297,12 +10299,24 @@ function renderGastos(){
   const mes = document.getElementById('gs-mes').value, fc = document.getElementById('gs-fconc').value, q = normBusqueda(document.getElementById('gs-buscar').value);
   const L = (gastos || []).filter(g => (!mes || String(g.fecha).startsWith(mes)) && (!fc || g.concepto === fc) && (!q || normBusqueda([g.concepto, g.medio, g.quien, g.nota].join(' ')).includes(q)));
   const tot = L.filter(g => !g.enML).reduce((a, g) => a + (+g.monto || 0), 0), totML = L.filter(g => g.enML).reduce((a, g) => a + (+g.monto || 0), 0), por = {};
-  L.filter(g => !g.enML).forEach(g => { por[g.concepto] = (por[g.concepto] || 0) + (+g.monto || 0); });
+  const claveC = c => normBusqueda(c).replace(/s$/, ''), nomC = {};
+  L.filter(g => !g.enML).forEach(g => { const k = claveC(g.concepto); if(!nomC[k]) nomC[k] = String(g.concepto).charAt(0).toUpperCase() + String(g.concepto).slice(1); por[nomC[k]] = (por[nomC[k]] || 0) + (+g.monto || 0); });
   const max = Math.max(1, ...Object.values(por));
   document.getElementById('gs-resumen').innerHTML = L.length ? `<div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px;">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;"><b>Total de gastos</b><b style="font-size:1.3rem;color:#A6432F;">${formatPrice(tot)}</b></div>
-    ${totML ? `<div style="font-size:.82rem;color:#5b2a86;margin-top:2px;">+ ${formatPrice(totML)} ya descontados en Resultados ML (cadetes Flex): no se suman acá.</div>` : ''}
+    <div style="display:flex;justify-content:space-between;align-items:baseline;"><b>Gastos comerciales</b><b style="font-size:1.3rem;color:#A6432F;">${formatPrice(tot)}</b></div>
+    ${totML ? `<div style="font-size:.82rem;color:#5b2a86;margin-top:2px;">Además cargaste ${formatPrice(totML)} de cadetes Flex: ya están dentro de los egresos de Mercado Libre, no se suman dos veces.</div>` : ''}
     ${Object.entries(por).sort((a, b) => b[1] - a[1]).map(([c, v]) => `<div style="display:grid;grid-template-columns:120px 1fr 110px;gap:8px;align-items:center;font-size:.85rem;margin-top:6px;"><span>${escaparHtml(c)}</span><div style="height:8px;background:#EEE9F3;border-radius:6px;overflow:hidden;"><div style="width:${Math.round(v / max * 100)}%;height:100%;background:#D97A3A;"></div></div><span style="text-align:right;">${formatPrice(v)} <small class="meta">${Math.round(v / tot * 100)} %</small></span></div>`).join('')}</div>` : '';
+  // egresos de Mercado Libre del mismo mes (vienen de Resultados ML)
+  { const ME = mes ? (mlEgresos || {})[mes] : Object.values(mlEgresos || {}).reduce((a, m) => { Object.keys(m).forEach(k => a[k] = (a[k] || 0) + m[k]); return a; }, {});
+    const NOM = { comision: 'Comisión por vender', cargoFijo: 'Cargo fijo por unidad', cuotas: 'Cuotas sin interés', envios: 'Envíos pagados a ML', cadete: 'Cadete Flex', full: 'Full (colecta, almacenamiento)', publicidad: 'Publicidad', impuestos: 'Impuestos y retenciones' };
+    const totME = ME ? Object.values(ME).reduce((a, v) => a + (v > 0 ? v : 0), 0) : 0;
+    const maxM = Math.max(1, ...Object.values(ME || {}));
+    document.getElementById('gs-resumen').innerHTML += totME ? `<div style="background:#fff;border:1px solid #CDBFE0;border-radius:14px;padding:12px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;"><b style="color:#5b2a86;">Egresos de Mercado Libre</b><b style="font-size:1.3rem;color:#5b2a86;">${formatPrice(totME)}</b></div>
+      <small class="note" style="display:block;text-align:left;margin:0 0 4px;">Lo que cobró ML ${mes ? 'en el mes' : 'en total'}, según los reportes cargados en Resultados ML (cuentas Alberto y Rita).</small>
+      ${Object.entries(ME).filter(([k, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div style="display:grid;grid-template-columns:170px 1fr 110px;gap:8px;align-items:center;font-size:.85rem;margin-top:6px;"><span>${NOM[k] || k}</span><div style="height:8px;background:#EEE9F3;border-radius:6px;overflow:hidden;"><div style="width:${Math.round(v / maxM * 100)}%;height:100%;background:#8E6BB8;"></div></div><span style="text-align:right;">${formatPrice(v)} <small class="note">${Math.round(v / totME * 100)} %</small></span></div>`).join('')}</div>
+      <div style="background:#3D2B4E;color:#fff;border-radius:14px;padding:12px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline;"><b>Total de egresos</b><span><b style="font-size:1.3rem;">${formatPrice(tot + totME)}</b><small style="display:block;opacity:.8;font-size:.75rem;text-align:right;">gastos ${formatPrice(tot)} + Mercado Libre ${formatPrice(totME)}</small></span></div>` :
+      (mes ? '<p class="note" style="text-align:left;">No hay reportes de Mercado Libre cargados para este mes (se cargan en Resultados ML).</p>' : ''); }
   document.getElementById('gs-lista').innerHTML = L.length ? L.map(g => `<div style="display:grid;grid-template-columns:86px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:12px;margin-bottom:6px;background:#fff;">
       <span style="font-size:.82rem;color:#6B6258;">${new Date(g.fecha + 'T12:00:00').toLocaleDateString('es-AR')}</span>
       <div><b>${escaparHtml(g.concepto || '')}</b> <span class="meta">· ${escaparHtml(g.quien || '')}</span>${g.enML ? ' <span style="font-size:.7rem;background:#EEE8F7;color:#5b2a86;border-radius:999px;padding:1px 7px;">ya en Resultados ML</span>' : ''}<div style="font-size:.78rem;color:#8A8072;">${escaparHtml(g.medio || '')}${g.nota ? ' · ' + escaparHtml(g.nota) : ''}</div></div>
@@ -18288,7 +18302,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v242';
+const APP_VERSION = '2026-10-02-v243';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
