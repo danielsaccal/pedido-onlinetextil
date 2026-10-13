@@ -1595,7 +1595,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v243</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v244</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2219,7 +2219,7 @@ a.grilla-celda{display:block;}
         <input id="gs-buscar" placeholder="🔍 Buscar" oninput="renderGastos()" style="flex:1;min-width:150px;padding:9px;border:1px solid var(--line);border-radius:10px;">
       </div>
       <div id="gs-resumen"></div>
-      <div id="gs-lista"></div>
+      <details id="gs-det" style="border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:#fff;"><summary style="cursor:pointer;font-weight:700;color:var(--purple);" id="gs-det-tit">📋 Ver el detalle de los gastos</summary><div id="gs-lista" style="margin-top:8px;"></div></details>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
   </div>
@@ -10317,6 +10317,7 @@ function renderGastos(){
       ${Object.entries(ME).filter(([k, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div style="display:grid;grid-template-columns:170px 1fr 110px;gap:8px;align-items:center;font-size:.85rem;margin-top:6px;"><span>${NOM[k] || k}</span><div style="height:8px;background:#EEE9F3;border-radius:6px;overflow:hidden;"><div style="width:${Math.round(v / maxM * 100)}%;height:100%;background:#8E6BB8;"></div></div><span style="text-align:right;">${formatPrice(v)} <small class="note">${Math.round(v / totME * 100)} %</small></span></div>`).join('')}</div>
       <div style="background:#3D2B4E;color:#fff;border-radius:14px;padding:12px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline;"><b>Total de egresos</b><span><b style="font-size:1.3rem;">${formatPrice(tot + totME)}</b><small style="display:block;opacity:.8;font-size:.75rem;text-align:right;">gastos ${formatPrice(tot)} + Mercado Libre ${formatPrice(totME)}</small></span></div>` :
       (mes ? '<p class="note" style="text-align:left;">No hay reportes de Mercado Libre cargados para este mes (se cargan en Resultados ML).</p>' : ''); }
+  { const t = document.getElementById('gs-det-tit'); if(t) t.textContent = `📋 Ver el detalle de los gastos (${L.length})`; }
   document.getElementById('gs-lista').innerHTML = L.length ? L.map(g => `<div style="display:grid;grid-template-columns:86px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:12px;margin-bottom:6px;background:#fff;">
       <span style="font-size:.82rem;color:#6B6258;">${new Date(g.fecha + 'T12:00:00').toLocaleDateString('es-AR')}</span>
       <div><b>${escaparHtml(g.concepto || '')}</b> <span class="meta">· ${escaparHtml(g.quien || '')}</span>${g.enML ? ' <span style="font-size:.7rem;background:#EEE8F7;color:#5b2a86;border-radius:999px;padding:1px 7px;">ya en Resultados ML</span>' : ''}<div style="font-size:.78rem;color:#8A8072;">${escaparHtml(g.medio || '')}${g.nota ? ' · ' + escaparHtml(g.nota) : ''}</div></div>
@@ -18302,7 +18303,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v243';
+const APP_VERSION = '2026-10-02-v244';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
