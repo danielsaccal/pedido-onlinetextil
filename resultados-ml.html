@@ -241,7 +241,7 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
     <div id="resBody"></div>
   </section>
   <p class="note" id="rarosAviso" style="display:none;margin:10px 0 0;"></p>
-  <details class="pleg" data-k="calcu"><summary>🧮 ¿Cuánto me queda si vendo a $…?</summary><div class="pleg-body">
+  <details class="pleg" data-k="calcu" id="calcuBox" style="display:none;"><summary>🧮 ¿Cuánto me queda si vendo a $…?</summary><div class="pleg-body">
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       <input id="cqPrecio" inputmode="decimal" placeholder="Precio de venta, ej: 24000" style="flex:1;min-width:180px;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:1rem;">
       <select id="cqTipo" style="padding:9px;border:1px solid var(--line);border-radius:10px;"><option value="sin">💵 Sin cuotas (Clásica)</option><option value="con">💳 Con cuotas (Premium)</option></select>
@@ -1522,6 +1522,15 @@ firebase.auth().onAuthStateChanged(async u=>{
   await load();
   $('cargando').hidden=true;
   render();
+  if(/calcu=1/.test(location.search)){ // solo la calculadora
+    document.querySelectorAll('#app > *').forEach(el=>{ if(el.id!=='calcuBox') el.style.display='none'; });
+    document.querySelectorAll('main > *').forEach(el=>{ if(el.id!=='app'&&el.id!=='err') el.style.display='none'; });
+    const cb=$('calcuBox'); cb.style.display=''; cb.open=true; cb.querySelector('summary').style.pointerEvents='none';
+    const t=document.querySelector('header.top h1'); if(t) t.textContent='¿Cuánto me queda en Mercado Libre?';
+    const sub=$('periodo'); if(sub) sub.textContent='Según tus ventas reales de precio parecido';
+    const ld=document.querySelector('header.top .load'); if(ld) ld.style.display='none';
+    setTimeout(()=>$('cqPrecio').focus(),100);
+  }
   setTimeout(guardarParametrosML,1500);
 });
 </script>
