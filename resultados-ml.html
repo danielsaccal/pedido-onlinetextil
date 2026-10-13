@@ -241,6 +241,13 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
     <div id="resBody"></div>
   </section>
   <p class="note" id="rarosAviso" style="display:none;margin:10px 0 0;"></p>
+  <details class="pleg" data-k="calcu"><summary>🧮 ¿Cuánto me queda si vendo a $…?</summary><div class="pleg-body">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <input id="cqPrecio" inputmode="decimal" placeholder="Precio de venta, ej: 24000" style="flex:1;min-width:180px;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:1rem;">
+      <select id="cqTipo" style="padding:9px;border:1px solid var(--line);border-radius:10px;"><option value="sin">💵 Sin cuotas (Clásica)</option><option value="con">💳 Con cuotas (Premium)</option></select>
+    </div>
+    <div id="cqRes" style="margin-top:10px;"></div>
+  </div></details>
   <details class="pleg" data-k="glosario"><summary>ⓘ ¿Qué significa cada cosa?</summary><div class="pleg-body" style="font-size:.92rem;line-height:1.55;">
     <p><b>Ventas:</b> lo que pagaron los clientes por los productos (ya con descuentos).</p>
     <p><b>Envíos cobrados:</b> lo que Mercado Libre te devuelve por los envíos Flex y lo que pagó el comprador por el envío.</p>
@@ -955,6 +962,23 @@ function guardarParametrosML(){
     db.collection('config').doc('ml_egresos').set({m:M,actualizado:new Date().toISOString()}).catch(()=>{});
   }catch(e){console.error(e);}
 }
+// ===== Calculadora: cuanto queda de un precio, segun tus ventas reales de precio parecido =====
+function calcularQueda(){
+  const P=parseFloat(String($('cqPrecio').value).replace(/\./g,'').replace(',','.'));const box=$('cqRes');
+  if(!(P>0)){box.innerHTML='<p class="note">Escribí un precio.</p>';return;}
+  const con=$('cqTipo').value==='con', fc=$('fCuenta').value;
+  const base=allRows().filter(o=>o.tipo==='Venta'&&o.pcd>0&&o.unid&&!o.excl&&(!fc||o.cuenta===fc)&&(/premium/i.test(o.pubT||'')===con));
+  const logDe=o=>o.log==='Flex'||o.log==='Full'?o.log:'Correo';
+  const med=a=>{const s=a.slice().sort((x,y)=>x-y);return s[Math.floor(s.length/2)];};
+  const fila=(lg,ic)=>{let r=base.filter(o=>logDe(o)===lg&&o.pcd>=P*0.7&&o.pcd<=P*1.3);let rango='±30 %';
+    if(r.length<5){r=base.filter(o=>logDe(o)===lg&&o.pcd>=P*0.5&&o.pcd<=P*1.5);rango='±50 %';}
+    if(r.length<3)return `<tr style="border-top:1px solid var(--line);"><td style="padding:8px;">${ic} ${lg}</td><td colspan="3" class="meta" style="padding:8px;">Pocas ventas parecidas para calcular.</td></tr>`;
+    const pq=med(r.map(o=>o.neto/o.pcd)); const q=P*pq;
+    return `<tr style="border-top:1px solid var(--line);"><td style="padding:8px;">${ic} <b>${lg}</b></td><td style="padding:8px;text-align:right;font-size:1.15rem;font-weight:800;">${fmt(q)}</td><td style="padding:8px;text-align:right;">${pctf(pq)}<small class="meta" style="display:block;">ML se lleva ${fmt(P-q)}</small></td><td style="padding:8px;text-align:right;" class="meta">${r.length} ventas de ${fmt(P*(rango==='±30 %'?0.7:0.5))} a ${fmt(P*(rango==='±30 %'?1.3:1.5))}</td></tr>`;};
+  box.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:.9rem;"><tr style="color:#8A8072;font-size:.72rem;text-transform:uppercase;"><td style="padding:6px;">Envío</td><td style="padding:6px;text-align:right;">Te queda</td><td style="padding:6px;text-align:right;">% del precio</td><td style="padding:6px;text-align:right;">Calculado con</td></tr>
+    ${fila('Flex','🛵')}${fila('Correo','📦')}${fila('Full','🏬')}</table>
+    <p class="note" style="margin-top:6px;">Promedio de tus ventas reales ${con?'con cuotas':'sin cuotas'} de precio parecido: comisión, cargo fijo, cuotas, envío, cadete Flex (con reintegros) e impuestos. Antes de restar tu costo.</p>`;
+}
 // ===== Equivalencias de SKU: codigo mal puesto en ML -> codigo de la app (config/ml_equivalencias: { m: { ML: 'APP' | 'APP x N' } }) =====
 let EQ={};
 async function cargarEquivalencias(){try{const d=await db.collection('config').doc('ml_equivalencias').get();EQ=d.exists?(d.data().m||{}):{};}catch(e){EQ={};}
@@ -1454,6 +1478,7 @@ $('fLog').addEventListener('change',()=>{const f=$('fLog').value==='Flex';$('fFl
 $('resMes').addEventListener('change',()=>{renderResumen();renderRanking();});
 ['rkMes','rkGrupo','rkOrden','rkVer'].forEach(id=>$(id).addEventListener('change',renderRanking));
 $('dsMes').addEventListener('change',renderDesglose);
+$('cqPrecio').addEventListener('input',calcularQueda);$('cqTipo').addEventListener('change',calcularQueda);
 $('ftMes').addEventListener('change',renderFaltan);
 $('ogMes').addEventListener('change',renderOrigen);$('cqOrigen').addEventListener('change',renderCuotas);$('ogLog').addEventListener('change',renderOrigen);
 document.querySelectorAll('details.pleg').forEach(d=>{const k='ml.pleg.'+d.dataset.k;try{if(localStorage.getItem(k)==='1')d.open=true;}catch(e){}
