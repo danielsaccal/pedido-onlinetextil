@@ -1596,7 +1596,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v249</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v250</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5733,7 +5733,7 @@ const GRUPOS_INICIO = {
     [['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()'], ['📋 Historial de pedidos', 'abrirHistorial()']],
     [['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']],
     [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']],
-    [['🧾 Ventas facturadas', 'abrirFacturas()'], ['💸 Gastos comerciales', 'abrirGastos()'], ['📈 Resultados Mercado Libre', 'abrirResultadosML()']]
+    [['🧾 Ventas facturadas', 'abrirFacturas()'], ['💸 Gastos comerciales', 'abrirGastos()'], ['📈 Resultados Mercado Libre', 'abrirResultadosML()'], ['🧮 ¿Cuánto me queda en ML?', 'abrirCalculadoraML()']]
   ] },
   f: { lado: 'int', titulo: 'Catálogo', titulosColumnas: ['1 · Productos', '2 · Fotos y textos', '3 · Precios'], columnas: [
     [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['🗂️ Ordenar categorías', 'abrirCategorias()']],
@@ -10053,6 +10053,10 @@ async function prepararDatosML(){
   try{ const mot = {}; const todos = new Set(skusQueFabrico()); CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => todos.add(String(v.sku).toUpperCase()))));
     todos.forEach(S => { if(costoUnidadSku(S) == null) mot[S] = motivoSinCosto(S); }); await idbGuardar('motivos_sin_costo', mot); } catch(e){ console.error(e); }
 }
+async function abrirCalculadoraML(){
+  if(!puede('resultadosML')){ alert('No tenés permiso para entrar acá.'); return; }
+  location.href = 'resultados-ml.html?calcu=1&v=' + Date.now();
+}
 async function abrirResultadosML(){
   if(!esDueno()){ alert('Solo el dueño puede ver los resultados de Mercado Libre.'); return; }
   const t = document.getElementById('pub-titulo'); if(t) t.textContent = '📈 Resultados ML';
@@ -10732,7 +10736,7 @@ let permisosActuales = null;
 function permisoDeAccion(f){
   const s = String(f);
   if(/abrirUsuarios/.test(s)) return 'dueno';
-  if(/abrirResultadosML/.test(s)) return 'resultadosML';
+  if(/abrirResultadosML|abrirCalculadoraML/.test(s)) return 'resultadosML';
   if(/abrirFacturas/.test(s)) return 'facturas';
   if(/abrirGastos/.test(s)) return 'gastos';
   if(/abrirCostosReventa|abrirConfeccion|abrirCalculadoraCostos|abrirVentasML/.test(s)) return 'costos';
@@ -18390,7 +18394,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v249';
+const APP_VERSION = '2026-10-02-v250';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
