@@ -1595,7 +1595,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v241</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v242</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -9138,7 +9138,7 @@ window.addEventListener('load', () => {
   conDeshacer('guardarPreciosTelas', 'Precios de telas guardados', ['telas']);
   conDeshacer('guardarStock', 'Stock guardado', ['stock']);
   conDeshacer('guardarConfeccion', 'Costos de confección guardados', ['tabla']);
-  ['guardarConfeccion', 'guardarPreciosTelas', 'aplicarPfMasivo'].forEach(n => { const o = window[n]; if(typeof o !== 'function') return; window[n] = async function(...a){ const r = await o.apply(this, a); setTimeout(() => registrarHistorialCostos().catch(() => {}), 500); return r; }; });
+  ['guardarConfeccion', 'guardarPreciosTelas', 'aplicarPfMasivo', 'guardarTela', 'guardarAC', 'guardarCompletarSku'].forEach(n => { const o = window[n]; if(typeof o !== 'function') return; window[n] = async function(...a){ const r = await o.apply(this, a); setTimeout(() => registrarHistorialCostos().catch(() => {}), 500); return r; }; });
   conDeshacer('aplicarMinimosTodos', 'Mínimos aplicados', ['tabla']);
   conDeshacer('guardarReventa', 'Descripciones guardadas', ['reventa'], () => Object.keys(rvPend).filter(k => k.startsWith('v:')).map(k => k.slice(2)).concat(productosReventa().filter(x => rvPend['p:' + x.p._editKey]).flatMap(x => x.p.variantes.map(v => v.sku))));
   conDeshacer('aplicarPfMasivo', 'Cambios aplicados a los SKU', ['fabricacion', 'tabla', 'stock']);
@@ -9982,10 +9982,12 @@ async function registrarHistorialCostos(){
     const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
     const nuevos = [];
     const fabricados = new Set(skusQueFabrico());
+    const cambiosCosto = [];
     fabricados.forEach(S => {
       const a = costoActualSku(S); if(!a) return;
-      if(ult[S] == null || Math.abs(ult[S] - a.costo) >= 1){ nuevos.push({ sku: S, fecha: hoy, costo: a.costo, desglose: a.desglose }); ult[S] = a.costo; }
+      if(ult[S] == null || Math.abs(ult[S] - a.costo) >= 1){ if(ult[S] > 0 && Math.abs(ult[S] - a.costo) / ult[S] >= 0.005) cambiosCosto.push({ sku: S, antes: ult[S], ahora: a.costo }); nuevos.push({ sku: S, fecha: hoy, costo: a.costo, desglose: a.desglose }); ult[S] = a.costo; }
     });
+
     // productos de reventa: costo de compra cargado por el dueño
     if(costosReventa === null) await cargarCostosReventa();
     const DIV = { 'docena': 12, 'media docena': 6, 'par': 2 };
@@ -9993,7 +9995,7 @@ async function registrarHistorialCostos(){
       if(fabricados.has(S) || !(c0 > 0) || esCodigoTela(S) || (kitsDatos && kitsDatos[S])) return;
       const r = buscarProductoPorSku(S), u = r ? (unidadesVenta[r.producto._editKey] || '') : '';
       const c = Math.round(c0 / (DIV[u] || 1) * 100) / 100;
-      if(ult[S] == null || Math.abs(ult[S] - c) >= 0.5){ nuevos.push({ sku: S, fecha: hoy, costo: c, desglose: { reventa: true, costoCargado: c0, por: u || 'unidad' } }); ult[S] = c; }
+      if(ult[S] == null || Math.abs(ult[S] - c) >= 0.5){ if(ult[S] > 0 && Math.abs(ult[S] - c) / ult[S] >= 0.005) cambiosCosto.push({ sku: S, antes: ult[S], ahora: c }); nuevos.push({ sku: S, fecha: hoy, costo: c, desglose: { reventa: true, costoCargado: c0, por: u || 'unidad' } }); ult[S] = c; }
     });
     // juegos armados con otros SKU: suma de sus partes
     if(kitsDatos === null) await cargarKits();
@@ -10011,6 +10013,7 @@ async function registrarHistorialCostos(){
     const ahora = Date.now();
     for(let i = 0; i < nuevos.length; i += 400){ const b = db.batch(); nuevos.slice(i, i + 400).forEach(x => b.set(db.collection('historial_costos').doc(), { ...x, creado: ahora })); await b.commit(); }
     if(nuevos.length) await ref.set({ c: ult, actualizado: new Date().toISOString() });
+    if(cambiosCosto.length) setTimeout(() => proponerPreciosPorCosto(cambiosCosto), 300);
     return nuevos.length;
   })();
   try{ return await registrandoCostos; } finally { registrandoCostos = null; }
@@ -10635,6 +10638,41 @@ async function importarLinksWeb(inp){
   document.getElementById('lw-res').innerHTML = `<div style="background:#EEF6F0;border-radius:12px;padding:10px 12px;margin:8px 0;">✓ <b>${con.length}</b> SKU del catálogo quedaron con su link.</div>
     ${sin.length ? `<details style="margin:6px 0;"><summary style="cursor:pointer;"><b>${sin.length}</b> SKU del catálogo que no están en la web</summary><p class="note" style="text-align:left;">${sin.map(escaparHtml).join(', ')}</p></details>` : ''}
     ${soloWeb.length ? `<details style="margin:6px 0;"><summary style="cursor:pointer;"><b>${soloWeb.length}</b> SKU de la web que no están en el catálogo de la app</summary><p class="note" style="text-align:left;">${soloWeb.map(escaparHtml).join(', ')}</p></details>` : ''}`;
+}
+
+// ===== Cuando cambia el costo de lo que fabricas: proponer el precio nuevo del catalogo, manteniendo el mismo margen =====
+function precioTxt(n){ return Math.round(n * 100) / 100 === Math.round(n) ? formatoPesos(Math.round(n)) + ',00' : (Math.round(n * 100) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+async function proponerPreciosPorCosto(cambios){
+  const filas = cambios.map(c => { const r = buscarProductoPorSku(c.sku); if(!r || !r.variante) return null; const pr = parsePrice(r.variante.precio); if(!(pr > 0)) return null;
+    const nuevo = Math.ceil(pr * c.ahora / c.antes / 10) * 10; return { ...c, r, pr, nuevo }; }).filter(Boolean);
+  if(!filas.length) return;
+  window.__propPrecios = filas;
+  const t = document.getElementById('pub-titulo'); if(t) t.textContent = '💲 Cambió el costo';
+  document.getElementById('pub-cont').innerHTML = `<p class="note" style="text-align:left;">Cambió el costo de <b>${filas.length}</b> ${filas.length === 1 ? 'producto' : 'productos'}. Te propongo el precio nuevo del catálogo <b>manteniendo el mismo margen</b> que tenían. Destildá los que no quieras cambiar.</p>
+    <div style="max-height:50vh;overflow:auto;">${filas.map((f, i) => `<label style="display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 4px;border-top:1px solid var(--line);font-size:.86rem;cursor:pointer;">
+      <input type="checkbox" class="pp-sel" data-i="${i}" checked>
+      <span><b>${escaparHtml(f.sku)}</b> <span class="note" style="margin:0;">${escaparHtml(f.r.producto.nombre)}</span><br><small style="color:#6B6258;">costo ${formatPrice(f.antes)} → <b>${formatPrice(f.ahora)}</b> (${f.ahora > f.antes ? '+' : ''}${Math.round((f.ahora / f.antes - 1) * 1000) / 10} %)</small></span>
+      <span style="text-align:right;white-space:nowrap;"><small class="note" style="margin:0;">precio ${formatPrice(f.pr)}</small><br><b style="color:var(--purple);">→ ${formatPrice(f.nuevo)}</b></span></label>`).join('')}</div>
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="aplicarPreciosPorCosto()">Actualizar precios del catálogo</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Ahora no</button></div>`;
+  document.getElementById('pub-modal').style.display = 'block';
+}
+async function aplicarPreciosPorCosto(){
+  const sel = [...document.querySelectorAll('.pp-sel:checked')].map(c => window.__propPrecios[+c.dataset.i]);
+  if(!sel.length){ cerrarPublicar(); return; }
+  const porProd = new Map(); sel.forEach(f => { const p = f.r.producto; (porProd.get(p) || porProd.set(p, []).get(p)).push(f); });
+  let ok = 0;
+  for(const [p, fs] of porProd){
+    const variantes = p.variantes.map(v => { const f = fs.find(x => String(x.sku).toUpperCase() === String(v.sku).toUpperCase()); return f ? { ...v, precio: precioTxt(f.nuevo) } : v; });
+    const datos = { nombre: p.nombre, composicion: p.composicion || '', variantes, metros: p.metros || null };
+    try{
+      if(p._editKey && p._editKey.startsWith('nuevo-')) await db.collection('productos_nuevos').doc(p._docId).update(datos);
+      else if(p._editKey) await db.collection('productos_editados').doc(p._editKey).set(datos, { merge: true });
+      else continue;
+      p.variantes = variantes; ok += fs.length;
+    } catch(e){ console.error('precio por costo', e); }
+  }
+  cerrarPublicar(); try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+  alert(`Listo: ${ok} ${ok === 1 ? 'precio actualizado' : 'precios actualizados'} en el catálogo.`);
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -18250,7 +18288,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v241';
+const APP_VERSION = '2026-10-02-v242';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
