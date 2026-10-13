@@ -947,6 +947,12 @@ function guardarParametrosML(){
       retenciones:pct(vs,o=>o.ret),fijo:{monto:Math.round(med),hasta:Math.round(hasta)},envioPorVenta:Math.max(0,Math.round(envio)),ventas:vs.length,actualizado:new Date().toISOString()};
     if(!cl.length)P.clasica.com=P.premium.com;
     db.collection('config').doc('ml_parametros').set(JSON.parse(JSON.stringify(P))).catch(()=>{});
+    // egresos de Mercado Libre por mes (para la pantalla de Gastos de la app)
+    const M={}; const eOut=o=>o.envOut!==undefined?o.envOut:Math.min(o.envio||0,0);
+    allRows().filter(o=>!o.excl).forEach(o=>{const k=o.periodo;if(!k||k==='sin-fecha')return;const m=M[k]||(M[k]={comision:0,cargoFijo:0,cuotas:0,envios:0,cadete:0,full:0,publicidad:0,impuestos:0});
+      m.comision-=o.vender||0;m.cargoFijo-=o.unidad||0;m.cuotas-=o.cuotas||0;m.envios-=eOut(o)||0;m.cadete-=o.cad||0;m.full-=o.full||0;m.publicidad-=o.ads||0;m.impuestos-=(o.ret||0)+(o.otros||0);});
+    Object.values(M).forEach(m=>Object.keys(m).forEach(k=>m[k]=Math.round(m[k])));
+    db.collection('config').doc('ml_egresos').set({m:M,actualizado:new Date().toISOString()}).catch(()=>{});
   }catch(e){console.error(e);}
 }
 // ===== Equivalencias de SKU: codigo mal puesto en ML -> codigo de la app (config/ml_equivalencias: { m: { ML: 'APP' | 'APP x N' } }) =====
