@@ -1292,14 +1292,14 @@ function fichaSku(q){
   const maxM=Math.max(1,...MM.map(x=>Math.abs(x.gan)));
   const graficoMes=MM.length>1?`<div style="display:flex;gap:8px;align-items:flex-end;height:120px;">${MM.map(x=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
       <small style="font-size:.7rem;">${fmt(x.gan)}</small><div style="width:80%;height:${Math.max(4,Math.round(Math.abs(x.gan)/maxM*80))}px;background:${x.gan<0?'#A6432F':'#5b2a86'};border-radius:6px 6px 0 0;"></div><small class="meta" style="font-size:.7rem;">${mesTxt(x.per).slice(0,3)} ${x.per.slice(2,4)}</small></div>`).join('')}</div>`:'';
-  const tarj=(t,v,sub,col)=>`<div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 12px;"><small class="meta">${t}</small><div style="font-weight:800;font-size:1.25rem;${col?'color:'+col+';':''}">${v}</div>${sub?`<small class="meta">${sub}</small>`:''}</div>`;
+  const tarj=(t,v,sub,col,ley)=>`<div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 12px;"><small class="meta">${t}</small><div style="font-weight:800;font-size:1.25rem;${col?'color:'+col+';':''}">${v}</div>${sub?`<small class="meta">${sub}</small>`:''}${ley?`<small style="display:block;margin-top:4px;font-size:.7rem;font-weight:700;color:#5b2a86;">${ley}</small>`:''}</div>`;
   box.innerHTML=`<div style="border:2px solid #5b2a86;border-radius:18px;padding:16px;margin-bottom:12px;background:#FCFAFE;">
     <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;"><div><b style="font-size:1.3rem;color:#3d1466;">${q}</b> <span class="meta">${NAMES[q]||''}</span></div><span class="meta">${cur==='todo'?'Todos los meses':mesTxt(cur)}${fc?' · '+fc:''}</span></div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:12px 0;">
       ${tarj('📦 Vendiste',g.unid.toLocaleString('es-AR')+' unid.',fmt(g.vend))}
       ${tarj('🏷️ Costo por unidad',act!=null?fmt(act):'sin costo',cu!=null&&act!=null&&Math.abs(cu-act)>=1?'promedio vendido '+fmt(cu):'','#D97A3A')}
-      ${tarj(g.gan<0?'📉 Perdiste':'💚 Ganaste',g.nC?fmt(g.gan):'–',gu!=null?fmt(gu)+' por unidad · '+(g.vend>0?pctf(g.gan/g.vend):'')+' de lo vendido':'',g.gan<0?'#A6432F':'#2F7A47')}
-      ${tarj('📈 Ganancia sobre el costo',g.costo>0?pctf(g.gan/g.costo):'–',g.costo>0?`costó ${fmt(g.costo)} y ganaste ${fmt(g.gan)}`:'',g.gan<0?'#A6432F':'#2F7A47')}
+      ${tarj(g.gan<0?'📉 Perdiste':'💚 Ganaste',g.nC?fmt(g.gan):'–',gu!=null?fmt(gu)+' por unidad · '+(g.vend>0?pctf(g.gan/g.vend):'')+' de lo vendido':'',g.gan<0?'#A6432F':'#2F7A47','Descontando egresos de Mercado Libre')}
+      ${tarj('📈 Ganancia sobre el costo',g.costo>0?pctf(g.gan/g.costo):'–',g.costo>0?`costó ${fmt(g.costo)} y ganaste ${fmt(g.gan)}`:'',g.gan<0?'#A6432F':'#2F7A47','Descontando egresos de Mercado Libre')}
     </div>
     <b style="font-size:.9rem;color:#3d1466;">¿A dónde va lo que vendiste?</b>
     <div style="margin:6px 0 14px;">${barra}</div>
