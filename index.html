@@ -1596,7 +1596,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v247</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v248</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -9707,7 +9707,7 @@ async function generarVideoAuto(modo){
   const conPrecio = document.getElementById('vc-precio').checked;
   const desc = Math.max(0, Math.min(90, parseFloat(document.getElementById('vc-desc').value) || 0));
   const opc = { med: document.getElementById('vc-med').checked, gr: document.getElementById('vc-gr').checked, comp: document.getElementById('vc-comp').checked };
-  let escenas = [], nombre = '', apertura = '', prods = '';
+  let escenas = [], nombre = '', apertura = '', prods = '', prodsVid = [];
   if(modo === 'cat'){
     const ci = +document.getElementById('vc-cat').value, n = +document.getElementById('vc-n').value, c = CATALOGO[ci];
     let pis = (c.productos || []).map((p, pi) => pi).filter(pi => Array.isArray(c.productos[pi].variantes) && imagenesEfectivas(ci, pi, c.productos[pi]).length);
@@ -9717,16 +9717,16 @@ async function generarVideoAuto(modo){
     else if(orden === 'baratos') pis.sort((a, b) => minP(a) - minP(b));
     else if(orden === 'caros') pis.sort((a, b) => (minP(b) === Infinity ? -1 : minP(b)) - (minP(a) === Infinity ? -1 : minP(a)));
     pis = pis.slice(0, n);
-    escenas = pis.map(pi => escenaDeProducto(ci, pi, conPrecio, desc, opc));
+    escenas = pis.map(pi => escenaDeProducto(ci, pi, conPrecio, desc, opc)); prodsVid = pis.map(pi => c.productos[pi]);
     nombre = c.categoria; apertura = c.categoria; prods = pis.map(pi => c.productos[pi].nombre).slice(0, 5).join(' • ');
   } else {
     if(!vpSel.size){ alert('Tildá al menos un producto.'); return; }
-    escenas = [...vpSel].map(k => { const [ci, pi] = k.split('-').map(Number); return escenaDeProducto(ci, pi, conPrecio, desc, opc); });
+    escenas = [...vpSel].map(k => { const [ci, pi] = k.split('-').map(Number); return escenaDeProducto(ci, pi, conPrecio, desc, opc); }); prodsVid = [...vpSel].map(k => { const [ci, pi] = k.split('-').map(Number); return CATALOGO[ci].productos[pi]; });
     const cats = [...new Set([...vpSel].map(k => CATALOGO[+k.split('-')[0]].categoria))];
     nombre = cats.join(' y '); apertura = 'Textiles para el hogar y la hotelería'; prods = cats.join(' • ');
   }
   try{
-    await idbGuardar('video_auto', { escenas, nombre, apertura, prods, oferta: desc ? `${desc}% OFF` : '', fecha: Date.now() });
+    await idbGuardar('video_auto', { escenas, nombre, apertura, prods, oferta: desc ? `${desc}% OFF` : '', fecha: Date.now(), links: linksDeProductos(prodsVid) });
     cerrarPublicar(); location.href = 'videos.html?auto=1&v=' + Date.now();
   } catch(e){ alert('No se pudo preparar el video: ' + e.message); }
 }
@@ -9767,7 +9767,7 @@ async function difVideo(){
   const escenas = difSkus.map(x => escenaDeProducto(x.ci, x.pi, true, 0, { med: true, gr: true, comp: true }));
   const cats = [...new Set(difSkus.map(x => CATALOGO[x.ci].categoria))];
   try{
-    await idbGuardar('video_auto', { escenas, nombre: 'Nuevo ingreso', apertura: 'Nuevo ingreso', prods: cats.join(' • '), oferta: '', fecha: Date.now() });
+    await idbGuardar('video_auto', { escenas, nombre: 'Nuevo ingreso', apertura: 'Nuevo ingreso', prods: cats.join(' • '), oferta: '', fecha: Date.now(), links: linksDeProductos(difSkus.map(x => CATALOGO[x.ci].productos[x.pi])) });
     cerrarPublicar(); location.href = 'videos.html?auto=1&v=' + Date.now();
   } catch(e){ alert('No se pudo preparar el video: ' + e.message); }
 }
@@ -10623,6 +10623,15 @@ async function recibirCompartido(){
       await abrirGastos(); const dt = new DataTransfer(); dt.items.add((imgs[0] || pdfs[0])); document.getElementById('gs-comp').files = dt.files; document.getElementById('gs-monto').focus();
     }
   } catch(e){ console.error('compartido', e); }
+}
+
+// links de la web de una lista de productos (para pegar en historias y reels)
+function linksDeProductos(prods){ const vistos = new Set(); return prods.map(p => { const u = p && linkWebDeProducto(p); if(!u || vistos.has(u)) return null; vistos.add(u); return { nombre: p.nombre, url: u }; }).filter(Boolean); }
+function htmlLinksWeb(links){
+  if(!links || !links.length) return '';
+  return `<div style="grid-column:1/-1;background:#fff;border:1px solid #CDBFE0;border-radius:14px;padding:10px 12px;margin-bottom:10px;">
+    <b style="color:#5b2a86;">🔗 Links de la web</b> <small class="note">para poner el enlace en la historia o el reel</small>
+    ${links.map(l => `<div style="display:flex;gap:8px;align-items:center;margin-top:6px;font-size:.85rem;"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><b>${escaparHtml(l.nombre)}</b> <span class="note" style="margin:0;">${escaparHtml(l.url)}</span></span><button type="button" class="btn-mini" onclick="navigator.clipboard&&navigator.clipboard.writeText('${escapeAttr(l.url)}').then(()=>{this.textContent='✓ Copiado';setTimeout(()=>this.textContent='🔗 Copiar',1500);})">🔗 Copiar</button></div>`).join('')}</div>`;
 }
 
 // ===== Links de la web: SKU -> link de Tienda Nube (config/links_web) =====
@@ -15721,6 +15730,11 @@ function dibujarFotoContain(ctx, img, x, y, w, h, fondo){
 }
 
 async function generarFlyersNuevoIngreso(){
+  window.__niLinks = [];
+  try{ return await generarFlyersNuevoIngresoBase(); }
+  finally{ const cont = document.getElementById('ni-resultado'); if(cont && window.__niLinks && window.__niLinks.length && !cont.querySelector('.ni-links')){ cont.insertAdjacentHTML('afterbegin', '<div class="ni-links" style="grid-column:1/-1;">' + htmlLinksWeb(window.__niLinks) + '</div>'); } }
+}
+async function generarFlyersNuevoIngresoBase(){
   const modo = document.querySelector('input[name="ni-modo"]:checked').value;
   let textoAdicional = document.getElementById('ni-texto').value.trim();
   const variantesColor = document.getElementById('ni-variantes').value.trim();
@@ -15873,6 +15887,7 @@ async function generarFlyersNuevoIngreso(){
       }
     });
     const grupos = Object.values(gruposMap);
+    window.__niLinks = linksDeProductos(grupos.map(g => g.producto));
 
     // cargar la foto de cada producto distinto (respetando cual eligio el usuario si hay varias)
     for(const g of grupos){
@@ -18320,7 +18335,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v247';
+const APP_VERSION = '2026-10-02-v248';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
