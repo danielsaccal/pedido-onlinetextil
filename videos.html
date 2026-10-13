@@ -649,6 +649,7 @@ async function cargarAuto(){
   $('c-on').checked = escenas.filter(e => e.foto).length >= 3; $('p-on').checked = true;
   if(pq.prods) $('z-prod').value = pq.prods;
   if(pq.oferta){ $('o-on').checked = true; $('o-txt').value = pq.oferta; }
+  if(pq.links && pq.links.length){ const box = document.createElement('div'); box.className = 'card'; box.innerHTML = '<h3>🔗 Links de la web</h3><p class="note" style="margin:0 0 6px;">Para poner el enlace en la historia o el reel.</p>' + pq.links.map(l => `<div style="display:flex;gap:8px;align-items:center;margin-top:6px;font-size:.85rem;"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><b>${l.nombre}</b> <span class="note">${l.url}</span></span><button class="btn sm" onclick="navigator.clipboard&&navigator.clipboard.writeText('${l.url}').then(()=>{this.textContent='✓ Copiado';setTimeout(()=>this.textContent='🔗 Copiar',1500);})">🔗 Copiar</button></div>`).join(''); const vista = document.querySelector('.vista'); if(vista) vista.appendChild(box); }
   history.replaceState(null, '', location.pathname);
   pintarEscenas(); act(); verGrande();
 }
