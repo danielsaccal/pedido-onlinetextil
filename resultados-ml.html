@@ -780,7 +780,7 @@ function showErr(m){const e=$('err');e.textContent=m;e.style.display=m?'block':'
 $('file').addEventListener('change',async ev=>{
   const f=ev.target.files[0]; if(!f)return; showErr('');
   try{
-    alertOk('Leyendo '+f.name+'…'); await new Promise(r=>setTimeout(r,30));
+    procesando('Procesando '+f.name+'…'); alertOk('Leyendo '+f.name+'…'); await new Promise(r=>setTimeout(r,30));
     const buf=await f.arrayBuffer(); const wb=XLSX.read(buf,{type:'array'});
     let cuenta=$('cuenta').value; let rows=parseWorkbook(wb,cuenta,f.name);
     let d=normEntry({file:f.name,cuenta,rows});
@@ -791,15 +791,17 @@ $('file').addEventListener('change',async ev=>{
      if((cOtra!=null&&cOtra>0.5)||(cEsta!=null&&cEsta<0.1)){
        const msg=cOtra!=null&&cOtra>0.5?`Este reporte de ${mesTxt(d.periodo)} parece ser de ${otra} (sus operaciones coinciden con el mes de ${otra} que ya está guardado).`:`Ya hay un ${mesTxt(d.periodo)} guardado de ${cuenta} y ninguna operación coincide con este reporte: puede ser de ${otra}.`;
        if(confirm(msg+`\n\nAceptar = guardarlo como ${otra}\nCancelar = no guardar nada`)){cuenta=otra;$('cuenta').value=otra;rows=parseWorkbook(wb,cuenta,f.name);d=normEntry({file:f.name,cuenta,rows});}
-       else{alertOk('No se guardó nada. Elegí la cuenta correcta y volvé a subirlo.');ev.target.value='';return;}
+       else{procesando.fin();alertOk('No se guardó nada. Elegí la cuenta correcta y volvé a subirlo.');ev.target.value='';return;}
      }}
     const existed=DATA.some(x=>x.id===d.id);
     DATA=DATA.filter(x=>x.id!==d.id); DATA.push(d); DATA.sort((a,b)=>a.periodo.localeCompare(b.periodo));
     shown=200; aplicarCostos(); render();
     alertOk(mesTxt(d.periodo)+' de '+cuenta+': '+rows.length.toLocaleString('es-AR')+' operaciones leídas. Guardando en la base… no cierres la página.');
+    procesando.texto('Guardando '+mesTxt(d.periodo)+' de '+cuenta+' · '+rows.length.toLocaleString('es-AR')+' operaciones…');
     const ok=await saveEntry(d);
     if(ok) alertOk('✓ '+mesTxt(d.periodo)+' de '+cuenta+(existed?' reemplazado con el reporte nuevo.':' guardado.')+' ('+rows.length.toLocaleString('es-AR')+' operaciones)');
-  }catch(e){showErr('No se pudo leer el archivo: '+(e.message||e));}
+    if(ok) procesando.listo('✓ '+mesTxt(d.periodo)+' guardado'); else procesando.error('No se pudo guardar');
+  }catch(e){showErr('No se pudo leer el archivo: '+(e.message||e));procesando.error('No se pudo leer el archivo');}
   ev.target.value='';
 });
 
@@ -836,8 +838,9 @@ function render(){
   $('mgBorrar').onclick=async()=>{
     const ids=[...$('files').querySelectorAll('.mgSel:checked')].map(c=>c.value); if(!ids.length)return;
     if(!confirm(`¿Borrar ${ids.length} ${ids.length===1?'mes':'meses'} de la app? Los podés volver a subir cuando quieras.`))return;
-    for(const id of ids){try{await borrarMes(id);}catch(e){showErr('No se pudo borrar: '+e.message);return;}try{await IDB.del(id);}catch(e){}}
-    DATA=DATA.filter(x=>!ids.includes(x.id)); render(); alertOk(ids.length+(ids.length===1?' mes borrado.':' meses borrados.'));
+    procesando('Borrando '+ids.length+(ids.length===1?' mes…':' meses…'));
+    for(const id of ids){try{await borrarMes(id);}catch(e){showErr('No se pudo borrar: '+e.message);procesando.error('No se pudo borrar');return;}try{await IDB.del(id);}catch(e){}}
+    DATA=DATA.filter(x=>!ids.includes(x.id)); render(); procesando.listo('✓ Borrado'); alertOk(ids.length+(ids.length===1?' mes borrado.':' meses borrados.'));
   };
   if(!has)return;
   applyCadete(); renderCad();
@@ -1259,14 +1262,15 @@ function perdidasReclamo(){
 }
 function renderPerdidas(){
   const L=perdidasReclamo(), P=L.filter(x=>x.tipo==='perdida'), Q=L.filter(x=>x.tipo==='pendiente');
-  const item=x=>{const o=x.rs.find(r=>r.pcd>0)||x.rs[0]; const fechas=[...new Set(x.rs.map(r=>r.fecha))].join(', ');
+  const item=x=>{const o=x.rs.find(r=>r.pcd>0)||x.rs[0]; const fe=f=>String(f||'').split('/').reverse().join('');
+    const fechas=x.rs.slice().sort((a,b)=>fe(a.fecha).localeCompare(fe(b.fecha))).map(r=>{const t=r.pcd>0?'venta (cobro)':r.pcd<0?'reintegro al comprador':Object.keys(r.cd||{}).some(k=>/devoluci/i.test(k)&&!/anulaci/i.test(k))?'cargo por devolución':'otro movimiento';return `${String(r.fecha).slice(0,5)} ${t}`;}).join(' · ');
     return `<div style="border-bottom:1px solid var(--line);padding:10px 0;font-size:.88rem;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;">
         <b>${o.cuenta}</b><span>Operación <b>${o.op}</b></span>
         <button type="button" style="padding:2px 8px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:.78rem;" onclick="navigator.clipboard&&navigator.clipboard.writeText('${o.op}').then(()=>{this.textContent='✓ Copiado';setTimeout(()=>this.textContent='Copiar N.º',1500);})">Copiar N.º</button>
         <span class="meta">${o.skuBase||''} ${NAMES[o.skuBase]?'· '+NAMES[o.skuBase]:''}</span>
         <b style="margin-left:auto;color:${x.tipo==='perdida'?'#A6432F':'#8A6417'};">${x.tipo==='perdida'?fmt(x.net):'falta reintegrar'}</b></div>
-      <div class="meta" style="margin-top:3px;">${o.estado} · fechas: ${fechas}</div>
+      <div class="meta" style="margin-top:3px;">${o.estado} · ${fechas}</div>
       ${Object.keys(x.cargos).length?`<div style="margin-top:3px;font-size:.82rem;">Cargos: ${Object.entries(x.cargos).filter(([,v])=>Math.abs(v)>0.5).map(([k,v])=>`${k} ${fmt(v)}`).join(' · ')}</div>`:''}</div>`;};
   $('perdidasBox').innerHTML=`<div class="panel" style="padding:14px;">
     <p class="note" style="margin-top:0;">Operaciones canceladas o devueltas en las que Mercado Libre te cobró (envío de vuelta, envío no anulado, cargo por devolución). Copiá el N.º de operación para reclamar. Respeta la cuenta elegida arriba.</p>
@@ -1864,12 +1868,13 @@ firebase.auth().onAuthStateChanged(async u=>{
       m[k]=porDia;});
     COSTOS=m;}catch(e){}
   await cargarZonas();
+  procesando('Cargando los meses guardados…');
   await cargarEquivalencias();
   await cargarConfirmadas();
   await cargarUnidades();
   await load();
   $('cargando').hidden=true;
-  render();
+  render(); procesando.fin();
   if(/calcu=1/.test(location.search)){ // solo la calculadora
     document.querySelectorAll('#app > *').forEach(el=>{ if(el.id!=='calcuBox') el.style.display='none'; });
     document.querySelectorAll('main > *').forEach(el=>{ if(el.id!=='app'&&el.id!=='err') el.style.display='none'; });
@@ -1881,6 +1886,41 @@ firebase.auth().onAuthStateChanged(async u=>{
   }
   setTimeout(guardarParametrosML,1500);
 });
+</script>
+<script>
+// ===== Aviso "Procesando…" (igual en la app y en Resultados ML) =====
+(function(){
+  const css = '#procAviso{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:10000;background:#3D2B4E;color:#fff;border-radius:999px;padding:9px 18px;font:600 .9rem system-ui,sans-serif;display:none;align-items:center;gap:10px;box-shadow:0 6px 22px rgba(0,0,0,.25);max-width:92vw}'
+    + '#procAviso .rueda{width:16px;height:16px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:procGira .8s linear infinite;flex:none}'
+    + '#procAviso.ok{background:#2F7A47}#procAviso.mal{background:#A6432F}#procAviso.ok .rueda,#procAviso.mal .rueda{display:none}'
+    + '@keyframes procGira{to{transform:rotate(360deg)}}';
+  const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+  let n = 0, timer = null, boton = null;
+  function el(){ let e = document.getElementById('procAviso'); if(!e){ e = document.createElement('div'); e.id = 'procAviso'; e.innerHTML = '<span class="rueda"></span><span class="txt"></span>'; document.body.appendChild(e); } return e; }
+  window.procesando = function(msg){
+    const e = el(); clearTimeout(timer); n++;
+    e.className = ''; e.querySelector('.txt').textContent = msg || 'Procesando…'; e.style.display = 'flex';
+    const a = document.activeElement; if(a && (a.tagName === 'BUTTON' || a.tagName === 'LABEL') && !a.disabled){ boton = a; try{ a.disabled = true; a.style.opacity = '.6'; }catch(x){} }
+  };
+  window.procesando.texto = function(msg){ const e = el(); e.querySelector('.txt').textContent = msg; };
+  function soltar(){ if(boton){ try{ boton.disabled = false; boton.style.opacity = ''; }catch(x){} boton = null; } }
+  window.procesando.listo = function(msg){ n = Math.max(0, n - 1); if(n) return; const e = el(); soltar(); e.className = 'ok'; e.querySelector('.txt').textContent = msg || '✓ Listo'; e.style.display = 'flex'; clearTimeout(timer); timer = setTimeout(() => { e.style.display = 'none'; }, 1200); };
+  window.procesando.error = function(msg){ n = 0; const e = el(); soltar(); e.className = 'mal'; e.querySelector('.txt').textContent = '✕ ' + (msg || 'No se pudo completar'); e.style.display = 'flex'; clearTimeout(timer); timer = setTimeout(() => { e.style.display = 'none'; }, 4000); };
+  window.procesando.fin = function(){ n = Math.max(0, n - 1); if(n) return; soltar(); clearTimeout(timer); el().style.display = 'none'; };
+  // envuelve una funcion global: muestra el aviso mientras corre
+  window.conProcesando = function(nombre, texto, textoListo){
+    const f = window[nombre]; if(typeof f !== 'function' || f.__proc) return;
+    const g = async function(...a){ window.procesando(typeof texto === 'function' ? texto(...a) : texto);
+      try{ const r = await f.apply(this, a); window.procesando.listo(textoListo); return r; }
+      catch(e){ window.procesando.error(e && e.message); throw e; } };
+    g.__proc = true; window[nombre] = g;
+  };
+})();
+
+window.addEventListener('load', () => setTimeout(() => [
+  ['confirmarVenta','Guardando…'],['aplicarPackSug','Aplicando el pack…'],['packSoloVenta','Aplicando el pack…'],['skuSoloVenta','Cambiando el SKU…'],['aplicarCambioSku','Cambiando el SKU…'],
+  ['quitarEqDeVenta','Quitando la equivalencia…'],['costoFaltante','Guardando el costo…'],['emparejarFaltante','Guardando…'],['asignarSugeridos','Asignando equivalencias…'],['quitarEquivalencia','Quitando la equivalencia…']
+].forEach(([n,t])=>conProcesando(n,t)),0));
 </script>
 </body>
 </html>
