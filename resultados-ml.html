@@ -235,6 +235,7 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
 </style>
 </head>
 <body>
+<div id="bandaCuenta" style="position:sticky;top:0;z-index:50;text-align:center;font:800 .95rem system-ui,sans-serif;letter-spacing:.06em;padding:7px 10px;color:#fff;background:#6B6258;">Viendo: AMBAS CUENTAS</div>
 <header class="top">
   <div style="display:flex;gap:8px;justify-content:center;margin-bottom:6px;"><a href="./" style="color:#fff;border:1px solid rgba(255,255,255,.45);border-radius:10px;padding:5px 12px;text-decoration:none;font-size:.85rem;">← Volver a la app</a></div>
   <h1>Resultados Mercado Libre</h1>
@@ -794,6 +795,12 @@ $('file').addEventListener('change',async ev=>{
        if(confirm(msg+`\n\nAceptar = guardarlo como ${otra}\nCancelar = no guardar nada`)){cuenta=otra;$('cuenta').value=otra;rows=parseWorkbook(wb,cuenta,f.name);d=normEntry({file:f.name,cuenta,rows});}
        else{procesando.fin();alertOk('No se guardó nada. Elegí la cuenta correcta y volvé a subirlo.');ev.target.value='';return;}
      }}
+    { const fs=rows.map(o=>String(o.fecha)).filter(x=>/\d{2}\/\d{2}\/\d{4}/.test(x)).sort((a,b)=>a.split('/').reverse().join('').localeCompare(b.split('/').reverse().join('')));
+      procesando.fin();
+      const r=await confirmarCarga(cuenta,d.periodo,rows.length,fs[0],fs[fs.length-1]);
+      if(r==='cancel'){alertOk('No se cargó nada.');ev.target.value='';return;}
+      if(r==='otra'){cuenta=cuenta==='Alberto'?'Rita':'Alberto';$('cuenta').value=cuenta;pintarCuenta();rows=parseWorkbook(wb,cuenta,f.name);d=normEntry({file:f.name,cuenta,rows});}
+      procesando('Guardando…'); }
     const existed=DATA.some(x=>x.id===d.id);
     DATA=DATA.filter(x=>x.id!==d.id); DATA.push(d); DATA.sort((a,b)=>a.periodo.localeCompare(b.periodo));
     shown=200; aplicarCostos(); render();
@@ -887,6 +894,7 @@ function draw(){
   try{renderOrigen();}catch(e){console.error(e);}
   try{renderCuotas();}catch(e){console.error(e);}
   try{renderRevisar();}catch(e){console.error(e);}
+  try{pintarCuenta();}catch(e){}
   try{ if(!menuArmado) armarMenuML(); else { pintarMenuML(); if(window.__pantallaML){ abrirPantallaML(window.__pantallaML,true); } } }catch(e){console.error(e);}
   // lista
   $('count').textContent=r.length.toLocaleString('es-AR')+' operaciones';
@@ -1176,8 +1184,8 @@ function renderRevisar(){
   if(!L.length){box.innerHTML='<p class="note">✓ No hay ventas para revisar.</p>';return;}
   const abierta=!!(box.querySelector('details')&&box.querySelector('details').open)||window.__revAbierta;
   box.innerHTML=`<details class="pleg" style="margin:10px 0;" ${abierta?'open':''} ontoggle="window.__revAbierta=this.open"><summary style="background:#FDEBE7;border-color:#E3B8AE;color:#A6432F;">⚠️ ${L.length} ${L.length===1?'venta para revisar':'ventas para revisar'} <small style="color:#A6432F;">· no se cuentan en la ganancia hasta que las confirmes</small></summary><div class="pleg-body">
-    ${L.slice(0,60).map(o=>`<div style="border-bottom:1px solid var(--line);padding:8px 0;font-size:.88rem;">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;"><b>${o.skuBase}</b><span class="meta">${o.fecha} · ${o.cuenta} · ${o.unid} unid. · precio ${fmt(o.pcd)} · costo ${fmt(o.costoRev)}</span>
+    ${L.slice(0,60).map(o=>`<div style="border-bottom:1px solid var(--line);padding:8px 0 8px 10px;font-size:.88rem;box-shadow:inset 4px 0 0 ${colorCta(o.cuenta)};">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;">${etiquetaCta(o.cuenta)}<b>${o.skuBase}</b><span class="meta">${o.fecha} · ${o.unid} unid. · precio ${fmt(o.pcd)} · costo ${fmt(o.costoRev)}</span>
         <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">${o.packSug?`<span style="display:inline-flex;gap:4px;align-items:center;border:1px solid #CDBFE0;background:#F4EFFA;border-radius:8px;padding:2px 4px 2px 8px;color:#5b2a86;font-weight:700;font-size:.85rem;">📦 Pack de <input type="number" min="2" value="${o.packSug}" style="width:52px;height:28px;min-height:0;padding:2px 4px;border:1px solid #CDBFE0;border-radius:6px;font-weight:700;font-size:.85rem;box-sizing:border-box;" onkeydown="if(event.key==='Enter')this.nextElementSibling.click()"><button type="button" style="padding:3px 8px;border-radius:6px;border:none;background:#5b2a86;color:#fff;font-weight:700;cursor:pointer;" title="Solo esta venta" onclick="const n=parseInt(this.previousElementSibling.value,10);if(n>=2)packSoloVenta('${claveVenta(o).replace(/'/g,'')}',n)">Solo esta venta</button><button type="button" style="padding:3px 8px;border-radius:6px;border:1px solid #CDBFE0;background:#fff;color:#5b2a86;font-weight:700;cursor:pointer;" title="Todas las ventas de este SKU sin x N en esta cuenta" onclick="const n=parseInt(this.parentElement.querySelector('input').value,10);if(n>=2)aplicarPackSug('${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}',n)">Todas</button></span>`:''}<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid #BFDCC8;background:#EEF6F0;color:#2F7A47;font-weight:700;cursor:pointer;" onclick="confirmarVenta('${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">✓ Está bien</button>
         <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" data-op="${o.op}" onclick="pedirCambioSku(this,'${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">🔁 Cambiar SKU</button>
         <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="verVentaAca(this,'${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">Ver venta</button></span></div>
@@ -1243,6 +1251,41 @@ function volverMenuML(){
 }
 // fila de "Cargo por devolución": monto del producto en 0, solo el cargo (no es un reintegro al comprador)
 function esCargoDevol(o){const ks=Object.keys(o.cd||{});return ks.some(k=>/devoluci/i.test(k)&&!/anulaci/i.test(k))&&!ks.some(k=>/anulaci/i.test(k))&&Math.abs((o.pcd||0)+(o.ec||0))<1;}
+// ===== Colores por cuenta (Alberto azul, Rita naranja, ambas gris) =====
+const COLOR_CTA={Alberto:'#1F5FAD',Rita:'#C8650F'};
+const colorCta=c=>COLOR_CTA[c]||'#6B6258';
+function etiquetaCta(c){return `<span style="display:inline-block;background:${colorCta(c)};color:#fff;border-radius:6px;padding:1px 8px;font-weight:800;font-size:.75rem;letter-spacing:.04em;">${String(c||'').toUpperCase()}</span>`;}
+function pintarCuenta(){
+  const fc=$('fCuenta')?$('fCuenta').value:'', b=$('bandaCuenta');
+  if(b){b.style.background=colorCta(fc);b.textContent=fc?'Viendo: cuenta de '+fc.toUpperCase():'Viendo: AMBAS CUENTAS (Alberto y Rita juntas)';}
+  const sc=$('cuenta'); if(sc){sc.style.background=colorCta(sc.value);sc.style.color='#fff';sc.style.fontWeight='800';}
+}
+// ===== Estado de cada reclamo (config/ml_reclamos) =====
+let RECLAMOS={};
+async function cargarReclamos(){try{const d=await db.collection('config').doc('ml_reclamos').get();RECLAMOS=d.exists?(d.data().r||{}):{};}catch(e){RECLAMOS={};}}
+async function guardarReclamo(k,campo,valor){
+  RECLAMOS[k]=Object.assign({},RECLAMOS[k]||{},{[campo]:valor,actualizado:new Date().toISOString()});
+  try{await db.collection('config').doc('ml_reclamos').set({r:RECLAMOS});}catch(e){showErr('No se pudo guardar: '+e.message);return;}
+  renderPerdidas();
+}
+const ESTADOS_REC=[['','Sin reclamar'],['reclamado','Reclamado, esperando respuesta'],['total','Devuelto total'],['parcial','Devuelto parcial'],['rechazado','Rechazado']];
+function recuperado(x){const r=RECLAMOS[x.k]||{};return r.estado==='total'?-x.net:r.estado==='parcial'?Math.min(-x.net,+r.monto||0):0;}
+// ===== Paso de confirmacion antes de cargar un reporte =====
+function confirmarCarga(cuenta,periodo,n,desde,hasta){
+  return new Promise(res=>{
+    const otra=cuenta==='Alberto'?'Rita':'Alberto';
+    const m=document.createElement('div'); m.style.cssText='position:fixed;inset:0;background:rgba(20,8,35,.6);z-index:400;display:flex;align-items:center;justify-content:center;padding:14px;';
+    m.innerHTML=`<div style="background:#fff;border-radius:16px;max-width:460px;width:100%;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.4);">
+      <div style="background:${colorCta(cuenta)};color:#fff;padding:14px 16px;font-weight:800;font-size:1.15rem;">¿Está seguro? Cuenta: ${cuenta.toUpperCase()}</div>
+      <div style="padding:14px 16px;font-size:.95rem;line-height:1.5;">Va a cargar el reporte de <b>${mesTxt(periodo)}</b><br>${n.toLocaleString('es-AR')} operaciones${desde?` · del ${desde} al ${hasta}`:''}<br>en la cuenta de <b style="color:${colorCta(cuenta)};">${cuenta.toUpperCase()}</b>.</div>
+      <div style="display:flex;flex-direction:column;gap:8px;padding:0 16px 16px;">
+        <button type="button" data-r="ok" style="padding:11px;border:none;border-radius:10px;background:${colorCta(cuenta)};color:#fff;font-weight:800;cursor:pointer;">Sí, es de ${cuenta.toUpperCase()}</button>
+        <button type="button" data-r="otra" style="padding:11px;border:2px solid ${colorCta(otra)};border-radius:10px;background:#fff;color:${colorCta(otra)};font-weight:800;cursor:pointer;">No, es de ${otra.toUpperCase()}</button>
+        <button type="button" data-r="cancel" style="padding:9px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer;">Cancelar, no cargar nada</button></div></div>`;
+    document.body.appendChild(m);
+    m.querySelectorAll('button').forEach(b=>b.onclick=()=>{m.remove();res(b.dataset.r);});
+  });
+}
 // ===== Perdidas para reclamar: cancelaciones y devoluciones que te costaron plata =====
 function perdidasReclamo(){
   const fc=$('fCuenta').value, G={};
@@ -1264,23 +1307,39 @@ function perdidasReclamo(){
   return out.sort((a,b)=>a.net-b.net);
 }
 function renderPerdidas(){
-  const L=perdidasReclamo(), P=L.filter(x=>x.tipo==='perdida'), Q=L.filter(x=>x.tipo==='pendiente');
+  const L=perdidasReclamo(); L.forEach(x=>{const o=x.rs.find(r=>r.pcd>0)||x.rs[0];x.k=o.cuenta+'|'+o.op;});
+  const P=L.filter(x=>x.tipo==='perdida'), Q=L.filter(x=>x.tipo==='pendiente');
+  const filtro=window.__recFiltro||'';
+  const perdido=P.reduce((a,x)=>a-x.net,0), recup=P.reduce((a,x)=>a+recuperado(x),0), rech=P.filter(x=>(RECLAMOS[x.k]||{}).estado==='rechazado').reduce((a,x)=>a-x.net,0);
   const item=x=>{const o=x.rs.find(r=>r.pcd>0)||x.rs[0]; const fe=f=>String(f||'').split('/').reverse().join('');
     const fechas=x.rs.slice().sort((a,b)=>fe(a.fecha).localeCompare(fe(b.fecha))).map(r=>{const t=esCargoDevol(r)?'cargo por devolución':r.pcd>0?'venta (cobro)':r.pcd<0?'reintegro al comprador':'otro movimiento';return `${String(r.fecha).slice(0,5)} ${t}`;}).join(' · ');
-    return `<div style="border-bottom:1px solid var(--line);padding:10px 0;font-size:.88rem;">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;">
-        <b>${o.cuenta}</b><span>Operación <b>${o.op}</b></span>
-        <button type="button" style="padding:2px 8px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:.78rem;" onclick="navigator.clipboard&&navigator.clipboard.writeText('${o.op}').then(()=>{this.textContent='✓ Copiado';setTimeout(()=>this.textContent='Copiar N.º',1500);})">Copiar N.º</button>
+    const rc=RECLAMOS[x.k]||{}, col=colorCta(o.cuenta), kq=x.k.replace(/'/g,'');
+    return `<div style="border-bottom:1px solid var(--line);padding:10px 0 10px 12px;font-size:.88rem;box-shadow:inset 5px 0 0 ${col};">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        ${etiquetaCta(o.cuenta)}<span>Operación <b>${o.op}</b></span>
+        <button type="button" style="padding:2px 8px;border-radius:6px;border:1px solid ${col};background:#fff;color:${col};cursor:pointer;font-size:.78rem;font-weight:700;" onclick="navigator.clipboard&&navigator.clipboard.writeText('${o.op}').then(()=>{this.textContent='✓ Copiado: operación de ${String(o.cuenta).toUpperCase()}';setTimeout(()=>this.textContent='Copiar N.º',2500);})">Copiar N.º</button>
         <span class="meta">${o.skuBase||''} ${NAMES[o.skuBase]?'· '+NAMES[o.skuBase]:''}</span>
         <b style="margin-left:auto;color:${x.tipo==='perdida'?'#A6432F':'#8A6417'};">${x.tipo==='perdida'?fmt(x.net):'falta reintegrar'}</b></div>
-      <div class="meta" style="margin-top:3px;">${o.estado} · ${fechas}</div>
-      ${Object.keys(x.cargos).length?`<div style="margin-top:3px;font-size:.82rem;">Cargos: ${Object.entries(x.cargos).filter(([,v])=>Math.abs(v)>0.5).map(([k,v])=>`${k} ${fmt(v)}`).join(' · ')}</div>`:''}</div>`;};
+      <div style="margin-top:3px;font-size:.8rem;font-weight:700;color:${col};">Reclamar desde la cuenta de ${String(o.cuenta).toUpperCase()}</div>
+      <div class="meta" style="margin-top:2px;">${o.estado} · ${fechas}</div>
+      ${Object.keys(x.cargos).length?`<div style="margin-top:3px;font-size:.82rem;">Cargos: ${Object.entries(x.cargos).filter(([,v])=>Math.abs(v)>0.5).map(([k,v])=>`${k} ${fmt(v)}`).join(' · ')}</div>`:''}
+      ${x.tipo==='perdida'?`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px;">
+        <select onchange="guardarReclamo('${kq}','estado',this.value)" style="padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;width:auto;">${ESTADOS_REC.map(([v,t])=>`<option value="${v}" ${(rc.estado||'')===v?'selected':''}>${t}</option>`).join('')}</select>
+        ${rc.estado==='parcial'?`<input type="number" min="0" placeholder="monto devuelto" value="${rc.monto||''}" onchange="guardarReclamo('${kq}','monto',+this.value||0)" style="width:130px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;">`:''}
+        <input placeholder="nota (N.º de reclamo, fecha…)" value="${String(rc.nota||'').replace(/"/g,'&quot;')}" onchange="guardarReclamo('${kq}','nota',this.value)" style="flex:1;min-width:160px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;"></div>`:''}</div>`;};
+  const pasa=x=>!filtro||(RECLAMOS[x.k]||{}).estado===filtro||(filtro==='sin'&&!(RECLAMOS[x.k]||{}).estado);
+  const PF=P.filter(pasa);
   $('perdidasBox').innerHTML=`<div class="panel" style="padding:14px;">
-    <p class="note" style="margin-top:0;">Operaciones canceladas o devueltas en las que Mercado Libre te cobró (envío de vuelta, envío no anulado, cargo por devolución). Copiá el N.º de operación para reclamar. Respeta la cuenta elegida arriba.</p>
-    <b style="color:#A6432F;">Te costaron plata: ${P.length} · ${fmt(P.reduce((a,x)=>a+x.net,0))}</b>
-    ${P.map(item).join('')||'<p class="note">No hay.</p>'}
+    <p class="note" style="margin-top:0;">Operaciones canceladas o devueltas en las que Mercado Libre le cobró (envío de vuelta, envío no anulado, cargo por devolución). Cada una indica desde qué cuenta se reclama. Respeta la cuenta elegida arriba.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:8px 0;">
+      <div style="border:1px solid var(--line);border-radius:12px;padding:8px 10px;"><small class="meta">Perdido</small><div style="font-weight:800;color:#A6432F;">${fmt(perdido)}</div><small class="meta">${P.length} operaciones</small></div>
+      <div style="border:1px solid var(--line);border-radius:12px;padding:8px 10px;"><small class="meta">Recuperado</small><div style="font-weight:800;color:#2F7A47;">${fmt(recup)}</div></div>
+      <div style="border:1px solid var(--line);border-radius:12px;padding:8px 10px;"><small class="meta">Rechazado</small><div style="font-weight:800;">${fmt(rech)}</div></div>
+      <div style="border:1px solid var(--line);border-radius:12px;padding:8px 10px;"><small class="meta">Pendiente</small><div style="font-weight:800;color:#8A6417;">${fmt(perdido-recup-rech)}</div></div></div>
+    <div style="margin:6px 0 4px;"><select onchange="window.__recFiltro=this.value;renderPerdidas();" style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;width:auto;"><option value="">Todos los estados</option><option value="sin" ${filtro==='sin'?'selected':''}>Sin reclamar</option>${ESTADOS_REC.slice(1).map(([v,t])=>`<option value="${v}" ${filtro===v?'selected':''}>${t}</option>`).join('')}</select></div>
+    ${PF.map(item).join('')||'<p class="note">No hay operaciones con este filtro.</p>'}
     ${Q.length?`<b style="display:block;margin-top:14px;color:#8A6417;">Cobradas dos veces y reintegradas una sola (todavía falta un reintegro): ${Q.length}</b>${Q.map(item).join('')}`:''}
-    <p class="note" style="margin-top:10px;">Si la venta y el reintegro están en meses distintos, aparecen cuando estén cargados los dos meses.</p></div>`;
+    <p class="note" style="margin-top:10px;">Lo recuperado no se suma al resultado del mes: ese dinero aparece en el reporte de Mercado Libre cuando entra. Si la venta y el reintegro están en meses distintos, la operación aparece cuando estén cargados los dos meses.</p></div>`;
 }
 // ===== Desglose de lo que se llevo ML en un mes (ventana) =====
 function conceptosML(p){
@@ -1818,7 +1877,7 @@ function card(o){
     </div>
     ${o.mp?`<p class="mpbox">Para buscar en Mercado Pago: <b>ID de pago ${o.mp}</b>${o.mpFecha?' · pagado el '+o.mpFecha.split('-').reverse().join('/'):''}${o.mpMedio&&o.mpMedio!=='-'?' · '+o.mpMedio:''}<br>Monto que debería figurar acreditado: <b>${fmt2(o.acred)}</b></p>`:''}<p class="note">Operación ${o.op} · ${o.cuenta}${o.cant?' · Publicación: '+o.sku+(o.cant>1?' × '+o.cant:''):''}${o.psd?' · Precio sin descuento '+fmt2(o.psd):''}${o.flexMonto!=null?' · Monto envío Flex '+fmt2(o.flexMonto):''}${o.nota?'<br>'+o.nota:''}</p></div>`;
   const skuCell=o.sku?`<span class="base">${o.raro?'<span title="Precio por unidad muy por debajo de lo habitual" style="font-size:.72rem;background:#FDEBE7;color:#A6432F;border-radius:6px;padding:1px 5px;margin-right:4px;">⚠️ precio</span>':''}${o.skuBase}${o.rep?' <span title="Envío compartido: el reintegro y el cadete se reparten entre los productos del envío" style="font-size:.72rem;background:#E3F0FF;color:#1F4E8C;border-radius:6px;padding:1px 5px;">🔀 '+o.rep.n+'</span>':''}</span>${NAMES[o.skuBase]?`<span class="var">${NAMES[o.skuBase]}</span>`:''}${o.variante?`<span class="var">${o.variante}</span>`:''}`:`<span class="base">${o.tipo}</span>`;
-  return `<tr class="v" tabindex="0"><td>${o.fecha}</td><td>${skuCell}</td><td>${o.unid??''}</td>
+  return `<tr class="v" tabindex="0" style="box-shadow:inset 4px 0 0 ${colorCta(o.cuenta)};"><td>${o.fecha}</td><td>${skuCell}</td><td>${o.unid??''}</td>
     <td>${o.pcd!=null?fmt(o.pcd):''}</td><td>${fmt(o.neto)}</td><td>${o.aUnit!=null?fmt(o.aUnit):''}</td>
     <td class="pct ${cls(o.pct)}">${o.pct==null?'–':pctf(o.pct)}</td>
     <td>${o.tipo==='Venta'&&o.pcd>0?(o.costo!=null?fmt(o.costo):'<span class="meta">sin costo</span>'):''}</td>
@@ -1833,7 +1892,7 @@ $('resMes').addEventListener('change',()=>{renderResumen();renderRanking();});
 $('dsMes').addEventListener('change',renderDesglose);
 $('cqPrecio').addEventListener('input',calcularQueda);$('cqTipo').addEventListener('change',calcularQueda);
 $('ftMes').addEventListener('change',renderFaltan);
-$('ogMes').addEventListener('change',renderOrigen);$('cqOrigen').addEventListener('change',renderCuotas);$('ogLog').addEventListener('change',renderOrigen);
+$('ogMes').addEventListener('change',renderOrigen);$('cuenta').addEventListener('change',()=>pintarCuenta());$('cqOrigen').addEventListener('change',renderCuotas);$('ogLog').addEventListener('change',renderOrigen);
 document.querySelectorAll('details.pleg').forEach(d=>{const k='ml.pleg.'+d.dataset.k;try{if(localStorage.getItem(k)==='1')d.open=true;}catch(e){}
   d.addEventListener('toggle',()=>{try{localStorage.setItem(k,d.open?'1':'0');}catch(e){}});});
 ['fMes','fCuenta','fTipo','fLog','fFlex','fOrden','fVista'].forEach(id=>$(id).addEventListener('change',()=>{shown=200;draw();}));
@@ -1872,6 +1931,7 @@ firebase.auth().onAuthStateChanged(async u=>{
     COSTOS=m;}catch(e){}
   await cargarZonas();
   procesando('Cargando los meses guardados…');
+  await cargarReclamos();
   await cargarEquivalencias();
   await cargarConfirmadas();
   await cargarUnidades();
