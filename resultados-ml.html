@@ -241,6 +241,7 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
     <div id="resBody"></div>
   </section>
   <p class="note" id="rarosAviso" style="display:none;margin:10px 0 0;"></p>
+  <div id="revisarBox" style="display:none;"></div>
   <details class="pleg" data-k="calcu" id="calcuBox" style="display:none;"><summary>🧮 ¿Cuánto me queda si vendo a $…?</summary><div class="pleg-body">
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       <input id="cqPrecio" inputmode="decimal" placeholder="Precio de venta, ej: 24000" style="flex:1;min-width:180px;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:1rem;">
@@ -560,7 +561,7 @@ function autoZonas(){
   if(changed)saveZ();
 }
 function applyCadete(){
-  aplicarEquivalencias();applyCadeteBase();aplicarCostos();marcarRaros();
+  aplicarEquivalencias();applyCadeteBase();aplicarCostos();marcarSospechosas();marcarRaros();
 }
 // precios raros: venta con precio por unidad 25 % o mas por debajo de lo habitual de ese SKU (mediana del mes; si hay pocas, de todos los meses)
 function marcarRaros(){
@@ -784,6 +785,7 @@ function draw(){
   try{renderFaltan();}catch(e){console.error(e);}
   try{renderOrigen();}catch(e){console.error(e);}
   try{renderCuotas();}catch(e){console.error(e);}
+  try{renderRevisar();}catch(e){console.error(e);}
   // lista
   $('count').textContent=r.length.toLocaleString('es-AR')+' operaciones';
   {const c=$('cntResumen');if(c)c.textContent='· '+r.length.toLocaleString('es-AR')+' operaciones';}
@@ -978,6 +980,47 @@ function calcularQueda(){
   box.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:.9rem;"><tr style="color:#8A8072;font-size:.72rem;text-transform:uppercase;"><td style="padding:6px;">Envío</td><td style="padding:6px;text-align:right;">Te queda</td><td style="padding:6px;text-align:right;">% del precio</td><td style="padding:6px;text-align:right;">Calculado con</td></tr>
     ${fila('Flex','🛵')}${fila('Correo','📦')}${fila('Full','🏬')}</table>
     <p class="note" style="margin-top:6px;">Promedio de tus ventas reales ${con?'con cuotas':'sin cuotas'} de precio parecido: comisión, cargo fijo, cuotas, envío, cadete Flex (con reintegros) e impuestos. Antes de restar tu costo.</p>`;
+}
+// ===== Control automatico: ventas con numeros sospechosos quedan afuera de los totales hasta confirmarlas =====
+let CONFIRMADAS={};
+async function cargarConfirmadas(){try{const d=await db.collection('config').doc('ml_confirmadas').get();CONFIRMADAS=d.exists?(d.data().ops||{}):{};}catch(e){CONFIRMADAS={};}}
+function marcarSospechosas(){
+  for(const o of allRows()){
+    o.revisar=null; if(o.costoRev!==undefined){o.costo=o.costoRev;o.gan=o.ganRev;o.ganPct=o.ganPctRev;delete o.costoRev;}
+    if(!(o.tipo==='Venta'&&o.pcd>0&&o.costo!=null&&o.unid))continue;
+    const m=[]; const cu=o.costo/o.unid, pu=o.pcd/o.unid;
+    if(o.ganPct!=null&&o.ganPct<-0.3)m.push(`pierde ${pctf(-o.ganPct)} sobre el costo`);
+    if(o.ganPct!=null&&o.ganPct>2)m.push(`gana ${pctf(o.ganPct)} sobre el costo (demasiado)`);
+    if(cu>pu)m.push(`el costo por unidad (${fmt(cu)}) es mayor que el precio por unidad (${fmt(pu)})`);
+    // el costo usado en esta venta comparado con el costo de hoy (si es 5 veces distinto, casi seguro es docena/unidad)
+    const hc=COSTOS[String(o.skuBase).toUpperCase()]||[]; const hoy=hc.length?hc[hc.length-1].costo:null;
+    if(hoy>0&&(cu/hoy>5||hoy/cu>5))m.push(`el costo usado (${fmt(cu)} c/u) es muy distinto del costo de hoy (${fmt(hoy)} c/u): ¿docena o unidad?`);
+    if(o.eqDe&&(o.multML||1)>1){const e=EQ[String(o.cuenta||'').toUpperCase()+'|'+String(o.skuBaseML||'').toUpperCase()]||EQ[String(o.skuBaseML||'').toUpperCase()]||'';if(/X\s*\d+/i.test(e))m.push(`la publicación ya dice "x ${o.multML}" y además hay una equivalencia "${e}": revisá las unidades`);}
+    if(!m.length)continue;
+    o.revisar=m;
+    const k=String(o.op||'')+'|'+String(o.skuBaseML||o.skuBase);
+    if(!CONFIRMADAS[k]){o.costoRev=o.costo;o.ganRev=o.gan;o.ganPctRev=o.ganPct;o.costo=null;o.gan=null;o.ganPct=null;}
+  }
+}
+async function confirmarVenta(op,sku){
+  CONFIRMADAS[String(op)+'|'+sku]=true;
+  try{await db.collection('config').doc('ml_confirmadas').set({ops:CONFIRMADAS});}catch(e){showErr('No se pudo guardar: '+e.message);return;}
+  render();
+}
+function renderRevisar(){
+  const fc=$('fCuenta').value;
+  const L=allRows().filter(o=>o.revisar&&(!fc||o.cuenta===fc)&&!CONFIRMADAS[String(o.op||'')+'|'+String(o.skuBaseML||o.skuBase)]);
+  const box=$('revisarBox'); if(!box)return;
+  if(!L.length){box.style.display='none';return;}
+  box.style.display='';
+  box.innerHTML=`<details class="pleg" style="margin:10px 0;"><summary style="background:#FDEBE7;border-color:#E3B8AE;color:#A6432F;">⚠️ ${L.length} ${L.length===1?'venta para revisar':'ventas para revisar'} <small style="color:#A6432F;">· no se cuentan en la ganancia hasta que las confirmes</small></summary><div class="pleg-body">
+    ${L.slice(0,60).map(o=>`<div style="border-bottom:1px solid var(--line);padding:8px 0;font-size:.88rem;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;"><b>${o.skuBase}</b><span class="meta">${o.fecha} · ${o.cuenta} · ${o.unid} unid. · precio ${fmt(o.pcd)} · costo ${fmt(o.costoRev)}</span>
+        <span style="margin-left:auto;display:flex;gap:6px;"><button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid #BFDCC8;background:#EEF6F0;color:#2F7A47;font-weight:700;cursor:pointer;" onclick="confirmarVenta('${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">✓ Está bien</button>
+        <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="$('fSku').value='${o.op}';document.querySelector('details[data-k=mas]').open=true;document.querySelector('details[data-k=lista]').open=true;render();document.querySelector('details[data-k=lista]').scrollIntoView({behavior:'smooth'});">Ver venta</button></span></div>
+      <ul style="margin:4px 0 0 18px;padding:0;color:#A6432F;">${o.revisar.map(x=>`<li>${x}</li>`).join('')}</ul></div>`).join('')}
+    ${L.length>60?`<p class="note">Y ${L.length-60} más.</p>`:''}
+    <p class="note">Si el número está bien, tocá <b>✓ Está bien</b> y pasa a contarse. Si está mal, corregí el costo, la unidad (docena) o la equivalencia y la alerta desaparece sola.</p></div></details>`;
 }
 // ===== Equivalencias de SKU: codigo mal puesto en ML -> codigo de la app (config/ml_equivalencias: { m: { ML: 'APP' | 'APP x N' } }) =====
 let EQ={};
@@ -1441,6 +1484,7 @@ function card(o){
     o.ganPct!=null&&o.ganPct>1.5&&!o.eqDe&&`<span class="tag bad">⚠️ Ganancia muy alta: ¿esta publicación trae más de una unidad? <a href="#" onclick="event.preventDefault();document.getElementById('eqPanel').open=true;$('eqCuenta').value='${o.cuenta}';$('eqML').value='${o.skuBaseML||o.skuBase}';$('eqApp').value='${o.skuBase} x ';$('eqApp').focus();$('eqPanel').scrollIntoView({behavior:'smooth'});">Indicar cuántas</a></span>`,
     o.multTitulo&&`<span class="tag" style="background:#FFF4D6;color:#8A6417;" title="${(o.titulo||'').replace(/"/g,'&quot;')}">📦 ${o.mult} unidades por venta (leído del título)</span>`,
     o.eqDe&&`<span class="tag" style="background:#EEE8F7;color:#3d1466;">🔁 En ML figura ${o.eqDe} → tomado como ${o.skuBase}${o.mult>1?' x '+o.mult:''}</span>`,
+    o.revisar&&`<span class="tag bad">⚠️ Para revisar: ${o.revisar.join(' · ')}${o.costo==null?' (no se cuenta en la ganancia)':''}</span>`,
     o.raro&&`<span class="tag bad">⚠️ Precio ${pctf(o.raro.pct)} por debajo de lo habitual (${fmt2(o.raro.med)} c/u) · revisá precio o descuento de la publicación</span>`,
     !o.rep&&o.flex==='Reintegro en otra venta del envío'&&`<span class="tag bad" title="La otra venta de este envío no está en los reportes cargados o fue cancelada">⚠️ No se encontró la otra venta del envío ${o.envNum}</span>`,
     o.rep&&`<span class="tag" style="background:#E3F0FF;color:#1F4E8C;">🔀 Envío compartido entre ${o.rep.n} productos · le toca el ${pctf(o.rep.sh)}</span>`].filter(Boolean).join('');
@@ -1520,6 +1564,7 @@ firebase.auth().onAuthStateChanged(async u=>{
     COSTOS=m;}catch(e){}
   await cargarZonas();
   await cargarEquivalencias();
+  await cargarConfirmadas();
   await load();
   $('cargando').hidden=true;
   render();
