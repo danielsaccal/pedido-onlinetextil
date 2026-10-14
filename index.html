@@ -1596,7 +1596,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v251</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v252</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -18394,7 +18394,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v251';
+const APP_VERSION = '2026-10-02-v252';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
@@ -18413,6 +18413,48 @@ async function revisarVersionNueva(){
 setInterval(revisarVersionNueva, 3 * 60 * 1000);
 document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') revisarVersionNueva(); });
 window.addEventListener('load', () => setTimeout(revisarVersionNueva, 5000));
+</script>
+<script>
+// ===== Aviso "Procesando…" (igual en la app y en Resultados ML) =====
+(function(){
+  const css = '#procAviso{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:10000;background:#3D2B4E;color:#fff;border-radius:999px;padding:9px 18px;font:600 .9rem system-ui,sans-serif;display:none;align-items:center;gap:10px;box-shadow:0 6px 22px rgba(0,0,0,.25);max-width:92vw}'
+    + '#procAviso .rueda{width:16px;height:16px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:procGira .8s linear infinite;flex:none}'
+    + '#procAviso.ok{background:#2F7A47}#procAviso.mal{background:#A6432F}#procAviso.ok .rueda,#procAviso.mal .rueda{display:none}'
+    + '@keyframes procGira{to{transform:rotate(360deg)}}';
+  const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+  let n = 0, timer = null, boton = null;
+  function el(){ let e = document.getElementById('procAviso'); if(!e){ e = document.createElement('div'); e.id = 'procAviso'; e.innerHTML = '<span class="rueda"></span><span class="txt"></span>'; document.body.appendChild(e); } return e; }
+  window.procesando = function(msg){
+    const e = el(); clearTimeout(timer); n++;
+    e.className = ''; e.querySelector('.txt').textContent = msg || 'Procesando…'; e.style.display = 'flex';
+    const a = document.activeElement; if(a && (a.tagName === 'BUTTON' || a.tagName === 'LABEL') && !a.disabled){ boton = a; try{ a.disabled = true; a.style.opacity = '.6'; }catch(x){} }
+  };
+  window.procesando.texto = function(msg){ const e = el(); e.querySelector('.txt').textContent = msg; };
+  function soltar(){ if(boton){ try{ boton.disabled = false; boton.style.opacity = ''; }catch(x){} boton = null; } }
+  window.procesando.listo = function(msg){ n = Math.max(0, n - 1); if(n) return; const e = el(); soltar(); e.className = 'ok'; e.querySelector('.txt').textContent = msg || '✓ Listo'; e.style.display = 'flex'; clearTimeout(timer); timer = setTimeout(() => { e.style.display = 'none'; }, 1200); };
+  window.procesando.error = function(msg){ n = 0; const e = el(); soltar(); e.className = 'mal'; e.querySelector('.txt').textContent = '✕ ' + (msg || 'No se pudo completar'); e.style.display = 'flex'; clearTimeout(timer); timer = setTimeout(() => { e.style.display = 'none'; }, 4000); };
+  window.procesando.fin = function(){ n = Math.max(0, n - 1); if(n) return; soltar(); clearTimeout(timer); el().style.display = 'none'; };
+  // envuelve una funcion global: muestra el aviso mientras corre
+  window.conProcesando = function(nombre, texto, textoListo){
+    const f = window[nombre]; if(typeof f !== 'function' || f.__proc) return;
+    const g = async function(...a){ window.procesando(typeof texto === 'function' ? texto(...a) : texto);
+      try{ const r = await f.apply(this, a); window.procesando.listo(textoListo); return r; }
+      catch(e){ window.procesando.error(e && e.message); throw e; } };
+    g.__proc = true; window[nombre] = g;
+  };
+})();
+
+window.addEventListener('load', () => {
+  const W = [
+    ['guardarProductoNuevo', 'Guardando el producto…'], ['guardarProductoEditado', 'Guardando los cambios…'], ['subirFotosRapido', 'Subiendo fotos…'],
+    ['guardarCostosReventa', 'Guardando costos…'], ['aplicarAumentoMasivo', 'Actualizando precios…'], ['aplicarPreciosPorCosto', 'Actualizando precios del catálogo…'],
+    ['guardarGasto', 'Guardando el gasto…'], ['borrarGasto', 'Borrando…'], ['abrirGastos', 'Cargando gastos…'],
+    ['abrirFacturas', 'Cargando facturas…'], ['leerFacturasPDF', 'Leyendo facturas…'], ['guardarFactura', 'Guardando la factura…'], ['borrarFacturasSel', 'Borrando facturas…'],
+    ['importarLinksWeb', 'Leyendo el archivo de Tienda Nube…'], ['analizarPedidoIA', 'La IA está armando el pedido…'],
+    ['generarFlyersNuevoIngreso', 'Generando las piezas…'], ['abrirResultadosML', 'Preparando Resultados ML…']
+  ];
+  setTimeout(() => W.forEach(([n, t]) => conProcesando(n, t)), 0);
+});
 </script>
 </body>
 </html>
