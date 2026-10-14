@@ -373,9 +373,7 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
 
   <details class="pleg" data-k="anual"><summary>📅 Mes por mes</summary>
   <section class="panel" id="anual">
-    <div class="tw"><table class="ventas anual"><thead><tr><th>Mes</th><th>Ventas</th><th>Unidades</th><th>Vendido c/desc.</th><th>Acreditado ML</th><th>Cadete</th><th>Le queda</th><th>% le queda<small style="display:block;font-weight:500;text-transform:none;">s/ lo vendido</small></th></tr></thead><tbody id="anualBody"></tbody></table></div>
-    <div id="anualBars" style="margin-top:12px"></div>
-    <p class="note" id="anualNote"></p>
+    <div id="anualBody"></div>
   </section></details>
 
   <details class="pleg" data-k="graficos"><summary>📊 Gráficos</summary>
@@ -915,25 +913,30 @@ function renderResumen(){
   </details>`;
 }
 function renderAnual(){
-  const r=filtered(true).filter(o=>!o.excl);
-  const M={};
-  for(const o of r){const k=o.periodo;M[k]=M[k]||{n:0,u:0,pcd:0,acr:0,cad:0,neto:0};const m=M[k];
-    if(o.tipo==='Venta'&&o.pcd>0){m.n++;m.u+=o.unid||0;}
-    m.pcd+=o.pcd||0;m.acr+=o.acred;m.cad+=o.cad||0;m.neto+=o.neto;}
-  const ks=Object.keys(M).sort();
-  const years=[...new Set(ks.map(k=>k.slice(0,4)))];
-  let html='';
-  for(const y of years){
-    const yk=ks.filter(k=>k.startsWith(y)); const T={n:0,u:0,pcd:0,acr:0,cad:0,neto:0};
-    for(const k of yk){const m=M[k];for(const f in T)T[f]+=m[f];
-      html+=`<tr><td>${k==='sin-fecha'?'Sin fecha':mesTxt(k)}</td><td>${m.n.toLocaleString('es-AR')}</td><td>${m.u.toLocaleString('es-AR')}</td><td>${fmt(m.pcd)}</td><td>${fmt(m.acr)}</td><td class="neg">${fmt(m.cad)}</td><td><b>${fmt(m.neto)}</b></td><td>${m.pcd>0?pctf(m.neto/m.pcd):'–'}</td></tr>`;}
-    if(yk.length>1&&y!=='sin-')html+=`<tr class="tot"><td>Total ${y}</td><td>${T.n.toLocaleString('es-AR')}</td><td>${T.u.toLocaleString('es-AR')}</td><td>${fmt(T.pcd)}</td><td>${fmt(T.acr)}</td><td class="neg">${fmt(T.cad)}</td><td><b>${fmt(T.neto)}</b></td><td>${T.pcd>0?pctf(T.neto/T.pcd):'–'}</td></tr>`;
-  }
-  $('anualBody').innerHTML=html;
-  const mx=Math.max(1,...ks.map(k=>M[k].neto));
-  $('anualBars').innerHTML=ks.length>1?ks.map(k=>`<div class="hrow"><span>${k==='sin-fecha'?'Sin fecha':mesTxt(k)}</span><div class="bar"><i style="width:${Math.max(0,M[k].neto)/mx*100}%;background:var(--indigo)"></i></div><em>${fmt(M[k].neto)}</em></div>`).join(''):'';
-  const f=[$('fCuenta').value&&'cuenta '+$('fCuenta').value,$('fLog').value&&'solo '+$('fLog').value,$('fSku').value.trim()&&!searchQ().isNum&&'búsqueda "'+$('fSku').value.trim()+'"'].filter(Boolean);
-  $('anualNote').textContent=(ks.length<2?'Cargue más meses para comparar. ':'')+'El % del mes es lo que le quedó sobre lo vendido en ese mes, todas las ventas juntas.'+(f.length?' Filtrado por '+f.join(', ')+'.':'');
+  // mes por mes, con la misma cuenta que el resumen: vendido -> lo que se llevo ML -> te quedo -> costo -> resultado
+  const fc=$('fCuenta').value;
+  const rows=allRows().filter(o=>!o.excl&&(!fc||o.cuenta===fc)&&o.periodo&&o.periodo!=='sin-fecha');
+  const ps=[...new Set(rows.map(o=>o.periodo))].sort();
+  const M=ps.map(p=>{const r=rows.filter(o=>o.periodo===p), v=r.filter(o=>o.tipo==='Venta'&&o.pcd>0);
+    const vend=v.reduce((a,o)=>a+o.pcd,0), quedo=r.reduce((a,o)=>a+(o.neto||0),0), cc=v.filter(o=>o.costo!=null), costo=cc.reduce((a,o)=>a+o.costo,0);
+    return {p,n:v.length,unid:v.reduce((a,o)=>a+(o.unid||0),0),vend,ml:vend-quedo,quedo,costo,res:quedo-costo,sinC:v.length-cc.length};});
+  const T=M.reduce((t,m)=>{['n','unid','vend','ml','quedo','costo','res','sinC'].forEach(k=>t[k]=(t[k]||0)+m[k]);return t;},{p:'Total'});
+  const pc=(x,y)=>y>0?(x/y*100).toLocaleString('es-AR',{maximumFractionDigits:1})+' %':'–';
+  const fila=(m,tot)=>`<tr style="${tot?'font-weight:800;border-top:2px solid #3d1466;background:#F6F2FB;':'border-top:1px solid var(--line);'}">
+    <td style="padding:8px 6px;">${tot?'Total':mesTxt(m.p)}</td>
+    <td style="padding:8px 6px;text-align:right;">${m.n.toLocaleString('es-AR')}<small class="meta" style="display:block;">${m.unid.toLocaleString('es-AR')} unid.</small></td>
+    <td style="padding:8px 6px;text-align:right;">${fmt(m.vend)}</td>
+    <td style="padding:8px 6px;text-align:right;color:#A6432F;">${fmt(-m.ml)}<small class="meta" style="display:block;">${pc(m.ml,m.vend)}</small></td>
+    <td style="padding:8px 6px;text-align:right;">${fmt(m.quedo)}</td>
+    <td style="padding:8px 6px;text-align:right;color:#A6432F;">${fmt(-m.costo)}${m.sinC?`<small class="meta" style="display:block;">${m.sinC} sin costo</small>`:''}</td>
+    <td style="padding:8px 6px;text-align:right;font-weight:800;color:${m.res<0?'#A6432F':'#2F7A47'};">${fmt(m.res)}<small style="display:block;font-weight:500;color:#8A8072;">${pc(m.res,m.vend)} de lo vendido</small></td></tr>`;
+  const maxR=Math.max(1,...M.map(m=>Math.abs(m.res)));
+  $('anualBody').innerHTML=!M.length?'<p class="note">No hay meses cargados.</p>':`
+    <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;">
+      <tr style="color:#8A8072;font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;"><td style="padding:6px;">Mes</td><td style="padding:6px;text-align:right;">Ventas</td><td style="padding:6px;text-align:right;">Vendido</td><td style="padding:6px;text-align:right;">Se llevó ML</td><td style="padding:6px;text-align:right;">Te quedó</td><td style="padding:6px;text-align:right;">Costo</td><td style="padding:6px;text-align:right;">Resultado</td></tr>
+      ${M.map(m=>fila(m,false)).join('')}${M.length>1?fila(T,true):''}</table></div>
+    <div style="margin-top:14px;">${M.map(m=>`<div style="display:grid;grid-template-columns:130px 1fr 120px;gap:8px;align-items:center;font-size:.86rem;margin:6px 0;"><span>${mesTxt(m.p)}</span><div style="height:12px;background:#EEE9F3;border-radius:6px;overflow:hidden;"><div style="width:${Math.round(Math.abs(m.res)/maxR*100)}%;height:100%;background:${m.res<0?'#A6432F':'#2F7A47'};"></div></div><b style="text-align:right;color:${m.res<0?'#A6432F':'#2F7A47'};">${fmt(m.res)}</b></div>`).join('')}</div>
+    <p class="note" style="margin-top:8px;"><b>Se llevó ML</b>: comisión, cuotas, envíos, cadete, Full, publicidad e impuestos (descontados los reintegros). <b>Resultado</b> = te quedó − costo de lo vendido. Respeta la cuenta elegida arriba.</p>`;
 }
 function renderSkuSum(r){
   const box=$('skuSum'), q=$('fSku').value.trim().toUpperCase();
