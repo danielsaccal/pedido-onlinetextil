@@ -415,7 +415,7 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
 </details>
 <details class="box" id="filesPanel" hidden><summary>Meses guardados</summary>
   <div class="files" id="files" style="margin-top:12px"></div>
-  <p class="note">Cada mes queda guardado en este navegador. Si vuelve a subir el mismo mes de la misma cuenta, se reemplaza.</p>
+  <p class="note">Los meses quedan guardados en la base de la app. Si volvés a subir el mismo mes de la misma cuenta, se reemplaza.</p>
 </details>
   </div></details>
 </main>
@@ -767,10 +767,25 @@ function cls(p){return p==null?'':p<0.55?'lo':p<0.7?'mid':'hi';}
 function render(){
   const has=DATA.length>0;
   $('empty').hidden=has; $('app').hidden=!has; $('filesPanel').hidden=!has;
-  $('files').innerHTML=DATA.map(d=>`<span class="chip">${d.cuenta} · ${d.periodo==='sin-fecha'?d.file:mesTxt(d.periodo)} <span class="meta">(${d.rows.length.toLocaleString('es-AR')} op.)</span><button aria-label="Quitar ${mesTxt(d.periodo)}" data-id="${d.id}">✕</button></span>`).join('');
-  $('files').querySelectorAll('button').forEach(b=>b.onclick=async()=>{
-    if(!b.dataset.ok){b.dataset.ok='1';b.textContent='Quitar este mes';b.style.color='var(--bad)';b.style.fontWeight='600';setTimeout(()=>{if(b.isConnected){delete b.dataset.ok;b.textContent='✕';b.style.color='';b.style.fontWeight='';}},4000);return;}
-    try{await borrarMes(b.dataset.id);}catch(e){showErr('No se pudo borrar: '+e.message);return;}DATA=DATA.filter(x=>x.id!==b.dataset.id);try{await IDB.del(b.dataset.id);}catch(e){}render();});
+  // meses guardados: lista con casillas, igual que en la app (seleccionar y borrar varios)
+  const orden=DATA.slice().sort((x,y)=>(x.cuenta+x.periodo).localeCompare(y.cuenta+y.periodo));
+  $('files').style.display='block';
+  $('files').innerHTML=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+      <label style="display:flex;gap:6px;align-items:center;font-size:.88rem;cursor:pointer;"><input type="checkbox" id="mgTodos" style="width:18px;height:18px;"> Seleccionar todos</label>
+      <button type="button" id="mgBorrar" style="display:none;padding:6px 12px;border-radius:10px;border:1px solid #E3B8AE;background:#fff;color:#A6432F;font-weight:700;cursor:pointer;">🗑️ Borrar seleccionados</button></div>
+    ${orden.map(d=>`<label style="display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;background:#fff;cursor:pointer;">
+      <input type="checkbox" class="mgSel" value="${d.id}" style="width:18px;height:18px;">
+      <span style="flex:1;"><b>${d.cuenta}</b> · ${d.periodo==='sin-fecha'?d.file:mesTxt(d.periodo)}</span>
+      <span class="meta">${d.rows.length.toLocaleString('es-AR')} operaciones</span></label>`).join('')}`;
+  const actSel=()=>{const n=$('files').querySelectorAll('.mgSel:checked').length,t=$('files').querySelectorAll('.mgSel').length,bb=$('mgBorrar');bb.style.display=n?'inline-block':'none';bb.textContent=`🗑️ Borrar seleccionados (${n})`;$('mgTodos').checked=n>0&&n===t;$('mgTodos').indeterminate=n>0&&n<t;};
+  $('files').querySelectorAll('.mgSel').forEach(c=>c.onchange=actSel);
+  $('mgTodos').onchange=e=>{$('files').querySelectorAll('.mgSel').forEach(c=>c.checked=e.target.checked);actSel();};
+  $('mgBorrar').onclick=async()=>{
+    const ids=[...$('files').querySelectorAll('.mgSel:checked')].map(c=>c.value); if(!ids.length)return;
+    if(!confirm(`¿Borrar ${ids.length} ${ids.length===1?'mes':'meses'} de la app? Los podés volver a subir cuando quieras.`))return;
+    for(const id of ids){try{await borrarMes(id);}catch(e){showErr('No se pudo borrar: '+e.message);return;}try{await IDB.del(id);}catch(e){}}
+    DATA=DATA.filter(x=>!ids.includes(x.id)); render(); alertOk(ids.length+(ids.length===1?' mes borrado.':' meses borrados.'));
+  };
   if(!has)return;
   applyCadete(); renderCad();
   // filtros dinámicos
