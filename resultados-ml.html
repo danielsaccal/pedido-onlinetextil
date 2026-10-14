@@ -1001,7 +1001,8 @@ function aplicarEquivalencias(){
     if(o.skuBaseML===undefined){o.skuBaseML=o.skuBase;o.multML=o.mult||1;}
     const sk=String(o.skuBaseML||'').toUpperCase();
     const e=EQ[String(o.cuenta||'').toUpperCase()+'|'+sk]||EQ[sk];
-    if(e){const m=String(e).toUpperCase().match(/^(.+?)(?:\s*X\s*(\d+))?$/);o.skuBase=m[1].trim();o.mult=(o.multML||1)*(m[2]?+m[2]:1);o.eqDe=o.skuBaseML;}
+    // el "x N" de la equivalencia solo se usa si la publicacion de ML no dice cuantas trae (si dice "x 3", manda ese)
+    if(e){const m=String(e).toUpperCase().match(/^(.+?)(?:\s*X\s*(\d+))?$/);o.skuBase=m[1].trim();o.mult=(o.multML||1)>1?o.multML:(m[2]?+m[2]:1);o.eqDe=o.skuBaseML;}
     else{o.skuBase=o.skuBaseML;o.mult=o.multML||1;o.eqDe=null;}
     o.unid=o.cant?o.cant*o.mult:null;
   }
