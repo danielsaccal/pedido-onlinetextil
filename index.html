@@ -565,6 +565,7 @@ a.grilla-celda{display:block;}
 
   <!-- STEP: INICIO (iconos) -->
   <div class="step" id="step-inicio">
+    <div id="avisoCopia" style="display:none;"></div>
     <style>
       .ini-sec{font-size:0.78rem;font-weight:700;letter-spacing:.06em;color:#8A8072;margin:18px 0 10px;}
       .ini-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
@@ -1596,7 +1597,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v252</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v253</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5753,7 +5754,7 @@ const GRUPOS_INICIO = {
     [['🧮 Calculadora de costos', 'abrirCalculadoraCostos()']]
   ] },
   i: { lado: 'int', titulo: 'Configuración', titulosColumnas: ['1 · Cuenta', '2 · Datos de la app', '3 · Pantallas anteriores'], columnas: [
-    [['👥 Usuarios', 'abrirUsuarios()'], ['🔔 Avisos push', 'abrirConfigPush()']],
+    [['👥 Usuarios', 'abrirUsuarios()'], ['💾 Copia de seguridad', 'abrirCopiaSeguridad()'], ['🔔 Avisos push', 'abrirConfigPush()']],
     [['📝 Listas y opciones', 'abrirListas()'], ['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['📖 Palabras de la app', 'abrirGlosario()']],
     [['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']]
   ] },
@@ -9904,6 +9905,7 @@ auth.onAuthStateChanged(async u => {
     pintarUsuarioEnCabecera();
     resolverSesion(u);
     setTimeout(aplicarPermisosInicio, 0);
+    setTimeout(() => { try{ pintarAvisoCopia(); } catch(e){} }, 300);
     if(rol === 'dueño') setTimeout(() => registrarHistorialCostos().catch(e => console.error('historial de costos', e)), 8000);
 
   } catch(e){ mostrarLogin('No se pudo verificar la cuenta: ' + escaparHtml(e.message), true); }
@@ -10735,7 +10737,7 @@ let permisosActuales = null;
 // que permiso hace falta para cada pantalla
 function permisoDeAccion(f){
   const s = String(f);
-  if(/abrirUsuarios/.test(s)) return 'dueno';
+  if(/abrirUsuarios|abrirCopiaSeguridad/.test(s)) return 'dueno';
   if(/abrirResultadosML|abrirCalculadoraML/.test(s)) return 'resultadosML';
   if(/abrirFacturas/.test(s)) return 'facturas';
   if(/abrirGastos/.test(s)) return 'gastos';
@@ -10764,6 +10766,68 @@ function aplicarPermisosInicio(){
 async function guardarPermiso(mail, perm, val){
   try{ const ref = db.collection('usuarios').doc(mail); const d = await ref.get(); const P = Object.assign({}, PERMISOS_BASE, (d.exists && d.data().permisos) || {}); P[perm] = val; await ref.set({ permisos: P }, { merge: true }); }
   catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+
+// ===== Copia de seguridad: descarga toda la base a la computadora (.zip) =====
+const COLECCIONES_COPIA = ['config', 'productos_nuevos', 'productos_editados', 'productos_eliminados', 'historial_precios', 'clientes', 'pedidos',
+  'ordenes_trabajo', 'envios_tela', 'ingresos_taller', 'stock_movs', 'historial_costos', 'calculadora_costos', 'gastos', 'gastos_periodicos_ml',
+  'ventas_facturadas', 'movimientos_ml', 'usuarios', 'mlMeses', 'fotos'];
+function cargarJSZip(){
+  if(window.JSZip) return Promise.resolve();
+  return new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload = res; s.onerror = () => rej(new Error('No se pudo cargar el compresor')); document.head.appendChild(s); });
+}
+function diasDesdeCopia(){ try{ const f = localStorage.getItem('ot_ultimaCopia'); return f ? Math.floor((Date.now() - new Date(f).getTime()) / 86400000) : null; } catch(e){ return null; } }
+function abrirCopiaSeguridad(){
+  if(!esDueno()){ alert('Solo el dueño puede descargar la copia de seguridad.'); return; }
+  const d = diasDesdeCopia();
+  const t = document.getElementById('pub-titulo'); if(t) t.textContent = '💾 Copia de seguridad';
+  document.getElementById('pub-cont').innerHTML = `<p class="note" style="text-align:left;">Descarga <b>toda la información de la app</b> a esta computadora, en un archivo .zip: productos y precios, clientes, pedidos, órdenes y entregas, stock, telas y costos, gastos, facturas, usuarios y Resultados ML. No cambia nada en la app.</p>
+    <p class="note" style="text-align:left;">${d == null ? 'Todavía no se descargó ninguna copia desde este dispositivo.' : d === 0 ? 'Última copia descargada: hoy.' : `Última copia descargada: hace ${d} ${d === 1 ? 'día' : 'días'}.`}</p>
+    <label style="display:flex;gap:8px;align-items:center;margin:8px 0;"><input type="checkbox" id="cs-fotos" checked style="width:18px;height:18px;"> Incluir fotos <span class="note" style="margin:0;">(sin fotos el archivo es mucho más liviano)</span></label>
+    <div id="cs-res"></div>
+    <button class="btn btn-gold" style="width:100%;margin-top:8px;" onclick="descargarCopia(document.getElementById('cs-fotos').checked)">💾 Descargar copia</button>`;
+  document.getElementById('pub-modal').style.display = 'block';
+}
+async function descargarCopia(conFotos){
+  const res = document.getElementById('cs-res');
+  try{
+    await cargarJSZip();
+    const zip = new JSZip(), resumen = {}, fecha = new Date();
+    const plano = v => JSON.parse(JSON.stringify(v, (k, x) => x && typeof x === 'object' && typeof x.toDate === 'function' ? x.toDate().toISOString() : x));
+    const cols = COLECCIONES_COPIA.filter(c => conFotos || c !== 'fotos');
+    for(let i = 0; i < cols.length; i++){
+      const c = cols[i];
+      procesando.texto(`Copiando ${c}… (${i + 1} de ${cols.length})`);
+      const s = await db.collection(c).get();
+      const docs = s.docs.map(d => ({ id: d.id, datos: plano(d.data()) }));
+      if(c === 'mlMeses'){ // cada mes de Mercado Libre tiene sus operaciones en bloques
+        for(const d of docs){ const b = await db.collection('mlMeses').doc(d.id).collection('bloques').get(); d.bloques = b.docs.map(x => ({ id: x.id, datos: plano(x.data()) })); }
+      }
+      zip.file(c + '.json', JSON.stringify(docs));
+      resumen[c] = docs.length;
+    }
+    zip.file('LEAME.txt', `Copia de seguridad de OnLineTextil\nFecha: ${fecha.toLocaleString('es-AR')}\nVersión de la app: ${APP_VERSION}\nFotos incluidas: ${conFotos ? 'sí' : 'no'}\n\nRegistros por sección:\n` + Object.entries(resumen).map(([k, v]) => `- ${k}: ${v}`).join('\n') + '\n');
+    procesando.texto('Comprimiendo el archivo…');
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    const nombre = `onlinetextil-copia-${fecha.toISOString().slice(0, 10)}${conFotos ? '' : '-sin-fotos'}.zip`;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+    try{ localStorage.setItem('ot_ultimaCopia', fecha.toISOString()); } catch(e){}
+    pintarAvisoCopia();
+    const total = Object.values(resumen).reduce((x, y) => x + y, 0);
+    res.innerHTML = `<div style="background:#EEF6F0;border-radius:12px;padding:10px 12px;margin-top:8px;font-size:.88rem;">✓ Se descargó <b>${nombre}</b> (${(blob.size / 1048576).toLocaleString('es-AR', { maximumFractionDigits: 1 })} MB, ${total.toLocaleString('es-AR')} registros).<br><span class="note" style="margin:0;">${Object.entries(resumen).map(([k, v]) => `${k}: ${v}`).join(' · ')}</span></div>`;
+  } catch(e){ res.innerHTML = `<p class="error" style="display:block;">No se pudo completar la copia: ${escaparHtml(e.message)}</p>`; throw e; }
+}
+// aviso semanal en el inicio (solo el dueño)
+function pintarAvisoCopia(){
+  const box = document.getElementById('avisoCopia'); if(!box) return;
+  if(!esDueno()){ box.style.display = 'none'; return; }
+  const d = diasDesdeCopia();
+  if(d != null && d < 7){ box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#FFF8E6;border:1px solid #EBD9A8;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:.9rem;">
+    <span style="flex:1;">💾 ${d == null ? 'Todavía no descargó ninguna copia de seguridad.' : `Hace ${d} días que no descarga una copia de seguridad.`}</span>
+    <button type="button" class="btn-mini" onclick="abrirCopiaSeguridad()">Descargar ahora</button></div>`;
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -18394,7 +18458,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v252';
+const APP_VERSION = '2026-10-02-v253';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
@@ -18451,7 +18515,7 @@ window.addEventListener('load', () => {
     ['guardarGasto', 'Guardando el gasto…'], ['borrarGasto', 'Borrando…'], ['abrirGastos', 'Cargando gastos…'],
     ['abrirFacturas', 'Cargando facturas…'], ['leerFacturasPDF', 'Leyendo facturas…'], ['guardarFactura', 'Guardando la factura…'], ['borrarFacturasSel', 'Borrando facturas…'],
     ['importarLinksWeb', 'Leyendo el archivo de Tienda Nube…'], ['analizarPedidoIA', 'La IA está armando el pedido…'],
-    ['generarFlyersNuevoIngreso', 'Generando las piezas…'], ['abrirResultadosML', 'Preparando Resultados ML…']
+    ['generarFlyersNuevoIngreso', 'Generando las piezas…'], ['abrirResultadosML', 'Preparando Resultados ML…'], ['descargarCopia', 'Preparando la copia…']
   ];
   setTimeout(() => W.forEach(([n, t]) => conProcesando(n, t)), 0);
 });
