@@ -723,7 +723,8 @@ async function load(){
   }catch(e){showErr('No se pudieron leer los meses guardados: '+e.message);}
   DATA.forEach(normEntry);
   // meses que estaban guardados solo en este navegador (version anterior): se suben a la base
-  try{await IDB.open();const viejos=(await IDB.all())||[];for(const d of viejos){normEntry(d);if(!DATA.some(x=>x.id===d.id)){DATA.push(d);await saveEntry(d);}}}catch(e){}
+  // la copia vieja que habia en el navegador ya no se usa (los meses estan en la base): se vacia para que no "resuciten" meses borrados
+  try{await IDB.open();await IDB.tx('readwrite',s=>s.clear());}catch(e){}
   // datos de la versión anterior (guardados de otra forma): se pasan a la base por mes
   try{const s=localStorage.getItem(STORE);if(s){const old=JSON.parse(s)||[];
     for(const d of old){normEntry(d);if(!DATA.some(x=>x.id===d.id)){DATA.push(d);await IDB.put(d);}}
