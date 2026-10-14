@@ -117,6 +117,15 @@ tr.v:focus-visible,tr.g:focus-visible{outline:3px solid var(--gold-dark);outline
 td.pct{font-weight:700;font-size:.92rem}
 .pct.lo{color:var(--bad)}.pct.mid{color:var(--warn)}.pct.hi{color:var(--good)}
 tr.d{display:none}tr.d.open{display:table-row}
+/* lista de ventas: que entre en la pantalla sin arrastrar */
+#list{font-size:.84rem}
+table.ventas{width:100%;table-layout:auto;min-width:0 !important}
+table.ventas th,table.ventas tr.v td{padding:8px 6px !important;white-space:nowrap}
+table.ventas tr.v td:nth-child(2){white-space:normal;max-width:220px}
+table.ventas tr.v td:nth-child(2) .meta,table.ventas tr.v td:nth-child(2) small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px}
+table.ventas th:nth-child(6),table.ventas tr.v td:nth-child(6){display:none}
+@media(max-width:820px){table.ventas th:nth-child(4),table.ventas tr.v td:nth-child(4){display:none}}
+@media(max-width:560px){table.ventas th:nth-child(1),table.ventas tr.v td:nth-child(1),table.ventas th:nth-child(7),table.ventas tr.v td:nth-child(7),table.ventas th:nth-child(8),table.ventas tr.v td:nth-child(8){display:none}table.ventas tr.v td:nth-child(2){max-width:140px}table.ventas th,table.ventas tr.v td{padding:6px 3px !important;font-size:.8rem}table.ventas tr.v td:nth-child(2) .meta,table.ventas tr.v td:nth-child(2) small{max-width:130px}}
 /* detalle de la venta: etiquetas sobrias, sin colores fuertes */
 tr.d .tag,#revisarBox .tag{background:#F2EFEA !important;color:#5F574E !important;font-weight:500 !important;border:none !important;border-radius:6px !important;font-size:.76rem !important}
 tr.d .tag.bad,#revisarBox .tag.bad{background:#FFF8F6 !important;color:#9A4A3A !important;border:1px solid #EFD3CB !important;font-weight:500 !important}
