@@ -1148,6 +1148,11 @@ async function asignarSugeridos(){
   try{await guardarEquivalencias();}catch(e){showErr('No se pudo guardar: '+e.message);return;}
   render();alertOk('Equivalencias asignadas.');
 }
+async function quitarEqDeVenta(cta,sku){
+  const k1=String(cta).toUpperCase()+'|'+String(sku).toUpperCase(), k2=String(sku).toUpperCase(); const k=EQ[k1]!==undefined?k1:k2;
+  if(EQ[k]===undefined)return; if(!confirm(`¿Quitar la equivalencia ${sku} → ${EQ[k]}? Todas las ventas de ${sku} vuelven a tomarse como figuran en ML.`))return;
+  delete EQ[k]; try{await guardarEquivalencias();}catch(e){showErr('No se pudo guardar: '+e.message);return;} render();
+}
 async function quitarEquivalencia(k){delete EQ[k];try{await guardarEquivalencias();}catch(e){}render();}
 // ===== Juegos armados: cada venta de un juego se reparte entre sus partes (segun el costo de cada parte) =====
 function partesKit(txt){return String(txt||'').toUpperCase().split('+').map(s=>s.trim()).filter(Boolean).map(s=>{const m=s.match(/^(.+?)(?:\s*X\s*(\d+))?$/);return {sku:m[1].trim(),n:m[2]?+m[2]:1};});}
@@ -1553,7 +1558,7 @@ function card(o){
     o.skuVenta&&`<span class="tag">Esta venta se compara con ${o.skuVenta}${o.multVenta?' x '+o.multVenta:''} <a href="#" onclick="event.preventDefault();event.stopPropagation();delete UNI['${claveVenta(o).replace(/'/g,'')}'];db.collection('config').doc('ml_unidades').set({u:UNI}).then(render);">quitar</a></span>`,
     !o.skuVenta&&o.multVenta&&`<span class="tag" style="background:#EEE8F7;color:#3d1466;">📦 Esta venta: pack de ${o.multVenta} (${o.unid} unid.) <a href="#" onclick="event.preventDefault();event.stopPropagation();delete UNI['${claveVenta(o).replace(/'/g,'')}'];db.collection('config').doc('ml_unidades').set({u:UNI}).then(render);">quitar</a></span>`,
     o.multTitulo&&`<span class="tag" style="background:#FFF4D6;color:#8A6417;" title="${(o.titulo||'').replace(/"/g,'&quot;')}">📦 ${o.mult} unidades por venta (leído del título)</span>`,
-    o.eqDe&&`<span class="tag" style="background:#EEE8F7;color:#3d1466;">🔁 En ML figura ${o.eqDe} → tomado como ${o.skuBase}${o.mult>1?' x '+o.mult:''}</span>`,
+    o.eqDe&&`<span class="tag">🔁 En ML figura ${o.eqDe} → tomado como ${o.skuBase}${o.mult>1?' x '+o.mult:''} (en todas las ventas de ${o.eqDe} de ${o.cuenta}) <a href="#" onclick="event.preventDefault();event.stopPropagation();quitarEqDeVenta('${o.cuenta}','${String(o.eqDe).replace(/'/g,'')}')">quitar</a></span>`,
     o.revisar&&`<span class="tag bad">⚠️ Para revisar: ${o.revisar.join(' · ')}${o.costo==null?' — no se cuenta en la ganancia hasta que la confirmes':''}</span>`,
     o.raro&&`<span class="tag bad">⚠️ Precio ${pctf(o.raro.pct)} por debajo de lo habitual (${fmt2(o.raro.med)} c/u) · revisá precio o descuento de la publicación</span>`,
     !o.rep&&o.flex==='Reintegro en otra venta del envío'&&`<span class="tag bad" title="La otra venta de este envío no está en los reportes cargados o fue cancelada">⚠️ No se encontró la otra venta del envío ${o.envNum}</span>`,
