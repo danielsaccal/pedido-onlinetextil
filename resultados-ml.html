@@ -1131,7 +1131,9 @@ async function aplicarCambioSku(cta,sku,nuevo){
 function verVentaAca(btn,op,sku){
   const cont=btn.closest('div[style*="border-bottom"]').querySelector('.rev-det');
   if(cont.innerHTML){cont.innerHTML='';btn.textContent='Ver venta';return;}
+  try{applyCadete();}catch(e){}
   const o=allRows().find(x=>String(x.op)===String(op)&&String(x.skuBaseML||x.skuBase)===sku); if(!o)return;
+  if(!o.revisar){ const item=btn.closest('div[style*="border-bottom"]'); if(item){ item.innerHTML='<p class="note" style="margin:6px 0;">✓ Con los números actuales esta venta ya no tiene nada para revisar.</p>'; } setTimeout(()=>{try{renderRevisar();pintarMenuML();}catch(e){}},1500); return; }
   cont.innerHTML=`<div class="tw" style="margin-top:8px;border:1px solid var(--line);border-radius:12px;background:#fff;"><table class="ventas" style="width:100%;"><tbody>${card(o)}</tbody></table></div>`;
   const d=cont.querySelector('tr.d'); if(d)d.classList.add('open');
   btn.textContent='Ocultar';
@@ -1212,6 +1214,7 @@ function abrirPantallaML(k,sinScroll){
   [...$('pantallasML').children].forEach(c=>c.style.display='none');
   $('menuML').style.display='none'; $('volverML').style.display='flex'; $('volverTit').textContent=p[1]+' '+p[2];
   el.style.display=''; el.classList.add('pantallaML'); if(el.tagName==='DETAILS') el.open=true;
+  if(k==='revisar'&&!sinScroll){ try{applyCadete();renderRevisar();}catch(e){console.error(e);} }
   if(k==='revisar'){ const d=el.querySelector('details'); if(d){ d.open=true; d.querySelector('summary').style.display='none'; } if(!el.innerHTML.trim()) el.innerHTML='<p class="note">✓ No hay ventas para revisar.</p>'; }
   const misma=window.__pantallaML===k; window.__pantallaML=k; if(!sinScroll&&!misma) window.scrollTo({top:$('volverML').offsetTop-10,behavior:'smooth'});
 }
