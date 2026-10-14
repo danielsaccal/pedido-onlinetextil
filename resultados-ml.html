@@ -452,7 +452,13 @@ function unidadesDelTitulo(t){
 }
 function splitSku(s){
   const m=String(s||'').trim().match(/^(\S+?)\s*[xX]\s*(\d+)(?:\s+(.+))?$/);
-  if(!m)return {base:String(s||'').trim(),mult:1,variante:''};
+  if(!m){
+    const t=String(s||'').trim();
+    // "IC3512 Pasabarral", "SIM121J SEGUNDA": el codigo es la primera palabra y el resto es una aclaracion
+    const k=t.match(/^([A-Za-z]{1,6}\d[A-Za-z0-9]*)\s+(.+)$/);
+    if(k&&!/^\d/.test(k[2]))return {base:k[1].toUpperCase(),mult:1,variante:k[2]};
+    return {base:t.toUpperCase(),mult:1,variante:''};
+  }
   return {base:m[1].toUpperCase(),mult:parseInt(m[2],10)||1,variante:(m[3]||'').trim()};
 }
 const LOG={'me2 - fulfillment':'Full','me2 - self_service':'Flex','me2 - xd_drop_off':'Colecta'};
@@ -984,7 +990,11 @@ function calcularQueda(){
 // ===== Control automatico: ventas con numeros sospechosos quedan afuera de los totales hasta confirmarlas =====
 let CONFIRMADAS={};
 async function cargarConfirmadas(){try{const d=await db.collection('config').doc('ml_confirmadas').get();CONFIRMADAS=d.exists?(d.data().ops||{}):{};}catch(e){CONFIRMADAS={};}}
+let PACKS={};
 function marcarSospechosas(){
+  // precio por unidad de cada base cuando se vende en pack ("x N")
+  PACKS={};const acc={};allRows().forEach(o=>{if(o.tipo==='Venta'&&o.pcd>0&&o.cant&&(o.multML||1)>1){const k=o.skuBase;(acc[k]=acc[k]||[]).push({u:o.pcd/o.cant/o.multML,n:o.multML});}});
+  Object.entries(acc).forEach(([k,a])=>{const s=a.map(x=>x.u).sort((x,y)=>x-y);PACKS[k]={unit:s[Math.floor(s.length/2)],n:a[0].n};});
   for(const o of allRows()){
     o.revisar=null; if(o.costoRev!==undefined){o.costo=o.costoRev;o.gan=o.ganRev;o.ganPct=o.ganPctRev;delete o.costoRev;}
     if(!(o.tipo==='Venta'&&o.pcd>0&&o.costo!=null&&o.unid))continue;
@@ -992,6 +1002,8 @@ function marcarSospechosas(){
     if(o.ganPct!=null&&o.ganPct<-0.3)m.push(`pierde ${pctf(-o.ganPct)} sobre el costo`);
     if(o.ganPct!=null&&o.ganPct>2)m.push(`gana ${pctf(o.ganPct)} sobre el costo (demasiado)`);
     if(cu>pu)m.push(`el costo por unidad (${fmt(cu)}) es mayor que el precio por unidad (${fmt(pu)})`);
+    // la misma base se vende tambien con "x N" y esta publicacion (sin x N) tiene precio de pack
+    if((o.multML||1)===1&&PACKS[o.skuBase]){const pk=PACKS[o.skuBase];if(pu>=pk.unit*1.8){const n=Math.max(2,Math.round(pu/pk.unit));o.packSug=n;m.push(`la publicación no dice cuántas trae, pero cobra ${fmt(pu)} y el pack "x ${pk.n}" sale ${fmt(pk.unit)} por unidad: parece un pack de ${n}`);}}
     // el costo usado en esta venta comparado con el costo de hoy (si es 5 veces distinto, casi seguro es docena/unidad)
     const hc=COSTOS[String(o.skuBase).toUpperCase()]||[]; const hoy=hc.length?hc[hc.length-1].costo:null;
     if(hoy>0&&(cu/hoy>5||hoy/cu>5))m.push(`el costo usado (${fmt(cu)} c/u) es muy distinto del costo de hoy (${fmt(hoy)} c/u): ¿docena o unidad?`);
@@ -1000,6 +1012,12 @@ function marcarSospechosas(){
     const k=String(o.op||'')+'|'+String(o.skuBaseML||o.skuBase);
     if(!CONFIRMADAS[k]){o.costoRev=o.costo;o.ganRev=o.gan;o.ganPctRev=o.ganPct;o.costo=null;o.gan=null;o.ganPct=null;}
   }
+}
+async function aplicarPackSug(cta,sku,n){
+  if(!confirm(`¿Tomar todas las ventas de ${sku} sin "x N" de la cuenta ${cta} como pack de ${n}?`))return;
+  EQ[String(cta).toUpperCase()+'|'+String(sku).toUpperCase()]=String(sku).toUpperCase()+' X '+n;
+  try{await guardarEquivalencias();}catch(e){showErr('No se pudo guardar: '+e.message);return;}
+  render();alertOk(sku+' → pack de '+n+' (cuenta '+cta+')');
 }
 async function confirmarVenta(op,sku){
   CONFIRMADAS[String(op)+'|'+sku]=true;
@@ -1015,7 +1033,7 @@ function renderRevisar(){
   box.innerHTML=`<details class="pleg" style="margin:10px 0;"><summary style="background:#FDEBE7;border-color:#E3B8AE;color:#A6432F;">⚠️ ${L.length} ${L.length===1?'venta para revisar':'ventas para revisar'} <small style="color:#A6432F;">· no se cuentan en la ganancia hasta que las confirmes</small></summary><div class="pleg-body">
     ${L.slice(0,60).map(o=>`<div style="border-bottom:1px solid var(--line);padding:8px 0;font-size:.88rem;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;"><b>${o.skuBase}</b><span class="meta">${o.fecha} · ${o.cuenta} · ${o.unid} unid. · precio ${fmt(o.pcd)} · costo ${fmt(o.costoRev)}</span>
-        <span style="margin-left:auto;display:flex;gap:6px;"><button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid #BFDCC8;background:#EEF6F0;color:#2F7A47;font-weight:700;cursor:pointer;" onclick="confirmarVenta('${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">✓ Está bien</button>
+        <span style="margin-left:auto;display:flex;gap:6px;">${o.packSug?`<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid #CDBFE0;background:#F4EFFA;color:#5b2a86;font-weight:700;cursor:pointer;" onclick="aplicarPackSug('${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}',${o.packSug})">📦 Es pack de ${o.packSug}</button>`:''}<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid #BFDCC8;background:#EEF6F0;color:#2F7A47;font-weight:700;cursor:pointer;" onclick="confirmarVenta('${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">✓ Está bien</button>
         <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="$('fSku').value='${o.op}';document.querySelector('details[data-k=mas]').open=true;document.querySelector('details[data-k=lista]').open=true;render();document.querySelector('details[data-k=lista]').scrollIntoView({behavior:'smooth'});">Ver venta</button></span></div>
       <ul style="margin:4px 0 0 18px;padding:0;color:#A6432F;">${o.revisar.map(x=>`<li>${x}</li>`).join('')}</ul></div>`).join('')}
     ${L.length>60?`<p class="note">Y ${L.length-60} más.</p>`:''}
