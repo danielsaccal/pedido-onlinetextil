@@ -1003,7 +1003,7 @@ function marcarSospechosas(){
     if(o.ganPct!=null&&o.ganPct>2)m.push(`gana ${pctf(o.ganPct)} sobre el costo (demasiado)`);
     if(cu>pu)m.push(`el costo por unidad (${fmt(cu)}) es mayor que el precio por unidad (${fmt(pu)})`);
     // la misma base se vende tambien con "x N" y esta publicacion (sin x N) tiene precio de pack
-    if((o.multML||1)===1&&PACKS[o.skuBase]){const pk=PACKS[o.skuBase];if(pu>=pk.unit*1.8){const n=Math.max(2,Math.round(pu/pk.unit));o.packSug=n;m.push(`la publicación no dice cuántas trae, pero cobra ${fmt(pu)} y el pack "x ${pk.n}" sale ${fmt(pk.unit)} por unidad: parece un pack de ${n}`);}}
+    if((o.multML||1)===1&&PACKS[o.skuBase]){const pk=PACKS[o.skuBase];if(pu>=pk.unit*2){const r=pu/pk.unit;const n=[2,3,4,5,6,8,10,12,20,24,50].concat([pk.n]).reduce((a,b)=>Math.abs(b-r)<Math.abs(a-r)?b:a,2);o.packSug=n;m.push(`la publicación no dice cuántas trae, pero cobra ${fmt(pu)} y el pack "x ${pk.n}" sale ${fmt(pk.unit)} por unidad: parece un pack de ${n}`);}}
     // el costo usado en esta venta comparado con el costo de hoy (si es 5 veces distinto, casi seguro es docena/unidad)
     const hc=COSTOS[String(o.skuBase).toUpperCase()]||[]; const hoy=hc.length?hc[hc.length-1].costo:null;
     if(hoy>0&&(cu/hoy>5||hoy/cu>5))m.push(`el costo usado (${fmt(cu)} c/u) es muy distinto del costo de hoy (${fmt(hoy)} c/u): ¿docena o unidad?`);
@@ -1030,7 +1030,8 @@ function renderRevisar(){
   const box=$('revisarBox'); if(!box)return;
   if(!L.length){box.style.display='none';return;}
   box.style.display='';
-  box.innerHTML=`<details class="pleg" style="margin:10px 0;"><summary style="background:#FDEBE7;border-color:#E3B8AE;color:#A6432F;">⚠️ ${L.length} ${L.length===1?'venta para revisar':'ventas para revisar'} <small style="color:#A6432F;">· no se cuentan en la ganancia hasta que las confirmes</small></summary><div class="pleg-body">
+  const abierta=!!(box.querySelector('details')&&box.querySelector('details').open)||window.__revAbierta;
+  box.innerHTML=`<details class="pleg" style="margin:10px 0;" ${abierta?'open':''} ontoggle="window.__revAbierta=this.open"><summary style="background:#FDEBE7;border-color:#E3B8AE;color:#A6432F;">⚠️ ${L.length} ${L.length===1?'venta para revisar':'ventas para revisar'} <small style="color:#A6432F;">· no se cuentan en la ganancia hasta que las confirmes</small></summary><div class="pleg-body">
     ${L.slice(0,60).map(o=>`<div style="border-bottom:1px solid var(--line);padding:8px 0;font-size:.88rem;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;"><b>${o.skuBase}</b><span class="meta">${o.fecha} · ${o.cuenta} · ${o.unid} unid. · precio ${fmt(o.pcd)} · costo ${fmt(o.costoRev)}</span>
         <span style="margin-left:auto;display:flex;gap:6px;">${o.packSug?`<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid #CDBFE0;background:#F4EFFA;color:#5b2a86;font-weight:700;cursor:pointer;" onclick="aplicarPackSug('${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}',${o.packSug})">📦 Es pack de ${o.packSug}</button>`:''}<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid #BFDCC8;background:#EEF6F0;color:#2F7A47;font-weight:700;cursor:pointer;" onclick="confirmarVenta('${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">✓ Está bien</button>
