@@ -1013,8 +1013,17 @@ function marcarSospechosas(){
     if(!CONFIRMADAS[k]){o.costoRev=o.costo;o.ganRev=o.gan;o.ganPctRev=o.ganPct;o.costo=null;o.gan=null;o.ganPct=null;}
   }
 }
+// abre el detalle de la venta ahi mismo, debajo del aviso
+function verVentaAca(btn,op,sku){
+  const cont=btn.closest('div[style*="border-bottom"]').querySelector('.rev-det');
+  if(cont.innerHTML){cont.innerHTML='';btn.textContent='Ver venta';return;}
+  const o=allRows().find(x=>String(x.op)===String(op)&&String(x.skuBaseML||x.skuBase)===sku); if(!o)return;
+  cont.innerHTML=`<div class="tw" style="margin-top:8px;border:1px solid var(--line);border-radius:12px;background:#fff;"><table class="ventas" style="width:100%;"><tbody>${card(o)}</tbody></table></div>`;
+  const d=cont.querySelector('tr.d'); if(d)d.classList.add('open');
+  btn.textContent='Ocultar';
+}
 async function aplicarPackSug(cta,sku,n){
-  if(!confirm(`¿Tomar todas las ventas de ${sku} sin "x N" de la cuenta ${cta} como pack de ${n}?`))return;
+  if(!confirm(`¿Tomar todas las ventas de ${sku} (sin "x N") de la cuenta ${cta} como pack de ${n}?`))return;
   EQ[String(cta).toUpperCase()+'|'+String(sku).toUpperCase()]=String(sku).toUpperCase()+' X '+n;
   try{await guardarEquivalencias();}catch(e){showErr('No se pudo guardar: '+e.message);return;}
   render();alertOk(sku+' → pack de '+n+' (cuenta '+cta+')');
@@ -1034,8 +1043,9 @@ function renderRevisar(){
   box.innerHTML=`<details class="pleg" style="margin:10px 0;" ${abierta?'open':''} ontoggle="window.__revAbierta=this.open"><summary style="background:#FDEBE7;border-color:#E3B8AE;color:#A6432F;">⚠️ ${L.length} ${L.length===1?'venta para revisar':'ventas para revisar'} <small style="color:#A6432F;">· no se cuentan en la ganancia hasta que las confirmes</small></summary><div class="pleg-body">
     ${L.slice(0,60).map(o=>`<div style="border-bottom:1px solid var(--line);padding:8px 0;font-size:.88rem;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;"><b>${o.skuBase}</b><span class="meta">${o.fecha} · ${o.cuenta} · ${o.unid} unid. · precio ${fmt(o.pcd)} · costo ${fmt(o.costoRev)}</span>
-        <span style="margin-left:auto;display:flex;gap:6px;">${o.packSug?`<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid #CDBFE0;background:#F4EFFA;color:#5b2a86;font-weight:700;cursor:pointer;" onclick="aplicarPackSug('${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}',${o.packSug})">📦 Es pack de ${o.packSug}</button>`:''}<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid #BFDCC8;background:#EEF6F0;color:#2F7A47;font-weight:700;cursor:pointer;" onclick="confirmarVenta('${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">✓ Está bien</button>
-        <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="$('fSku').value='${o.op}';document.querySelector('details[data-k=mas]').open=true;document.querySelector('details[data-k=lista]').open=true;render();document.querySelector('details[data-k=lista]').scrollIntoView({behavior:'smooth'});">Ver venta</button></span></div>
+        <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">${o.packSug?`<span style="display:inline-flex;gap:4px;align-items:center;border:1px solid #CDBFE0;background:#F4EFFA;border-radius:8px;padding:2px 4px 2px 8px;color:#5b2a86;font-weight:700;font-size:.85rem;">📦 Pack de <input type="number" min="2" value="${o.packSug}" style="width:52px;height:28px;min-height:0;padding:2px 4px;border:1px solid #CDBFE0;border-radius:6px;font-weight:700;font-size:.85rem;box-sizing:border-box;" onkeydown="if(event.key==='Enter')this.nextElementSibling.click()"><button type="button" style="padding:3px 8px;border-radius:6px;border:none;background:#5b2a86;color:#fff;font-weight:700;cursor:pointer;" onclick="const n=parseInt(this.previousElementSibling.value,10);if(n>=2)aplicarPackSug('${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}',n)">Aceptar</button></span>`:''}<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid #BFDCC8;background:#EEF6F0;color:#2F7A47;font-weight:700;cursor:pointer;" onclick="confirmarVenta('${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">✓ Está bien</button>
+        <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="verVentaAca(this,'${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">Ver venta</button></span></div>
+      <div class="rev-det"></div>
       <ul style="margin:4px 0 0 18px;padding:0;color:#A6432F;">${o.revisar.map(x=>`<li>${x}</li>`).join('')}</ul></div>`).join('')}
     ${L.length>60?`<p class="note">Y ${L.length-60} más.</p>`:''}
     <p class="note">Si el número está bien, tocá <b>✓ Está bien</b> y pasa a contarse. Si está mal, corregí el costo, la unidad (docena) o la equivalencia y la alerta desaparece sola.</p></div></details>`;
