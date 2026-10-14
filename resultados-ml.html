@@ -629,6 +629,18 @@ function applyCadeteBase(){
       g.forEach(o=>{const sh=o.pcd/S;o.ajEnv=F*sh-(o===lead?F:0);o.cad=T*sh;o.rep={n:g.length,F,T,sh,lead:o===lead};});
     });
   }
+  // venta Flex cancelada en la que ML igual pago el envio: el cadete hizo el viaje, se descuenta su costo
+  {
+    const G={};for(const d of DATA)for(const o of d.rows){if(o.esDevol&&o.log==='Flex'){const k=o.cuenta+'|'+o.op;(G[k]=G[k]||[]).push(o);}}
+    const montos=Object.keys(AMTZ).map(Number).filter(x=>x>0), maxM=Math.max(0,...montos);
+    for(const rs of Object.values(G)){
+      const venta=rs.find(o=>o.pcd>0), reint=rs.some(o=>o.pcd<0); if(!venta||!reint)continue;
+      if(rs.filter(o=>o.pcd>0).length!==rs.filter(o=>o.pcd<0).length)continue; // falta un reintegro: no se toca
+      const net=rs.reduce((a,o)=>a+(o.acred||0),0); if(!(net>1000)||net>maxM*1.3)continue;
+      const m=montos.reduce((a,b)=>Math.abs(b-net)<Math.abs(a-net)?b:a,montos[0]); const z=AMTZ[m];
+      if(z&&ZCOST[z]){venta.cad=-(+ZCOST[z]||0);venta.flex='Cancelada: ML pagó el envío, se descuenta el cadete';venta.cadCancel=true;}
+    }
+  }
   for(const d of DATA){
     for(const o of d.rows){
       o.neto=o.acred+(o.ajEnv||0)+o.cad;
@@ -985,7 +997,7 @@ function renderAnual(){
     <td style="padding:8px 6px;">${tot?'Total':mesTxt(m.p)}</td>
     <td style="padding:8px 6px;text-align:right;">${m.n.toLocaleString('es-AR')}<small class="meta" style="display:block;">${m.unid.toLocaleString('es-AR')} unid.</small></td>
     <td style="padding:8px 6px;text-align:right;">${fmt(m.vend)}</td>
-    <td style="padding:8px 6px;text-align:right;color:#A6432F;">${fmt(-m.ml)}<small class="meta" style="display:block;">${pc(m.ml,m.vend)}</small></td>
+    <td style="padding:8px 6px;text-align:right;color:#A6432F;">${tot?fmt(-m.ml):`<a href="#" style="color:inherit;text-decoration:underline dotted;" onclick="event.preventDefault();abrirDesgloseMes('${m.p}')">${fmt(-m.ml)}</a>`}<small class="meta" style="display:block;">${pc(m.ml,m.vend)}${tot?'':' · ver desglose'}</small></td>
     <td style="padding:8px 6px;text-align:right;">${fmt(m.quedo)}</td>
     <td style="padding:8px 6px;text-align:right;color:#A6432F;">${fmt(-m.costo)}${m.sinC?`<small class="meta" style="display:block;">${m.sinC} sin costo</small>`:''}</td>
     <td style="padding:8px 6px;text-align:right;font-weight:800;color:${m.res<0?'#A6432F':'#2F7A47'};">${fmt(m.res)}<small style="display:block;font-weight:500;color:#8A8072;">${pc(m.res,m.vend)} de lo vendido</small></td></tr>`;
@@ -1184,12 +1196,14 @@ function armarMenuML(){
   if(sec){ let n=sec.nextElementSibling; sec.remove(); while(n){const x=n.nextElementSibling; aj.appendChild(n); n=x;} }
   cont.appendChild(aj);
   ['revisarBox'].forEach(id=>{const e=$(id); if(e) cont.appendChild(e);});
+  { const pb=document.createElement('div'); pb.id='perdidasBox'; cont.appendChild(pb); }
   ['glosario','ranking'].forEach(k=>{const e=document.querySelector('details[data-k='+k+']'); if(e) cont.appendChild(e);});
   const menu=document.createElement('div'); menu.id='menuML';
   const vol=document.createElement('div'); vol.id='volverML'; vol.innerHTML='<button type="button" onclick="volverMenuML()">← Volver</button><b id="volverTit"></b>';
   const res=$('resumen'); res.after(menu); menu.after(vol); vol.after(cont);
   window.__pantallas=[
     ['revisar','⚠️','Ventas para revisar','Números dudosos: confirmalos o corregilos',()=>$('revisarBox')],
+    ['perdidas','💸','Pérdidas para reclamar','Cancelaciones y devoluciones que te costaron plata',()=>{renderPerdidas();return $('perdidasBox');}],
     ['ranking','🏆','¿Qué productos me dejan más plata?','Ranking y ficha de cada SKU',()=>document.querySelector('details[data-k=ranking]')],
     ['cuotas','💳','Con cuotas o sin cuotas','Qué te deja más, mes por mes',()=>document.querySelector('details[data-k=cuotas]')],
     ['origen','🏭','Fabricado vs reventa','Facturación y ganancia de cada uno',()=>document.querySelector('details[data-k=origen]')],
@@ -1223,6 +1237,80 @@ function volverMenuML(){
   $('volverML').style.display='none'; $('menuML').style.display=''; window.__pantallaML=null; pintarMenuML();
   window.scrollTo({top:0,behavior:'smooth'});
 }
+// ===== Perdidas para reclamar: cancelaciones y devoluciones que te costaron plata =====
+function perdidasReclamo(){
+  const fc=$('fCuenta').value, G={};
+  allRows().forEach(o=>{ if(!o.esDevol||(fc&&o.cuenta!==fc))return; const k=o.cuenta+'|'+o.op; (G[k]=G[k]||[]).push(o); });
+  const out=[];
+  Object.values(G).forEach(rs=>{
+    const cobros=rs.filter(o=>o.pcd>0).length, reint=rs.filter(o=>o.pcd<0).length;
+    if(!cobros||!reint)return; // si falta la venta o el reintegro (otro mes), no se puede saber
+    const net=rs.reduce((a,o)=>a+(o.neto||0),0); const parcial=rs.some(o=>/parcial/i.test(o.estado));
+    // cargos de envio y devolucion, netos de sus anulaciones (lo que ML no devolvio)
+    const base=k=>norm(k).replace(/^anulacion (del|de la|de los|de) /,'').replace(/^cargo por /,'').replace(/\s+/g,' ').trim();
+    const cargos={}, nombre={}; rs.forEach(o=>Object.entries(o.cd||{}).forEach(([k,v])=>{ if(!/devoluci|env[ií]o/i.test(k))return; const b=base(k), an=/anulaci/i.test(k); if(!an)nombre[b]=k.trim(); cargos[b]=(cargos[b]||0)+(an?-Math.abs(v):Math.abs(v)); }));
+    Object.keys(cargos).forEach(b=>{ if(cargos[b]<=0.5) delete cargos[b]; else { const n=nombre[b]||b; if(n!==b){cargos[n]=cargos[b];delete cargos[b];} } });
+    const devol=Object.entries(cargos).filter(([k])=>/devoluci/i.test(k)).reduce((a,[,v])=>a+v,0);
+    if(cobros>reint) out.push({rs,tipo:'pendiente',net,cargos,devol});
+    else if(!parcial&&net<-1) out.push({rs,tipo:'perdida',net,cargos,devol});
+    else if(parcial&&devol>0) out.push({rs,tipo:'perdida',net:-devol,cargos,devol});
+  });
+  return out.sort((a,b)=>a.net-b.net);
+}
+function renderPerdidas(){
+  const L=perdidasReclamo(), P=L.filter(x=>x.tipo==='perdida'), Q=L.filter(x=>x.tipo==='pendiente');
+  const item=x=>{const o=x.rs.find(r=>r.pcd>0)||x.rs[0]; const fechas=[...new Set(x.rs.map(r=>r.fecha))].join(', ');
+    return `<div style="border-bottom:1px solid var(--line);padding:10px 0;font-size:.88rem;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;">
+        <b>${o.cuenta}</b><span>Operación <b>${o.op}</b></span>
+        <button type="button" style="padding:2px 8px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:.78rem;" onclick="navigator.clipboard&&navigator.clipboard.writeText('${o.op}').then(()=>{this.textContent='✓ Copiado';setTimeout(()=>this.textContent='Copiar N.º',1500);})">Copiar N.º</button>
+        <span class="meta">${o.skuBase||''} ${NAMES[o.skuBase]?'· '+NAMES[o.skuBase]:''}</span>
+        <b style="margin-left:auto;color:${x.tipo==='perdida'?'#A6432F':'#8A6417'};">${x.tipo==='perdida'?fmt(x.net):'falta reintegrar'}</b></div>
+      <div class="meta" style="margin-top:3px;">${o.estado} · fechas: ${fechas}</div>
+      ${Object.keys(x.cargos).length?`<div style="margin-top:3px;font-size:.82rem;">Cargos: ${Object.entries(x.cargos).filter(([,v])=>Math.abs(v)>0.5).map(([k,v])=>`${k} ${fmt(v)}`).join(' · ')}</div>`:''}</div>`;};
+  $('perdidasBox').innerHTML=`<div class="panel" style="padding:14px;">
+    <p class="note" style="margin-top:0;">Operaciones canceladas o devueltas en las que Mercado Libre te cobró (envío de vuelta, envío no anulado, cargo por devolución). Copiá el N.º de operación para reclamar. Respeta la cuenta elegida arriba.</p>
+    <b style="color:#A6432F;">Te costaron plata: ${P.length} · ${fmt(P.reduce((a,x)=>a+x.net,0))}</b>
+    ${P.map(item).join('')||'<p class="note">No hay.</p>'}
+    ${Q.length?`<b style="display:block;margin-top:14px;color:#8A6417;">Cobradas dos veces y reintegradas una sola (todavía falta un reintegro): ${Q.length}</b>${Q.map(item).join('')}`:''}
+    <p class="note" style="margin-top:10px;">Si la venta y el reintegro están en meses distintos, aparecen cuando estén cargados los dos meses.</p></div>`;
+}
+// ===== Desglose de lo que se llevo ML en un mes (ventana) =====
+function conceptosML(p){
+  const fc=$('fCuenta').value, r=allRows().filter(o=>!o.excl&&o.periodo===p&&(!fc||o.cuenta===fc));
+  const v=r.filter(o=>o.tipo==='Venta'&&o.pcd>0), dv=r.filter(o=>o.esDevol), otros=r.filter(o=>!(o.tipo==='Venta'&&o.pcd>0)&&!o.esDevol);
+  const S=(a,f)=>a.reduce((x,o)=>x+(f(o)||0),0);
+  const vend=S(v,o=>o.pcd), tomaV=S(v,o=>o.pcd-o.neto);
+  const C={'Comisión por vender':-S(v,o=>o.vender),'Cargo fijo por unidad':-S(v,o=>o.unidad),'Cuotas':-S(v,o=>o.cuotas),'Impuestos y retenciones':-S(v,o=>o.ret)-S(v,o=>o.otros),'Publicidad':-S(v,o=>o.ads),'Full':-S(v,o=>o.full)};
+  C['Envíos y cadete (neto de reintegros)']=tomaV-Object.values(C).reduce((a,b)=>a+b,0);
+  const porTipo={}; otros.forEach(o=>{const k=/publicidad|mclicks|ads/i.test(o.tipo)?'Publicidad':/full|almacenamiento|colecta/i.test(o.tipo)?'Full':/retenci|percepci|impuesto/i.test(o.tipo)?'Impuestos y retenciones':/env[ií]o/i.test(o.tipo)?'Envíos y cadete (neto de reintegros)':'Otros cargos';porTipo[k]=(porTipo[k]||0)-(o.neto||0);});
+  Object.entries(porTipo).forEach(([k,x])=>C[k]=(C[k]||0)+x);
+  const devCargos=dv.reduce((a,o)=>a+Object.entries(o.cd||{}).filter(([k])=>/devoluci/i.test(k)&&!/anulaci/i.test(k)).reduce((x,[,y])=>x+y,0),0);
+  C['Cancelaciones y devoluciones (neto)']=-S(dv,o=>o.neto);
+  return {vend,C,total:Object.values(C).reduce((a,b)=>a+b,0),devCargos};
+}
+function abrirDesgloseMes(p){
+  const ps=[...new Set(allRows().map(o=>o.periodo))].filter(x=>x&&x!=='sin-fecha').sort(), i=ps.indexOf(p), ant=i>0?ps[i-1]:null;
+  const A=conceptosML(p), B=ant?conceptosML(ant):null;
+  const pc=(x,v)=>v>0?x/v*100:0, f1=x=>x.toLocaleString('es-AR',{maximumFractionDigits:1});
+  const ks=Object.keys(A.C).filter(k=>Math.abs(A.C[k])>1||(B&&Math.abs(B.C[k]||0)>1)).sort((a,b)=>A.C[b]-A.C[a]);
+  const filas=ks.map(k=>{const a=pc(A.C[k],A.vend), b=B?pc(B.C[k]||0,B.vend):null, d=b!=null?a-b:null;
+    return `<tr style="border-top:1px solid var(--line);"><td style="padding:7px 6px;">${k}${k.startsWith('Cancel')&&A.devCargos?`<small class="meta" style="display:block;">incluye cargos por devolución ${fmt(A.devCargos)} · <a href="#" onclick="event.preventDefault();cerrarDesglose();abrirPantallaML('perdidas');">ver para reclamar</a></small>`:''}</td>
+      <td style="padding:7px 6px;text-align:right;">${fmt(A.C[k])}</td><td style="padding:7px 6px;text-align:right;">${f1(a)} %</td>
+      ${B?`<td style="padding:7px 6px;text-align:right;color:#8A8072;">${f1(b)} %</td><td style="padding:7px 6px;text-align:right;font-weight:700;color:${d>0.05?'#A6432F':d<-0.05?'#2F7A47':'#8A8072'};">${d>0?'+':''}${f1(d)} pts</td>`:''}</tr>`;}).join('');
+  const todos=ps.map(q=>({q,x:conceptosML(q)}));
+  let m=$('desgloseModal'); if(!m){m=document.createElement('div');m.id='desgloseModal';m.style.cssText='position:fixed;inset:0;background:rgba(20,8,35,.55);z-index:300;display:flex;align-items:center;justify-content:center;padding:12px;';document.body.appendChild(m);m.addEventListener('click',e=>{if(e.target===m)cerrarDesglose();});}
+  m.innerHTML=`<div style="background:#fff;border-radius:16px;width:min(900px,100%);max-height:90vh;overflow:auto;padding:16px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><b style="flex:1;font-size:1.1rem;color:#3d1466;">Qué se llevó Mercado Libre · ${mesTxt(p)}</b><button type="button" onclick="cerrarDesglose()" style="border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 12px;cursor:pointer;font-weight:700;">✕ Cerrar</button></div>
+    <p class="note" style="margin:0 0 8px;">Vendido ${fmt(A.vend)} · se llevó ML ${fmt(A.total)} (${f1(pc(A.total,A.vend))} % de lo vendido)${B?` · mes anterior ${f1(pc(B.total,B.vend))} %`:''}</p>
+    <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><tr style="color:#8A8072;font-size:.72rem;text-transform:uppercase;"><td style="padding:6px;">Concepto</td><td style="padding:6px;text-align:right;">$</td><td style="padding:6px;text-align:right;">% de lo vendido</td>${B?`<td style="padding:6px;text-align:right;">${mesTxt(ant)}</td><td style="padding:6px;text-align:right;">Cambio</td>`:''}</tr>${filas}</table></div>
+    ${todos.length>1?`<b style="display:block;margin:14px 0 6px;color:#3d1466;">Todos los meses (% de lo vendido)</b><div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.82rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:5px;">Concepto</td>${todos.map(t=>`<td style="padding:5px;text-align:right;">${mesTxt(t.q).slice(0,3)} ${t.q.slice(2,4)}</td>`).join('')}</tr>
+      ${ks.map(k=>`<tr style="border-top:1px solid var(--line);"><td style="padding:5px;">${k}</td>${todos.map(t=>`<td style="padding:5px;text-align:right;">${f1(pc(t.x.C[k]||0,t.x.vend))}</td>`).join('')}</tr>`).join('')}
+      <tr style="border-top:2px solid #3d1466;font-weight:800;"><td style="padding:5px;">Total</td>${todos.map(t=>`<td style="padding:5px;text-align:right;">${f1(pc(t.x.total,t.x.vend))}</td>`).join('')}</tr></table></div>`:''}
+    <p class="note" style="margin-top:8px;">"Cancelaciones y devoluciones (neto)" separa lo que ML te cobró en ventas que no se concretaron; puede dar a favor o en contra. Respeta la cuenta elegida arriba.</p></div>`;
+  m.style.display='flex';
+}
+function cerrarDesglose(){const m=$('desgloseModal');if(m)m.style.display='none';}
 // ===== Equivalencias de SKU: codigo mal puesto en ML -> codigo de la app (config/ml_equivalencias: { m: { ML: 'APP' | 'APP x N' } }) =====
 let EQ={}, UNI={};
 async function cargarUnidades(){try{const d=await db.collection('config').doc('ml_unidades').get();UNI=d.exists?(d.data().u||{}):{};}catch(e){UNI={};}}
