@@ -995,7 +995,6 @@ function marcarSospechosas(){
     // el costo usado en esta venta comparado con el costo de hoy (si es 5 veces distinto, casi seguro es docena/unidad)
     const hc=COSTOS[String(o.skuBase).toUpperCase()]||[]; const hoy=hc.length?hc[hc.length-1].costo:null;
     if(hoy>0&&(cu/hoy>5||hoy/cu>5))m.push(`el costo usado (${fmt(cu)} c/u) es muy distinto del costo de hoy (${fmt(hoy)} c/u): ¿docena o unidad?`);
-    if(o.eqDe&&(o.multML||1)>1){const e=EQ[String(o.cuenta||'').toUpperCase()+'|'+String(o.skuBaseML||'').toUpperCase()]||EQ[String(o.skuBaseML||'').toUpperCase()]||'';if(/X\s*\d+/i.test(e))m.push(`la publicación ya dice "x ${o.multML}" y además hay una equivalencia "${e}": revisá las unidades`);}
     if(!m.length)continue;
     o.revisar=m;
     const k=String(o.op||'')+'|'+String(o.skuBaseML||o.skuBase);
