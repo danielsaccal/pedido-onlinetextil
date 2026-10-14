@@ -211,6 +211,18 @@ details.pleg>summary small{font-weight:600;color:#8A8072;font-size:.8rem}
 details.pleg[open]>summary{border-bottom-left-radius:0;border-bottom-right-radius:0;margin-bottom:0}
 details.pleg>.panel,details.pleg>.pleg-body{margin-top:0;border-top-left-radius:0;border-top-right-radius:0}
 details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);border-top:none;border-radius:0 0 14px 14px;padding:12px}
+
+/* menu de Resultados ML con la misma logica que la app: tarjetas -> pantalla -> volver */
+#menuML{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin:14px 0}
+#menuML .mt{background:#fff;border:1px solid var(--line,#E3DCD2);border-radius:16px;padding:14px;cursor:pointer;text-align:left;font:inherit;color:inherit;display:flex;flex-direction:column;gap:4px;transition:transform .1s,box-shadow .1s}
+#menuML .mt:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.06)}
+#menuML .mt .ic{font-size:1.6rem}#menuML .mt b{font-size:1rem;color:#3d1466}#menuML .mt span{font-size:.8rem;color:#8A8072}
+#menuML .mt .cnt{align-self:flex-start;background:#FDEBE7;color:#A6432F;border-radius:999px;padding:1px 8px;font-size:.75rem;font-weight:700}
+#volverML{display:none;align-items:center;gap:10px;margin:14px 0 6px}
+#volverML button{border:1px solid var(--line,#E3DCD2);background:#fff;border-radius:12px;padding:8px 14px;font:inherit;font-weight:700;cursor:pointer;color:#3d1466}
+#volverML b{font-size:1.1rem;color:#3d1466}
+.pantallaML>summary{display:none !important}
+.pantallaML>.pleg-body,.pantallaML>.panel{border-top-left-radius:14px !important;border-top-right-radius:14px !important;border-top:1px solid var(--line,#E3DCD2) !important}
 </style>
 </head>
 <body>
@@ -796,12 +808,13 @@ function draw(){
   try{renderOrigen();}catch(e){console.error(e);}
   try{renderCuotas();}catch(e){console.error(e);}
   try{renderRevisar();}catch(e){console.error(e);}
+  try{ if(!menuArmado) armarMenuML(); else { pintarMenuML(); if(window.__pantallaML){ abrirPantallaML(window.__pantallaML,true); } } }catch(e){console.error(e);}
   // lista
   $('count').textContent=r.length.toLocaleString('es-AR')+' operaciones';
   {const c=$('cntResumen');if(c)c.textContent='· '+r.length.toLocaleString('es-AR')+' operaciones';}
   {const nr=allRows().filter(o=>o.raro&&(!$('fMes').value||o.periodo===$('fMes').value)&&(!$('fCuenta').value||o.cuenta===$('fCuenta').value)).length, a=$('rarosAviso'), on=$('fTipo').value==='raros';
    a.style.display=nr||on?'block':'none';
-   a.innerHTML=on?`Mostrando solo <b>⚠️ precios raros</b> · <a href="#" onclick="event.preventDefault();$('fTipo').value='ventas';render();">ver todas</a>`:`<span style="background:#FDEBE7;color:#A6432F;border-radius:8px;padding:4px 8px;display:inline-block;">⚠️ <b>${nr}</b> ${nr===1?'venta':'ventas'} con precio muy por debajo de lo habitual · <a href="#" style="color:#A6432F;font-weight:700;" onclick="event.preventDefault();$('fTipo').value='raros';document.querySelector('details[data-k=lista]').open=true;render();document.querySelector('details[data-k=lista]').scrollIntoView({behavior:'smooth'});">Ver</a></span>`;}
+   a.innerHTML=on?`Mostrando solo <b>⚠️ precios raros</b> · <a href="#" onclick="event.preventDefault();$('fTipo').value='ventas';render();">ver todas</a>`:`<span style="background:#FDEBE7;color:#A6432F;border-radius:8px;padding:4px 8px;display:inline-block;">⚠️ <b>${nr}</b> ${nr===1?'venta':'ventas'} con precio muy por debajo de lo habitual · <a href="#" style="color:#A6432F;font-weight:700;" onclick="event.preventDefault();$('fTipo').value='raros';window.__pantallaML='lista';render();">Ver</a></span>`;}
   renderList(r);
   const sq=searchQ();
   if(sq.isNum&&r.length&&r.length<=5)$('list').querySelectorAll('tr.d').forEach(x=>x.classList.add('open'));
@@ -1071,8 +1084,7 @@ function renderRevisar(){
   const fc=$('fCuenta').value;
   const L=allRows().filter(o=>o.revisar&&(!fc||o.cuenta===fc)&&!CONFIRMADAS[String(o.op||'')+'|'+String(o.skuBaseML||o.skuBase)]);
   const box=$('revisarBox'); if(!box)return;
-  if(!L.length){box.style.display='none';return;}
-  box.style.display='';
+  if(!L.length){box.innerHTML='<p class="note">✓ No hay ventas para revisar.</p>';return;}
   const abierta=!!(box.querySelector('details')&&box.querySelector('details').open)||window.__revAbierta;
   box.innerHTML=`<details class="pleg" style="margin:10px 0;" ${abierta?'open':''} ontoggle="window.__revAbierta=this.open"><summary style="background:#FDEBE7;border-color:#E3B8AE;color:#A6432F;">⚠️ ${L.length} ${L.length===1?'venta para revisar':'ventas para revisar'} <small style="color:#A6432F;">· no se cuentan en la ganancia hasta que las confirmes</small></summary><div class="pleg-body">
     ${L.slice(0,60).map(o=>`<div style="border-bottom:1px solid var(--line);padding:8px 0;font-size:.88rem;">
@@ -1084,6 +1096,58 @@ function renderRevisar(){
       <ul style="margin:4px 0 0 18px;padding:0;color:#A6432F;">${o.revisar.map(x=>`<li>${x}</li>`).join('')}</ul></div>`).join('')}
     ${L.length>60?`<p class="note">Y ${L.length-60} más.</p>`:''}
     <p class="note">Si el número está bien, tocá <b>✓ Está bien</b> y pasa a contarse. Si está mal, corregí el costo, la unidad (docena) o la equivalencia y la alerta desaparece sola.</p></div></details>`;
+}
+// ===== Menu con tarjetas (como la app): cada seccion es una pantalla con Volver =====
+let menuArmado=false;
+function armarMenuML(){
+  if(menuArmado||/calcu=1/.test(location.search))return; menuArmado=true;
+  const app=$('app'), mas=document.querySelector('details[data-k=mas]');
+  const cont=document.createElement('div'); cont.id='pantallasML';
+  // sacar todo de "Mas detalles"
+  if(mas){ [...mas.children].forEach(c=>{ if(c.tagName==='SUMMARY')return; if(c.classList.contains('pleg-body')) [...c.children].forEach(x=>cont.appendChild(x)); else cont.appendChild(c); }); mas.remove(); }
+  // ajustes: el titulo "Ajustes" y las cajas que lo siguen
+  const aj=document.createElement('div'); aj.id='ajustesML';
+  const sec=[...cont.querySelectorAll('p.sec')].find(p=>/Ajustes/.test(p.textContent));
+  if(sec){ let n=sec.nextElementSibling; sec.remove(); while(n){const x=n.nextElementSibling; aj.appendChild(n); n=x;} }
+  cont.appendChild(aj);
+  ['revisarBox'].forEach(id=>{const e=$(id); if(e) cont.appendChild(e);});
+  ['glosario','ranking'].forEach(k=>{const e=document.querySelector('details[data-k='+k+']'); if(e) cont.appendChild(e);});
+  const menu=document.createElement('div'); menu.id='menuML';
+  const vol=document.createElement('div'); vol.id='volverML'; vol.innerHTML='<button type="button" onclick="volverMenuML()">← Volver</button><b id="volverTit"></b>';
+  const res=$('resumen'); res.after(menu); menu.after(vol); vol.after(cont);
+  window.__pantallas=[
+    ['revisar','⚠️','Ventas para revisar','Números dudosos: confirmalos o corregilos',()=>$('revisarBox')],
+    ['ranking','🏆','¿Qué productos me dejan más plata?','Ranking y ficha de cada SKU',()=>document.querySelector('details[data-k=ranking]')],
+    ['cuotas','💳','Con cuotas o sin cuotas','Qué te deja más, mes por mes',()=>document.querySelector('details[data-k=cuotas]')],
+    ['origen','🏭','Fabricado vs reventa','Facturación y ganancia de cada uno',()=>document.querySelector('details[data-k=origen]')],
+    ['desglose','🚚','Envíos, Full y publicidad','Lo que cobró ML por cada cosa',()=>document.querySelector('details[data-k=desglose]')],
+    ['lista','📋','Venta por venta','Buscar una venta, un SKU o un N.º',()=>document.querySelector('details[data-k=lista]')],
+    ['anual','📅','Mes por mes','Comparar meses',()=>document.querySelector('details[data-k=anual]')],
+    ['faltan','🔍','SKU sin datos en la app','Lo que falta cargar o emparejar',()=>document.querySelector('details[data-k=faltan]')],
+    ['graficos','📊','Gráficos','',()=>document.querySelector('details[data-k=graficos]')],
+    ['glosario','ⓘ','¿Qué significa cada cosa?','Explicación de cada número',()=>document.querySelector('details[data-k=glosario]')],
+    ['ajustes','⚙️','Ajustes','Equivalencias, cadete, meses guardados',()=>$('ajustesML')]
+  ];
+  [...cont.children].forEach(c=>c.style.display='none');
+  pintarMenuML();
+}
+function pintarMenuML(){
+  const m=$('menuML'); if(!m)return;
+  const nRev=(document.querySelectorAll('#revisarBox div[style*="border-bottom"]')||[]).length;
+  m.innerHTML=window.__pantallas.map(([k,ic,t,d])=>`<button type="button" class="mt" onclick="abrirPantallaML('${k}')"><span class="ic">${ic}</span><b>${t}</b>${d?`<span>${d}</span>`:''}${k==='revisar'&&nRev?`<span class="cnt">${nRev}</span>`:''}</button>`).join('');
+}
+function abrirPantallaML(k,sinScroll){
+  const p=window.__pantallas.find(x=>x[0]===k); if(!p)return; const el=p[4](); if(!el)return;
+  [...$('pantallasML').children].forEach(c=>c.style.display='none');
+  $('menuML').style.display='none'; $('volverML').style.display='flex'; $('volverTit').textContent=p[1]+' '+p[2];
+  el.style.display=''; el.classList.add('pantallaML'); if(el.tagName==='DETAILS') el.open=true;
+  if(k==='revisar'){ const d=el.querySelector('details'); if(d){ d.open=true; d.querySelector('summary').style.display='none'; } if(!el.innerHTML.trim()) el.innerHTML='<p class="note">✓ No hay ventas para revisar.</p>'; }
+  const misma=window.__pantallaML===k; window.__pantallaML=k; if(!sinScroll&&!misma) window.scrollTo({top:$('volverML').offsetTop-10,behavior:'smooth'});
+}
+function volverMenuML(){
+  [...$('pantallasML').children].forEach(c=>c.style.display='none');
+  $('volverML').style.display='none'; $('menuML').style.display=''; window.__pantallaML=null; pintarMenuML();
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 // ===== Equivalencias de SKU: codigo mal puesto en ML -> codigo de la app (config/ml_equivalencias: { m: { ML: 'APP' | 'APP x N' } }) =====
 let EQ={}, UNI={};
@@ -1292,9 +1356,8 @@ async function refrescarCostos(){
   render();
 }
 window.addEventListener('message',e=>{if(e.data&&e.data.tipo==='ot-costos-actualizados'){const s=$('appModalEstado');if(s)s.textContent='✓ Guardado y actualizado';refrescarCostos();}});
-function verVentasTipo(f){const m=document.querySelector('details[data-k=mas]'),l=document.querySelector('details[data-k=lista]');if(m)m.open=true;if(l)l.open=true;
-  $('fTipo').value=f;$('fMes').value=$('resMes').value==='todo'?'':$('resMes').value;$('fSku').value='';render();setTimeout(()=>l&&l.scrollIntoView({behavior:'smooth',block:'start'}),60);}
-function verFaltantes(){const m=document.querySelector('details[data-k=mas]'),f=document.querySelector('details[data-k=faltan]');if(m)m.open=true;if(f){f.open=true;$('ftMes').value=$('resMes').value;renderFaltan();setTimeout(()=>f.scrollIntoView({behavior:'smooth',block:'start'}),50);}}
+function verVentasTipo(f){$('fTipo').value=f;$('fMes').value=$('resMes').value==='todo'?'':$('resMes').value;$('fSku').value='';window.__pantallaML='lista';render();abrirPantallaML('lista');}
+function verFaltantes(){$('ftMes').value=$('resMes').value;renderFaltan();abrirPantallaML('faltan');}
 // ===== SKU de Mercado Libre que no estan en la app o no tienen costo =====
 function renderFaltan(){
   const sel=$('ftMes'), ps=[...new Set(DATA.map(d=>d.periodo))].sort().reverse();
