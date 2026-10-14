@@ -689,7 +689,8 @@ function aplicarCostos(){for(const d of DATA)for(const o of d.rows){
   // segunda pasada, por operacion: unidades devueltas enteras y nunca mas que las vendidas
   const G={};for(const d of DATA)for(const o of d.rows){if(o.esDevol&&o.c2!=null)(G[o.op]=G[o.op]||[]).push(o);}
   for(const rs of Object.values(G)){
-    const ventas=rs.filter(o=>o.pcd>0), reint=rs.filter(o=>o.pcd<0);
+    rs.filter(o=>o.pcd<0&&esCargoDevol(o)).forEach(o=>{o.uDev=0;o.costoAj=0;});
+    const ventas=rs.filter(o=>o.pcd>0), reint=rs.filter(o=>o.pcd<0&&!esCargoDevol(o)); if(!reint.length)continue;
     let tope=ventas.length?ventas.reduce((a,o)=>a+o.unid,0):Math.max(...reint.map(o=>o.unid));
     for(const o of reint){
       // venta cancelada entera: vuelven todas las unidades (en el primer reintegro); los demas reintegros son solo plata
@@ -1240,13 +1241,15 @@ function volverMenuML(){
   $('volverML').style.display='none'; $('menuML').style.display=''; window.__pantallaML=null; pintarMenuML();
   window.scrollTo({top:0,behavior:'smooth'});
 }
+// fila de "Cargo por devolución": monto del producto en 0, solo el cargo (no es un reintegro al comprador)
+function esCargoDevol(o){const ks=Object.keys(o.cd||{});return ks.some(k=>/devoluci/i.test(k)&&!/anulaci/i.test(k))&&!ks.some(k=>/anulaci/i.test(k))&&Math.abs((o.pcd||0)+(o.ec||0))<1;}
 // ===== Perdidas para reclamar: cancelaciones y devoluciones que te costaron plata =====
 function perdidasReclamo(){
   const fc=$('fCuenta').value, G={};
   allRows().forEach(o=>{ if(!o.esDevol||(fc&&o.cuenta!==fc))return; const k=o.cuenta+'|'+o.op; (G[k]=G[k]||[]).push(o); });
   const out=[];
   Object.values(G).forEach(rs=>{
-    const cobros=rs.filter(o=>o.pcd>0).length, reint=rs.filter(o=>o.pcd<0).length;
+    const cobros=rs.filter(o=>o.pcd>0).length, reint=rs.filter(o=>o.pcd<0&&!esCargoDevol(o)).length;
     if(!cobros||!reint)return; // si falta la venta o el reintegro (otro mes), no se puede saber
     const net=rs.reduce((a,o)=>a+(o.neto||0),0); const parcial=rs.some(o=>/parcial/i.test(o.estado));
     // cargos de envio y devolucion, netos de sus anulaciones (lo que ML no devolvio)
@@ -1263,7 +1266,7 @@ function perdidasReclamo(){
 function renderPerdidas(){
   const L=perdidasReclamo(), P=L.filter(x=>x.tipo==='perdida'), Q=L.filter(x=>x.tipo==='pendiente');
   const item=x=>{const o=x.rs.find(r=>r.pcd>0)||x.rs[0]; const fe=f=>String(f||'').split('/').reverse().join('');
-    const fechas=x.rs.slice().sort((a,b)=>fe(a.fecha).localeCompare(fe(b.fecha))).map(r=>{const t=r.pcd>0?'venta (cobro)':r.pcd<0?'reintegro al comprador':Object.keys(r.cd||{}).some(k=>/devoluci/i.test(k)&&!/anulaci/i.test(k))?'cargo por devolución':'otro movimiento';return `${String(r.fecha).slice(0,5)} ${t}`;}).join(' · ');
+    const fechas=x.rs.slice().sort((a,b)=>fe(a.fecha).localeCompare(fe(b.fecha))).map(r=>{const t=esCargoDevol(r)?'cargo por devolución':r.pcd>0?'venta (cobro)':r.pcd<0?'reintegro al comprador':'otro movimiento';return `${String(r.fecha).slice(0,5)} ${t}`;}).join(' · ');
     return `<div style="border-bottom:1px solid var(--line);padding:10px 0;font-size:.88rem;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;">
         <b>${o.cuenta}</b><span>Operación <b>${o.op}</b></span>
