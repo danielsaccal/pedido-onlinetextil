@@ -1003,7 +1003,7 @@ function marcarSospechosas(){
     if(o.ganPct!=null&&o.ganPct>2)m.push(`gana ${pctf(o.ganPct)} sobre el costo (demasiado)`);
     if(cu>pu)m.push(`el costo por unidad (${fmt(cu)}) es mayor que el precio por unidad (${fmt(pu)})`);
     // la misma base se vende tambien con "x N" y esta publicacion (sin x N) tiene precio de pack
-    if((o.multML||1)===1&&PACKS[o.skuBase]){const pk=PACKS[o.skuBase];if(pu>=pk.unit*2){const r=pu/pk.unit;const n=[2,3,4,5,6,8,10,12,20,24,50].concat([pk.n]).reduce((a,b)=>Math.abs(b-r)<Math.abs(a-r)?b:a,2);o.packSug=n;m.push(`la publicación no dice cuántas trae, pero cobra ${fmt(pu)} y el pack "x ${pk.n}" sale ${fmt(pk.unit)} por unidad: parece un pack de ${n}`);}}
+    if((o.multML||1)===1&&!o.eqDe&&PACKS[o.skuBase]){const pk=PACKS[o.skuBase];if(pu>=pk.unit*2){const r=pu/pk.unit;const n=[2,3,4,5,6,8,10,12,20,24,50].concat([pk.n]).reduce((a,b)=>Math.abs(b-r)<Math.abs(a-r)?b:a,2);o.packSug=n;m.push(`la publicación no dice cuántas trae, pero cobra ${fmt(pu)} y el pack "x ${pk.n}" sale ${fmt(pk.unit)} por unidad: parece un pack de ${n}`);}}
     // el costo usado en esta venta comparado con el costo de hoy (si es 5 veces distinto, casi seguro es docena/unidad)
     const hc=COSTOS[String(o.skuBase).toUpperCase()]||[]; const hoy=hc.length?hc[hc.length-1].costo:null;
     if(hoy>0&&(cu/hoy>5||hoy/cu>5))m.push(`el costo usado (${fmt(cu)} c/u) es muy distinto del costo de hoy (${fmt(hoy)} c/u): ¿docena o unidad?`);
@@ -1012,6 +1012,23 @@ function marcarSospechosas(){
     const k=String(o.op||'')+'|'+String(o.skuBaseML||o.skuBase);
     if(!CONFIRMADAS[k]){o.costoRev=o.costo;o.ganRev=o.gan;o.ganPctRev=o.ganPct;o.costo=null;o.gan=null;o.ganPct=null;}
   }
+}
+// cambiar el SKU contra el que se compara el costo (queda como equivalencia de esa cuenta)
+function pedirCambioSku(btn,cta,sku){
+  const cont=btn.closest('div[style*="border-bottom"]').querySelector('.rev-det');
+  cont.innerHTML=`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;background:#F4EFFA;border:1px solid #CDBFE0;border-radius:10px;padding:8px;">
+    <span style="font-size:.85rem;">En ML figura <b>${sku}</b>. ¿Con qué SKU de la app se compara?</span>
+    <input placeholder="ej: IA905" list="eqSinMatch" style="width:130px;height:30px;min-height:0;padding:3px 8px;border:1px solid #CDBFE0;border-radius:8px;text-transform:uppercase;box-sizing:border-box;" onkeydown="if(event.key==='Enter')this.nextElementSibling.click()">
+    <button type="button" style="padding:5px 10px;border-radius:8px;border:none;background:#5b2a86;color:#fff;font-weight:700;cursor:pointer;" onclick="aplicarCambioSku('${cta}','${sku}',this.previousElementSibling.value)">Aceptar</button>
+    <small class="meta" style="width:100%;">Se aplica a todas las ventas de ${sku} de la cuenta ${cta}. Si tiene "x N", se respeta.</small></div>`;
+  cont.querySelector('input').focus();
+}
+async function aplicarCambioSku(cta,sku,nuevo){
+  nuevo=String(nuevo||'').trim().toUpperCase(); if(!nuevo)return;
+  if(!NAMES[nuevo.split(/\s*X\s*/)[0]]&&!COSTOS[nuevo.split(/\s*X\s*/)[0]]&&!confirm(`${nuevo} no figura en la app. ¿Lo uso igual?`))return;
+  EQ[String(cta).toUpperCase()+'|'+String(sku).toUpperCase()]=nuevo;
+  try{await guardarEquivalencias();}catch(e){showErr('No se pudo guardar: '+e.message);return;}
+  render();alertOk(`${sku} → ${nuevo} (cuenta ${cta})`);
 }
 // abre el detalle de la venta ahi mismo, debajo del aviso
 function verVentaAca(btn,op,sku){
@@ -1044,6 +1061,7 @@ function renderRevisar(){
     ${L.slice(0,60).map(o=>`<div style="border-bottom:1px solid var(--line);padding:8px 0;font-size:.88rem;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;"><b>${o.skuBase}</b><span class="meta">${o.fecha} · ${o.cuenta} · ${o.unid} unid. · precio ${fmt(o.pcd)} · costo ${fmt(o.costoRev)}</span>
         <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">${o.packSug?`<span style="display:inline-flex;gap:4px;align-items:center;border:1px solid #CDBFE0;background:#F4EFFA;border-radius:8px;padding:2px 4px 2px 8px;color:#5b2a86;font-weight:700;font-size:.85rem;">📦 Pack de <input type="number" min="2" value="${o.packSug}" style="width:52px;height:28px;min-height:0;padding:2px 4px;border:1px solid #CDBFE0;border-radius:6px;font-weight:700;font-size:.85rem;box-sizing:border-box;" onkeydown="if(event.key==='Enter')this.nextElementSibling.click()"><button type="button" style="padding:3px 8px;border-radius:6px;border:none;background:#5b2a86;color:#fff;font-weight:700;cursor:pointer;" onclick="const n=parseInt(this.previousElementSibling.value,10);if(n>=2)aplicarPackSug('${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}',n)">Aceptar</button></span>`:''}<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid #BFDCC8;background:#EEF6F0;color:#2F7A47;font-weight:700;cursor:pointer;" onclick="confirmarVenta('${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">✓ Está bien</button>
+        <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="pedirCambioSku(this,'${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">🔁 Cambiar SKU</button>
         <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="verVentaAca(this,'${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">Ver venta</button></span></div>
       <div class="rev-det"></div>
       <ul style="margin:4px 0 0 18px;padding:0;color:#A6432F;">${o.revisar.map(x=>`<li>${x}</li>`).join('')}</ul></div>`).join('')}
