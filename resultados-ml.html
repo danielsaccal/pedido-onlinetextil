@@ -280,7 +280,8 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
     <p><b>Envíos cobrados:</b> lo que Mercado Libre te devuelve por los envíos Flex y lo que pagó el comprador por el envío.</p>
     <p><b>Mercado Libre:</b> todo lo que te cobró: comisión, cuotas, envíos, Full, publicidad, impuestos y devoluciones.</p>
     <p><b>Me quedó:</b> lo que te llega a Mercado Pago (entró − Mercado Libre), menos el cadete Flex.</p>
-    <p><b>Costo de lo vendido:</b> lo que te costó lo que vendiste: tela + confección + insumos si lo fabricás, o el costo de compra si es de reventa.</p>
+    <p><b>Costo de mercadería:</b> lo que te costó lo que vendiste: tela + confección + insumos si lo fabricás, o el costo de compra si es de reventa.</p>
+    <p><b>Cancelaciones y devoluciones:</b> la venta lleva el costo de todas sus unidades en el mes en que se vendió; cuando ML hace el reintegro, el costo de las unidades devueltas se resta en el mes del reintegro (la mercadería vuelve al stock). Si se devuelve plata sin mercadería (reclamo, bonificación), no se resta costo. Se asume que lo devuelto se puede volver a vender.</p>
     <p><b>Resultado del mes:</b> me quedó − costo. <b>Es lo que ganaste o perdiste de verdad.</b></p>
     <p><b>Ganancia por producto</b> (en la tabla de productos): lo mismo pero producto por producto. No incluye los cargos generales del mes (Full, publicidad), por eso la suma da más que el resultado del mes.</p>
     <p><b>% sobre el costo:</b> cuánto ganás por cada $ 100 de costo. Ej: costo $ 100 y ganás $ 25 → 25 %.</p>
@@ -499,7 +500,8 @@ function parseWorkbook(wb,cuenta,file){
     ec:col('Envío pagado por el comprador'),cc:col('Costo por ofrecer cuotas pagado'),bruto:col('Monto bruto (='),
     ret:col('Monto total de retenciones'),pos:col('Monto total de cargos pospagos'),neto:col('Monto neto después'),
     det:col('Detalles de cargos'),envNum:col('Número del envío'),metodo:col('Método de envío'),paq:H.findIndex(h=>h.startsWith('Número del paquete')),pago:H.findIndex(h=>h.startsWith('Detalles del pago')),
-    tit:H.findIndex(h=>/^t[ií]tulo|^descripci[oó]n de la publicaci|^publicaci[oó]n$/i.test(String(h).trim()))};
+    tit:H.findIndex(h=>/^t[ií]tulo|^descripci[oó]n de la publicaci|^publicaci[oó]n$/i.test(String(h).trim())),
+    reb:H.findIndex(h=>h.startsWith('Descuentos de Mercado Libre')),dv:H.findIndex(h=>h.startsWith('Descuento del vendedor')),fv:H.findIndex(h=>h.startsWith('Fecha de la venta'))};
   const raw=aoa.slice(hi+1).filter(r=>String(r[C.tipo]).trim()!=='');
   // reintegros Flex en filas "Envío"
   const envMap={};
@@ -520,7 +522,10 @@ function parseWorkbook(wb,cuenta,file){
       psd:isVenta&&bruto>0?num(r[C.valor]):null, pcd:isVenta?bruto-ec-cc:null,
       vender:-p.vender,unidad:-p.unidad,cuotas:-p.cuotas,envio:ec+cc-p.envio,full:-p.full,ads:-p.ads,otros:-p.otros,
       envIn:ec+cc+p.flexBon,envOut:-(p.envML+p.flexCargo),ret:num(r[C.ret]),acred:num(r[C.neto])-pos,excl:false,flex:'',flexMonto:null,nota:'',
-      ec, cd:Object.fromEntries(Object.entries(p.det).filter(([k,v])=>Math.abs(v)>0.004).map(([k,v])=>[k,Math.round(v*100)/100]))};
+      ec, esDevol:isVenta&&/cancel|devuelt|reembols|anulad/i.test(estado),
+      prodTotal:Math.abs(num(r[C.valor]))-Math.abs(C.reb>=0?num(r[C.reb]):0)-Math.abs(C.dv>=0?num(r[C.dv]):0),
+      fechaVenta:C.fv>=0?String(r[C.fv]||''):'',
+      cd:Object.fromEntries(Object.entries(p.det).filter(([k,v])=>Math.abs(v)>0.004).map(([k,v])=>[k,Math.round(v*100)/100]))};
     if(tipoOp==='Pago de facturas'){o.excl=true;o.acred=0;o.otros=0;o.nota='Pago de factura ML por '+fmt2(Math.abs(pos))+'. Paga cargos ya listados; no se suma.';}
     else if(!isVenta&&pos!==0)o.nota='Cargo facturado aparte, no descontado de una venta.';
     o.pct=o.pcd>0?o.acred/o.pcd:null;
@@ -657,7 +662,32 @@ function costoUnit(base,fecha){const h=COSTOS[String(base||'').toUpperCase()];if
 function cambiarModoCosto(v){MODO_COSTO=v;try{localStorage.setItem('ml.modoCosto',v);}catch(e){}aplicarCostos();render();}
 function aplicarCostos(){for(const d of DATA)for(const o of d.rows){
   const esVenta=o.tipo==='Venta'&&o.pcd>0;const cu=esVenta&&o.unid?costoUnit(o.skuBase,o.fecha):null;
-  o.costo=cu!=null?cu*o.unid:null;o.gan=o.costo!=null?o.neto-o.costo:null;o.ganPct=o.gan!=null&&o.costo>0?o.gan/o.costo:null;}}
+  o.costo=cu!=null?cu*o.unid:null;o.gan=o.costo!=null?o.neto-o.costo:null;o.ganPct=o.gan!=null&&o.costo>0?o.gan/o.costo:null;
+  // Ventas canceladas o devueltas (criterio de lo devengado):
+  //  - la fila de la venta (monto positivo) lleva el costo de todas sus unidades, en el mes de la venta;
+  //  - la fila del reintegro (monto negativo) devuelve el costo de las unidades devueltas, en el mes del reintegro
+  //    (la mercaderia vuelve al stock). Unidades devueltas = cantidad x (monto reintegrado / monto del producto).
+  //  Con las dos filas cargadas, queda el costo solo de lo que el comprador se quedo.
+  o.costoAj=null;o.uDev=null;o.reintDinero=false;o.c2=null;
+  if(!esVenta&&o.esDevol&&o.unid&&o.pcd){
+    o.c2=costoUnit(o.skuBase,o.fechaVenta||o.fecha);
+    if(o.c2!=null&&o.pcd>0)o.costoAj=o.c2*o.unid;
+  }
+}
+  // segunda pasada, por operacion: unidades devueltas enteras y nunca mas que las vendidas
+  const G={};for(const d of DATA)for(const o of d.rows){if(o.esDevol&&o.c2!=null)(G[o.op]=G[o.op]||[]).push(o);}
+  for(const rs of Object.values(G)){
+    const ventas=rs.filter(o=>o.pcd>0), reint=rs.filter(o=>o.pcd<0);
+    let tope=ventas.length?ventas.reduce((a,o)=>a+o.unid,0):Math.max(...reint.map(o=>o.unid));
+    for(const o of reint){
+      // venta cancelada entera: vuelven todas las unidades (en el primer reintegro); los demas reintegros son solo plata
+      if(/cancel/i.test(o.estado)){o.uDev=Math.max(0,tope);tope=0;o.costoAj=-o.c2*o.uDev;if(!o.uDev)o.reintDinero=true;continue;}
+      const tot=o.prodTotal>0?o.prodTotal:Math.abs(o.pcd), u=o.unid*Math.min(1,Math.abs(o.pcd)/tot), ui=Math.round(u);
+      if(ui<1||Math.abs(u-ui)>0.1){o.uDev=0;o.reintDinero=true;o.costoAj=0;continue;} // devolvieron plata, no mercaderia (reclamo, bonificacion)
+      o.uDev=Math.min(ui,Math.max(0,tope)); tope-=o.uDev; o.costoAj=-o.c2*o.uDev;
+    }
+  }
+}
 const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 function searchQ(){const raw=$('fSku').value.trim(), qd=raw.replace(/[#\s.\-]/g,'');return {raw,q:norm(raw),qd,isNum:/^\d{8,}$/.test(qd)};}
 if(false)$('names').addEventListener('change',async ev=>{
@@ -878,7 +908,10 @@ function renderResumen(){
   const entro=recibi+L.envIn, pague=entro-quedo;
   const wasOpen=!!(document.querySelector('#resBody details')||{}).open;
   // resumen limpio: de lo que entró, a lo que quedó, al resultado (con costo)
-  const cc=vs.filter(o=>o.costo!=null), costo=cc.reduce((a,o)=>a+o.costo,0), sinC=vs.filter(o=>o.costo==null&&o.costoRev==null).length, nRev=vs.filter(o=>o.costoRev!=null).length;
+  const cc=vs.filter(o=>o.costo!=null), costoV=cc.reduce((a,o)=>a+o.costo,0), sinC=vs.filter(o=>o.costo==null&&o.costoRev==null).length, nRev=vs.filter(o=>o.costoRev!=null).length;
+  // canceladas y devueltas: costo de la venta anulada (+) y mercaderia que vuelve al stock (-)
+  const dv=r.filter(o=>o.costoAj!=null), costoAj=dv.reduce((a,o)=>a+o.costoAj,0), uVuelven=dv.reduce((a,o)=>a+(o.uDev||0),0), nDinero=r.filter(o=>o.reintDinero).length;
+  const costo=costoV+costoAj;
   const res=quedo-costo, rcC=cc.reduce((a,o)=>a+o.pcd,0), gV=cc.reduce((a,o)=>a+o.neto,0)-costo;
   const pE=v=>entro>0?(v/entro*100).toLocaleString('es-AR',{maximumFractionDigits:0})+' %':'';
   const L1=(t,v,sub,cls)=>`<div class="rr ${cls||''}"><span>${t}${sub?`<small>${sub}</small>`:''}</span><b>${fmt(v)}</b><em>${pE(Math.abs(v))}</em></div>`;
@@ -904,7 +937,7 @@ function renderResumen(){
       ${L1('Entró',entro,'','tot')}
       ${L1('Mercado Libre',-pague,'Comisión, cuotas, envíos, Full, publicidad, impuestos','rn')}
       ${L1('Me quedó',quedo,'','tot')}
-      ${cc.length?L1('Costo de lo vendido',-costo,sinC?`${sinC} ${sinC===1?'venta':'ventas'} sin costo cargado`:'','rn'):''}
+      ${cc.length?L1('Costo de mercadería',-costo,[sinC?`${sinC} ${sinC===1?'venta':'ventas'} sin costo cargado`:'',Math.round(costoAj)?`cancelaciones y devoluciones: ${costoAj<0?'se restaron':'se sumaron'} ${fmt(Math.abs(costoAj))} (${uVuelven.toLocaleString('es-AR')} unid. vuelven al stock)`:''].filter(Boolean).join(' · '),'rn'):''}
       ${cc.length?L1('Resultado',res,'','tot'):''}
     </div>
     ${cc.length?(()=>{const P=cc.filter(o=>o.gan<0),B=cc.filter(o=>o.gan>=0&&o.costo>0&&o.gan/o.costo<0.2),OK=cc.filter(o=>o.gan>=0&&!(o.costo>0&&o.gan/o.costo<0.2));
@@ -944,7 +977,7 @@ function renderAnual(){
   const rows=allRows().filter(o=>!o.excl&&(!fc||o.cuenta===fc)&&o.periodo&&o.periodo!=='sin-fecha');
   const ps=[...new Set(rows.map(o=>o.periodo))].sort();
   const M=ps.map(p=>{const r=rows.filter(o=>o.periodo===p), v=r.filter(o=>o.tipo==='Venta'&&o.pcd>0);
-    const vend=v.reduce((a,o)=>a+o.pcd,0), quedo=r.reduce((a,o)=>a+(o.neto||0),0), cc=v.filter(o=>o.costo!=null), costo=cc.reduce((a,o)=>a+o.costo,0);
+    const vend=v.reduce((a,o)=>a+o.pcd,0), quedo=r.reduce((a,o)=>a+(o.neto||0),0), cc=v.filter(o=>o.costo!=null), costo=cc.reduce((a,o)=>a+o.costo,0)+r.reduce((a,o)=>a+(o.costoAj||0),0);
     return {p,n:v.length,unid:v.reduce((a,o)=>a+(o.unid||0),0),vend,ml:vend-quedo,quedo,costo,res:quedo-costo,sinC:v.length-cc.length};});
   const T=M.reduce((t,m)=>{['n','unid','vend','ml','quedo','costo','res','sinC'].forEach(k=>t[k]=(t[k]||0)+m[k]);return t;},{p:'Total'});
   const pc=(x,y)=>y>0?(x/y*100).toLocaleString('es-AR',{maximumFractionDigits:1})+' %':'–';
