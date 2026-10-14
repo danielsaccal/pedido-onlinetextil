@@ -1020,12 +1020,21 @@ function marcarSospechosas(){
 // cambiar el SKU contra el que se compara el costo (queda como equivalencia de esa cuenta)
 function pedirCambioSku(btn,cta,sku){
   const cont=btn.closest('div[style*="border-bottom"]').querySelector('.rev-det');
-  cont.innerHTML=`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;background:#F4EFFA;border:1px solid #CDBFE0;border-radius:10px;padding:8px;">
+  const op=btn.getAttribute('data-op')||'';
+  cont.innerHTML=`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;background:#FAF8F5;border:1px solid var(--line);border-radius:10px;padding:8px;">
     <span style="font-size:.85rem;">En ML figura <b>${sku}</b>. ¿Con qué SKU de la app se compara?</span>
-    <input placeholder="ej: IA905" list="eqSinMatch" style="width:130px;height:30px;min-height:0;padding:3px 8px;border:1px solid #CDBFE0;border-radius:8px;text-transform:uppercase;box-sizing:border-box;" onkeydown="if(event.key==='Enter')this.nextElementSibling.click()">
-    <button type="button" style="padding:5px 10px;border-radius:8px;border:none;background:#5b2a86;color:#fff;font-weight:700;cursor:pointer;" onclick="aplicarCambioSku('${cta}','${sku}',this.previousElementSibling.value)">Aceptar</button>
-    <small class="meta" style="width:100%;">Se aplica a todas las ventas de ${sku} de la cuenta ${cta}. Si tiene "x N", se respeta.</small></div>`;
+    <input placeholder="ej: IA905 o IA905 x 3" list="eqSinMatch" style="width:150px;height:30px;min-height:0;padding:3px 8px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;box-sizing:border-box;">
+    <button type="button" style="padding:5px 10px;border-radius:8px;border:none;background:#3d1466;color:#fff;font-weight:700;cursor:pointer;" onclick="skuSoloVenta('${op}','${sku}',this.previousElementSibling.value)">Solo esta venta</button>
+    <button type="button" style="padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:#3d1466;font-weight:700;cursor:pointer;" onclick="aplicarCambioSku('${cta}','${sku}',this.parentElement.querySelector('input').value)">Todas las de ${sku}</button></div>`;
   cont.querySelector('input').focus();
+}
+async function skuSoloVenta(op,sku,nuevo){
+  nuevo=String(nuevo||'').trim().toUpperCase(); if(!nuevo)return;
+  const m=nuevo.match(/^(.+?)(?:\s*X\s*(\d+))?$/); const base=m[1].trim(), mult=m[2]?+m[2]:null;
+  if(!NAMES[base]&&!COSTOS[base]&&!confirm(`${base} no figura en la app. ¿Lo uso igual?`))return;
+  UNI[String(op)+'|'+String(sku).toUpperCase()]={sku:base,mult};
+  try{await db.collection('config').doc('ml_unidades').set({u:UNI});}catch(e){showErr('No se pudo guardar: '+e.message);return;}
+  render();alertOk('Solo esa venta: '+sku+' → '+nuevo);
 }
 async function aplicarCambioSku(cta,sku,nuevo){
   nuevo=String(nuevo||'').trim().toUpperCase(); if(!nuevo)return;
@@ -1069,7 +1078,7 @@ function renderRevisar(){
     ${L.slice(0,60).map(o=>`<div style="border-bottom:1px solid var(--line);padding:8px 0;font-size:.88rem;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;"><b>${o.skuBase}</b><span class="meta">${o.fecha} · ${o.cuenta} · ${o.unid} unid. · precio ${fmt(o.pcd)} · costo ${fmt(o.costoRev)}</span>
         <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">${o.packSug?`<span style="display:inline-flex;gap:4px;align-items:center;border:1px solid #CDBFE0;background:#F4EFFA;border-radius:8px;padding:2px 4px 2px 8px;color:#5b2a86;font-weight:700;font-size:.85rem;">📦 Pack de <input type="number" min="2" value="${o.packSug}" style="width:52px;height:28px;min-height:0;padding:2px 4px;border:1px solid #CDBFE0;border-radius:6px;font-weight:700;font-size:.85rem;box-sizing:border-box;" onkeydown="if(event.key==='Enter')this.nextElementSibling.click()"><button type="button" style="padding:3px 8px;border-radius:6px;border:none;background:#5b2a86;color:#fff;font-weight:700;cursor:pointer;" title="Solo esta venta" onclick="const n=parseInt(this.previousElementSibling.value,10);if(n>=2)packSoloVenta('${claveVenta(o).replace(/'/g,'')}',n)">Solo esta venta</button><button type="button" style="padding:3px 8px;border-radius:6px;border:1px solid #CDBFE0;background:#fff;color:#5b2a86;font-weight:700;cursor:pointer;" title="Todas las ventas de este SKU sin x N en esta cuenta" onclick="const n=parseInt(this.parentElement.querySelector('input').value,10);if(n>=2)aplicarPackSug('${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}',n)">Todas</button></span>`:''}<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid #BFDCC8;background:#EEF6F0;color:#2F7A47;font-weight:700;cursor:pointer;" onclick="confirmarVenta('${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">✓ Está bien</button>
-        <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="pedirCambioSku(this,'${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">🔁 Cambiar SKU</button>
+        <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" data-op="${o.op}" onclick="pedirCambioSku(this,'${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">🔁 Cambiar SKU</button>
         <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="verVentaAca(this,'${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">Ver venta</button></span></div>
       <div class="rev-det"></div>
       <ul style="margin:4px 0 0 18px;padding:0;color:#A6432F;">${o.revisar.map(x=>`<li>${x}</li>`).join('')}</ul></div>`).join('')}
@@ -1103,7 +1112,9 @@ function aplicarEquivalencias(){
     // el "x N" de la equivalencia solo se usa si la publicacion de ML no dice cuantas trae (si dice "x 3", manda ese)
     if(e){const m=String(e).toUpperCase().match(/^(.+?)(?:\s*X\s*(\d+))?$/);o.skuBase=m[1].trim();o.mult=(o.multML||1)>1?o.multML:(m[2]?+m[2]:1);o.eqDe=o.skuBaseML;}
     else{o.skuBase=o.skuBaseML;o.mult=o.multML||1;o.eqDe=null;}
-    const u1=UNI[claveVenta(o)]; o.multVenta=null; if(u1){o.mult=u1;o.multVenta=u1;}
+    const u1=UNI[claveVenta(o)]; o.multVenta=null; o.skuVenta=null;
+    if(typeof u1==='number'&&u1>0){o.mult=u1;o.multVenta=u1;}
+    else if(u1&&u1.sku){o.skuBase=u1.sku;o.skuVenta=u1.sku;o.mult=u1.mult||o.multML||1;o.multVenta=u1.mult||null;}
     o.unid=o.cant?o.cant*o.mult:null;
   }
 }
@@ -1539,7 +1550,8 @@ function card(o){
     o.flex&&`<span class="tag ${/10 %|en contra|Sin reintegro/.test(o.flex)?'bad':'warn'}">${o.flex}</span>`,
     o.tipo!=='Venta'&&`<span class="tag bad">${o.tipo}</span>`,
     o.ganPct!=null&&o.ganPct>1.5&&!o.eqDe&&`<span class="tag bad">⚠️ Ganancia muy alta: ¿esta publicación trae más de una unidad? <a href="#" onclick="event.preventDefault();document.getElementById('eqPanel').open=true;$('eqCuenta').value='${o.cuenta}';$('eqML').value='${o.skuBaseML||o.skuBase}';$('eqApp').value='${o.skuBase} x ';$('eqApp').focus();$('eqPanel').scrollIntoView({behavior:'smooth'});">Indicar cuántas</a></span>`,
-    o.multVenta&&`<span class="tag" style="background:#EEE8F7;color:#3d1466;">📦 Esta venta: pack de ${o.multVenta} (${o.unid} unid.) <a href="#" onclick="event.preventDefault();event.stopPropagation();delete UNI['${claveVenta(o).replace(/'/g,'')}'];db.collection('config').doc('ml_unidades').set({u:UNI}).then(render);">quitar</a></span>`,
+    o.skuVenta&&`<span class="tag">Esta venta se compara con ${o.skuVenta}${o.multVenta?' x '+o.multVenta:''} <a href="#" onclick="event.preventDefault();event.stopPropagation();delete UNI['${claveVenta(o).replace(/'/g,'')}'];db.collection('config').doc('ml_unidades').set({u:UNI}).then(render);">quitar</a></span>`,
+    !o.skuVenta&&o.multVenta&&`<span class="tag" style="background:#EEE8F7;color:#3d1466;">📦 Esta venta: pack de ${o.multVenta} (${o.unid} unid.) <a href="#" onclick="event.preventDefault();event.stopPropagation();delete UNI['${claveVenta(o).replace(/'/g,'')}'];db.collection('config').doc('ml_unidades').set({u:UNI}).then(render);">quitar</a></span>`,
     o.multTitulo&&`<span class="tag" style="background:#FFF4D6;color:#8A6417;" title="${(o.titulo||'').replace(/"/g,'&quot;')}">📦 ${o.mult} unidades por venta (leído del título)</span>`,
     o.eqDe&&`<span class="tag" style="background:#EEE8F7;color:#3d1466;">🔁 En ML figura ${o.eqDe} → tomado como ${o.skuBase}${o.mult>1?' x '+o.mult:''}</span>`,
     o.revisar&&`<span class="tag bad">⚠️ Para revisar: ${o.revisar.join(' · ')}${o.costo==null?' — no se cuenta en la ganancia hasta que la confirmes':''}</span>`,
