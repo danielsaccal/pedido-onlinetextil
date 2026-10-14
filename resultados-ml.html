@@ -996,14 +996,14 @@ function marcarSospechosas(){
   PACKS={};const acc={};allRows().forEach(o=>{if(o.tipo==='Venta'&&o.pcd>0&&o.cant&&(o.multML||1)>1){const k=o.skuBase;(acc[k]=acc[k]||[]).push({u:o.pcd/o.cant/o.multML,n:o.multML});}});
   Object.entries(acc).forEach(([k,a])=>{const s=a.map(x=>x.u).sort((x,y)=>x-y);PACKS[k]={unit:s[Math.floor(s.length/2)],n:a[0].n};});
   for(const o of allRows()){
-    o.revisar=null; if(o.costoRev!==undefined){o.costo=o.costoRev;o.gan=o.ganRev;o.ganPct=o.ganPctRev;delete o.costoRev;}
+    o.revisar=null; delete o.costoRev; delete o.ganRev; delete o.ganPctRev; // el costo ya viene recalculado de aplicarCostos
     if(!(o.tipo==='Venta'&&o.pcd>0&&o.costo!=null&&o.unid))continue;
     const m=[]; const cu=o.costo/o.unid, pu=o.pcd/o.unid;
     if(o.ganPct!=null&&o.ganPct<-0.3)m.push(`pierde ${pctf(-o.ganPct)} sobre el costo`);
     if(o.ganPct!=null&&o.ganPct>2)m.push(`gana ${pctf(o.ganPct)} sobre el costo (demasiado)`);
     if(cu>pu)m.push(`el costo por unidad (${fmt(cu)}) es mayor que el precio por unidad (${fmt(pu)})`);
     // la misma base se vende tambien con "x N" y esta publicacion (sin x N) tiene precio de pack
-    if((o.multML||1)===1&&!o.eqDe&&PACKS[o.skuBase]){const pk=PACKS[o.skuBase];if(pu>=pk.unit*2){const r=pu/pk.unit;const n=[2,3,4,5,6,8,10,12,20,24,50].concat([pk.n]).reduce((a,b)=>Math.abs(b-r)<Math.abs(a-r)?b:a,2);o.packSug=n;m.push(`la publicación no dice cuántas trae, pero cobra ${fmt(pu)} y el pack "x ${pk.n}" sale ${fmt(pk.unit)} por unidad: parece un pack de ${n}`);}}
+    if((o.multML||1)===1&&!o.eqDe&&!o.multVenta&&PACKS[o.skuBase]){const pk=PACKS[o.skuBase];if(pu>=pk.unit*2){const r=pu/pk.unit;const n=[2,3,4,5,6,8,10,12,20,24,50].concat([pk.n]).reduce((a,b)=>Math.abs(b-r)<Math.abs(a-r)?b:a,2);o.packSug=n;m.push(`la publicación no dice cuántas trae, pero cobra ${fmt(pu)} y el pack "x ${pk.n}" sale ${fmt(pk.unit)} por unidad: parece un pack de ${n}`);}}
     // el costo usado en esta venta comparado con el costo de hoy (si es 5 veces distinto, casi seguro es docena/unidad)
     const hc=COSTOS[String(o.skuBase).toUpperCase()]||[]; const hoy=hc.length?hc[hc.length-1].costo:null;
     if(hoy>0&&(cu/hoy>5||hoy/cu>5))m.push(`el costo usado (${fmt(cu)} c/u) es muy distinto del costo de hoy (${fmt(hoy)} c/u): ¿docena o unidad?`);
@@ -1039,6 +1039,10 @@ function verVentaAca(btn,op,sku){
   const d=cont.querySelector('tr.d'); if(d)d.classList.add('open');
   btn.textContent='Ocultar';
 }
+async function packSoloVenta(k,n){
+  UNI[k]=n; try{await db.collection('config').doc('ml_unidades').set({u:UNI});}catch(e){showErr('No se pudo guardar: '+e.message);return;}
+  render(); alertOk('Esa venta queda como pack de '+n);
+}
 async function aplicarPackSug(cta,sku,n){
   if(!confirm(`¿Tomar todas las ventas de ${sku} (sin "x N") de la cuenta ${cta} como pack de ${n}?`))return;
   EQ[String(cta).toUpperCase()+'|'+String(sku).toUpperCase()]=String(sku).toUpperCase()+' X '+n;
@@ -1060,7 +1064,7 @@ function renderRevisar(){
   box.innerHTML=`<details class="pleg" style="margin:10px 0;" ${abierta?'open':''} ontoggle="window.__revAbierta=this.open"><summary style="background:#FDEBE7;border-color:#E3B8AE;color:#A6432F;">⚠️ ${L.length} ${L.length===1?'venta para revisar':'ventas para revisar'} <small style="color:#A6432F;">· no se cuentan en la ganancia hasta que las confirmes</small></summary><div class="pleg-body">
     ${L.slice(0,60).map(o=>`<div style="border-bottom:1px solid var(--line);padding:8px 0;font-size:.88rem;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;"><b>${o.skuBase}</b><span class="meta">${o.fecha} · ${o.cuenta} · ${o.unid} unid. · precio ${fmt(o.pcd)} · costo ${fmt(o.costoRev)}</span>
-        <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">${o.packSug?`<span style="display:inline-flex;gap:4px;align-items:center;border:1px solid #CDBFE0;background:#F4EFFA;border-radius:8px;padding:2px 4px 2px 8px;color:#5b2a86;font-weight:700;font-size:.85rem;">📦 Pack de <input type="number" min="2" value="${o.packSug}" style="width:52px;height:28px;min-height:0;padding:2px 4px;border:1px solid #CDBFE0;border-radius:6px;font-weight:700;font-size:.85rem;box-sizing:border-box;" onkeydown="if(event.key==='Enter')this.nextElementSibling.click()"><button type="button" style="padding:3px 8px;border-radius:6px;border:none;background:#5b2a86;color:#fff;font-weight:700;cursor:pointer;" onclick="const n=parseInt(this.previousElementSibling.value,10);if(n>=2)aplicarPackSug('${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}',n)">Aceptar</button></span>`:''}<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid #BFDCC8;background:#EEF6F0;color:#2F7A47;font-weight:700;cursor:pointer;" onclick="confirmarVenta('${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">✓ Está bien</button>
+        <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">${o.packSug?`<span style="display:inline-flex;gap:4px;align-items:center;border:1px solid #CDBFE0;background:#F4EFFA;border-radius:8px;padding:2px 4px 2px 8px;color:#5b2a86;font-weight:700;font-size:.85rem;">📦 Pack de <input type="number" min="2" value="${o.packSug}" style="width:52px;height:28px;min-height:0;padding:2px 4px;border:1px solid #CDBFE0;border-radius:6px;font-weight:700;font-size:.85rem;box-sizing:border-box;" onkeydown="if(event.key==='Enter')this.nextElementSibling.click()"><button type="button" style="padding:3px 8px;border-radius:6px;border:none;background:#5b2a86;color:#fff;font-weight:700;cursor:pointer;" title="Solo esta venta" onclick="const n=parseInt(this.previousElementSibling.value,10);if(n>=2)packSoloVenta('${claveVenta(o).replace(/'/g,'')}',n)">Solo esta venta</button><button type="button" style="padding:3px 8px;border-radius:6px;border:1px solid #CDBFE0;background:#fff;color:#5b2a86;font-weight:700;cursor:pointer;" title="Todas las ventas de este SKU sin x N en esta cuenta" onclick="const n=parseInt(this.parentElement.querySelector('input').value,10);if(n>=2)aplicarPackSug('${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}',n)">Todas</button></span>`:''}<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid #BFDCC8;background:#EEF6F0;color:#2F7A47;font-weight:700;cursor:pointer;" onclick="confirmarVenta('${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">✓ Está bien</button>
         <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="pedirCambioSku(this,'${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">🔁 Cambiar SKU</button>
         <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="verVentaAca(this,'${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">Ver venta</button></span></div>
       <div class="rev-det"></div>
@@ -1069,7 +1073,9 @@ function renderRevisar(){
     <p class="note">Si el número está bien, tocá <b>✓ Está bien</b> y pasa a contarse. Si está mal, corregí el costo, la unidad (docena) o la equivalencia y la alerta desaparece sola.</p></div></details>`;
 }
 // ===== Equivalencias de SKU: codigo mal puesto en ML -> codigo de la app (config/ml_equivalencias: { m: { ML: 'APP' | 'APP x N' } }) =====
-let EQ={};
+let EQ={}, UNI={};
+async function cargarUnidades(){try{const d=await db.collection('config').doc('ml_unidades').get();UNI=d.exists?(d.data().u||{}):{};}catch(e){UNI={};}}
+const claveVenta=o=>String(o.op||'')+'|'+String(o.skuBaseML||o.skuBase||'').toUpperCase();
 async function cargarEquivalencias(){try{const d=await db.collection('config').doc('ml_equivalencias').get();EQ=d.exists?(d.data().m||{}):{};}catch(e){EQ={};}
   try{ // si en "código en la app" se escribio un precio, se convierte en costo de ese SKU
     const malos=Object.entries(EQ).filter(([k,v])=>/^[\d.,\s$]+$/.test(String(v)));
@@ -1093,6 +1099,7 @@ function aplicarEquivalencias(){
     // el "x N" de la equivalencia solo se usa si la publicacion de ML no dice cuantas trae (si dice "x 3", manda ese)
     if(e){const m=String(e).toUpperCase().match(/^(.+?)(?:\s*X\s*(\d+))?$/);o.skuBase=m[1].trim();o.mult=(o.multML||1)>1?o.multML:(m[2]?+m[2]:1);o.eqDe=o.skuBaseML;}
     else{o.skuBase=o.skuBaseML;o.mult=o.multML||1;o.eqDe=null;}
+    const u1=UNI[claveVenta(o)]; o.multVenta=null; if(u1){o.mult=u1;o.multVenta=u1;}
     o.unid=o.cant?o.cant*o.mult:null;
   }
 }
@@ -1528,6 +1535,7 @@ function card(o){
     o.flex&&`<span class="tag ${/10 %|en contra|Sin reintegro/.test(o.flex)?'bad':'warn'}">${o.flex}</span>`,
     o.tipo!=='Venta'&&`<span class="tag bad">${o.tipo}</span>`,
     o.ganPct!=null&&o.ganPct>1.5&&!o.eqDe&&`<span class="tag bad">⚠️ Ganancia muy alta: ¿esta publicación trae más de una unidad? <a href="#" onclick="event.preventDefault();document.getElementById('eqPanel').open=true;$('eqCuenta').value='${o.cuenta}';$('eqML').value='${o.skuBaseML||o.skuBase}';$('eqApp').value='${o.skuBase} x ';$('eqApp').focus();$('eqPanel').scrollIntoView({behavior:'smooth'});">Indicar cuántas</a></span>`,
+    o.multVenta&&`<span class="tag" style="background:#EEE8F7;color:#3d1466;">📦 Esta venta: pack de ${o.multVenta} (${o.unid} unid.) <a href="#" onclick="event.preventDefault();event.stopPropagation();delete UNI['${claveVenta(o).replace(/'/g,'')}'];db.collection('config').doc('ml_unidades').set({u:UNI}).then(render);">quitar</a></span>`,
     o.multTitulo&&`<span class="tag" style="background:#FFF4D6;color:#8A6417;" title="${(o.titulo||'').replace(/"/g,'&quot;')}">📦 ${o.mult} unidades por venta (leído del título)</span>`,
     o.eqDe&&`<span class="tag" style="background:#EEE8F7;color:#3d1466;">🔁 En ML figura ${o.eqDe} → tomado como ${o.skuBase}${o.mult>1?' x '+o.mult:''}</span>`,
     o.revisar&&`<span class="tag bad">⚠️ Para revisar: ${o.revisar.join(' · ')}${o.costo==null?' — no se cuenta en la ganancia hasta que la confirmes':''}</span>`,
@@ -1612,6 +1620,7 @@ firebase.auth().onAuthStateChanged(async u=>{
   await cargarZonas();
   await cargarEquivalencias();
   await cargarConfirmadas();
+  await cargarUnidades();
   await load();
   $('cargando').hidden=true;
   render();
