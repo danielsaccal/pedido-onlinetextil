@@ -1597,7 +1597,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v253</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v254</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5469,8 +5469,8 @@ function cambioEmpaqueAC(){
     sku: document.getElementById('ac-sku').value.trim().toUpperCase(),
     porBolsa: Math.max(1, parseInt(document.getElementById('ac-por-bolsa').value, 10) || 1),
     colchon: document.getElementById('ac-colchon').value.trim(),
-    confeccion: parseFloat(String(document.getElementById('ac-confeccion').value).replace(/\./g, '').replace(',', '.')) || 0,
-    insumos: parseFloat(String(document.getElementById('ac-insumos').value).replace(/\./g, '').replace(',', '.')) || 0,
+    confeccion: numAr(document.getElementById('ac-confeccion').value) || 0,
+    insumos: numAr(document.getElementById('ac-insumos').value) || 0,
   };
   marcarEmpaquePendiente();
 }
@@ -6494,7 +6494,7 @@ async function guardarTela(){
     ancho: parseFloat(document.getElementById('tl-ancho').value) || null,
     hilos: parseInt(document.getElementById('tl-hilos').value, 10) || null,
     mPorKg: parseFloat(String(document.getElementById('tl-mkg').value).replace(',', '.')) || null,
-    precio: parseFloat(String(document.getElementById('tl-precio').value).replace(/\./g, '').replace(',', '.')) || null,
+    precio: numAr(document.getElementById('tl-precio').value) || null,
     precioUsd: numAr(document.getElementById('tl-precio-usd').value) || null,
     precioUnidad: document.getElementById('tl-precio-u').value,
     usos: [...document.querySelectorAll('.tl-uso:checked')].map(x => x.value),
@@ -6604,7 +6604,18 @@ async function separarColorTelas(){
 // ----- precios editables desde la lista de telas (se guardan juntos con el boton verde) -----
 const preciosPend = {};
 // numeros escritos a la argentina ("2.500,50") o con punto decimal ("3.25")
-const numAr = v => { const s = String(v || '').trim(); if(s.includes(',')) return parseFloat(s.replace(/\./g, '').replace(',', '.')); if(/^\d+\.\d{1,2}$/.test(s)) return parseFloat(s); return parseFloat(s.replace(/\./g, '')); };
+// montos que se escriben a mano: "24591.02", "24591,02" y "24.591,02" valen lo mismo; "24.591" es veinticuatro mil
+const numAr = s=>{let t=String(s==null?'':s).trim().replace(/[$\s]/g,'');if(!t)return NaN;const lp=t.lastIndexOf('.'),lc=t.lastIndexOf(',');
+  if(lp>=0&&lc>=0){const dec=lp>lc?'.':',',mil=dec==='.'?',':'.';return parseFloat(t.split(mil).join('').replace(dec,'.'));}
+  if(lc>=0){return parseFloat(t.slice(0,lc).replace(/,/g,'')+'.'+t.slice(lc+1));}
+  if(lp>=0){const p=t.split('.');if(p.length===2&&p[1].length<=2)return parseFloat(t);return parseFloat(t.replace(/\./g,''));}
+  return parseFloat(t);};
+// muestra al lado del casillero como se entendio el monto (ej: "= $ 24.591,02")
+document.addEventListener('input',e=>{const i=e.target;if(!i||i.tagName!=='INPUT'||i.type==='number'||i.type==='file'||i.type==='checkbox')return;
+  const esMonto=i.inputMode==='decimal'||/costo|precio|monto|\$/i.test((i.placeholder||'')+' '+(i.id||'')+' '+(i.className||''));if(!esMonto)return;
+  let h=i.nextElementSibling;if(!h||!h.classList||!h.classList.contains('monto-hint')){h=document.createElement('small');h.className='monto-hint';h.style.cssText='display:block;font-size:.75rem;color:#5b2a86;margin-top:2px;';i.insertAdjacentElement('afterend',h);}
+  const v=i.value.trim(),n=numAr(v);h.textContent=/[.,]/.test(v)&&n>0?'= $ '+n.toLocaleString('es-AR',{minimumFractionDigits:n%1?2:0,maximumFractionDigits:2}):'';});
+
 function precioPendTela(c, campo){
   const p = preciosPend[c], t = telasDatos.telas[c] || {};
   if(campo === 'u') return p && p.u ? p.u : (t.precioUnidad || 'm');
@@ -6706,7 +6717,7 @@ async function aplicarMasivoTelas(){
   if(parseFloat(v('tm-ancho')) > 0) cambios.ancho = parseFloat(v('tm-ancho'));
   if(parseInt(v('tm-hilos'), 10) > 0) cambios.hilos = parseInt(v('tm-hilos'), 10);
   if(parseFloat(v('tm-mkg').replace(',', '.')) > 0) cambios.mPorKg = parseFloat(v('tm-mkg').replace(',', '.'));
-  if(parseFloat(v('tm-precio').replace(/\./g, '').replace(',', '.')) > 0){ cambios.precio = parseFloat(v('tm-precio').replace(/\./g, '').replace(',', '.')); cambios.precioUnidad = v('tm-precio-u'); }
+  if(numAr(v('tm-precio')) > 0){ cambios.precio = numAr(v('tm-precio')); cambios.precioUnidad = v('tm-precio-u'); }
   const accionUso = v('tm-uso-accion');
   let uso = document.getElementById('tl-masivo-uso').value;
   if(accionUso && uso === '__nuevo__'){
@@ -10134,6 +10145,8 @@ function crTodo(pi, v){
   renderCostosReventa(); crMostrarGuardar();
 }
 async function guardarCostosReventa(){
+  { const raros = Object.entries(crPend).map(([s, v]) => { const n = numAr(v), a = costosReventa && costosReventa[s]; return n > 0 && a > 0 && (n / a > 5 || a / n > 5) ? `${s}: antes ${formatPrice(a)} → ahora ${formatPrice(n)}` : null; }).filter(Boolean);
+    if(raros.length && !confirm('¿Seguro? Estos costos cambian más de 5 veces:\n\n' + raros.join('\n') + '\n\nAceptar = guardar igual · Cancelar = revisar')) return; }
   const nuevo = { ...costosReventa };
   const telas = { ...telasDatos.telas }; let cambioTelas = false;
   Object.entries(crPend).forEach(([s, v]) => {
@@ -18458,7 +18471,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v253';
+const APP_VERSION = '2026-10-02-v254';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
