@@ -1597,7 +1597,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v254</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v255</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2251,6 +2251,17 @@ a.grilla-celda{display:block;}
       <p class="note" style="text-align:left;">Subí el archivo que exporta Tienda Nube (Productos → Exportar → CSV). La app toma el <b>SKU</b> y el <b>Identificador de URL</b> de cada producto y le asigna su link. Cuando cambies algo en la web, lo volvés a subir.</p>
       <label class="btn btn-gold" style="display:block;text-align:center;cursor:pointer;margin:10px 0;">📥 Subir CSV de Tienda Nube<input type="file" accept=".csv,text/csv" style="display:none;" onchange="importarLinksWeb(this)"></label>
       <div id="lw-res"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-faltantes">
+    <div class="form-card" style="max-width:960px;">
+      <h2>Faltantes de stock</h2>
+      <p class="note" style="text-align:left;">Lo que marcan los empleados desde el link de WhatsApp. Cada SKU aparece una sola vez, con lo que escribió cada uno. Primero lo que <b>no</b> está en confección; abajo, lo que ya se está fabricando.</p>
+      <button class="btn btn-gold" style="width:100%;margin:6px 0 12px;" onclick="abrirEnviarFaltantes()">📲 Enviar listado a empleados</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"><input id="fs-buscar" placeholder="🔍 Buscar SKU o producto" oninput="renderFaltantes()" style="flex:1;min-width:180px;padding:9px;border:1px solid var(--line);border-radius:10px;"><button type="button" class="btn-mini" onclick="copiarFaltantes()">📋 Copiar lista</button></div>
+      <div id="fs-lista"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
   </div>
@@ -5743,7 +5754,7 @@ const GRUPOS_INICIO = {
   ] },
   g: { lado: 'int', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas', '💲 Costos'], colorColumnas: { 5: '#2F7A47' }, columnas: [
     [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()'], ['💰 Costos de confección', 'abrirConfeccion()']],
-    [['📊 Stock y prioridades', 'abrirStock()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📋 Nueva orden de trabajo', 'abrirAsistenteOT()']],
+    [['📦 Faltantes de stock', 'abrirFaltantes()'], ['📊 Stock y prioridades', 'abrirStock()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📋 Nueva orden de trabajo', 'abrirAsistenteOT()']],
     [['🚚 Ingreso a los talleres', 'abrirEnviosTela()'], ['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🏭 Productos en producción', 'abrirEnProduccion()']],
     [['📥 Entregas del taller', 'abrirIngresoTaller()']],
     [['📦 Historial de órdenes', 'abrirHistorialOT()'], ['🗂️ Historial de entregas', 'abrirHistorialEntregas()'], ['🔎 ¿Cuándo hice este SKU?', 'abrirHistorialSku()']],
@@ -10756,6 +10767,7 @@ function permisoDeAccion(f){
   if(/abrirGastos/.test(s)) return 'gastos';
   if(/abrirCostosReventa|abrirConfeccion|abrirCalculadoraCostos|abrirVentasML/.test(s)) return 'costos';
   if(/abrirPedidoIA|abrirHistorial\(|abrirPendientesEntrega/.test(s)) return 'ventas';
+  if(/abrirFaltantes/.test(s)) return 'produccion';
   if(/abrirClientes/.test(s)) return 'clientes';
   if(/irACatalogoDesdeInicio|escaner/.test(s)) return 'pedidos';
   if(/abrirNuevoProducto|abrirEditarProducto|abrirCategorias|abrirActualizarFoto|abrirReventa|abrirLinksWeb|abrirImportarExcel|abrirAumentoMasivo|abrirHistorialPrecios/.test(s)) return 'catalogo';
@@ -10841,6 +10853,72 @@ function pintarAvisoCopia(){
   box.innerHTML = `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#FFF8E6;border:1px solid #EBD9A8;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:.9rem;">
     <span style="flex:1;">💾 ${d == null ? 'Todavía no descargó ninguna copia de seguridad.' : `Hace ${d} días que no descarga una copia de seguridad.`}</span>
     <button type="button" class="btn-mini" onclick="abrirCopiaSeguridad()">Descargar ahora</button></div>`;
+}
+
+// ===== Faltantes de stock: listado por categoria para empleados (link sin sesion) =====
+let faltantes = null;
+const URL_FALTANTES = 'https://danielsaccal.github.io/pedido-onlinetextil/faltantes/';
+async function cargarFaltantes(){ const s = await db.collection('faltantes').get(); faltantes = s.docs.map(d => ({ _id: d.id, ...d.data() })); }
+async function abrirFaltantes(){
+  mostrarPaso('step-faltantes');
+  document.getElementById('fs-lista').innerHTML = '<p class="empty-msg">Cargando…</p>';
+  await cargarFaltantes();
+  try{ await cargarHistorialOT(); } catch(e){}
+  renderFaltantes();
+}
+function enConfeccionPorSku(){
+  const m = {}; try{ filasEnProduccion().forEach(f => { const s = String(f.sku || '').toUpperCase(); if(!s) return; (m[s] = m[s] || { pend: 0, det: [] }); m[s].pend += f.pend; m[s].det.push(`${f.pend} u. en ${f.taller} (orden ${f.orden})`); }); } catch(e){}
+  return m;
+}
+function renderFaltantes(){
+  const q = normBusqueda(document.getElementById('fs-buscar').value), conf = enConfeccionPorSku();
+  const L = (faltantes || []).filter(f => f.estado !== 'repuesto' && (!q || normBusqueda(`${f.sku} ${f.producto} ${f.desc}`).includes(q)));
+  const item = f => { const c = conf[String(f.sku).toUpperCase()], rs = f.reportes || [];
+    const quedan = rs.map(r => r.quedan).filter(x => x !== '' && x != null && !isNaN(x));
+    return `<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:.9rem;">
+      <div><b>${escaparHtml(f.sku)}</b> <span class="note" style="margin:0;">${escaparHtml(f.producto || '')} · ${escaparHtml(f.desc || '')}</span>
+        ${quedan.length ? `<div style="font-size:.82rem;">Quedan: <b>${Math.min(...quedan.map(Number))}</b>${quedan.length > 1 ? ' (el menor informado)' : ''}</div>` : ''}
+        <div style="font-size:.8rem;color:#6B6258;margin-top:2px;">${rs.map(r => `${escaparHtml(r.nombre || 'Sin nombre')}${r.nota ? ': ' + escaparHtml(r.nota) : ''} <span style="opacity:.7;">(${new Date(r.fecha).toLocaleDateString('es-AR')})</span>`).join(' · ')}</div>
+        ${c ? `<div style="font-size:.8rem;color:#2E5A8C;margin-top:2px;">🏭 En confección: ${c.det.join(' · ')}</div>` : ''}</div>
+      <div style="display:flex;gap:6px;align-items:start;"><button type="button" class="btn-mini" onclick="faltanteRepuesto('${escapeAttr(f._id)}')">✓ Repuesto</button></div></div>`; };
+  const grupo = (tit, arr, col) => { if(!arr.length) return ''; const porCat = {}; arr.forEach(f => (porCat[f.categoria || 'Otros'] = porCat[f.categoria || 'Otros'] || []).push(f));
+    return `<div style="margin-bottom:16px;"><b style="color:${col};font-size:1rem;">${tit} (${arr.length})</b>${Object.entries(porCat).map(([c, fs]) => `<div style="margin-top:8px;"><div class="note" style="text-align:left;margin:0;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">${escaparHtml(c)}</div>${fs.sort((a, b) => String(a.sku).localeCompare(String(b.sku))).map(item).join('')}</div>`).join('')}</div>`; };
+  const no = L.filter(f => !conf[String(f.sku).toUpperCase()]), si = L.filter(f => conf[String(f.sku).toUpperCase()]);
+  document.getElementById('fs-lista').innerHTML = L.length ? grupo('🔴 Faltan y NO están en confección', no, '#A6432F') + grupo('🏭 Faltan, pero ya están en confección', si, '#2E5A8C') : '<p class="empty-msg">No hay faltantes informados.</p>';
+}
+async function faltanteRepuesto(id){
+  try{ await db.collection('faltantes').doc(id).set({ estado: 'repuesto', repuesto: new Date().toISOString() }, { merge: true }); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  const f = faltantes.find(x => x._id === id); if(f) f.estado = 'repuesto'; renderFaltantes();
+}
+function copiarFaltantes(){
+  const conf = enConfeccionPorSku(), L = (faltantes || []).filter(f => f.estado !== 'repuesto');
+  const t = 'Faltantes de stock\n' + L.map(f => `- ${f.sku} ${f.producto || ''} ${f.desc || ''}${(f.reportes || []).some(r => r.nota) ? ' (' + (f.reportes || []).filter(r => r.nota).map(r => r.nota).join('; ') + ')' : ''}${conf[String(f.sku).toUpperCase()] ? ' [en confección]' : ''}`).join('\n');
+  navigator.clipboard && navigator.clipboard.writeText(t).then(() => alert('Lista copiada.'));
+}
+// enviar el listado: se elige la categoria, se guarda una "foto" del catalogo y se arma el link
+function abrirEnviarFaltantes(){
+  const t = document.getElementById('pub-titulo'); if(t) t.textContent = '📲 Enviar listado a empleados';
+  document.getElementById('pub-cont').innerHTML = `<p class="note" style="text-align:left;">Elija las categorías. Se arma un link (sin precios) para que los empleados marquen lo que falta.</p>
+    <div style="display:grid;gap:6px;margin:8px 0;">${CATALOGO.map((c, i) => `<label style="display:flex;gap:8px;align-items:center;"><input type="checkbox" class="fs-cat" value="${i}" style="width:18px;height:18px;"> ${escaparHtml(c.categoria)}</label>`).join('')}</div>
+    <button class="btn btn-gold" style="width:100%;" onclick="crearListaFaltantes()">Crear link y abrir WhatsApp</button><div id="fs-link"></div>`;
+  document.getElementById('pub-modal').style.display = 'block';
+}
+function miniatura(src){
+  return new Promise(res => { if(!src){ res(''); return; } if(!/^data:/.test(src)){ res(src); return; }
+    const im = new Image(); im.onload = () => { const s = Math.min(1, 160 / Math.max(im.width, im.height)); const c = document.createElement('canvas'); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); res(c.toDataURL('image/jpeg', 0.7)); }; im.onerror = () => res(''); im.src = src; });
+}
+async function crearListaFaltantes(){
+  const sel = [...document.querySelectorAll('.fs-cat:checked')].map(c => +c.value); if(!sel.length){ alert('Elija al menos una categoría.'); return; }
+  const categorias = [];
+  for(const ci of sel){ const c = CATALOGO[ci]; const prods = [];
+    for(let pi = 0; pi < (c.productos || []).length; pi++){ const p = c.productos[pi]; if(!(p.variantes || []).length) continue;
+      prods.push({ nombre: p.nombre, foto: await miniatura(imagenEfectiva(ci, pi, p)), variantes: p.variantes.map(v => ({ sku: v.sku, desc: v.desc || '' })) }); }
+    categorias.push({ nombre: c.categoria, productos: prods }); }
+  const token = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+  await db.collection('faltantes_listas').doc(token).set({ categorias, creado: new Date().toISOString() });
+  const url = URL_FALTANTES + '?l=' + token, nombres = categorias.map(c => c.nombre).join(', ');
+  document.getElementById('fs-link').innerHTML = `<p class="note" style="text-align:left;margin-top:8px;">Link: <a href="${url}" target="_blank">${url}</a></p>`;
+  window.open('https://wa.me/?text=' + encodeURIComponent(`Marquen lo que falta de ${nombres}: ${url}`), '_blank');
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -18471,7 +18549,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v254';
+const APP_VERSION = '2026-10-02-v255';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
@@ -18528,7 +18606,8 @@ window.addEventListener('load', () => {
     ['guardarGasto', 'Guardando el gasto…'], ['borrarGasto', 'Borrando…'], ['abrirGastos', 'Cargando gastos…'],
     ['abrirFacturas', 'Cargando facturas…'], ['leerFacturasPDF', 'Leyendo facturas…'], ['guardarFactura', 'Guardando la factura…'], ['borrarFacturasSel', 'Borrando facturas…'],
     ['importarLinksWeb', 'Leyendo el archivo de Tienda Nube…'], ['analizarPedidoIA', 'La IA está armando el pedido…'],
-    ['generarFlyersNuevoIngreso', 'Generando las piezas…'], ['abrirResultadosML', 'Preparando Resultados ML…'], ['descargarCopia', 'Preparando la copia…']
+    ['generarFlyersNuevoIngreso', 'Generando las piezas…'], ['abrirResultadosML', 'Preparando Resultados ML…'], ['descargarCopia', 'Preparando la copia…'],
+    ['abrirFaltantes', 'Cargando faltantes…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
   ];
   setTimeout(() => W.forEach(([n, t]) => conProcesando(n, t)), 0);
 });
