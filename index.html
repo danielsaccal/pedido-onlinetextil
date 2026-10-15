@@ -1597,7 +1597,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v256</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v257</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2263,6 +2263,56 @@ a.grilla-celda{display:block;}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"><input id="fs-buscar" placeholder="🔍 Buscar SKU o producto" oninput="renderFaltantes()" style="flex:1;min-width:180px;padding:9px;border:1px solid var(--line);border-radius:10px;"><button type="button" class="btn-mini" onclick="copiarFaltantes()">📋 Copiar lista</button></div>
       <div id="fs-lista"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-presupuestos">
+    <div class="form-card" style="max-width:900px;">
+      <h2>Presupuestos</h2>
+      <button class="btn btn-gold" style="width:100%;margin:6px 0 12px;" onclick="nuevoPresupuesto()">➕ Nuevo presupuesto</button>
+      <input id="pr-buscar" placeholder="🔍 Buscar por número o cliente" oninput="renderPresupuestos()" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;">
+      <div id="pr-lista"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-presupuesto">
+    <div class="form-card" style="max-width:960px;">
+      <h2 id="pe-titulo">Nuevo presupuesto</h2>
+      <p class="note" style="text-align:left;">Ningún dato es obligatorio. Precios con IVA incluido.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;">
+        <div class="field" style="margin:0;"><label>Razón social / Nombre</label><input id="pe-nombre" list="pe-clientes" oninput="completarClientePresu()"></div>
+        <div class="field" style="margin:0;"><label>CUIT</label><input id="pe-cuit"></div>
+        <div class="field" style="margin:0;"><label>Teléfono</label><input id="pe-tel" inputmode="tel"></div>
+        <div class="field" style="margin:0;"><label>Email</label><input id="pe-email" inputmode="email"></div>
+        <div class="field" style="margin:0;"><label>Dirección</label><input id="pe-dir"></div>
+        <div class="field" style="margin:0;"><label>Localidad</label><input id="pe-loc"></div>
+      </div>
+      <datalist id="pe-clientes"></datalist><datalist id="pe-productos"></datalist>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 8px;">
+        <input id="pe-agregar" list="pe-productos" placeholder="🔍 Agregar producto: SKU o nombre" style="flex:1;min-width:220px;padding:10px;border:1px solid var(--line);border-radius:10px;" onkeydown="if(event.key==='Enter'){event.preventDefault();agregarItemPresu();}">
+        <button type="button" class="btn-mini" onclick="agregarItemPresu()">+ Agregar</button>
+        <button type="button" class="btn-mini" onclick="agregarLibrePresu()">+ Renglón libre</button>
+      </div>
+      <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><thead><tr style="color:#8A8072;font-size:.72rem;text-transform:uppercase;"><td style="padding:6px;">Producto</td><td style="padding:6px;width:70px;">Cant.</td><td style="padding:6px;width:120px;">Precio unit.</td><td style="padding:6px;width:70px;">Desc. %</td><td style="padding:6px;text-align:right;">Subtotal</td><td></td></tr></thead><tbody id="pe-items"></tbody></table></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin-top:10px;">
+        <span>Descuento sobre el total:</span>
+        <input id="pe-desc" style="width:90px;padding:7px;border:1px solid var(--line);border-radius:8px;" oninput="renderItemsPresu()">
+        <select id="pe-desc-tipo" onchange="renderItemsPresu()" style="padding:7px;border:1px solid var(--line);border-radius:8px;"><option value="%">%</option><option value="$">$</option></select>
+      </div>
+      <div id="pe-totales" style="text-align:right;margin-top:8px;"></div>
+      <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;margin-top:10px;align-items:start;">
+        <div class="field" style="margin:0;"><label>Validez (días)</label><input id="pe-validez" type="number" min="0" value="7"></div>
+        <div class="field" style="margin:0;"><label>Observaciones</label><input id="pe-obs" placeholder="Ej: entrega en 7 días, forma de pago…"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-top:14px;">
+        <button class="btn btn-gold" onclick="guardarPresupuesto()">💾 Guardar</button>
+        <button class="btn btn-ghost" onclick="pdfPresupuesto(true)">📄 Descargar PDF</button>
+        <button class="btn btn-ghost" onclick="enviarPresupuesto('wa')">💬 WhatsApp</button>
+        <button class="btn btn-ghost" onclick="enviarPresupuesto('mail')">✉️ Email</button>
+        <button class="btn btn-ghost" onclick="convertirPresuEnPedido()">🛒 Convertir en pedido</button>
+      </div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="abrirPresupuestos()">← Volver a presupuestos</button>
     </div>
   </div>
 
@@ -5742,7 +5792,7 @@ const GRUPOS_INICIO = {
     [['🖼️ Nuevo ingreso (flyers)', 'abrirNuevoIngreso()'], ['📣 Anuncios y promociones', 'abrirAnuncio()']],
   ] },
   d: { lado: 'int', titulo: 'Ventas', titulosColumnas: ['1 · Tomar pedidos', '2 · Entregar', '3 · Clientes', '4 · Plata'], columnas: [
-    [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['📷 Escanear etiqueta (SKU)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto').click()"], ['🤖 Buscar por foto (IA)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto-producto').click()"], ['📄 Pedido desde una foto', "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)"], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()'], ['📋 Historial de pedidos', 'abrirHistorial()']],
+    [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['🧾 Presupuestos', 'abrirPresupuestos()'], ['📄 Pedido desde una foto', "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)"], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()'], ['📋 Historial de pedidos', 'abrirHistorial()']],
     [['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']],
     [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']],
     [['🧾 Ventas facturadas', 'abrirFacturas()'], ['💸 Gastos comerciales', 'abrirGastos()'], ['📈 Resultados Mercado Libre', 'abrirResultadosML()'], ['🧮 ¿Cuánto me queda en ML?', 'abrirCalculadoraML()']]
@@ -10769,6 +10819,7 @@ function permisoDeAccion(f){
   if(/setTimeout\(\(\) => document.getElementById\('pia-foto'\)/.test(s)) return 'pedidos';
   if(/abrirPedidoIA|abrirHistorial\(|abrirPendientesEntrega/.test(s)) return 'ventas';
   if(/abrirFaltantes/.test(s)) return 'produccion';
+  if(/abrirPresupuestos/.test(s)) return 'ventas';
   if(/abrirClientes/.test(s)) return 'clientes';
   if(/irACatalogoDesdeInicio|escaner/.test(s)) return 'pedidos';
   if(/abrirNuevoProducto|abrirEditarProducto|abrirCategorias|abrirActualizarFoto|abrirReventa|abrirLinksWeb|abrirImportarExcel|abrirAumentoMasivo|abrirHistorialPrecios/.test(s)) return 'catalogo';
@@ -10920,6 +10971,151 @@ async function crearListaFaltantes(){
   const url = URL_FALTANTES + '?l=' + token, nombres = categorias.map(c => c.nombre).join(', ');
   document.getElementById('fs-link').innerHTML = `<p class="note" style="text-align:left;margin-top:8px;">Link: <a href="${url}" target="_blank">${url}</a></p>`;
   window.open('https://wa.me/?text=' + encodeURIComponent(`Marquen lo que falta de ${nombres}: ${url}`), '_blank');
+}
+
+// ===== Presupuestos: numerados, con descuentos por renglon y sobre el total, precios a mano, PDF y WhatsApp =====
+let presupuestos = null, presu = null;
+async function abrirPresupuestos(){
+  mostrarPaso('step-presupuestos');
+  document.getElementById('pr-lista').innerHTML = '<p class="empty-msg">Cargando…</p>';
+  const s = await db.collection('presupuestos').get(); presupuestos = s.docs.map(d => ({ _id: d.id, ...d.data() })).sort((a, b) => (b.numero || 0) - (a.numero || 0));
+  renderPresupuestos();
+}
+const numPresu = n => 'P-' + String(n || 0).padStart(4, '0');
+function totalesPresu(p){
+  const sub = (p.items || []).reduce((a, it) => a + (+it.cant || 0) * (+it.precio || 0), 0);
+  const conDescItems = (p.items || []).reduce((a, it) => a + (+it.cant || 0) * (+it.precio || 0) * (1 - Math.min(100, +it.descPct || 0) / 100), 0);
+  const dItems = sub - conDescItems, d = +p.descTotal || 0;
+  const dTot = p.descTotalTipo === '$' ? Math.min(conDescItems, d) : conDescItems * Math.min(100, d) / 100;
+  return { sub, dItems, dTot, total: conDescItems - dTot };
+}
+function renderPresupuestos(){
+  const q = normBusqueda(document.getElementById('pr-buscar').value);
+  const L = (presupuestos || []).filter(p => !q || normBusqueda(`${numPresu(p.numero)} ${(p.cliente || {}).nombre || ''}`).includes(q));
+  document.getElementById('pr-lista').innerHTML = L.length ? L.map(p => { const t = totalesPresu(p);
+    return `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:12px;margin-bottom:6px;background:#fff;">
+      <b>${numPresu(p.numero)}</b><div><b>${escaparHtml((p.cliente || {}).nombre || 'Sin nombre')}</b><div class="note" style="text-align:left;margin:0;">${new Date(p.fecha).toLocaleDateString('es-AR')} · ${(p.items || []).length} renglones${p.pedido ? ' · 🛒 convertido en pedido' : ''}</div></div>
+      <div style="text-align:right;"><b>${formatPrice(t.total)}</b><div style="display:flex;gap:4px;margin-top:4px;justify-content:flex-end;"><button type="button" class="btn-mini" onclick="editarPresupuesto('${p._id}')">✏️ Abrir</button><button type="button" class="btn-mini" onclick="duplicarPresupuesto('${p._id}')">⧉ Duplicar</button></div></div></div>`; }).join('') : '<p class="empty-msg">Todavía no hay presupuestos.</p>';
+}
+function prepararEditorPresu(){
+  document.getElementById('pe-clientes').innerHTML = (clientesAutocomplete || []).map(c => `<option value="${escapeAttr(((c.nombre || '') + ' ' + (c.apellido || '')).trim())}">`).join('');
+  const ops = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => ops.push(`<option value="${escapeAttr(v.sku + ' · ' + p.nombre + ' · ' + (v.desc || ''))}">`))));
+  document.getElementById('pe-productos').innerHTML = ops.join('');
+}
+function cargarFormPresu(){
+  const c = presu.cliente || {};
+  ['nombre', 'cuit', 'tel', 'email', 'dir', 'loc'].forEach(k => document.getElementById('pe-' + k).value = c[k] || '');
+  document.getElementById('pe-desc').value = presu.descTotal || ''; document.getElementById('pe-desc-tipo').value = presu.descTotalTipo || '%';
+  document.getElementById('pe-validez').value = presu.validez != null ? presu.validez : 7; document.getElementById('pe-obs').value = presu.obs || '';
+  document.getElementById('pe-titulo').textContent = presu.numero ? 'Presupuesto ' + numPresu(presu.numero) : 'Nuevo presupuesto';
+  renderItemsPresu();
+}
+function leerFormPresu(){
+  presu.cliente = {}; ['nombre', 'cuit', 'tel', 'email', 'dir', 'loc'].forEach(k => presu.cliente[k] = document.getElementById('pe-' + k).value.trim());
+  presu.descTotal = numAr(document.getElementById('pe-desc').value) || 0; presu.descTotalTipo = document.getElementById('pe-desc-tipo').value;
+  presu.validez = +document.getElementById('pe-validez').value || 0; presu.obs = document.getElementById('pe-obs').value.trim();
+}
+async function nuevoPresupuesto(){ presu = { items: [], fecha: new Date().toISOString(), validez: 7 }; mostrarPaso('step-presupuesto'); prepararEditorPresu(); cargarFormPresu(); }
+function editarPresupuesto(id){ const p = presupuestos.find(x => x._id === id); if(!p) return; presu = JSON.parse(JSON.stringify(p)); mostrarPaso('step-presupuesto'); prepararEditorPresu(); cargarFormPresu(); }
+function duplicarPresupuesto(id){ const p = presupuestos.find(x => x._id === id); if(!p) return; presu = JSON.parse(JSON.stringify(p)); delete presu._id; delete presu.numero; delete presu.pedido; presu.fecha = new Date().toISOString(); mostrarPaso('step-presupuesto'); prepararEditorPresu(); cargarFormPresu(); }
+function completarClientePresu(){
+  const v = document.getElementById('pe-nombre').value.trim().toLowerCase();
+  const c = (clientesAutocomplete || []).find(x => ((x.nombre || '') + ' ' + (x.apellido || '')).trim().toLowerCase() === v); if(!c) return;
+  const set = (id, val) => { const e = document.getElementById(id); if(e && !e.value) e.value = val || ''; };
+  set('pe-cuit', c.cuit); set('pe-tel', c.telefono); set('pe-email', c.email); set('pe-dir', c.direccion); set('pe-loc', c.localidad);
+}
+function agregarItemPresu(){
+  const v = document.getElementById('pe-agregar').value.trim(); if(!v) return;
+  const sku = v.split(' · ')[0].trim(), r = buscarProductoPorSku(sku);
+  if(!r){ alert('No encontré ese SKU en el catálogo. Use "+ Renglón libre" para escribirlo a mano.'); return; }
+  leerItemsPresu();
+  presu.items.push({ sku: r.variante.sku, desc: r.producto.nombre + ' · ' + (r.variante.desc || ''), cant: 1, precio: parsePrice(r.variante.precio) || 0, descPct: 0 });
+  document.getElementById('pe-agregar').value = ''; renderItemsPresu();
+}
+function agregarLibrePresu(){ leerItemsPresu(); presu.items.push({ sku: '', desc: '', cant: 1, precio: 0, descPct: 0 }); renderItemsPresu(); }
+function quitarItemPresu(i){ leerItemsPresu(); presu.items.splice(i, 1); renderItemsPresu(); }
+function leerItemsPresu(){
+  document.querySelectorAll('#pe-items tr').forEach((tr, i) => { const it = presu.items[i]; if(!it || !tr.querySelector('.pi-desc')) return;
+    it.desc = tr.querySelector('.pi-desc').value; it.cant = numAr(tr.querySelector('.pi-cant').value) || 0; it.precio = numAr(tr.querySelector('.pi-precio').value) || 0; it.descPct = numAr(tr.querySelector('.pi-desc-pct').value) || 0; });
+}
+function renderItemsPresu(){
+  const tb = document.getElementById('pe-items');
+  const inp = 'padding:6px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
+  tb.innerHTML = presu.items.map((it, i) => `<tr style="border-top:1px solid var(--line);">
+    <td style="padding:5px;"><input class="pi-desc" value="${escapeAttr(it.desc || '')}" placeholder="Descripción" style="${inp}">${it.sku ? `<small class="note" style="margin:0;">${escaparHtml(it.sku)}</small>` : ''}</td>
+    <td style="padding:5px;"><input class="pi-cant" value="${it.cant}" inputmode="decimal" style="${inp}" oninput="renderTotalesPresu()"></td>
+    <td style="padding:5px;"><input class="pi-precio" value="${String(it.precio).replace('.', ',')}" inputmode="decimal" style="${inp}" oninput="renderTotalesPresu()"></td>
+    <td style="padding:5px;"><input class="pi-desc-pct" value="${it.descPct || ''}" inputmode="decimal" style="${inp}" oninput="renderTotalesPresu()"></td>
+    <td style="padding:5px;text-align:right;white-space:nowrap;" class="pi-sub"></td>
+    <td><button type="button" class="btn-mini" onclick="quitarItemPresu(${i})">✕</button></td></tr>`).join('') || '<tr><td colspan="6" class="note" style="padding:10px;">Agregue productos con el buscador o un renglón libre.</td></tr>';
+  renderTotalesPresu();
+}
+function renderTotalesPresu(){
+  leerItemsPresu(); presu.descTotal = numAr(document.getElementById('pe-desc').value) || 0; presu.descTotalTipo = document.getElementById('pe-desc-tipo').value;
+  document.querySelectorAll('#pe-items tr').forEach((tr, i) => { const it = presu.items[i]; const c = tr.querySelector('.pi-sub'); if(it && c) c.textContent = formatPrice(it.cant * it.precio * (1 - Math.min(100, it.descPct || 0) / 100)); });
+  const t = totalesPresu(presu);
+  document.getElementById('pe-totales').innerHTML = `<div>Subtotal: ${formatPrice(t.sub)}</div>${t.dItems > 0.5 ? `<div>Descuentos por renglón: −${formatPrice(t.dItems)}</div>` : ''}${t.dTot > 0.5 ? `<div>Descuento sobre el total: −${formatPrice(t.dTot)}</div>` : ''}<div style="font-size:1.25rem;font-weight:800;color:var(--purple);margin-top:4px;">Total: ${formatPrice(t.total)}</div><div class="note" style="text-align:right;margin:0;">IVA incluido</div>`;
+}
+async function proximoNumeroPresu(){
+  const ref = db.collection('config').doc('presupuestos_num');
+  if(db.runTransaction){ return db.runTransaction(async tx => { const d = await tx.get(ref); const n = ((d.exists && d.data().n) || 0) + 1; tx.set(ref, { n }); return n; }); }
+  const d = await ref.get(); const n = ((d.exists && d.data().n) || 0) + 1; await ref.set({ n }); return n;
+}
+async function guardarPresupuesto(silencio){
+  leerFormPresu(); leerItemsPresu();
+  if(!presu.numero) presu.numero = await proximoNumeroPresu();
+  const datos = { ...presu, actualizado: new Date().toISOString(), hechoPor: (usuarioActual && usuarioActual.email) || '' }; delete datos._id;
+  if(presu._id) await db.collection('presupuestos').doc(presu._id).set(datos); else { const r = await db.collection('presupuestos').add(datos); presu._id = r.id; }
+  document.getElementById('pe-titulo').textContent = 'Presupuesto ' + numPresu(presu.numero);
+  if(!silencio) alert('Presupuesto ' + numPresu(presu.numero) + ' guardado.');
+}
+function pdfPresupuesto(descargar){
+  leerFormPresu(); leerItemsPresu();
+  const { jsPDF } = window.jspdf, doc = new jsPDF(), c = presu.cliente || {}, t = totalesPresu(presu);
+  doc.setFillColor(61, 43, 78); doc.rect(0, 0, 210, 26, 'F'); doc.setTextColor(255); doc.setFontSize(18); doc.text('OnLineTextil', 14, 16);
+  doc.setFontSize(11); doc.text('PRESUPUESTO ' + (presu.numero ? numPresu(presu.numero) : '(sin guardar)'), 196, 12, { align: 'right' }); doc.text(new Date(presu.fecha || Date.now()).toLocaleDateString('es-AR'), 196, 19, { align: 'right' });
+  doc.setTextColor(40); doc.setFontSize(10); let y = 36;
+  [['Cliente', c.nombre], ['CUIT', c.cuit], ['Teléfono', c.tel], ['Email', c.email], ['Dirección', c.dir], ['Localidad', c.loc]].filter(x => x[1]).forEach(([k, v]) => { doc.text(`${k}: ${v}`, 14, y); y += 6; });
+  doc.autoTable({ startY: y + 2, head: [['Producto', 'Cant.', 'Precio unit.', 'Desc.', 'Subtotal']], headStyles: { fillColor: [61, 43, 78] },
+    body: presu.items.map(it => [(it.sku ? it.sku + ' · ' : '') + (it.desc || ''), String(it.cant).replace('.', ','), formatPrice(it.precio), it.descPct ? it.descPct + ' %' : '', formatPrice(it.cant * it.precio * (1 - Math.min(100, it.descPct || 0) / 100))]),
+    columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } }, styles: { fontSize: 9 } });
+  y = doc.lastAutoTable.finalY + 8;
+  const lin = (k, v, b) => { doc.setFont(undefined, b ? 'bold' : 'normal'); doc.text(k, 140, y, { align: 'right' }); doc.text(v, 196, y, { align: 'right' }); y += 6; };
+  lin('Subtotal', formatPrice(t.sub)); if(t.dItems > 0.5) lin('Descuentos por renglón', '- ' + formatPrice(t.dItems)); if(t.dTot > 0.5) lin('Descuento sobre el total' + (presu.descTotalTipo === '%' ? ` (${presu.descTotal} %)` : ''), '- ' + formatPrice(t.dTot));
+  doc.setFontSize(12); lin('TOTAL (IVA incluido)', formatPrice(t.total), true); doc.setFontSize(9); doc.setFont(undefined, 'normal');
+  y += 4; if(presu.validez) { doc.text(`Presupuesto válido por ${presu.validez} días desde la fecha de emisión.`, 14, y); y += 5; }
+  if(presu.obs) doc.text(doc.splitTextToSize('Observaciones: ' + presu.obs, 180), 14, y);
+  const nombre = `Presupuesto-${presu.numero ? numPresu(presu.numero) : 'borrador'}${c.nombre ? '-' + c.nombre.replace(/[^\w]+/g, '_') : ''}.pdf`;
+  if(descargar) doc.save(nombre);
+  return { blob: doc.output('blob'), nombre, total: t.total };
+}
+async function enviarPresupuesto(medio){
+  await guardarPresupuesto(true);
+  const r = pdfPresupuesto(false), c = presu.cliente || {};
+  const texto = `Hola${c.nombre ? ' ' + c.nombre : ''}, le envío el presupuesto ${numPresu(presu.numero)} de OnLineTextil por ${formatPrice(r.total)} (IVA incluido)${presu.validez ? `, válido por ${presu.validez} días` : ''}.`;
+  const file = new File([r.blob], r.nombre, { type: 'application/pdf' });
+  if(medio === 'wa' && navigator.canShare && navigator.canShare({ files: [file] })){ try{ await navigator.share({ files: [file], text: texto }); return; } catch(e){ if(e.name === 'AbortError') return; } }
+  // en la computadora: se descarga el PDF y se abre WhatsApp o el correo con el texto, para adjuntarlo
+  const a = document.createElement('a'); a.href = URL.createObjectURL(r.blob); a.download = r.nombre; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  if(medio === 'wa'){ const tel = String(c.tel || '').replace(/\D/g, ''); window.open((tel ? 'https://wa.me/' + (tel.startsWith('54') ? tel : '54' + tel) : 'https://wa.me/') + '?text=' + encodeURIComponent(texto + ' (adjunto el PDF)'), '_blank'); }
+  else window.location.href = 'mailto:' + encodeURIComponent(c.email || '') + '?subject=' + encodeURIComponent('Presupuesto ' + numPresu(presu.numero) + ' · OnLineTextil') + '&body=' + encodeURIComponent(texto + '\n\nAdjunto el presupuesto en PDF.');
+}
+async function convertirPresuEnPedido(){
+  await guardarPresupuesto(true);
+  if(!confirm(`¿Pasar el presupuesto ${numPresu(presu.numero)} al pedido? Se cargan los productos, precios y descuentos.`)) return;
+  Object.keys(cart).forEach(k => delete cart[k]); Object.keys(descuentosItem).forEach(k => delete descuentosItem[k]);
+  presu.items.forEach((it, n) => { const r = it.sku ? buscarProductoPorSku(it.sku) : null; let id;
+    if(r){ const vi = r.producto.variantes.findIndex(v => String(v.sku).toUpperCase() === String(it.sku).toUpperCase()); id = rowId(r.ci, r.pi, vi); }
+    else id = 'libre-' + n;
+    cart[id] = { sku: it.sku || '—', desc: it.desc || '', nombreProducto: r ? r.producto.nombre : (it.desc || 'Producto'), precio: +it.precio || 0, cantidad: +it.cant || 0, imagen: r ? imagenEfectiva(r.ci, r.pi, r.producto) : '' };
+    if(it.descPct) descuentosItem[id] = +it.descPct; });
+  irADatos();
+  const c = presu.cliente || {}, set = (id, v) => { const e = document.getElementById(id); if(e) e.value = v || ''; };
+  set('f-nombre', c.nombre); set('f-cuit', c.cuit); set('f-telefono', c.tel); set('f-email', c.email); set('f-localidad', c.loc);
+  const t = totalesPresu(presu), base = t.sub - t.dItems; set('f-descuento', base > 0 && t.dTot > 0 ? Math.round(t.dTot / base * 10000) / 100 : '');
+  set('f-observaciones', [`Presupuesto ${numPresu(presu.numero)}`, c.dir ? 'Dirección: ' + c.dir : '', presu.obs].filter(Boolean).join(' · '));
+  try{ await db.collection('presupuestos').doc(presu._id).set({ pedido: new Date().toISOString() }, { merge: true }); } catch(e){}
+  try{ actualizarResumen && actualizarResumen(); } catch(e){}
 }
 
 // ===== Piezas de un juego → instrucciones propias =====
@@ -18550,7 +18746,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v256';
+const APP_VERSION = '2026-10-02-v257';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
@@ -18608,7 +18804,7 @@ window.addEventListener('load', () => {
     ['abrirFacturas', 'Cargando facturas…'], ['leerFacturasPDF', 'Leyendo facturas…'], ['guardarFactura', 'Guardando la factura…'], ['borrarFacturasSel', 'Borrando facturas…'],
     ['importarLinksWeb', 'Leyendo el archivo de Tienda Nube…'], ['analizarPedidoIA', 'La IA está armando el pedido…'],
     ['generarFlyersNuevoIngreso', 'Generando las piezas…'], ['abrirResultadosML', 'Preparando Resultados ML…'], ['descargarCopia', 'Preparando la copia…'],
-    ['abrirFaltantes', 'Cargando faltantes…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
+    ['abrirFaltantes', 'Cargando faltantes…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
   ];
   setTimeout(() => W.forEach(([n, t]) => conProcesando(n, t)), 0);
 });
