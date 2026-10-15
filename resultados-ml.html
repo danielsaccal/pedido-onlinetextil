@@ -1084,7 +1084,7 @@ function guardarParametrosML(){
 }
 // ===== Calculadora: cuanto queda de un precio, segun tus ventas reales de precio parecido =====
 function calcularQueda(){
-  const P=parseFloat(String($('cqPrecio').value).replace(/\./g,'').replace(',','.'));const box=$('cqRes');
+  const P=leerMonto($('cqPrecio').value);const box=$('cqRes');
   if(!(P>0)){box.innerHTML='<p class="note">Escribí un precio.</p>';return;}
   const con=$('cqTipo').value==='con', fc=$('fCuenta').value;
   const base=allRows().filter(o=>o.tipo==='Venta'&&o.pcd>0&&o.unid&&!o.excl&&(!fc||o.cuenta===fc)&&(/premium/i.test(o.pubT||'')===con));
@@ -1270,6 +1270,18 @@ async function guardarReclamo(k,campo,valor){
 }
 const ESTADOS_REC=[['','Sin reclamar'],['reclamado','Reclamado, esperando respuesta'],['total','Devuelto total'],['parcial','Devuelto parcial'],['rechazado','Rechazado']];
 function recuperado(x){const r=RECLAMOS[x.k]||{};return r.estado==='total'?-x.net:r.estado==='parcial'?Math.min(-x.net,+r.monto||0):0;}
+// montos escritos a mano: "24591.02", "24591,02" y "24.591,02" valen lo mismo
+const leerMonto=s=>{let t=String(s==null?'':s).trim().replace(/[$\s]/g,'');if(!t)return NaN;const lp=t.lastIndexOf('.'),lc=t.lastIndexOf(',');
+  if(lp>=0&&lc>=0){const dec=lp>lc?'.':',',mil=dec==='.'?',':'.';return parseFloat(t.split(mil).join('').replace(dec,'.'));}
+  if(lc>=0){return parseFloat(t.slice(0,lc).replace(/,/g,'')+'.'+t.slice(lc+1));}
+  if(lp>=0){const p=t.split('.');if(p.length===2&&p[1].length<=2)return parseFloat(t);return parseFloat(t.replace(/\./g,''));}
+  return parseFloat(t);};
+// muestra al lado del casillero como se entendio el monto (ej: "= $ 24.591,02")
+document.addEventListener('input',e=>{const i=e.target;if(!i||i.tagName!=='INPUT'||i.type==='number'||i.type==='file'||i.type==='checkbox')return;
+  const esMonto=i.inputMode==='decimal'||/costo|precio|monto|\$/i.test((i.placeholder||'')+' '+(i.id||'')+' '+(i.className||''));if(!esMonto)return;
+  let h=i.nextElementSibling;if(!h||!h.classList||!h.classList.contains('monto-hint')){h=document.createElement('small');h.className='monto-hint';h.style.cssText='display:block;font-size:.75rem;color:#5b2a86;margin-top:2px;';i.insertAdjacentElement('afterend',h);}
+  const v=i.value.trim(),n=leerMonto(v);h.textContent=/[.,]/.test(v)&&n>0?'= $ '+n.toLocaleString('es-AR',{minimumFractionDigits:n%1?2:0,maximumFractionDigits:2}):'';});
+
 // ===== Paso de confirmacion antes de cargar un reporte =====
 function confirmarCarga(cuenta,periodo,n,desde,hasta){
   return new Promise(res=>{
@@ -1557,7 +1569,8 @@ async function emparejarFaltante(sku,id){
   render(); alertOk(sku+' → '+v);
 }
 async function costoFaltante(sku,id){
-  const raw=($(id).value||'').trim(); const n=parseFloat(raw.replace(/\./g,'').replace(',','.')); if(!(n>0)){showErr('Escribí el costo por unidad.');return;}
+  const raw=($(id).value||'').trim(); const n=leerMonto(raw); if(!(n>0)){showErr('Escribí el costo por unidad.');return;}
+  { const h0=COSTOS[sku], a=h0&&h0.length?h0[h0.length-1].costo:null; if(!confirm(`¿Guardar el costo de ${sku} en ${fmt(n)} por unidad?`+(a>0&&(n/a>5||a/n>5)?`\n\n¡Atención! Antes era ${fmt(a)}: cambia más de 5 veces.`:'')))return; }
   const hoy=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
   try{
     const ref=db.collection('config').doc('costos_reventa'); const d=await ref.get(); const c=d.exists?(d.data().c||{}):{};
