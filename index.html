@@ -615,10 +615,10 @@ a.grilla-celda{display:block;}
     <div class="search-wrap"><input type="text" id="inicio-buscar" placeholder="Buscar producto o SKU..." oninput="buscarDesdeInicio(this.value)"></div>
     <div id="ini-recientes-wrap" style="display:none;"><p class="ini-sec">LO ÚLTIMO QUE USASTE</p><div class="ini-recientes" id="ini-recientes"></div></div>
     <p class="ini-sec">PARA CLIENTES Y PÚBLICO</p>
-    <div class="ini-grid ini-ext"><div class="ini-tile" id="ini-t-a" onclick="abrirGrupoInicio('a')"><div class="ini-ic">🛒</div><b>Armar pedido</b><span>Catálogo, escanear SKU, buscar por foto</span></div><div class="ini-tile" id="ini-t-c" onclick="abrirGrupoInicio('c')"><div class="ini-ic">📣</div><b>Difusión</b><span>Compartir catálogo, enviar a clientes, redes, promociones, videos</span></div></div>
+    <div class="ini-grid ini-ext"><div class="ini-tile" id="ini-t-c" onclick="abrirGrupoInicio('c')"><div class="ini-ic">📣</div><b>Difusión</b><span>Compartir catálogo, enviar a clientes, redes, promociones, videos</span></div></div>
     <div class="ini-sub" id="ini-sub-ext" style="display:none;"></div>
     <p class="ini-sec">ADMINISTRACIÓN INTERNA</p>
-    <div class="ini-grid"><div class="ini-tile" id="ini-t-d" onclick="abrirGrupoInicio('d')"><div class="ini-ic">🧾</div><b>Ventas</b><span>Pedidos, clientes, gastos y resultados ML</span></div><div class="ini-tile" id="ini-t-f" onclick="abrirGrupoInicio('f')"><div class="ini-ic">🏷️</div><b>Catálogo</b><span>Altas, edición, fotos, precios, aumentos</span></div><div class="ini-tile" id="ini-t-g" onclick="abrirGrupoInicio('g')"><div class="ini-ic">✂️</div><b>Producción</b><span>Telas, cortes, órdenes, talleres, stock</span></div></div>
+    <div class="ini-grid"><div class="ini-tile" id="ini-t-d" onclick="abrirGrupoInicio('d')"><div class="ini-ic">🧾</div><b>Ventas</b><span>Armar pedidos, clientes, gastos y resultados ML</span></div><div class="ini-tile" id="ini-t-f" onclick="abrirGrupoInicio('f')"><div class="ini-ic">🏷️</div><b>Catálogo</b><span>Altas, edición, fotos, precios, aumentos</span></div><div class="ini-tile" id="ini-t-g" onclick="abrirGrupoInicio('g')"><div class="ini-ic">✂️</div><b>Producción</b><span>Telas, cortes, órdenes, talleres, stock</span></div></div>
     <div class="ini-sub" id="ini-sub-int" style="display:none;"></div>
   </div>
 
@@ -1597,7 +1597,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v255</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v256</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5742,7 +5742,7 @@ const GRUPOS_INICIO = {
     [['🖼️ Nuevo ingreso (flyers)', 'abrirNuevoIngreso()'], ['📣 Anuncios y promociones', 'abrirAnuncio()']],
   ] },
   d: { lado: 'int', titulo: 'Ventas', titulosColumnas: ['1 · Tomar pedidos', '2 · Entregar', '3 · Clientes', '4 · Plata'], columnas: [
-    [['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()'], ['📋 Historial de pedidos', 'abrirHistorial()']],
+    [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['📷 Escanear etiqueta (SKU)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto').click()"], ['🤖 Buscar por foto (IA)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto-producto').click()"], ['📄 Pedido desde una foto', "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)"], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()'], ['📋 Historial de pedidos', 'abrirHistorial()']],
     [['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']],
     [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']],
     [['🧾 Ventas facturadas', 'abrirFacturas()'], ['💸 Gastos comerciales', 'abrirGastos()'], ['📈 Resultados Mercado Libre', 'abrirResultadosML()'], ['🧮 ¿Cuánto me queda en ML?', 'abrirCalculadoraML()']]
@@ -10766,6 +10766,7 @@ function permisoDeAccion(f){
   if(/abrirFacturas/.test(s)) return 'facturas';
   if(/abrirGastos/.test(s)) return 'gastos';
   if(/abrirCostosReventa|abrirConfeccion|abrirCalculadoraCostos|abrirVentasML/.test(s)) return 'costos';
+  if(/setTimeout\(\(\) => document.getElementById\('pia-foto'\)/.test(s)) return 'pedidos';
   if(/abrirPedidoIA|abrirHistorial\(|abrirPendientesEntrega/.test(s)) return 'ventas';
   if(/abrirFaltantes/.test(s)) return 'produccion';
   if(/abrirClientes/.test(s)) return 'clientes';
@@ -18549,7 +18550,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v255';
+const APP_VERSION = '2026-10-02-v256';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
