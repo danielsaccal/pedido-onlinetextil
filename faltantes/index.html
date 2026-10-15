@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Faltantes de stock · OnLineTextil</title>
+<style>
+:root{--purple:#3D2B4E;--gold:#F4C430;--line:#E3DCD2;--bg:#F5F3EF}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:#2B2420}
+header{background:var(--purple);color:#fff;padding:16px;text-align:center}header h1{margin:0;font-size:1.25rem}header p{margin:4px 0 0;opacity:.85;font-size:.85rem}
+main{max-width:760px;margin:0 auto;padding:12px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+.cat{font-weight:800;color:var(--purple);letter-spacing:.04em;text-transform:uppercase;margin:16px 4px 8px;font-size:.85rem}
+.prod{display:flex;gap:10px;align-items:center;margin-bottom:6px}.prod img{width:56px;height:56px;object-fit:cover;border-radius:10px;background:#eee;flex:none}.prod b{font-size:.95rem}
+.var{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:center;padding:8px 0;border-top:1px dashed var(--line)}
+.var .sku{font-weight:700;font-size:.9rem}.var .desc{font-size:.8rem;color:#6B6258}
+.extra{grid-column:1/-1;display:none;gap:6px}.var.on .extra{display:flex}
+.extra input{padding:8px;border:1px solid var(--line);border-radius:8px;font-size:.9rem}.extra .q{width:80px}.extra .n{flex:1;min-width:0}
+input[type=checkbox]{width:22px;height:22px}
+.nombre{width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font-size:1rem}
+.btn{display:block;width:100%;padding:14px;border:none;border-radius:12px;background:var(--gold);color:var(--purple);font-weight:800;font-size:1rem;cursor:pointer}
+.barra{position:sticky;bottom:0;background:var(--bg);padding:10px 0}
+.msg{text-align:center;padding:30px 10px;font-size:1rem}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+</head><body>
+<header><h1>Faltantes de stock</h1><p>Marque lo que falta y toque “Aceptar y enviar”</p></header>
+<main id="main"><p class="msg">Cargando…</p></main>
+<script>
+firebase.initializeApp({ apiKey: "AIzaSyCE0N4d-Hn_1S0X1B_LsiEvFtX-93LWn3A", authDomain: "catalogo-onlinetextil.firebaseapp.com", projectId: "catalogo-onlinetextil", storageBucket: "catalogo-onlinetextil.firebasestorage.app", messagingSenderId: "380063692818", appId: "1:380063692818:web:9d3bcfee44bf36c3d780cb" });
+const db = firebase.firestore();
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const token = new URLSearchParams(location.search).get('l');
+let LISTA = null;
+async function iniciar(){
+  if(!token){ $('main').innerHTML = '<p class="msg">El link no es válido.</p>'; return; }
+  try{ const d = await db.collection('faltantes_listas').doc(token).get(); if(!d.exists){ $('main').innerHTML = '<p class="msg">Este listado ya no existe. Pida un link nuevo.</p>'; return; } LISTA = d.data(); }
+  catch(e){ $('main').innerHTML = '<p class="msg">No se pudo cargar el listado. Revise la conexión.</p>'; return; }
+  let nom = ''; try{ nom = localStorage.getItem('falt_nombre') || ''; } catch(e){}
+  let html = `<div class="card"><label style="font-weight:700;font-size:.9rem;">Su nombre</label><input id="nombre" class="nombre" value="${esc(nom)}" placeholder="Ej: Juan"></div>`;
+  LISTA.categorias.forEach(c => {
+    html += `<div class="cat">${esc(c.nombre)}</div>`;
+    c.productos.forEach(p => {
+      const foto = p.foto ? (/^data:/.test(p.foto) || /^https?:/.test(p.foto) ? p.foto : '../' + p.foto) : '';
+      html += `<div class="card"><div class="prod">${foto ? `<img src="${esc(foto)}" alt="" loading="lazy">` : ''}<b>${esc(p.nombre)}</b></div>`;
+      p.variantes.forEach(v => {
+        html += `<label class="var" data-sku="${esc(v.sku)}" data-producto="${esc(p.nombre)}" data-desc="${esc(v.desc)}" data-cat="${esc(c.nombre)}">
+          <input type="checkbox" onchange="this.parentElement.classList.toggle('on',this.checked)">
+          <span><span class="sku">${esc(v.sku)}</span> <span class="desc">${esc(v.desc)}</span> · <span style="font-size:.8rem;color:#A6432F;">Falta</span></span>
+          <span class="extra"><input class="q" type="number" min="0" inputmode="numeric" placeholder="Quedan"><input class="n" placeholder="Aclaración (opcional)"></span></label>`;
+      });
+      html += `</div>`;
+    });
+  });
+  html += `<div class="barra"><button class="btn" onclick="enviar()">Aceptar y enviar</button></div>`;
+  $('main').innerHTML = html;
+}
+async function enviar(){
+  const nombre = $('nombre').value.trim(); if(!nombre){ alert('Escriba su nombre.'); $('nombre').focus(); return; }
+  try{ localStorage.setItem('falt_nombre', nombre); } catch(e){}
+  const marcados = [...document.querySelectorAll('.var')].filter(l => l.querySelector('input[type=checkbox]').checked);
+  if(!marcados.length){ alert('No marcó ningún faltante.'); return; }
+  const b = document.querySelector('.btn'); b.disabled = true; b.textContent = 'Enviando…';
+  try{
+    for(const l of marcados){
+      const sku = l.dataset.sku, ref = db.collection('faltantes').doc(String(sku).toUpperCase().replace(/\//g, '-'));
+      const rep = { nombre, quedan: l.querySelector('.q').value === '' ? null : +l.querySelector('.q').value, nota: l.querySelector('.n').value.trim(), fecha: new Date().toISOString(), lista: token };
+      const d = await ref.get(); const ant = d.exists ? d.data() : null;
+      // mismo SKU: una sola vez; si ya estaba repuesto, empieza de nuevo
+      const reportes = ant && ant.estado !== 'repuesto' ? (ant.reportes || []).filter(r => r.nombre !== nombre).concat([rep]) : [rep];
+      await ref.set({ sku, producto: l.dataset.producto, desc: l.dataset.desc, categoria: l.dataset.cat, estado: 'falta', reportes, ultimo: rep.fecha }, { merge: true });
+    }
+    $('main').innerHTML = `<p class="msg">✓ Se enviaron ${marcados.length} ${marcados.length === 1 ? 'faltante' : 'faltantes'}. Gracias, ${esc(nombre)}.</p>`;
+  } catch(e){ b.disabled = false; b.textContent = 'Aceptar y enviar'; alert('No se pudo enviar: ' + e.message); }
+}
+iniciar();
+</script>
+</body></html>
