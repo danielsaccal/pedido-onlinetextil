@@ -1125,6 +1125,20 @@ function marcarSospechosas(){
     if(!CONFIRMADAS[k]){o.costoRev=o.costo;o.ganRev=o.gan;o.ganPctRev=o.ganPct;o.costo=null;o.gan=null;o.ganPct=null;}
   }
 }
+// ===== Corregir el costo de cualquier SKU (este o no en el catalogo) =====
+function pedirCorregirCosto(btn,sku){
+  const item=btn.closest('#revisarBox div[style*="border-bottom"]');
+  const cont=item?item.querySelector('.rev-det'):(btn.closest('.corr-wrap')||btn.parentElement); let f=cont.querySelector('.corr-form');
+  if(f){f.remove();return;}
+  const h0=COSTOS[String(sku).toUpperCase()], act=h0&&h0.length?h0[h0.length-1].costo:null, id='cc-'+Math.random().toString(36).slice(2,8);
+  f=document.createElement('div'); f.className='corr-form';
+  f.style.cssText='display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;background:#FAF8F5;border:1px solid var(--line);border-radius:10px;padding:8px;';
+  f.innerHTML=`<span style="font-size:.85rem;">Costo por unidad de <b>${sku}</b>${act!=null?` (hoy: ${fmt(act)})`:''}:</span>
+    <span><input id="${id}" placeholder="costo $ c/u" value="" style="width:130px;height:30px;min-height:0;padding:3px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box;"></span>
+    <button type="button" style="padding:5px 12px;border-radius:8px;border:none;background:#3d1466;color:#fff;font-weight:700;cursor:pointer;" onclick="costoFaltante('${String(sku).replace(/'/g,'')}','${id}')">Guardar</button>
+    <small class="meta" style="width:100%;">Se guarda con fecha de hoy y se aplica a todas las ventas de ${sku}.</small>`;
+  cont.appendChild(f); f.querySelector('input').focus();
+}
 // cambiar el SKU contra el que se compara el costo (queda como equivalencia de esa cuenta)
 function pedirCambioSku(btn,cta,sku){
   const cont=btn.closest('div[style*="border-bottom"]').querySelector('.rev-det');
@@ -1188,6 +1202,7 @@ function renderRevisar(){
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;">${etiquetaCta(o.cuenta)}<b>${o.skuBase}</b><span class="meta">${o.fecha} · ${o.unid} unid. · precio ${fmt(o.pcd)} · costo ${fmt(o.costoRev)}</span>
         <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">${o.packSug?`<span style="display:inline-flex;gap:4px;align-items:center;border:1px solid #CDBFE0;background:#F4EFFA;border-radius:8px;padding:2px 4px 2px 8px;color:#5b2a86;font-weight:700;font-size:.85rem;">📦 Pack de <input type="number" min="2" value="${o.packSug}" style="width:52px;height:28px;min-height:0;padding:2px 4px;border:1px solid #CDBFE0;border-radius:6px;font-weight:700;font-size:.85rem;box-sizing:border-box;" onkeydown="if(event.key==='Enter')this.nextElementSibling.click()"><button type="button" style="padding:3px 8px;border-radius:6px;border:none;background:#5b2a86;color:#fff;font-weight:700;cursor:pointer;" title="Solo esta venta" onclick="const n=parseInt(this.previousElementSibling.value,10);if(n>=2)packSoloVenta('${claveVenta(o).replace(/'/g,'')}',n)">Solo esta venta</button><button type="button" style="padding:3px 8px;border-radius:6px;border:1px solid #CDBFE0;background:#fff;color:#5b2a86;font-weight:700;cursor:pointer;" title="Todas las ventas de este SKU sin x N en esta cuenta" onclick="const n=parseInt(this.parentElement.querySelector('input').value,10);if(n>=2)aplicarPackSug('${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}',n)">Todas</button></span>`:''}<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid #BFDCC8;background:#EEF6F0;color:#2F7A47;font-weight:700;cursor:pointer;" onclick="confirmarVenta('${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">✓ Está bien</button>
         <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" data-op="${o.op}" onclick="pedirCambioSku(this,'${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">🔁 Cambiar SKU</button>
+        <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="pedirCorregirCosto(this,'${String(o.skuBase).replace(/'/g,'')}')">✏️ Corregir costo</button>
         <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="verVentaAca(this,'${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">Ver venta</button></span></div>
       <div class="rev-det"></div>
       <ul style="margin:4px 0 0 18px;padding:0;color:#A6432F;">${o.revisar.map(x=>`<li>${x}</li>`).join('')}</ul></div>`).join('')}
@@ -1884,6 +1899,7 @@ function card(o){
     ${L.map(x=>fila(x[0],x[1])).join('')}${L2.map(x=>fila(x[0],x[1],x[2])).join('')}${fila('Le queda',o.neto,'sum')}
     ${o.costo!=null?fila(`Costo <small class="meta">(${fmt2(o.costo/o.unid)} c/u${MODO_COSTO==='actual'?', actual':', a la fecha'})</small>`,-o.costo):''}
     ${o.costo==null&&o.costoRev!=null?fila(`Costo <small class="meta">(${fmt2(o.costoRev/o.unid)} c/u · ${o.unid} unid.)</small>`,-o.costoRev):''}
+    ${o.tipo==='Venta'&&o.pcd>0&&o.skuBase?`<div class="corr-wrap" style="margin:4px 0 6px;"><button type="button" style="padding:3px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:.8rem;" onclick="event.stopPropagation();pedirCorregirCosto(this,'${String(o.skuBase).replace(/'/g,'')}')">✏️ Corregir costo de ${o.skuBase}</button></div>`:''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px;">
       ${chip('Le queda',fmt(o.neto)+(o.pct!=null?` · ${pctf(o.pct)}`:''),'#3d1466')}
       ${o.costo!=null?chip('Ganancia',fmt(o.gan)+(o.ganPct!=null?` · ${pctf(o.ganPct)} s/costo`:''),o.gan<0?'#A6432F':'#2F7A47'):(o.costoRev!=null?chip('Ganancia (para revisar)',fmt(o.ganRev)+(o.ganPctRev!=null?` · ${pctf(o.ganPctRev)} s/costo`:''),'#A6432F')+`<button type="button" onclick="event.stopPropagation();confirmarVenta('${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')" style="align-self:center;padding:8px 12px;border-radius:10px;border:1px solid #BFDCC8;background:#EEF6F0;color:#2F7A47;font-weight:700;cursor:pointer;">✓ Está bien, contarla</button>`:(o.tipo==='Venta'&&o.pcd>0?chip('Ganancia','sin costo cargado','#8A8072'):''))}
