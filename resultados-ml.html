@@ -959,7 +959,8 @@ function renderResumen(){
       ${L1('Ventas',recibi,'Precio de los productos (con descuento)','rp')}
       ${L1('Envíos cobrados',entro-recibi,'Reintegros Flex y lo que pagó el comprador por el envío','rp')}
       ${L1('Entró',entro,'','tot')}
-      ${L1('Mercado Libre',-pague,'Comisión, cuotas, envíos, Full, publicidad, impuestos','rn')}
+      ${L1('Mercado Libre',-pague,`Comisión, cuotas, envíos, Full, publicidad, impuestos · <a href="#" onclick="event.preventDefault();toggleDesgloseML();" style="color:#3d1466;font-weight:700;">${window.__mlDesgOpen?'▾ Ocultar desglose':'▸ Ver desglose'}</a>`,'rn')}
+      ${window.__mlDesgOpen?htmlDesgloseML(cur,fc):''}
       ${L1('Me quedó',quedo,'','tot')}
       ${cc.length?L1('Costo de mercadería',-costo,[sinC?`${sinC} ${sinC===1?'venta':'ventas'} sin costo cargado`:'',Math.round(costoAj)?`cancelaciones y devoluciones: ${costoAj<0?'se restaron':'se sumaron'} ${fmt(Math.abs(costoAj))} (${uVuelven.toLocaleString('es-AR')} unid. vuelven al stock)`:''].filter(Boolean).join(' · '),'rn'):''}
       ${cc.length?L1('Resultado',res,'','tot'):''}
@@ -1313,6 +1314,47 @@ function confirmarCarga(cuenta,periodo,n,desde,hasta){
     m.querySelectorAll('button').forEach(b=>b.onclick=()=>{m.remove();res(b.dataset.r);});
   });
 }
+// ===== Desglose de la linea "Mercado Libre" del resumen (cierra exacto con esa linea) =====
+function desgloseLineaML(per,fc){
+  const r=allRows().filter(o=>!o.excl&&(per==='todo'||o.periodo===per)&&(!fc||o.cuenta===fc));
+  const eIn=o=>o.envIn!==undefined?o.envIn:Math.max(o.envio||0,0), eOut=o=>o.envOut!==undefined?o.envOut:Math.min(o.envio||0,0);
+  const esV=o=>o.tipo==='Venta'&&o.pcd>0;
+  const recibi=r.filter(esV).reduce((a,o)=>a+o.pcd,0), envIn=r.reduce((a,o)=>a+(eIn(o)||0),0), quedo=r.reduce((a,o)=>a+(o.neto||0),0);
+  const total=recibi+envIn-quedo, entro=recibi+envIn;
+  const dv=r.filter(o=>o.esDevol), nd=r.filter(o=>!o.esDevol);
+  const S=(a,f)=>a.reduce((x,o)=>x+(f(o)||0),0);
+  const logo=o=>o.log==='Flex'?'Flex':o.log==='Full'?'Full':'Correo';
+  const C={
+    'Comisión por vender':-S(nd,o=>o.vender),
+    'Cargo fijo por unidad':-S(nd,o=>o.unidad),
+    'Cuotas sin interés':-S(nd,o=>o.cuotas),
+    'Envíos Flex (cargo de ML)':-S(nd.filter(o=>logo(o)==='Flex'),eOut),
+    'Cadete Flex (lo paga usted, no ML)':-S(nd,o=>o.cad),
+    'Envíos por correo':-S(nd.filter(o=>logo(o)==='Correo'),eOut),
+    'Envíos Full':-S(nd.filter(o=>logo(o)==='Full'),eOut),
+    'Full (colecta, almacenamiento, stock antiguo)':-S(nd,o=>o.full),
+    'Publicidad':-S(nd,o=>o.ads),
+    'Impuestos y retenciones':-S(nd,o=>o.ret)-S(nd,o=>o.otros),
+    'Cancelaciones y devoluciones (neto)':S(dv,o=>(esV(o)?o.pcd:0)+(eIn(o)||0)-(o.neto||0))
+  };
+  const suma=Object.values(C).reduce((a,b)=>a+b,0), resto=total-suma;
+  if(Math.abs(resto)>=1) C['Otros (reparto de envíos compartidos y ajustes)']=resto;
+  return {C,total,entro};
+}
+function htmlDesgloseML(per,fc){
+  const A=desgloseLineaML(per,fc);
+  const ps=[...new Set(allRows().map(o=>o.periodo))].filter(x=>x&&x!=='sin-fecha').sort(), i=ps.indexOf(per), ant=per!=='todo'&&i>0?ps[i-1]:null, B=ant?desgloseLineaML(ant,fc):null;
+  const f1=x=>x.toLocaleString('es-AR',{maximumFractionDigits:1});
+  const ks=Object.keys(A.C).filter(k=>Math.abs(A.C[k])>=1).sort((a,b)=>A.C[b]-A.C[a]);
+  return `<div style="background:#FAF8F5;border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin:4px 0 8px;">
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) auto 64px 64px;gap:8px;font-size:.7rem;color:#8A8072;text-transform:uppercase;padding:2px 0 4px;"><span>Concepto</span><span style="text-align:right;">$</span><span style="text-align:right;">% entró</span><span style="text-align:right;">% de ML</span></div>
+    ${ks.map(k=>{const v=A.C[k], pe=A.entro>0?v/A.entro*100:0, pm=A.total?v/A.total*100:0; const b=B&&B.entro>0?(B.C[k]||0)/B.entro*100:null, d=b!=null?pe-b:null;
+      return `<div style="display:grid;grid-template-columns:minmax(0,1fr) auto 64px 64px;gap:8px;align-items:baseline;padding:5px 0;border-top:1px dashed var(--line);font-size:.85rem;">
+        <span>${k}${d!=null&&Math.abs(d)>=0.05?` <small style="color:${d>0?'#A6432F':'#2F7A47'};font-weight:700;">${d>0?'+':''}${f1(d)} pts</small>`:''}</span><b style="text-align:right;${v<0?'color:#2F7A47;':''}">${fmt(v)}</b><span style="text-align:right;color:#6B6258;">${f1(pe)} %</span><span style="text-align:right;color:#6B6258;">${f1(pm)} %</span></div>`;}).join('')}
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) auto 64px 64px;gap:8px;padding:6px 0 2px;border-top:2px solid #3d1466;font-weight:800;font-size:.88rem;"><span>Total</span><span style="text-align:right;">${fmt(A.total)}</span><span style="text-align:right;">${f1(A.entro>0?A.total/A.entro*100:0)} %</span><span style="text-align:right;">100 %</span></div>
+    <small class="meta" style="display:block;margin-top:4px;">"pts": diferencia contra ${ant?mesTxt(ant):'el mes anterior'} en % de lo que entró. Los montos negativos son a favor.</small></div>`;
+}
+function toggleDesgloseML(){window.__mlDesgOpen=!window.__mlDesgOpen;renderResumen();}
 // ===== Perdidas para reclamar: cancelaciones y devoluciones que te costaron plata =====
 function perdidasReclamo(){
   const fc=$('fCuenta').value, G={};
