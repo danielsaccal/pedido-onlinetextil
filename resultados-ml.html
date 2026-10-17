@@ -269,12 +269,18 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
   </section>
   <p class="note" id="rarosAviso" style="display:none;margin:10px 0 0;"></p>
   <div id="revisarBox" style="display:none;"></div>
-  <details class="pleg" data-k="calcu" id="calcuBox" style="display:none;"><summary>🧮 ¿Cuánto me queda si vendo a $…?</summary><div class="pleg-body">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-      <input id="cqPrecio" inputmode="decimal" placeholder="Precio de venta, ej: 24000" style="flex:1;min-width:180px;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:1rem;">
-      <select id="cqTipo" style="padding:9px;border:1px solid var(--line);border-radius:10px;"><option value="sin">💵 Sin cuotas (Clásica)</option><option value="con">💳 Con cuotas (Premium)</option></select>
+  <details class="pleg" data-k="calcu" id="calcuBox" style="display:none;"><summary>🧮 Simulador de costos de Mercado Libre</summary><div class="pleg-body">
+    <div style="display:flex;gap:6px;margin-bottom:10px;"><button type="button" id="smT1" onclick="simModo(1)" style="flex:1;padding:9px;border-radius:10px;border:2px solid #3d1466;background:#3d1466;color:#fff;font-weight:700;cursor:pointer;">Si lo vendo a $…</button><button type="button" id="smT2" onclick="simModo(2)" style="flex:1;padding:9px;border-radius:10px;border:2px solid #3d1466;background:#fff;color:#3d1466;font-weight:700;cursor:pointer;">Mi costo es $… ¿a cuánto lo vendo?</button></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
+      <label id="smLP"><small class="meta">Precio de venta</small><input id="smPrecio" inputmode="decimal" placeholder="ej: 24000" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--line);border-radius:10px;" oninput="simular()"></label>
+      <label><small class="meta">Costo del producto</small><input id="smCosto" inputmode="decimal" placeholder="opcional en modo 1" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--line);border-radius:10px;" oninput="simular()"></label>
+      <label><small class="meta">Peso (kg)</small><input id="smPeso" inputmode="decimal" placeholder="ej: 0,8" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--line);border-radius:10px;" oninput="simular()"></label>
+      <label><small class="meta">Medidas del paquete (cm)</small><input id="smMed" placeholder="largo x ancho x alto" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--line);border-radius:10px;" oninput="simular()"></label>
+      <label><small class="meta">Envío</small><select id="smLog" onchange="simular()" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px;"><option>Flex</option><option>Full</option><option value="Correo">Correo / colecta</option></select></label>
+      <label><small class="meta">Publicación</small><select id="smCuotas" onchange="simular()" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:10px;"><option value="sin">Sin cuotas (Clásica)</option><option value="con">Con cuotas (Premium)</option></select></label>
+      <label id="smLM" style="display:none;"><small class="meta">Ganancia buscada (% s/costo)</small><input id="smMargen" inputmode="decimal" value="30" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--line);border-radius:10px;" oninput="simular()"></label>
     </div>
-    <div id="cqRes" style="margin-top:10px;"></div>
+    <div id="smRes" style="margin-top:12px;"></div>
   </div></details>
   <details class="pleg" data-k="glosario"><summary>ⓘ ¿Qué significa cada cosa?</summary><div class="pleg-body" style="font-size:.92rem;line-height:1.55;">
     <p><b>Ventas:</b> lo que pagaron los clientes por los productos (ya con descuentos).</p>
@@ -1082,6 +1088,88 @@ function guardarParametrosML(){
     Object.values(M).forEach(m=>Object.keys(m).forEach(k=>m[k]=Math.round(m[k])));
     db.collection('config').doc('ml_egresos').set({m:M,actualizado:new Date().toISOString()}).catch(()=>{});
   }catch(e){console.error(e);}
+}
+// ===== Simulador de costos ML: tarifas oficiales (sep-2026, reputacion verde) + comision, cuotas, retenciones y Flex de sus ventas reales =====
+const TARIFA_FIJO_FLEX=[[15000,1330],[24000,2740],[33000,3320]];               // Flex: solo por precio
+const TARIFA_FIJO_PESO={0.3:[1330,2740,3320],1:[1390,2780,3360],3:[1450,2860,3470],8:[1520,3130,3760],20:[1640,3320,4100],180:[1920,3700,4550]}; // Full/correo: puntos conocidos de la tabla oficial
+const TARIFA_ENVIO_VERDE={0.3:[6190,6790],0.5:[6790,7290],1:[7790,8290]};   // envio gratis desde $33.000, reputacion verde: [33.000–49.999, desde 50.000]
+let SIM_MODO=1;
+function simModo(n){SIM_MODO=n;$('smT1').style.background=n===1?'#3d1466':'#fff';$('smT1').style.color=n===1?'#fff':'#3d1466';$('smT2').style.background=n===2?'#3d1466':'#fff';$('smT2').style.color=n===2?'#fff':'#3d1466';$('smLP').style.display=n===1?'':'none';$('smLM').style.display=n===2?'':'none';simular();}
+const pctl=(a,q)=>{if(!a.length)return null;const s=a.slice().sort((x,y)=>x-y);return s[Math.min(s.length-1,Math.max(0,Math.round((s.length-1)*q)))];};
+function datosReales(){
+  const fc=$('fCuenta').value, v=allRows().filter(o=>o.tipo==='Venta'&&o.pcd>0&&!o.excl&&!o.esDevol&&(!fc||o.cuenta===fc));
+  const rat=(arr,f)=>arr.map(o=>f(o)/o.pcd).filter(x=>isFinite(x));
+  const cl=v.filter(o=>!/premium/i.test(o.pubT||'')), pr=v.filter(o=>/premium/i.test(o.pubT||''));
+  const eOut=o=>o.envOut!==undefined?o.envOut:Math.min(o.envio||0,0), eIn=o=>o.envIn!==undefined?o.envIn:Math.max(o.envio||0,0);
+  const flex=lo=>v.filter(o=>o.log==='Flex'&&(lo?o.pcd<33000:o.pcd>=33000)).map(o=>(eIn(o)||0)+(eOut(o)||0)+(o.cad||0)+(o.ajEnv||0));
+  const envio=(lg)=>v.filter(o=>o.pcd>=33000&&(lg==='Full'?o.log==='Full':o.log!=='Flex'&&o.log!=='Full')).map(o=>-(eOut(o)||0)).filter(x=>x>0);
+  return {n:v.length,
+    com:{sin:rat(cl.length?cl:v,o=>-o.vender),con:rat(pr.length?pr:v,o=>-o.vender)},
+    cuotas:rat(pr,o=>-o.cuotas),
+    ret:(()=>{const ps=[...new Set(v.map(o=>o.periodo))].filter(p=>p&&p!=='sin-fecha');return ps.map(p=>{const A=desgloseLineaML(p,fc);const vend=v.filter(o=>o.periodo===p).reduce((a,o)=>a+o.pcd,0);return vend>0?(A.C['Impuestos y retenciones']||0)/vend:null;}).filter(x=>x!=null&&isFinite(x));})(),
+    flexBajo:flex(true), flexAlto:flex(false), envFull:envio('Full'), envCorreo:envio('Correo')};
+}
+function pesoFact(){const p=leerMonto($('smPeso').value)||0;const m=String($('smMed').value||'').match(/(\d+[.,]?\d*)\D+(\d+[.,]?\d*)\D+(\d+[.,]?\d*)/);const vol=m?leerMonto(m[1])*leerMonto(m[2])*leerMonto(m[3])/4000:0;return {p,vol,f:Math.max(p,vol)};}
+function costoFijoRango(precio,log,kg){
+  if(precio>=33000)return [0,0];
+  const banda=precio<15000?0:precio<24000?1:2;
+  if(log==='Flex')return [TARIFA_FIJO_FLEX[banda][1],TARIFA_FIJO_FLEX[banda][1]];
+  const ks=Object.keys(TARIFA_FIJO_PESO).map(Number).sort((a,b)=>a-b); const w=kg>0?kg:1;
+  let lo=ks[0],hi=ks[ks.length-1]; for(const k of ks){if(k<=w)lo=k; if(k>=w){hi=k;break;}}
+  if(w<=ks[0])hi=ks[0];
+  return [TARIFA_FIJO_PESO[lo][banda],TARIFA_FIJO_PESO[hi][banda]];
+}
+function envioRango(precio,log,kg,D){
+  if(log==='Flex'){const a=precio<33000?D.flexBajo:D.flexAlto;if(a.length>=5)return {r:[-pctl(a,0.75),-pctl(a,0.25)],src:'sus ventas Flex: reintegro de ML − cadete'};return {r:[0,0],src:'sin datos Flex suficientes'};}
+  if(precio<33000)return {r:[0,0],src:'debajo de $ 33.000 el envío lo paga el comprador'};
+  const a=log==='Full'?D.envFull:D.envCorreo;
+  if(a.length>=5)return {r:[pctl(a,0.25),pctl(a,0.75)],src:`sus envíos reales por ${log==='Full'?'Full':'correo'} desde $ 33.000`};
+  const col=precio<50000?0:1, ks=Object.keys(TARIFA_ENVIO_VERDE).map(Number).sort((x,y)=>x-y), w=kg>0?kg:1;
+  const k=ks.find(x=>x>=w); if(k==null)return {r:null,src:'tabla oficial no disponible para ese peso'};
+  return {r:[TARIFA_ENVIO_VERDE[k][col],TARIFA_ENVIO_VERDE[k][col]],src:'tabla oficial, reputación verde'};
+}
+function simPrecio(precio,costo,D,kg){
+  const log=$('smLog').value, cq=$('smCuotas').value==='con';
+  const com=[pctl(D.com[cq?'con':'sin'],0.25),pctl(D.com[cq?'con':'sin'],0.75)].map(x=>x==null?(cq?0.165:0.145):x);
+  const cuo=cq?[pctl(D.cuotas,0.25)||0,pctl(D.cuotas,0.75)||0]:[0,0];
+  const ret=D.ret.length?[Math.min(...D.ret),Math.max(...D.ret)]:[0,0];
+  const fijo=costoFijoRango(precio,log,kg), env=envioRango(precio,log,kg,D);
+  const R=(i)=>{const e=env.r?env.r[i]:0;return {com:precio*com[i],fijo:fijo[i],cuo:precio*cuo[i],ret:precio*ret[i],env:e};};
+  const lo=R(0), hi=R(1), tot=x=>x.com+x.fijo+x.cuo+x.ret+x.env;
+  const quedaMax=precio-tot(lo), quedaMin=precio-tot(hi);
+  return {lo,hi,quedaMin,quedaMax,env,ganMin:costo?quedaMin-costo:null,ganMax:costo?quedaMax-costo:null};
+}
+function simular(){
+  const box=$('smRes'); if(!box)return; const D=datosReales(), P=pesoFact(), costo=leerMonto($('smCosto').value)||0;
+  if(!D.n){box.innerHTML='<p class="note">Cargue reportes de Mercado Libre: el simulador usa sus ventas reales para la comisión, las cuotas, las retenciones y Flex.</p>';return;}
+  const rng=(a,b)=>Math.round(a)===Math.round(b)?fmt(a):`${fmt(Math.min(a,b))} a ${fmt(Math.max(a,b))}`;
+  const nota=`<p class="note" style="margin-top:6px;">Peso usado: ${P.f?P.f.toLocaleString('es-AR',{maximumFractionDigits:2})+' kg'+(P.vol>P.p?' (volumétrico)':''):'1 kg (no indicado)'} · Tarifas oficiales desde 1/09/2026, reputación verde · Comisión, cuotas, retenciones y Flex: rango de sus ${D.n.toLocaleString('es-AR')} ventas reales (cuenta elegida arriba). Valores aproximados.</p>`;
+  if(SIM_MODO===1){
+    const precio=leerMonto($('smPrecio').value); if(!(precio>0)){box.innerHTML='<p class="note">Escriba el precio de venta.</p>';return;}
+    const s=simPrecio(precio,costo,D,P.f);
+    const fila=(t,a,b,extra)=>`<tr style="border-top:1px solid var(--line);"><td style="padding:6px;">${t}${extra?`<small class="meta" style="display:block;">${extra}</small>`:''}</td><td style="padding:6px;text-align:right;">${rng(a,b)}</td><td style="padding:6px;text-align:right;color:#6B6258;">${(Math.min(a,b)/precio*100).toLocaleString('es-AR',{maximumFractionDigits:1})}–${(Math.max(a,b)/precio*100).toLocaleString('es-AR',{maximumFractionDigits:1})} %</td></tr>`;
+    box.innerHTML=`<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.9rem;">
+      ${fila('Comisión por vender',s.lo.com,s.hi.com)}
+      ${fila('Costo fijo por unidad',s.lo.fijo,s.hi.fijo,precio>=33000?'no aplica desde $ 33.000':($('smLog').value==='Flex'?'tarifa Flex por precio':'según precio y peso'))}
+      ${$('smCuotas').value==='con'?fila('Cuotas sin interés',s.lo.cuo,s.hi.cuo):''}
+      ${fila('Impuestos y retenciones',s.lo.ret,s.hi.ret,'% de cada mes sobre lo vendido; muchas son a cuenta de impuestos')}
+      ${fila($('smLog').value==='Flex'?(s.lo.env<0?'Envío Flex (a favor: lo que paga el comprador o reintegra ML, menos el cadete)':'Envío Flex (cadete menos reintegro)'):'Envío gratis',s.lo.env,s.hi.env,s.env.src)}
+      <tr style="border-top:2px solid #3d1466;font-weight:800;"><td style="padding:6px;">Le queda</td><td style="padding:6px;text-align:right;">${rng(s.quedaMin,s.quedaMax)}</td><td style="padding:6px;text-align:right;">${(s.quedaMin/precio*100).toLocaleString('es-AR',{maximumFractionDigits:1})}–${(s.quedaMax/precio*100).toLocaleString('es-AR',{maximumFractionDigits:1})} %</td></tr>
+      ${costo?`<tr><td style="padding:6px;">Costo del producto</td><td style="padding:6px;text-align:right;">${fmt(costo)}</td><td></td></tr><tr style="font-weight:800;color:${s.ganMin<0?'#A6432F':'#2F7A47'};"><td style="padding:6px;">Ganancia</td><td style="padding:6px;text-align:right;">${rng(s.ganMin,s.ganMax)}</td><td style="padding:6px;text-align:right;">${Math.round(s.ganMin/costo*100)}–${Math.round(s.ganMax/costo*100)} % s/costo</td></tr>`:''}
+    </table></div>${s.env.r==null?'<p class="note" style="color:#A6432F;">No hay tarifa de envío para ese peso: el envío no está incluido.</p>':''}${nota}`;
+  } else {
+    if(!(costo>0)){box.innerHTML='<p class="note">Escriba el costo del producto.</p>';return;}
+    const meta=(leerMonto($('smMargen').value)||0)/100, filas=[]; let pMin=null,pMeta=null;
+    const desde=Math.max(1000,Math.floor(costo*1.1/500)*500), hasta=Math.max(desde+20000,Math.ceil(costo*3/1000)*1000), paso=Math.max(500,Math.round((hasta-desde)/30/500)*500);
+    for(let p=desde;p<=hasta;p+=paso){const s=simPrecio(p,costo,D,P.f);filas.push({p,s});if(pMin==null&&s.ganMin>=0)pMin=p;if(pMeta==null&&s.ganMin>=costo*meta)pMeta=p;}
+    const zona=p=>p>=15000&&p<16639?'zona que no conviene (salto del costo fijo)':p>=24000&&p<24674?'zona que no conviene (salto del costo fijo)':p>=33000&&p<33000+paso?'desde acá: sin costo fijo, con envío gratis':'';
+    box.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+      <div style="flex:1;min-width:180px;background:#FDEBE7;border-radius:12px;padding:8px 10px;"><small class="meta">Para no perder, como mínimo</small><div style="font-weight:800;font-size:1.15rem;">${pMin?fmt(pMin):'más de '+fmt(hasta)}</div></div>
+      <div style="flex:1;min-width:180px;background:#EEF6F0;border-radius:12px;padding:8px 10px;"><small class="meta">Para ganar ${Math.round(meta*100)} % sobre el costo</small><div style="font-weight:800;font-size:1.15rem;">${pMeta?fmt(pMeta):'más de '+fmt(hasta)}</div></div></div>
+      <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.85rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:5px;">Precio</td><td style="padding:5px;text-align:right;">Se lleva ML</td><td style="padding:5px;text-align:right;">Le queda</td><td style="padding:5px;text-align:right;">Ganancia</td><td style="padding:5px;text-align:right;">% s/costo</td></tr>
+      ${filas.map(({p,s})=>{const z=zona(p);return `<tr style="border-top:1px solid var(--line);${z.includes('no conviene')?'background:#FFF4D6;':''}${p===pMeta?'font-weight:800;':''}"><td style="padding:5px;">${fmt(p)}${z?`<small class="meta" style="display:block;">${z}</small>`:''}</td><td style="padding:5px;text-align:right;">${rng(p-s.quedaMax,p-s.quedaMin)}</td><td style="padding:5px;text-align:right;">${rng(s.quedaMin,s.quedaMax)}</td><td style="padding:5px;text-align:right;color:${s.ganMin<0?'#A6432F':'#2F7A47'};">${rng(s.ganMin,s.ganMax)}</td><td style="padding:5px;text-align:right;">${Math.round(s.ganMin/costo*100)}–${Math.round(s.ganMax/costo*100)} %</td></tr>`;}).join('')}
+      </table></div>${nota}`;
+  }
 }
 // ===== Calculadora: cuanto queda de un precio, segun tus ventas reales de precio parecido =====
 function calcularQueda(){
@@ -1961,7 +2049,7 @@ $('fLog').addEventListener('change',()=>{const f=$('fLog').value==='Flex';$('fFl
 $('resMes').addEventListener('change',()=>{renderResumen();renderRanking();});
 ['rkMes','rkGrupo','rkOrden','rkVer'].forEach(id=>$(id).addEventListener('change',renderRanking));
 $('dsMes').addEventListener('change',renderDesglose);
-$('cqPrecio').addEventListener('input',calcularQueda);$('cqTipo').addEventListener('change',calcularQueda);
+
 $('ftMes').addEventListener('change',renderFaltan);
 $('ogMes').addEventListener('change',renderOrigen);$('cuenta').addEventListener('change',()=>pintarCuenta());$('cqOrigen').addEventListener('change',renderCuotas);$('ogLog').addEventListener('change',renderOrigen);
 document.querySelectorAll('details.pleg').forEach(d=>{const k='ml.pleg.'+d.dataset.k;try{if(localStorage.getItem(k)==='1')d.open=true;}catch(e){}
@@ -2013,10 +2101,10 @@ firebase.auth().onAuthStateChanged(async u=>{
     document.querySelectorAll('#app > *').forEach(el=>{ if(el.id!=='calcuBox') el.style.display='none'; });
     document.querySelectorAll('main > *').forEach(el=>{ if(el.id!=='app'&&el.id!=='err') el.style.display='none'; });
     const cb=$('calcuBox'); cb.style.display=''; cb.open=true; cb.querySelector('summary').style.pointerEvents='none';
-    const t=document.querySelector('header.top h1'); if(t) t.textContent='¿Cuánto me queda en Mercado Libre?';
-    const sub=$('periodo'); if(sub) sub.textContent='Según tus ventas reales de precio parecido';
+    const t=document.querySelector('header.top h1'); if(t) t.textContent='Simulador de costos de Mercado Libre';
+    const sub=$('periodo'); if(sub) sub.textContent='Tarifas oficiales y sus ventas reales';
     const ld=document.querySelector('header.top .load'); if(ld) ld.style.display='none';
-    setTimeout(()=>$('cqPrecio').focus(),100);
+    setTimeout(()=>{simModo(1);$('smPrecio').focus();},100);
   }
   setTimeout(guardarParametrosML,1500);
 });
