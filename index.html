@@ -1597,7 +1597,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v260</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v261</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2229,7 +2229,7 @@ a.grilla-celda{display:block;}
   <div class="step" id="step-facturas">
     <div class="form-card" style="max-width:960px;">
       <h2>Ventas facturadas</h2>
-      <p class="note" style="text-align:left;">Subí las facturas de TFactura (PDF). La app lee cada renglón, lo cruza con el costo de cada producto y te muestra la ganancia. El precio de cada producto ya tiene aplicados los <b>descuentos y bonificaciones</b> de la factura.</p>
+      <p class="note" style="text-align:left;">Subí las facturas de TFactura (PDF). La app lee cada renglón, lo cruza con el costo de cada producto <b>vigente el día de la factura</b> y te muestra la ganancia. El precio de cada producto ya tiene aplicados los <b>descuentos y bonificaciones</b> de la factura.</p>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;"><b style="font-size:.88rem;">Calcular la ganancia:</b>
         <select id="fc-modo" onchange="cambiarModoIvaFact(this.value)" style="padding:7px;border:1px solid var(--line);border-radius:10px;"><option value="con">con IVA (los costos están con IVA)</option><option value="sin">sin IVA</option></select></div>
       <label class="btn btn-gold" style="display:block;text-align:center;cursor:pointer;margin:10px 0;">📄 Subir facturas (PDF)<input type="file" id="fc-file" accept="application/pdf" multiple style="display:none;" onchange="leerFacturasPDF(this)"></label>
@@ -10551,12 +10551,23 @@ function parsearFactura(L, nombreArchivo){
 function skuDeFactura(cod){ const c = String(cod).toUpperCase(); return (fcEquiv && fcEquiv[c]) || c; }
 // en las facturas la cantidad va en la unidad de venta del catalogo (ej: docenas); el costo de la app es por unidad suelta
 function divisorVenta(s){ const r = buscarProductoPorSku(s); return r ? ({ 'docena': 12, 'media docena': 6, 'par': 2 }[unidadesVenta[r.producto._editKey]] || 1) : 1; }
-function costoItemFactura(it, fa){ const s = skuDeFactura(it.codigo); const cu = costoUnidadSku(s); if(cu == null) return null; const c = cu * divisorVenta(s) * it.cant; return fa && fa.esNC ? (fa.devolvieron === false ? 0 : -c) : c; }
+// costo por unidad vigente en una fecha (historial de costos); antes del primer registro, el primero; sin historial, el actual
+let histCostos = null;
+async function cargarHistCostos(){ if(histCostos) return; histCostos = {}; try{ const s = await db.collection('historial_costos').get();
+  s.docs.forEach(d => { const v = d.data(), k = String(v.sku || '').toUpperCase(); (histCostos[k] = histCostos[k] || []).push({ fecha: v.fecha, costo: +v.costo, creado: +v.creado || 0 }); });
+  Object.values(histCostos).forEach(a => a.sort((x, y) => String(x.fecha).localeCompare(String(y.fecha)) || x.creado - y.creado)); } catch(e){} }
+function costoUnidadEnFecha(S, fechaDMY){
+  const h0 = histCostos && histCostos[String(S).toUpperCase()]; if(!h0 || !h0.length) return costoUnidadSku(S);
+  const m = String(fechaDMY || '').match(/(\d{2})\/(\d{2})\/(\d{4})/); const f = m ? `${m[3]}-${m[2]}-${m[1]}` : new Date().toISOString().slice(0, 10);
+  let c = null; for(const x of h0){ if(x.fecha <= f) c = x.costo; else break; } return c != null ? c : h0[0].costo;
+}
+function costoItemFactura(it, fa){ const s = skuDeFactura(it.codigo); const cu = fa && fa.fecha ? costoUnidadEnFecha(s, fa.fecha) : costoUnidadSku(s); if(cu == null) return null; const c = cu * divisorVenta(s) * it.cant; return fa && fa.esNC ? (fa.devolvieron === false ? 0 : -c) : c; }
 function signoFact(fa){ return fa && fa.esNC ? -1 : 1; }
 async function prepararCostosFacturas(){
   if(tablaConsumo === null) await cargarTablaConsumo(); if(telasDatos === null) await cargarTelas(); if(fabricacion === null) await cargarFabricacion();
   if(typeof fichasArticulos !== 'undefined' && fichasArticulos === null) await cargarFichasArticulos();
   if(costosReventa === null) await cargarCostosReventa(); if(kitsDatos === null) await cargarKits();
+  await cargarHistCostos();
   if(fcEquiv === null){ try{ const d = await db.collection('config').doc('fact_equivalencias').get(); fcEquiv = d.exists ? (d.data().m || {}) : {}; } catch(e){ fcEquiv = {}; } }
 }
 async function abrirFacturas(){
@@ -18782,7 +18793,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v260';
+const APP_VERSION = '2026-10-02-v261';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
