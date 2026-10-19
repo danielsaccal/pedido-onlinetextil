@@ -398,7 +398,7 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
   </div></details>
 
   <p class="sec">Ajustes</p>
-  <div class="box" style="padding:10px 14px;"><b style="font-size:.9rem;">Costo que se usa para la ganancia:</b> <select id="modoCosto" aria-label="Costo" style="padding:6px 10px;font-size:.85rem;width:auto;margin-left:6px;" onchange="cambiarModoCosto(this.value)" title="Qué costo usar para la ganancia"><option value="actual">Costo: el actual</option><option value="fecha">Costo: a la fecha de cada venta</option></select></div>
+  <div class="box" style="padding:10px 14px;font-size:.88rem;"><b>Costo que se usa:</b> el vigente el día de cada venta. Las ventas anteriores al primer costo registrado de un SKU usan ese primer costo.</div>
   <details class="box"><summary>Costo del cadete por envío Flex</summary>
     <div class="cad" id="cadForm"></div>
     <details class="zd"><summary>Ver o corregir qué zona es cada monto que paga ML</summary>
@@ -674,10 +674,10 @@ const fechaISO=f=>{const [d,m,y]=String(f||'').split('/');return y?`${y}-${m}-${
 // costo unitario a la fecha de la venta: ultimo registro <= fecha; si no hay, el primero posterior
 // modo 'actual' (por defecto): siempre el costo vigente hoy. Modo 'fecha': el costo vigente el dia de la venta
 // (y para ventas anteriores al primer registro, el costo actual: el primero cargado puede tener errores ya corregidos).
-let MODO_COSTO=(()=>{try{return localStorage.getItem('ml.modoCosto')||'actual';}catch(e){return 'actual';}})();
+let MODO_COSTO='fecha'; // siempre el costo vigente el dia de cada venta
 function costoUnit(base,fecha){const h=COSTOS[String(base||'').toUpperCase()];if(!h||!h.length)return null;
   const actual=h[h.length-1].costo; if(MODO_COSTO==='actual')return actual;
-  const f=fechaISO(fecha);let c=null;for(const x of h){if(x.fecha<=f)c=x.costo;else break;}return c!=null?c:actual;}
+  const f=fechaISO(fecha);let c=null;for(const x of h){if(x.fecha<=f)c=x.costo;else break;}return c!=null?c:h[0].costo;}
 function cambiarModoCosto(v){MODO_COSTO=v;try{localStorage.setItem('ml.modoCosto',v);}catch(e){}aplicarCostos();render();}
 function aplicarCostos(){for(const d of DATA)for(const o of d.rows){
   const esVenta=o.tipo==='Venta'&&o.pcd>0;const cu=esVenta&&o.unid?costoUnit(o.skuBase,o.fecha):null;
@@ -1224,8 +1224,9 @@ function pedirCorregirCosto(btn,sku){
   f.style.cssText='display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;background:#FAF8F5;border:1px solid var(--line);border-radius:10px;padding:8px;';
   f.innerHTML=`<span style="font-size:.85rem;">Costo por unidad de <b>${sku}</b>${act!=null?` (hoy: ${fmt(act)})`:''}:</span>
     <span><input id="${id}" placeholder="costo $ c/u" value="" style="width:130px;height:30px;min-height:0;padding:3px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box;"></span>
-    <button type="button" style="padding:5px 12px;border-radius:8px;border:none;background:#3d1466;color:#fff;font-weight:700;cursor:pointer;" onclick="costoFaltante('${String(sku).replace(/'/g,'')}','${id}')">Guardar</button>
-    <small class="meta" style="width:100%;">Se guarda con fecha de hoy y se aplica a todas las ventas de ${sku}.</small>`;
+    <select id="${id}-m" style="padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;width:auto;"><option value="error">Era un error de carga: corregir también las ventas anteriores</option><option value="cambio">El costo cambió: rige desde hoy</option></select>
+    <button type="button" style="padding:5px 12px;border-radius:8px;border:none;background:#3d1466;color:#fff;font-weight:700;cursor:pointer;" onclick="costoFaltante('${String(sku).replace(/'/g,'')}','${id}',document.getElementById('${id}-m').value)">Guardar</button>
+    <small class="meta" style="width:100%;">"Era un error" reemplaza el último costo cargado (las ventas desde esa fecha toman el valor corregido). "Cambió" lo registra con fecha de hoy: las ventas anteriores conservan su costo.</small>`;
   cont.appendChild(f); f.querySelector('input').focus();
 }
 // cambiar el SKU contra el que se compara el costo (queda como equivalencia de esa cuenta)
@@ -1713,15 +1714,20 @@ async function emparejarFaltante(sku,id){
   EQ[sku]=v; try{await guardarEquivalencias();}catch(e){showErr('No se pudo guardar: '+e.message);return;}
   render(); alertOk(sku+' → '+v);
 }
-async function costoFaltante(sku,id){
+async function costoFaltante(sku,id,modo){
   const raw=($(id).value||'').trim(); const n=leerMonto(raw); if(!(n>0)){showErr('Escribí el costo por unidad.');return;}
   { const h0=COSTOS[sku], a=h0&&h0.length?h0[h0.length-1].costo:null; if(!confirm(`¿Guardar el costo de ${sku} en ${fmt(n)} por unidad?`+(a>0&&(n/a>5||a/n>5)?`\n\n¡Atención! Antes era ${fmt(a)}: cambia más de 5 veces.`:'')))return; }
   const hoy=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
   try{
     const ref=db.collection('config').doc('costos_reventa'); const d=await ref.get(); const c=d.exists?(d.data().c||{}):{};
     c[sku]=n; await ref.set({c,actualizado:new Date().toISOString()});
-    await db.collection('historial_costos').add({sku,fecha:hoy,costo:n,desglose:{reventa:true,desde:'resultados-ml'},creado:Date.now()});
-    (COSTOS[sku]=COSTOS[sku]||[]).push({fecha:hoy,costo:n,creado:Date.now()});
+    const hs=COSTOS[sku]||[], ultimo=hs.length?hs[hs.length-1]:null;
+    if(modo==='error'&&ultimo&&ultimo.id){ // corrige el registro equivocado: las ventas desde esa fecha toman el valor correcto
+      await db.collection('historial_costos').doc(ultimo.id).set({costo:n,corregido:new Date().toISOString()},{merge:true}); ultimo.costo=n;
+    } else {
+      const r=await db.collection('historial_costos').add({sku,fecha:hoy,costo:n,desglose:{reventa:true,desde:'resultados-ml'},creado:Date.now()});
+      (COSTOS[sku]=COSTOS[sku]||[]).push({id:r&&r.id,fecha:hoy,costo:n,creado:Date.now()});
+    }
     render(); alertOk('Costo de '+sku+' guardado: '+fmt(n)+' por unidad.');
   }catch(e){showErr('No se pudo guardar: '+e.message);}
 }
@@ -2080,7 +2086,7 @@ firebase.auth().onAuthStateChanged(async u=>{
   TIPO=(await idbApp('tipo_sku'))||{};
   KITS=(await idbApp('kits_sku'))||{};
   {const s=$('modoCosto');if(s)s.value=MODO_COSTO;}
-  try{const s=await db.collection('historial_costos').get();const m={};s.docs.forEach(x=>{const v=x.data();const k=String(v.sku||'').toUpperCase();(m[k]=m[k]||[]).push({fecha:v.fecha,costo:+v.costo,creado:+v.creado||0});});
+  try{const s=await db.collection('historial_costos').get();const m={};s.docs.forEach(x=>{const v=x.data();const k=String(v.sku||'').toUpperCase();(m[k]=m[k]||[]).push({id:x.id,fecha:v.fecha,costo:+v.costo,creado:+v.creado||0});});
     let ult={};try{const u=await db.collection('config').doc('costos_ultimo').get();ult=u.exists?(u.data().c||{}):{};}catch(e){}
     // un solo costo por dia: el ultimo cargado; sin hora de carga, el que coincide con el costo actual
     Object.entries(m).forEach(([k,a])=>{a.sort((x,y)=>x.fecha.localeCompare(y.fecha)||x.creado-y.creado);
