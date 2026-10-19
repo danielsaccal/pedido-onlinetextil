@@ -1597,7 +1597,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v264</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v265</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2495,6 +2495,7 @@ document.querySelectorAll('.menu-dropdown span.menu-item').forEach(item => {
 
 // ---------- estado ----------
 const cart = {}; // key: rowId -> {sku, desc, nombreProducto, precio, cantidad, imagen}
+let fotosSku = {}; // SKU -> fotos propias de esa medida (si no tiene, usa las del producto)
 let fotosOverride = {}; // key: "ci-pi" -> foto reemplazada en base64 (se carga antes de renderizar el catalogo)
 let videosOverride = {}; // key: "ci-pi" -> array de links de video (Drive/YouTube)
 const notas = {}; // key: rowId -> texto de la nota (independiente de si hay cantidad cargada)
@@ -2589,7 +2590,7 @@ function renderCatalogo(filtro){
         variantesHtml += `
           <div class="variante">
             <div class="variante-fila">
-              <div class="desc">${descVarianteHtml(v.desc)}<span class="sku">SKU ${v.sku}</span>${rolloNota}</div>
+              <div class="desc" onclick="mostrarFotoSku('${escapeAttr(v.sku)}', ${ci}, ${pi}, this)" ${fotosSku[String(v.sku).toUpperCase()] ? 'style="cursor:pointer;"' : ''}>${descVarianteHtml(v.desc)}<span class="sku">SKU ${v.sku}${fotosSku[String(v.sku).toUpperCase()] ? ' · 📷' : ''}</span>${rolloNota}</div>
               <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioNum) + sufijoPrecio(p)}</div>
               ${precioNum===null ? '<div></div>' : `
               <div class="qty">
@@ -2641,6 +2642,7 @@ function renderCatalogo(filtro){
   });
 
   document.getElementById('sin-resultados').style.display = totalVisible === 0 ? 'block' : 'none';
+  try{ const q = String(filtro || '').trim().toUpperCase(); if(q && fotosSku[q]) document.querySelectorAll('.variante .desc').forEach(d => { if(d.textContent.includes('SKU ' + q)) d.click(); }); } catch(e){}
 }
 
 function escapeAttr(s){ return String(s).replace(/'/g, "\\'"); }
@@ -2699,7 +2701,7 @@ function setCantidad(id, valor, sku, desc, nombreProducto, precio){
     delete cart[id];
   } else {
     const [ci, pi] = id.split('-').map(Number);
-    const imagen = (CATALOGO[ci] && CATALOGO[ci].productos[pi]) ? imagenEfectiva(ci, pi, CATALOGO[ci].productos[pi]) : null;
+    const imagen = (CATALOGO[ci] && CATALOGO[ci].productos[pi]) ? (fotosDeSkuOProducto(sku, ci, pi, CATALOGO[ci].productos[pi])[0] || imagenEfectiva(ci, pi, CATALOGO[ci].productos[pi])) : null;
     cart[id] = {sku, desc, nombreProducto, precio, cantidad: n, imagen};
   }
   actualizarCartbar();
@@ -7959,12 +7961,61 @@ function renderPfMasivo(){
       <div class="field" style="margin:0;"><label>Stock mínimo</label><input id="pm-min" type="text" inputmode="decimal" placeholder="no cambiar"></div>
       <div class="field" style="margin:0;"><label>Categoría (al publicar)</label><select id="pm-cat">${nc}${CATALOGO.map(c => `<option value="${escapeAttr(c.categoria)}">${escaparHtml(c.categoria)}</option>`).join('')}</select></div>
     </div>
+    <div id="pf-fotos"></div>
     <button class="btn btn-gold" style="width:auto;padding:10px 18px;margin-top:10px;" onclick="aplicarPfMasivo()">Aplicar a los ${pfSel.size} SKU</button>
     ${[...pfSel].some(s => !buscarProductoPorSku(s)) ? `<button class="btn btn-ghost" style="width:auto;padding:10px 18px;margin-top:10px;margin-left:6px;" onclick="abrirPublicarVarios([...pfSel])">📸 Publicar en el catálogo los que no están</button>` : ''}
     ${[...pfSel].some(s => buscarProductoPorSku(s)) ? `<button class="btn btn-ghost" style="width:auto;padding:10px 18px;margin-top:10px;margin-left:6px;" onclick="abrirMoverSkus([...pfSel])">📦 Mover a otro producto</button>` : ''}
     <button class="btn btn-ghost" style="width:auto;padding:10px 18px;margin-top:10px;margin-left:6px;color:#A6432F;border-color:#E3B8AE;" onclick="borrarSkusPf()">🗑️ Borrar</button>
   </div>`;
   ['pm-cal', 'pm-art'].forEach(id => { const s = document.getElementById(id); hacerSelectBuscable(s); if(s._sync) s._sync(); });
+  window.__pfFt = {}; renderFotosPf();
+}
+// ===== Fotos en el panel "Editar SKU a la vez": del producto (todos los SKU) o propias de un SKU =====
+window.__pfFt = {};
+function grupoFotosPf(){
+  const g = {}; [...pfSel].forEach(s => { const r = buscarProductoPorSku(s); if(!r) return; const key = `${r.ci}-${r.pi}`; (g[key] = g[key] || { key, ci: r.ci, pi: r.pi, p: r.producto, skus: [] }).skus.push(String(s).toUpperCase()); });
+  return Object.values(g);
+}
+function renderFotosPf(){
+  const cont = document.getElementById('pf-fotos'); if(!cont) return;
+  const grupos = grupoFotosPf(), sinPub = [...pfSel].filter(s => !buscarProductoPorSku(s));
+  const caja = 'background:#fff;border:1px solid #D9CCE6;border-radius:10px;padding:10px;margin-top:10px;';
+  cont.innerHTML = `<div style="margin-top:12px;font-weight:800;color:var(--purple);">📷 Fotos</div>
+    ${grupos.map(g => { const st = window.__pfFt[g.key] = window.__pfFt[g.key] || { ref: 'prod', fotos: null, dirty: {} };
+      const ref = st.ref, lista = fotosPfLista(g, ref);
+      return `<div style="${caja}"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><b style="font-size:.88rem;">${escaparHtml(g.p.nombre)}</b>
+        <select onchange="window.__pfFt['${g.key}'].ref=this.value;renderFotosPf();" style="padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;width:auto;"><option value="prod" ${ref === 'prod' ? 'selected' : ''}>Fotos del producto (todos los SKU)</option>${g.skus.map(s => `<option value="${escapeAttr(s)}" ${ref === s ? 'selected' : ''}>Fotos solo de ${escaparHtml(s)}${fotosSku[s] ? ' (tiene propias)' : ''}</option>`).join('')}</select></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">${lista.map((f, i) => `<div style="position:relative;width:118px;" draggable="true" ondragstart="window.__pfDrag=${i}" ondragover="event.preventDefault()" ondrop="event.preventDefault();moverFotoPf('${g.key}',window.__pfDrag,${i})">
+          <img src="${f}" style="width:118px;height:118px;object-fit:cover;border-radius:8px;border:${i === 0 ? '3px solid var(--gold)' : '1px solid var(--line)'};">
+          <div style="display:flex;justify-content:space-between;margin-top:2px;"><button type="button" class="btn-mini" style="padding:1px 6px;" onclick="moverFotoPf('${g.key}',${i},${i - 1})">◀</button><button type="button" class="btn-mini" style="padding:1px 6px;" title="Principal" onclick="moverFotoPf('${g.key}',${i},0)">⭐</button><button type="button" class="btn-mini" style="padding:1px 6px;" onclick="moverFotoPf('${g.key}',${i},${i + 1})">▶</button><button type="button" class="btn-mini" style="padding:1px 6px;color:#A6432F;" onclick="quitarFotoPf('${g.key}',${i})">✕</button></div></div>`).join('') || `<span class="note" style="margin:0;">${ref === 'prod' ? 'Sin fotos.' : 'Sin fotos propias: usa las del producto.'}</span>`}</div>
+        <label class="btn-mini" style="display:inline-block;margin-top:8px;cursor:pointer;">➕ Agregar fotos<input type="file" accept="image/*" multiple style="display:none;" onchange="agregarFotosPf('${g.key}',this)"></label>
+        ${Object.keys(st.dirty).length ? '<span class="note" style="margin-left:8px;color:#A6432F;">● cambios sin guardar (se guardan con "Aplicar")</span>' : ''}</div>`; }).join('')}
+    ${sinPub.length ? `<p class="note" style="text-align:left;margin:6px 0 0;">${sinPub.join(', ')}: no ${sinPub.length === 1 ? 'está publicado' : 'están publicados'}; para tener fotos, primero publique.</p>` : ''}`;
+}
+function fotosPfLista(g, ref){
+  const st = window.__pfFt[g.key]; st.cache = st.cache || {};
+  if(!st.cache[ref]) st.cache[ref] = ref === 'prod' ? [...imagenesEfectivas(g.ci, g.pi, g.p)] : [...(fotosSku[ref] || [])];
+  return st.cache[ref];
+}
+function grupoPf(key){ return grupoFotosPf().find(g => g.key === key); }
+function moverFotoPf(key, de, a){ const g = grupoPf(key), st = window.__pfFt[key], l = fotosPfLista(g, st.ref); if(a < 0 || a >= l.length || de === a) return; const [f] = l.splice(de, 1); l.splice(a, 0, f); st.dirty[st.ref] = true; renderFotosPf(); }
+function quitarFotoPf(key, i){ const g = grupoPf(key), st = window.__pfFt[key], l = fotosPfLista(g, st.ref); l.splice(i, 1); st.dirty[st.ref] = true; renderFotosPf(); }
+async function agregarFotosPf(key, inp){
+  const g = grupoPf(key), st = window.__pfFt[key], l = fotosPfLista(g, st.ref);
+  for(const f of [...(inp.files || [])]){ try{ l.push(await comprimirImagenAFotoBase64(f)); } catch(e){} }
+  st.dirty[st.ref] = true; renderFotosPf();
+}
+async function guardarFotosPf(){
+  let n = 0;
+  for(const g of grupoFotosPf()){ const st = window.__pfFt[g.key]; if(!st) continue;
+    for(const ref of Object.keys(st.dirty)){ const fotos = st.cache[ref] || [];
+      if(ref === 'prod'){ await db.collection('fotos').doc(docFotos(g.key)).set({ imagenesBase64: fotos, imagenBase64: fotos[0] || null, sku: (g.p.variantes[0] || {}).sku || '', nombreProducto: g.p.nombre, actualizado: new Date().toISOString() }, { merge: true }); fotosOverride[g.key] = fotos; }
+      else { if(fotos.length){ await db.collection('fotos_sku').doc(ref).set({ imagenesBase64: fotos, actualizado: new Date().toISOString() }); fotosSku[ref] = fotos; } else { await db.collection('fotos_sku').doc(ref).delete(); delete fotosSku[ref]; } }
+      n++; }
+    st.dirty = {}; }
+  window.__pfFt = {};
+  if(n) try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+  return n;
 }
 async function aplicarPfMasivo(){
   const v = id => String(document.getElementById(id).value || '').trim();
@@ -7978,7 +8029,10 @@ async function aplicarPfMasivo(){
   if(pb) desc.push('Unidades por bolsa: ' + pb);
   if(min) desc.push('Stock mínimo: ' + min);
   if(catP) desc.push('Categoría al publicar: ' + catP);
+  const hayFotos = Object.values(window.__pfFt || {}).some(st => Object.keys(st.dirty || {}).length);
+  if(!desc.length && hayFotos){ try{ const n = await guardarFotosPf(); alert(n === 1 ? 'Fotos guardadas.' : n + ' grupos de fotos guardados.'); renderFotosPf(); } catch(e){ alert('No se pudieron guardar las fotos: ' + e.message); } return; }
   if(!desc.length){ alert('No completó nada para cambiar.'); return; }
+  if(hayFotos) desc.push('Fotos');
   const skus = [...pfSel];
   if(!confirm(`Aplicar a ${skus.length} SKU:\n\n• ${desc.join('\n• ')}\n\n¿Seguir?`)) return;
   try{
@@ -8013,6 +8067,7 @@ async function aplicarPfMasivo(){
       skus.forEach(s => { const x = stockDatos.skus[s] || { stock: 0, minimo: 0 }; x.minimo = numAr(min) || 0; stockDatos.skus[s] = x; });
       await db.collection('config').doc('stock').set(JSON.parse(JSON.stringify(stockDatos)));
     }
+    if(hayFotos) await guardarFotosPf();
     pfSel.clear();
     document.getElementById('pf-masivo').dataset.n = '';
     renderProductosFabrico();
@@ -12718,7 +12773,7 @@ function confirmarPedidoIA(){
   itemsResueltos.forEach(it => {
     if(!it.match) return;
     const id = it.match.ci + '-' + it.match.pi;
-    const imagen = imagenEfectiva(it.match.ci, it.match.pi, it.match.producto);
+    const imagen = fotosDeSkuOProducto(it.match.variante && it.match.variante.sku, it.match.ci, it.match.pi, it.match.producto)[0] || imagenEfectiva(it.match.ci, it.match.pi, it.match.producto);
     cart[id] = {
       sku: it.match.variante.sku,
       desc: it.match.variante.desc,
@@ -13550,6 +13605,7 @@ function cargarFotosOverride(){
       videosOverride[d.id] = data.videoLinks || [];
       fotosRaw[d.id] = fotosOverride[d.id]; videosRaw[d.id] = videosOverride[d.id];
     });
+    return db.collection('fotos_sku').get().then(s2 => { fotosSku = {}; s2.docs.forEach(d => { const a = d.data().imagenesBase64 || []; if(a.length) fotosSku[d.id] = a; }); }).catch(() => {});
   }).catch(e => console.error('Error cargando fotos override:', e));
 }
 function imagenesEfectivas(ci, pi, p){
@@ -13557,6 +13613,8 @@ function imagenesEfectivas(ci, pi, p){
   if(arr && arr.length) return arr;
   return p.imagen ? [p.imagen] : [];
 }
+// fotos de un SKU: las propias si tiene; si no, las del producto
+function fotosDeSkuOProducto(sku, ci, pi, p){ const f = fotosSku[String(sku || '').toUpperCase()]; return f && f.length ? f : imagenesEfectivas(ci, pi, p); }
 function imagenEfectiva(ci, pi, p){
   const arr = imagenesEfectivas(ci, pi, p);
   return arr[0] || p.imagen;
@@ -13728,7 +13786,7 @@ function agregarProductoEscaneado(sku){
   if(!match) return;
   const id = match.ci + '-' + match.pi;
   const enCarrito = cart[id] ? cart[id].cantidad : 0;
-  const imagen = imagenEfectiva(match.ci, match.pi, match.producto);
+  const imagen = fotosDeSkuOProducto(match.variante.sku, match.ci, match.pi, match.producto)[0] || imagenEfectiva(match.ci, match.pi, match.producto);
   cart[id] = { sku: match.variante.sku, desc: match.variante.desc, nombreProducto: match.producto.nombre, precio: parsePrice(match.variante.precio), cantidad: enCarrito + 1, imagen };
   actualizarCartbar();
   document.getElementById('escaner-resultado').innerHTML = '<p class="note">✅ Se agregó "' + match.producto.nombre + ' — ' + match.variante.desc + '" al pedido.</p>';
@@ -15867,9 +15925,17 @@ function cargarProductosEditados(){
   }).catch(e => console.error('Error cargando productos editados:', e));
 }
 
-function abrirGaleriaCatalogo(ci, pi){
+function mostrarFotoSku(sku, ci, pi, el){
+  const card = el && el.closest('.producto'); if(!card) return; const img = card.querySelector('img.producto-img'); if(!img) return;
+  const p = CATALOGO[ci].productos[pi], S = String(sku).toUpperCase(), propias = fotosSku[S];
+  const fotos = propias && propias.length ? propias : imagenesEfectivas(ci, pi, p);
+  img.src = fotos[0] || p.imagen; card.dataset.skuFoto = propias && propias.length ? S : '';
+  img.onclick = fotos.length > 1 ? () => abrirGaleriaCatalogo(ci, pi, card.dataset.skuFoto) : null; img.style.cursor = fotos.length > 1 ? 'pointer' : '';
+  const b = img.parentElement && img.parentElement.querySelector('span'); if(b && /📷/.test(b.textContent)) b.textContent = '📷 ' + fotos.length;
+}
+function abrirGaleriaCatalogo(ci, pi, sku){
   const p = CATALOGO[ci].productos[pi];
-  const fotos = imagenesEfectivas(ci, pi, p);
+  const fotos = sku && fotosSku[String(sku).toUpperCase()] ? fotosSku[String(sku).toUpperCase()] : imagenesEfectivas(ci, pi, p);
   let idx = 0;
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:200;display:flex;align-items:center;justify-content:center;flex-direction:column;';
@@ -16444,8 +16510,8 @@ async function generarFlyersNuevoIngresoBase(){
     const gruposMap = {};
     matches.forEach(m => {
       const key = m.ci + '-' + m.pi;
-      if(!gruposMap[key]) gruposMap[key] = { ci: m.ci, pi: m.pi, producto: m.producto, variantes: [], notaVariante: '' };
-      gruposMap[key].variantes.push({ desc: m.variante.desc, precio: m.variante.precio });
+      if(!gruposMap[key]) gruposMap[key] = { ci: m.ci, pi: m.pi, producto: m.producto, variantes: [], notaVariante: '', skus: [] };
+      gruposMap[key].variantes.push({ desc: m.variante.desc, precio: m.variante.precio }); gruposMap[key].skus.push(String(m.variante.sku).toUpperCase());
       if(!gruposMap[key].notaVariante && notasPorSku[m.variante.sku.toUpperCase()]){
         gruposMap[key].notaVariante = notasPorSku[m.variante.sku.toUpperCase()];
       }
@@ -16455,7 +16521,7 @@ async function generarFlyersNuevoIngresoBase(){
 
     // cargar la foto de cada producto distinto (respetando cual eligio el usuario si hay varias)
     for(const g of grupos){
-      const fotosDisponibles = imagenesEfectivas(g.ci, g.pi, g.producto);
+      const fotosDisponibles = (g.skus && g.skus.length === 1) ? fotosDeSkuOProducto(g.skus[0], g.ci, g.pi, g.producto) : imagenesEfectivas(g.ci, g.pi, g.producto);
       const indiceElegido = fotoElegidaPorProducto[`${g.ci}-${g.pi}`] || 0;
       const imgSrc = fotosDisponibles[indiceElegido] || fotosDisponibles[0] || g.producto.imagen;
       g.img = await cargarImagenParaCanvas(imgSrc);
@@ -16624,7 +16690,7 @@ async function generarFlyersNuevoIngresoBase(){
         let fotosVideo, opcionesVideo;
         if(grupos.length === 1){
           const g = grupos[0];
-          let urls = imagenesEfectivas(g.ci, g.pi, g.producto);
+          let urls = (g.skus && g.skus.length === 1) ? fotosDeSkuOProducto(g.skus[0], g.ci, g.pi, g.producto) : imagenesEfectivas(g.ci, g.pi, g.producto);
           const elegida = fotoElegidaPorProducto[`${g.ci}-${g.pi}`] || 0;
           if(elegida > 0 && elegida < urls.length) urls = [urls[elegida], ...urls.filter((_, k) => k !== elegida)];
           urls = urls.slice(0, REEL_MAX_TOMAS);
@@ -16700,7 +16766,7 @@ async function generarFlyersNuevoIngresoBase(){
       } else {
         try{
           const g = grupos[0];
-          let urls = imagenesEfectivas(g.ci, g.pi, g.producto);
+          let urls = (g.skus && g.skus.length === 1) ? fotosDeSkuOProducto(g.skus[0], g.ci, g.pi, g.producto) : imagenesEfectivas(g.ci, g.pi, g.producto);
           const elegida = fotoElegidaPorProducto[`${g.ci}-${g.pi}`] || 0;
           if(elegida > 0 && elegida < urls.length) urls = [urls[elegida], ...urls.filter((_, k) => k !== elegida)];
           urls = urls.slice(0, REEL_MAX_TOMAS);
@@ -18899,7 +18965,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v264';
+const APP_VERSION = '2026-10-02-v265';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
