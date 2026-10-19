@@ -1597,7 +1597,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v262</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v263</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -8546,7 +8546,7 @@ async function renderProductosAC(){
         ${x ? `<span style="font-size:0.72rem;">costo</span><b style="display:block;font-size:1.15rem;color:var(--purple);">$ ${formatoPesos(Math.round(x.total))}</b>` : '<span style="font-size:0.75rem;color:#A89E90;">costo sin calcular</span>'}
         <div style="margin-top:4px;display:flex;gap:4px;justify-content:flex-end;">
           ${r ? '' : `<button type="button" class="btn-mini" onclick="abrirPublicar('${escapeAttr(s)}')">📸 Publicar</button>`}
-          <button type="button" class="btn-mini" title="Cambiar la tela" onclick="cambiarTelaProductoAC('${escapeAttr(s)}')">✏️</button>
+          <button type="button" class="btn-mini" title="Editar todo el SKU" onclick="editarSkuCompleto('${escapeAttr(s)}')">✏️</button>
           <button type="button" class="btn-mini" title="Quitar de este artículo" onclick="quitarProductoAC('${escapeAttr(s)}')">🗑️</button>
         </div></div>${x ? `<div style="grid-column:1/-1;border-top:1px dashed var(--line);padding-top:6px;">${htmlPrecioML(x.total)}</div>` : ''}</div>`;
   };
@@ -8555,6 +8555,81 @@ async function renderProductosAC(){
     ${skus.length ? skus.map(tarjeta).join('') : '<p class="note" style="text-align:left;">Todavía no hay SKU con este artículo.</p>'}
     <div id="ac-np-form"></div>
     <button type="button" id="ac-np-btn" onclick="formNuevoProductoAC()" style="width:100%;padding:10px;border-radius:10px;border:1.5px dashed #B9AFC6;background:transparent;font-size:0.92rem;cursor:pointer;color:var(--purple);">➕ Agregar nuevo SKU</button>`;
+}
+// ===== Editar un SKU que se fabrica: fabricacion, venta y costo en una sola ventana (el codigo no se cambia) =====
+function editarSkuCompleto(s){
+  const S = String(s).toUpperCase(), r = buscarProductoPorSku(S), v = r && r.variante;
+  const art = articuloDeSku(S) || acArticulo || '', cal = calidadDeSku(S) || '';
+  const arts = articulosAC().sort((a, b) => a.localeCompare(b, 'es'));
+  const c = costosDeSku(S), x = c && c.porTela.find(y => y.total != null);
+  const emp = (tablaConsumo.empaque || {})[art] || {}, t = x ? telasDatos.telas[x.tela] : null;
+  const usd = t && t.precioUsd > 0, porKg = t && t.precioUnidad === 'kg';
+  const nArt = skusQueFabrico().filter(k => articuloDeSku(k) === art).length;
+  const nTela = x ? skusQueFabrico().filter(k => { const cc = costosDeSku(k); return cc && cc.porTela[0] && cc.porTela[0].tela === x.tela; }).length : 0;
+  const uv = unidadVentaSku(S), opts = [['', 'unidad (1)'], ['par', 'par (2)'], ['media docena', 'media docena (6)'], ['docena', 'docena (12)']];
+  const sec = 'margin:14px 0 6px;font-weight:800;color:var(--purple);font-size:.92rem;border-bottom:1px solid var(--line);padding-bottom:3px;';
+  const tit = document.getElementById('pub-titulo'); if(tit) tit.textContent = '✏️ Editar ' + S;
+  document.getElementById('pub-cont').innerHTML = `
+    <p class="note" style="text-align:left;margin:0;">El código del SKU no se cambia.</p>
+    <div style="${sec}">1 · Fabricación</div>
+    <div class="field"><label>Artículo de corte</label><select id="es-art">${arts.map(a => `<option value="${escapeAttr(a)}" ${a === art ? 'selected' : ''}>${escaparHtml(a)}</option>`).join('')}</select></div>
+    <div class="field"><label>Tela</label><select id="es-cal">${opcionesCalidad(cal)}</select></div>
+    <div style="${sec}">2 · Venta</div>
+    ${r ? `<div class="field"><label>Descripción de la medida</label><input id="es-desc" value="${escapeAttr(v.desc || '')}"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div class="field" style="margin:0;"><label>Precio de venta</label><input id="es-precio" inputmode="decimal" value="${escapeAttr(String(v.precio || ''))}"></div>
+        <div class="field" style="margin:0;"><label>Se vende por</label><select id="es-uv">${opts.map(([a, b]) => `<option value="${a}" ${uv === a ? 'selected' : ''}>${b}</option>`).join('')}${uv && !opts.some(o => o[0] === uv) ? `<option value="${escapeAttr(uv)}" selected>${escaparHtml(uv)}</option>` : ''}<option value="__otra">otra cantidad…</option></select></div></div>
+      <p class="note" style="text-align:left;margin:6px 0 0;">Producto: <b>${escaparHtml(r.producto.nombre)}</b> · <a href="#" onclick="event.preventDefault();cerrarPublicar();irAFotoConSku('${escapeAttr(S)}')">📷 Fotos</a></p>`
+      : `<div class="field"><label>Se vende por</label><select id="es-uv">${opts.map(([a, b]) => `<option value="${a}" ${uv === a ? 'selected' : ''}>${b}</option>`).join('')}${uv && !opts.some(o => o[0] === uv) ? `<option value="${escapeAttr(uv)}" selected>${escaparHtml(uv)}</option>` : ''}<option value="__otra">otra cantidad…</option></select></div>
+      <button type="button" class="btn-mini" onclick="cerrarPublicar();abrirPublicar('${escapeAttr(S)}')">📸 Publicar en el catálogo</button>`}
+    <div style="${sec}">3 · Costo</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div class="field" style="margin:0;"><label>Confección ($ por unidad)</label><input id="es-conf" inputmode="decimal" value="${emp.confeccion ? String(emp.confeccion).replace('.', ',') : ''}"></div>
+      <div class="field" style="margin:0;"><label>Insumos ($ por unidad)</label><input id="es-ins" inputmode="decimal" value="${emp.insumos ? String(emp.insumos).replace('.', ',') : ''}"></div></div>
+    <p class="note" style="text-align:left;margin:4px 0 8px;">Confección e insumos son del artículo "${escaparHtml(art)}": cambian el costo de sus ${nArt} SKU.</p>
+    ${x ? `<div class="field" style="margin:0;"><label>Precio de la tela ${escaparHtml(x.tela)} (${usd ? 'US$' : '$'} por ${porKg ? 'kg' : 'metro'})</label><input id="es-tela" inputmode="decimal" value="${String(usd ? t.precioUsd : (t.precio || '')).replace('.', ',')}"></div>
+      <p class="note" style="text-align:left;margin:4px 0 0;">Cambia el costo de los ${nTela} SKU que usan esta tela.</p>` : '<p class="note" style="text-align:left;">Sin tela con precio: el costo no se puede calcular.</p>'}
+    <div style="background:#FAF8F5;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:10px;font-size:.88rem;">
+      Hoy: costo por unidad <b>${x ? formatPrice(x.total) : '—'}</b> · por unidad de venta <b>${x ? formatPrice(x.total * cantUnidadVenta(uv)) : '—'}</b>${r ? ` · precio <b>${formatPrice(parsePrice(v.precio))}</b> · margen <b>${x && parsePrice(v.precio) ? Math.round((1 - x.total * cantUnidadVenta(uv) / parsePrice(v.precio)) * 100) + ' %' : '—'}</b>` : ''}</div>
+    <p class="error" id="pub-error" style="display:none;"></p>
+    <div style="display:flex;gap:8px;margin-top:12px;"><button class="btn btn-gold" style="flex:1;" onclick="guardarSkuCompleto('${escapeAttr(S)}')">💾 Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`;
+  ['es-art', 'es-cal'].forEach(id => { const sel = document.getElementById(id); hacerSelectBuscable(sel); if(sel._sync) sel._sync(); });
+  document.getElementById('es-uv').onchange = function(){ if(this.value === '__otra'){ const n = parseInt(prompt('¿Cuántas unidades trae lo que vende? (número)', ''), 10); if(n >= 2){ const o = document.createElement('option'); o.value = n + ' unidades'; o.textContent = n + ' unidades'; this.insertBefore(o, this.lastElementChild); this.value = o.value; } else this.value = ''; } };
+  document.getElementById('pub-modal').style.display = 'block';
+}
+async function guardarSkuCompleto(S){
+  const err = document.getElementById('pub-error'), val = id => { const e = document.getElementById(id); return e ? e.value : null; };
+  try{
+    const art = val('es-art'), cal = val('es-cal'), artAnt = articuloDeSku(S);
+    if(!art || !cal){ err.textContent = 'Elija el artículo y la tela.'; err.style.display = 'block'; return; }
+    // 1. fabricacion
+    if(art !== artAnt || cal !== calidadDeSku(S)){
+      fabricacion.vinculos[S] = { ...(fabricacion.vinculos[S] || {}), articulo: art, calidad: cal, tela: '' };
+      await guardarFabricacion();
+      const e0 = (tablaConsumo.empaque || {})[artAnt]; if(e0 && String(e0.sku || '').toUpperCase() === S && art !== artAnt) e0.sku = '';
+    }
+    // 2. costo: confeccion e insumos del articulo, precio de la tela
+    tablaConsumo.empaque = tablaConsumo.empaque || {}; const e = tablaConsumo.empaque[art] = tablaConsumo.empaque[art] || {};
+    const conf = numAr(val('es-conf')), ins = numAr(val('es-ins'));
+    e.confeccion = conf > 0 ? conf : 0; e.insumos = ins > 0 ? ins : 0;
+    await guardarTablaYConsumo();
+    const c = costosDeSku(S), x = c && c.porTela.find(y => y.total != null);
+    if(x && val('es-tela') != null){ const t = telasDatos.telas[x.tela], n = numAr(val('es-tela'));
+      if(n > 0){ const usd = t.precioUsd > 0; if(usd ? Math.abs(n - t.precioUsd) > 0.001 : Math.abs(n - (+t.precio || 0)) > 0.01){
+        if(usd) t.precioUsd = n; else t.precio = n;
+        await db.collection('config').doc('telas').set(JSON.parse(JSON.stringify(telasDatos))); } } }
+    // 3. venta: descripcion, precio y unidad
+    const r = buscarProductoPorSku(S), uvN = val('es-uv') || '';
+    const key = r ? r.producto._editKey : 'sku:' + S;
+    if(key && (unidadesVenta[key] || '') !== uvN){ if(uvN) unidadesVenta[key] = uvN; else delete unidadesVenta[key]; await db.collection('config').doc('unidades').set({ u: unidadesVenta }); }
+    if(r){ const d = val('es-desc'), pr = numAr(val('es-precio'));
+      if((d != null && d !== (r.variante.desc || '')) || (pr > 0 && Math.abs(pr - parsePrice(r.variante.precio)) > 0.01)){
+        r.producto.variantes = r.producto.variantes.map(vv => String(vv.sku).toUpperCase() === S ? { ...vv, desc: d != null ? d : vv.desc, precio: pr > 0 ? precioTxt(pr) : vv.precio } : vv);
+        await guardarProductoCatalogo(r.producto); } }
+    cerrarPublicar();
+    try{ renderProductosAC(); renderListaAC(); } catch(x2){} try{ renderProductosFabrico(); } catch(x2){} try{ renderCatalogo(document.getElementById('buscador').value); } catch(x2){}
+    registrarHistorialCostos().catch(() => {});
+  } catch(e2){ err.textContent = 'No se pudo guardar: ' + e2.message; err.style.display = 'block'; }
 }
 async function cambiarTelaProductoAC(s){
   const actual = calidadDeSku(s);
@@ -18810,7 +18885,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v262';
+const APP_VERSION = '2026-10-02-v263';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
@@ -18868,7 +18943,7 @@ window.addEventListener('load', () => {
     ['abrirFacturas', 'Cargando facturas…'], ['leerFacturasPDF', 'Leyendo facturas…'], ['guardarFactura', 'Guardando la factura…'], ['borrarFacturasSel', 'Borrando facturas…'],
     ['importarLinksWeb', 'Leyendo el archivo de Tienda Nube…'], ['analizarPedidoIA', 'La IA está armando el pedido…'],
     ['generarFlyersNuevoIngreso', 'Generando las piezas…'], ['abrirResultadosML', 'Preparando Resultados ML…'], ['descargarCopia', 'Preparando la copia…'],
-    ['abrirFaltantes', 'Cargando faltantes…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
+    ['abrirFaltantes', 'Cargando faltantes…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
   ];
   setTimeout(() => W.forEach(([n, t]) => conProcesando(n, t)), 0);
 });
