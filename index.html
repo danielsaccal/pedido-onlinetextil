@@ -1597,7 +1597,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v261</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v262</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -7326,6 +7326,16 @@ function filasProductosFabrico(){
   });
   return filas;
 }
+// "Se vende por": se guarda en el producto del catalogo (o por SKU si no esta publicado)
+async function pfUnidad(sku, v, sel){
+  if(v === '__otra'){ const n = prompt('¿Cuántas unidades trae lo que vende? (número)', ''); const k = parseInt(n, 10); if(!(k >= 1)){ renderProductosFabrico(); return; } v = k === 1 ? '' : k + ' unidades'; }
+  const r = buscarProductoPorSku(sku), key = r ? r.producto._editKey : 'sku:' + String(sku).toUpperCase();
+  if(!key){ alert('No se pudo guardar.'); return; }
+  if(v) unidadesVenta[key] = v; else delete unidadesVenta[key];
+  try{ await db.collection('config').doc('unidades').set({ u: unidadesVenta }); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  if(r && r.producto.variantes.length > 1) setTimeout(() => alert(`Se aplicó a todas las medidas de "${r.producto.nombre}", porque la unidad de venta es del producto.`), 50);
+  renderProductosFabrico(); try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){} registrarHistorialCostos().catch(() => {});
+}
 function renderProductosFabrico(){
   const q = normBusqueda(document.getElementById('pf-buscar').value);
   const todas = filasProductosFabrico();
@@ -7339,14 +7349,14 @@ function renderProductosFabrico(){
   if(!filas.length){ cont.innerHTML = `<p class="empty-msg">${todas.length ? 'No hay productos que coincidan.' : 'Todavía no vinculaste productos con fabricación. Se hace desde Artículos y cortes (SKU + calidad de tela) o desde Editar producto (🏭 Fabricación propia).'}</p>`; return; }
   let prodPrev = null;
   const nombreArt = a => a ? (a.startsWith('ficha:') ? nombreFicha(a.slice(6)) : a) : '';
-  cont.innerHTML = `<label style="display:inline-flex;gap:6px;align-items:center;font-size:0.82rem;color:#6B6258;margin-bottom:8px;cursor:pointer;"><input type="checkbox" ${pfDetalle ? 'checked' : ''} onchange="pfDetalle=this.checked; renderProductosFabrico();"> Ver detalle (artículo de corte, tela, costo, precio y margen)</label>
+  cont.innerHTML = `<label style="display:inline-flex;gap:6px;align-items:center;font-size:0.82rem;color:#6B6258;margin-bottom:8px;cursor:pointer;"><input type="checkbox" ${pfDetalle ? 'checked' : ''} onchange="pfDetalle=this.checked; renderProductosFabrico();"> Ver detalle (artículo de corte y tela)</label>
     <div class="${pfDetalle ? '' : 'pf-simple'}" style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;"><table style="width:100%;border-collapse:collapse;font-size:0.86rem;">
-    <thead><tr style="background:var(--cream);"><th style="padding:7px 4px 7px 8px;width:24px;"><input type="checkbox" title="Seleccionar todos los de la lista" onchange="pfSeleccionarTodos(this.checked)" ${filas.length && filas.every(f => pfSel.has(f.sku)) ? 'checked' : ''}></th><th style="padding:7px 8px;text-align:left;">SKU</th><th style="padding:7px 8px;text-align:left;">Medida</th><th class="pf-det" style="padding:7px 8px;text-align:left;">Artículo de corte</th><th class="pf-det" style="padding:7px 8px;text-align:left;">Tela</th><th class="pf-det" style="padding:7px 8px;text-align:right;">Costo</th><th class="pf-det" style="padding:7px 8px;text-align:right;">Precio de lista</th><th class="pf-det" style="padding:7px 8px;text-align:right;">Margen</th><th style="padding:7px 8px;text-align:center;">Estado</th></tr></thead><tbody>
+    <thead><tr style="background:var(--cream);"><th style="padding:7px 4px 7px 8px;width:24px;"><input type="checkbox" title="Seleccionar todos los de la lista" onchange="pfSeleccionarTodos(this.checked)" ${filas.length && filas.every(f => pfSel.has(f.sku)) ? 'checked' : ''}></th><th style="padding:7px 8px;text-align:left;">SKU</th><th style="padding:7px 8px;text-align:left;">Medida</th><th class="pf-det" style="padding:7px 8px;text-align:left;">Artículo de corte</th><th class="pf-det" style="padding:7px 8px;text-align:left;">Tela</th><th style="padding:7px 8px;text-align:left;">Se vende por</th><th style="padding:7px 8px;text-align:right;">Costo por unidad</th><th style="padding:7px 8px;text-align:right;">Costo por unidad de venta</th><th style="padding:7px 8px;text-align:right;">Precio de venta</th><th style="padding:7px 8px;text-align:right;">Margen</th><th style="padding:7px 8px;text-align:center;">Estado</th></tr></thead><tbody>
     ${filas.map(f => {
       let cab = '';
       if(f.producto !== prodPrev){
         prodPrev = f.producto;
-        cab = `<tr style="background:var(--purple);"><td colspan="9" style="padding:7px 10px;color:#fff;"><b>${escaparHtml(f.producto)}</b>${f.subtitulo ? `<br><span style="font-size:0.78rem;opacity:.85;">En el catálogo: ${escaparHtml(f.subtitulo)}</span>` : ''}</td></tr>`;
+        cab = `<tr style="background:var(--purple);"><td colspan="11" style="padding:7px 10px;color:#fff;"><b>${escaparHtml(f.producto)}</b>${f.subtitulo ? `<br><span style="font-size:0.78rem;opacity:.85;">En el catálogo: ${escaparHtml(f.subtitulo)}</span>` : ''}</td></tr>`;
       }
       const ok = completo(f);
       return cab + `<tr style="border-top:1px solid var(--line);${pfSel.has(f.sku) ? 'background:#F3EEF7;' : ''}">
@@ -7359,12 +7369,16 @@ function renderProductosFabrico(){
           const c = costosDeSku(f.sku), x = c && c.porTela.find(y => y.total != null);
           const r = buscarProductoPorSku(f.sku), v = r && r.variante, pr = v ? parsePrice(v.precio) : null;
           // si el precio de lista es por docena (u otra unidad), el costo se lleva a esa misma unidad
-          const div = r ? ({ 'docena': 12, 'media docena': 6, 'par': 2 }[unidadesVenta[r.producto._editKey]] || 1) : 1;
+          const uv = unidadVentaSku(f.sku), div = cantUnidadVenta(uv);
           const costo = x ? x.total * div : null;
           const mg = costo != null && pr ? (pr - costo) / pr : null;
-          return `<td class="pf-det" style="padding:7px 8px;text-align:right;white-space:nowrap;" title="${escapeAttr(textoCostoSku(f.sku))}">${costo != null ? '$ ' + formatoPesos(Math.round(costo)) : '<span class="note">—</span>'}</td>
-            <td class="pf-det" style="padding:7px 8px;text-align:right;white-space:nowrap;">${pr ? '$ ' + formatoPesos(Math.round(pr)) : '—'}</td>
-            <td class="pf-det" style="padding:7px 8px;text-align:right;white-space:nowrap;font-weight:700;color:${mg == null ? '#8A8072' : mg < 0.2 ? '#A6432F' : mg < 0.4 ? '#8A6417' : '#2F7A47'};">${mg != null ? Math.round(mg * 100) + ' %' : '—'}</td>`;
+          const opts = [['', 'unidad (1)'], ['par', 'par (2)'], ['media docena', 'media docena (6)'], ['docena', 'docena (12)']];
+          const esOtra = uv && !opts.some(o => o[0] === uv);
+          return `<td style="padding:7px 8px;"><select onchange="pfUnidad('${escapeAttr(f.sku)}', this.value, this)" style="padding:4px 6px;border:1px solid var(--line);border-radius:8px;font-size:0.8rem;width:auto;">${opts.map(([v, t]) => `<option value="${v}" ${uv === v ? 'selected' : ''}>${t}</option>`).join('')}${esOtra ? `<option value="${escapeAttr(uv)}" selected>${escaparHtml(uv)} (${div})</option>` : ''}<option value="__otra">otra cantidad…</option></select></td>
+            <td style="padding:7px 8px;text-align:right;white-space:nowrap;" title="${escapeAttr(textoCostoSku(f.sku))}">${x ? '$ ' + formatoPesos(Math.round(x.total)) : '<span class="note">—</span>'}</td>
+            <td style="padding:7px 8px;text-align:right;white-space:nowrap;font-weight:700;">${costo != null ? '$ ' + formatoPesos(Math.round(costo)) : '<span class="note">—</span>'}</td>
+            <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${pr ? '$ ' + formatoPesos(Math.round(pr)) : '<span class="note">sin publicar</span>'}</td>
+            <td style="padding:7px 8px;text-align:right;white-space:nowrap;font-weight:700;color:${mg == null ? '#8A8072' : mg < 0.2 ? '#A6432F' : mg < 0.4 ? '#8A6417' : '#2F7A47'};">${mg != null ? Math.round(mg * 100) + ' %' : '—'}</td>`;
         })()}
         <td style="padding:7px 8px;text-align:center;white-space:nowrap;">${ok ? '✅' : `<button type="button" class="btn-mini" onclick="completarSkuPf('${escapeAttr(f.sku)}')">⚠️ Completar</button>`}</td></tr>`;
     }).join('')}</tbody></table></div>
@@ -9486,6 +9500,9 @@ async function editarDatosTaller(i){
 var categoriasCfg = { extra: [], mover: [] }, fotosMapa = {}, fotosRaw = {}, videosRaw = {};
 // unidad de venta del precio (ej: por docena), guardada aparte en config/unidades
 var unidadesVenta = {};
+// cuantas unidades trae lo que se vende: docena 12, media docena 6, par 2, "10 unidades" 10; si no se aclara, 1
+function cantUnidadVenta(u){ const s = String(u || '').trim().toLowerCase(); const m = s.match(/^(\d+)/); if(m) return +m[1] || 1; return ({ 'docena': 12, 'media docena': 6, 'par': 2 })[s] || 1; }
+function unidadVentaSku(S){ const r = buscarProductoPorSku(S); return r ? (unidadesVenta[r.producto._editKey] || '') : (unidadesVenta['sku:' + String(S).toUpperCase()] || ''); }
 async function cargarUnidadesVenta(){ try{ const d = await db.collection('config').doc('unidades').get(); unidadesVenta = d.exists ? (d.data().u || {}) : {}; } catch(e){} }
 function sufijoPrecio(p){ if(p && p.metros) return ' /m'; const u = p && (typeof unidadesVenta === 'object' && unidadesVenta ? unidadesVenta : {})[p._editKey]; return u ? ' /' + u : ''; }
 async function cargarCategoriasCfg(){
@@ -10077,7 +10094,7 @@ async function registrarHistorialCostos(){
     Object.entries(costosReventa || {}).forEach(([S, c0]) => {
       if(fabricados.has(S) || !(c0 > 0) || esCodigoTela(S) || (kitsDatos && kitsDatos[S])) return;
       const r = buscarProductoPorSku(S), u = r ? (unidadesVenta[r.producto._editKey] || '') : '';
-      const c = Math.round(c0 / (DIV[u] || 1) * 100) / 100;
+      const c = Math.round(c0 / cantUnidadVenta(u) * 100) / 100;
       if(ult[S] == null || Math.abs(ult[S] - c) >= 0.5){ if(ult[S] > 0 && Math.abs(ult[S] - c) / ult[S] >= 0.005) cambiosCosto.push({ sku: S, antes: ult[S], ahora: c }); nuevos.push({ sku: S, fecha: hoy, costo: c, desglose: { reventa: true, costoCargado: c0, por: u || 'unidad' } }); ult[S] = c; }
     });
     // juegos armados con otros SKU: suma de sus partes
@@ -10183,12 +10200,12 @@ function renderCostosReventa(){
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;"><b style="flex:1;">${escaparHtml(x.p.nombre)}</b><span class="note" style="margin:0;">${escaparHtml(x.cat)}</span>
         ${x.p.variantes.every(v => codTela(v.sku)) ? '<span style="font-size:0.8rem;color:#2E5A8C;background:#F2F7FD;border-radius:8px;padding:5px 8px;">🧵 por metro</span>' : ''}<select title="Precio y costo por…" onchange="crUnidad('${escapeAttr(x.p._editKey)}', this.value)" style="padding:5px;border:1px solid var(--line);border-radius:8px;font-size:0.8rem;${x.p.variantes.every(v => codTela(v.sku)) ? 'display:none;' : ''}">${['', 'docena', 'media docena', 'par', 'juego', 'pack'].map(u => `<option value="${u}" ${(unidadesVenta[x.p._editKey] || '') === u ? 'selected' : ''}>${u ? 'por ' + u : 'por unidad'}</option>`).join('')}</select>
         <input type="text" inputmode="decimal" placeholder="mismo costo para todas" style="width:150px;padding:6px;border:1px solid var(--line);border-radius:8px;font-size:0.8rem;" onkeydown="if(event.key==='Enter'){crTodo(${pi}, this.value); this.value='';}"><span class="note" style="margin:0;">↵</span></div>
-      ${vs.map(v => { const s = String(v.sku).toUpperCase(); const i = window.__crSkus.push(s) - 1; const pr = parsePrice(v.precio), c = kitsDatos && kitsDatos[s] ? (costoUnidadSku(s) || 0) * ({ 'docena': 12, 'media docena': 6, 'par': 2 }[unidadesVenta[x.p._editKey]] || 1) : numAr(crValor(s)); const mg = c > 0 && pr > 0 ? (pr - c) / c : null;
+      ${vs.map(v => { const s = String(v.sku).toUpperCase(); const i = window.__crSkus.push(s) - 1; const pr = parsePrice(v.precio), c = kitsDatos && kitsDatos[s] ? (costoUnidadSku(s) || 0) * cantUnidadVenta(unidadesVenta[x.p._editKey]) : numAr(crValor(s)); const mg = c > 0 && pr > 0 ? (pr - c) / c : null;
         return `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 110px 120px 70px;gap:6px;align-items:center;padding:4px 0;border-top:1px solid var(--line);font-size:0.85rem;">
           <b>${escaparHtml(s)}</b><span style="color:#6B6258;">${escaparHtml(v.desc || '')}</span><span style="text-align:right;">${pr ? formatPrice(pr) + `<small class="meta">${sufijoPrecio(x.p)}</small>` : ''}</span>
-          ${kitsDatos && kitsDatos[s] ? `<div style="text-align:right;"><b>${costoUnidadSku(s) != null ? formatPrice(costoUnidadSku(s) * ({ 'docena': 12, 'media docena': 6, 'par': 2 }[unidadesVenta[x.p._editKey]] || 1)) : '—'}</b><small style="display:block;font-size:0.66rem;color:#6B4FA0;">🧩 ${escaparHtml(kitsDatos[s])}</small></div>` : `<div style="position:relative;"><input inputmode="decimal" value="${escapeAttr(crValor(s))}" placeholder="costo" oninput="crCambiar(${i}, this.value)" style="padding:7px;border:1px solid ${codTela(s) ? '#B9D3EE' : 'var(--line)'};border-radius:8px;text-align:right;width:100%;box-sizing:border-box;${codTela(s) ? 'background:#F2F7FD;' : ''}" title="${codTela(s) ? 'Costo por metro de la pantalla Telas (se cambia en los dos lados)' : ''}">${codTela(s) ? '<small style="display:block;text-align:right;font-size:0.66rem;color:#2E5A8C;margin-top:2px;">🧵 de Telas · por metro</small>' : ''}</div>`}
+          ${kitsDatos && kitsDatos[s] ? `<div style="text-align:right;"><b>${costoUnidadSku(s) != null ? formatPrice(costoUnidadSku(s) * cantUnidadVenta(unidadesVenta[x.p._editKey])) : '—'}</b><small style="display:block;font-size:0.66rem;color:#6B4FA0;">🧩 ${escaparHtml(kitsDatos[s])}</small></div>` : `<div style="position:relative;"><input inputmode="decimal" value="${escapeAttr(crValor(s))}" placeholder="costo" oninput="crCambiar(${i}, this.value)" style="padding:7px;border:1px solid ${codTela(s) ? '#B9D3EE' : 'var(--line)'};border-radius:8px;text-align:right;width:100%;box-sizing:border-box;${codTela(s) ? 'background:#F2F7FD;' : ''}" title="${codTela(s) ? 'Costo por metro de la pantalla Telas (se cambia en los dos lados)' : ''}">${codTela(s) ? '<small style="display:block;text-align:right;font-size:0.66rem;color:#2E5A8C;margin-top:2px;">🧵 de Telas · por metro</small>' : ''}</div>`}
           <span style="text-align:right;font-weight:700;color:${mg == null ? '#A89E90' : mg < 0.2 ? '#A6432F' : mg < 0.4 ? '#8A6417' : '#2F7A47'};" title="Margen sobre el costo">${mg == null ? '—' : Math.round(mg * 100) + ' %'}</span>
-          <div style="grid-column:2/-1;text-align:right;">${htmlPrecioML(kitsDatos && kitsDatos[s] ? costoUnidadSku(s) : (c > 0 ? c / ({ 'docena': 12, 'media docena': 6, 'par': 2 }[unidadesVenta[x.p._editKey]] || 1) : 0))}</div></div>`; }).join('')}</div>`;
+          <div style="grid-column:2/-1;text-align:right;">${htmlPrecioML(kitsDatos && kitsDatos[s] ? costoUnidadSku(s) : (c > 0 ? c / cantUnidadVenta(unidadesVenta[x.p._editKey]) : 0))}</div></div>`; }).join('')}</div>`;
   }).join('');
   document.getElementById('cr-lista').innerHTML = html ? `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 110px 120px 70px;gap:6px;font-size:0.72rem;color:#8A8072;padding:0 10px 4px;"><span>SKU</span><span>Descripción</span><span style="text-align:right;">Precio lista</span><span style="text-align:right;">Costo de compra $</span><span style="text-align:right;">Margen</span></div>` + html : '<p class="empty-msg">No hay productos con ese filtro.</p>';
 }
@@ -10285,7 +10302,7 @@ function costoUnidadSku(S, prof){
   if(kitsDatos && kitsDatos[S]){ let t = 0; for(const p of partesKit(kitsDatos[S])){ const c = costoUnidadSku(p.sku, prof + 1); if(c == null) return null; t += c * p.n; } return Math.round(t * 100) / 100; }
   if(fabricacion && fabricacion.vinculos[S] && fabricacion.vinculos[S].articulo){ const a = costoActualSku(S); if(a) return a.costo; }
   const ct = codTela(S); if(ct){ const pm = precioMetroTela(ct); if(pm > 0) return Math.round(pm * 100) / 100; }
-  const c0 = (costosReventa || {})[S]; if(c0 > 0){ const r = buscarProductoPorSku(S), u = r ? (unidadesVenta[r.producto._editKey] || '') : ''; return Math.round(c0 / ({ 'docena': 12, 'media docena': 6, 'par': 2 }[u] || 1) * 100) / 100; }
+  const c0 = (costosReventa || {})[S]; if(c0 > 0){ const r = buscarProductoPorSku(S), u = r ? (unidadesVenta[r.producto._editKey] || '') : ''; return Math.round(c0 / cantUnidadVenta(u) * 100) / 100; }
   return null;
 }
 function renderKits(){
@@ -10550,7 +10567,7 @@ function parsearFactura(L, nombreArchivo){
 }
 function skuDeFactura(cod){ const c = String(cod).toUpperCase(); return (fcEquiv && fcEquiv[c]) || c; }
 // en las facturas la cantidad va en la unidad de venta del catalogo (ej: docenas); el costo de la app es por unidad suelta
-function divisorVenta(s){ const r = buscarProductoPorSku(s); return r ? ({ 'docena': 12, 'media docena': 6, 'par': 2 }[unidadesVenta[r.producto._editKey]] || 1) : 1; }
+function divisorVenta(s){ return cantUnidadVenta(unidadVentaSku(s)); }
 // costo por unidad vigente en una fecha (historial de costos); antes del primer registro, el primero; sin historial, el actual
 let histCostos = null;
 async function cargarHistCostos(){ if(histCostos) return; histCostos = {}; try{ const s = await db.collection('historial_costos').get();
@@ -15393,7 +15410,7 @@ function buscarProductoParaEditar(){
   const esTelas = match.categoria === 'TELAS';
   document.getElementById('ep-metros-wrap').style.display = 'block';
   document.getElementById('ep-metros').value = p.metros || '';
-  document.getElementById('ep-unidad').value = unidadesVenta[p._editKey] || '';
+  { const sel = document.getElementById('ep-unidad'), u = unidadesVenta[p._editKey] || ''; if(u && ![...sel.options].some(o => (o.value || o.textContent) === u)){ const o = document.createElement('option'); o.textContent = u; sel.appendChild(o); } sel.value = u; }
 
   const cont = document.getElementById('ep-variantes-cont');
   cont.innerHTML = '';
@@ -18793,7 +18810,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v261';
+const APP_VERSION = '2026-10-02-v262';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
