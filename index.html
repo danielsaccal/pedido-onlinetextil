@@ -1597,7 +1597,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v263</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v264</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -7326,6 +7326,16 @@ function filasProductosFabrico(){
   });
   return filas;
 }
+// costo por unidad de venta (pieza x docena, etc.) segun el producto donde se publica o el SKU
+function costoPorUnidadVenta(S, prod){
+  const c = costosDeSku(String(S).toUpperCase()), x = c && c.porTela.find(y => y.total != null); if(!x) return null;
+  const u = prod ? (unidadesVenta[prod._editKey] || '') : unidadVentaSku(S); return { costo: x.total * cantUnidadVenta(u), pieza: x.total, cant: cantUnidadVenta(u), u: u || 'unidad' };
+}
+// control de seguridad: precio por debajo del costo por unidad de venta
+function precioBajoCostoOk(S, precio, prod){
+  const k = costoPorUnidadVenta(S, prod); if(!k || !(precio > 0) || precio >= k.costo) return true;
+  return confirm(`¿Seguro? El precio de ${S} (${formatPrice(precio)}) es MENOR que su costo por ${k.u}: ${formatPrice(k.costo)}${k.cant > 1 ? ` (${k.cant} × ${formatPrice(k.pieza)})` : ''}.\n\nAceptar = guardar igual · Cancelar = revisar el precio`);
+}
 // "Se vende por": se guarda en el producto del catalogo (o por SKU si no esta publicado)
 async function pfUnidad(sku, v, sel){
   if(v === '__otra'){ const n = prompt('¿Cuántas unidades trae lo que vende? (número)', ''); const k = parseInt(n, 10); if(!(k >= 1)){ renderProductosFabrico(); return; } v = k === 1 ? '' : k + ' unidades'; }
@@ -8032,12 +8042,12 @@ function sugerenciasPublicar(sku){
   }
   // precio sugerido: con el margen promedio de ese producto (o 50 %) sobre el costo; si no hay costo, el de otro SKU del mismo articulo
   let precio = null, motivo = '';
-  const c = costosDeSku(S), costo = c && c.porTela.find(x => x.total != null) ? c.porTela.find(x => x.total != null).total : null;
+  const kv = costoPorUnidadVenta(S, prod), costo = kv ? kv.costo : null, divP = prod ? cantUnidadVenta(unidadesVenta[prod._editKey]) : 1;
   if(costo){
-    const mgs = prod ? prod.variantes.map(v => { const cc = costosDeSku(String(v.sku).toUpperCase()), x = cc && cc.porTela.find(y => y.total != null), pr = parsePrice(v.precio); return x && pr ? (pr - x.total) / pr : null; }).filter(x => x != null && x > 0 && x < 0.9) : [];
+    const mgs = prod ? prod.variantes.map(v => { const cc = costosDeSku(String(v.sku).toUpperCase()), x = cc && cc.porTela.find(y => y.total != null), pr = parsePrice(v.precio); return x && pr ? (pr - x.total * divP) / pr : null; }).filter(x => x != null && x > 0 && x < 0.9) : [];
     const mg = mgs.length ? mgs.reduce((a, b) => a + b, 0) / mgs.length : 0.5;
     precio = Math.round(costo / (1 - mg) / 10) * 10;
-    motivo = `costo $ ${formatoPesos(Math.round(costo))} con margen ${Math.round(mg * 100)} %${mgs.length ? ' (el promedio de ese producto)' : ''}`;
+    motivo = `costo por ${kv.u} $ ${formatoPesos(Math.round(costo))}${kv.cant > 1 ? ` (${kv.cant} × $ ${formatoPesos(Math.round(kv.pieza))})` : ''} con margen ${Math.round(mg * 100)} %${mgs.length ? ' (el promedio de ese producto)' : ''}${kv.cant === 1 ? '. Si se vende por docena u otra cantidad, márquelo en "Se vende por" y el precio se recalcula' : ''}`;
   } else if(r0){
     const v = r0.p.variantes.find(v => herm.includes(articuloDeSku(String(v.sku).toUpperCase())));
     const pr = v && parsePrice(v.precio), artH = v && articuloDeSku(String(v.sku).toUpperCase());
@@ -8108,6 +8118,7 @@ async function confirmarPublicar(){
   if(!desc){ err.textContent = 'Falta la descripción.'; err.style.display = 'block'; return; }
   if(!(precioN > 0)){ err.textContent = 'Falta el precio.'; err.style.display = 'block'; return; }
   const precio = precioN.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if(!precioBajoCostoOk(pubSku, precioN, sel !== '__nuevo__' ? window.__pubProds(cat)[+sel] : null)) return;
   let fotos = [];
   try{ fotos = await leerFotosPublicar(); } catch(e){ err.textContent = 'No se pudo procesar alguna foto.'; err.style.display = 'block'; return; }
   const foto = fotos[0] || null;
@@ -8300,6 +8311,7 @@ async function confirmarPublicarVarios(){
     if(!document.getElementById('pubv-on-' + i).checked) continue;
     const desc = document.getElementById('pubv-desc-' + i).value.trim(), pr = numAr(document.getElementById('pubv-precio-' + i).value);
     if(!desc || !(pr > 0)){ err.textContent = `Falta la descripción o el precio de ${v.sku}.`; err.style.display = 'block'; return; }
+    if(!precioBajoCostoOk(v.sku, pr, sel !== '__nuevo__' ? window.__pubProds(cat)[+sel] : null)) return;
     variantesNuevas.push({ sku: v.sku, desc, precio: pr.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
   }
   let fotos = [];
@@ -8623,6 +8635,7 @@ async function guardarSkuCompleto(S){
     const key = r ? r.producto._editKey : 'sku:' + S;
     if(key && (unidadesVenta[key] || '') !== uvN){ if(uvN) unidadesVenta[key] = uvN; else delete unidadesVenta[key]; await db.collection('config').doc('unidades').set({ u: unidadesVenta }); }
     if(r){ const d = val('es-desc'), pr = numAr(val('es-precio'));
+      if(pr > 0 && !precioBajoCostoOk(S, pr, r.producto)) return;
       if((d != null && d !== (r.variante.desc || '')) || (pr > 0 && Math.abs(pr - parsePrice(r.variante.precio)) > 0.01)){
         r.producto.variantes = r.producto.variantes.map(vv => String(vv.sku).toUpperCase() === S ? { ...vv, desc: d != null ? d : vv.desc, precio: pr > 0 ? precioTxt(pr) : vv.precio } : vv);
         await guardarProductoCatalogo(r.producto); } }
@@ -8741,6 +8754,7 @@ async function anpGuardar(){
   if(publicar && sel === '__nuevo__' && !nombreNuevo){ err.textContent = 'Falta el nombre del producto nuevo.'; err.style.display = 'block'; return; }
   const q = calidadesTela().find(x => x.clave === cal);
   const prod = publicar && sel !== '__nuevo__' ? window.__anpProds[+sel] : null;
+  if(publicar){ const prev0 = fabricacion.vinculos[sku]; fabricacion.vinculos[sku] = { ...(prev0 || {}), articulo: acArticulo, calidad: cal }; const ok0 = precioBajoCostoOk(sku, pr, prod); if(prev0) fabricacion.vinculos[sku] = prev0; else delete fabricacion.vinculos[sku]; if(!ok0) return; }
   const lineas = [`• SKU ${sku} con la tela ${q ? q.etiqueta : ''}`, `• Se hace con el artículo "${acArticulo}"`];
   if(otroArt && otroArt !== acArticulo) lineas.push(`• Estaba en "${otroArt}": se pasa a este artículo`);
   if(yaEnCat) lineas.push(`• Ya está en el catálogo (${yaEnCat.producto.nombre}): no se publica de nuevo`);
@@ -18885,7 +18899,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v263';
+const APP_VERSION = '2026-10-02-v264';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
