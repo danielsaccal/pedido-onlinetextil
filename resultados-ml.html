@@ -1224,7 +1224,7 @@ function pedirCorregirCosto(btn,sku){
   f.style.cssText='display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;background:#FAF8F5;border:1px solid var(--line);border-radius:10px;padding:8px;';
   f.innerHTML=`<span style="font-size:.85rem;">Costo por unidad de <b>${sku}</b>${act!=null?` (hoy: ${fmt(act)})`:''}:</span>
     <span><input id="${id}" placeholder="costo $ c/u" value="" style="width:130px;height:30px;min-height:0;padding:3px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box;"></span>
-    <select id="${id}-m" style="padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;width:auto;"><option value="error">Era un error de carga: corregir también las ventas anteriores</option><option value="cambio">El costo cambió: rige desde hoy</option></select>
+    <select id="${id}-m" style="padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;width:auto;"><option value="error">Era un error de carga: corregir también las ventas anteriores</option><option value="cambio">El costo cambió: rige desde hoy</option><option value="todas">Aplicar a TODAS las ventas de este SKU (todas las fechas)</option></select>
     <button type="button" style="padding:5px 12px;border-radius:8px;border:none;background:#3d1466;color:#fff;font-weight:700;cursor:pointer;" onclick="costoFaltante('${String(sku).replace(/'/g,'')}','${id}',document.getElementById('${id}-m').value)">Guardar</button>
     <small class="meta" style="width:100%;">"Era un error" reemplaza el último costo cargado (las ventas desde esa fecha toman el valor corregido). "Cambió" lo registra con fecha de hoy: las ventas anteriores conservan su costo.</small>`;
   cont.appendChild(f); f.querySelector('input').focus();
@@ -1288,15 +1288,28 @@ function renderRevisar(){
   if(!L.length){box.innerHTML='<p class="note">✓ No hay ventas para revisar.</p>';return;}
   const abierta=!!(box.querySelector('details')&&box.querySelector('details').open)||window.__revAbierta;
   box.innerHTML=`<details class="pleg" style="margin:10px 0;" ${abierta?'open':''} ontoggle="window.__revAbierta=this.open"><summary style="background:#FDEBE7;border-color:#E3B8AE;color:#A6432F;">⚠️ ${L.length} ${L.length===1?'venta para revisar':'ventas para revisar'} <small style="color:#A6432F;">· no se cuentan en la ganancia hasta que las confirmes</small></summary><div class="pleg-body">
-    ${L.slice(0,60).map(o=>`<div style="border-bottom:1px solid var(--line);padding:8px 0 8px 10px;font-size:.88rem;box-shadow:inset 4px 0 0 ${colorCta(o.cuenta)};">
+    ${(()=>{ const G={}; L.forEach(o=>{const s=String(o.skuBase||'').toUpperCase();(G[s]=G[s]||[]).push(o);});
+      const item=o=>`<div style="border-bottom:1px solid var(--line);padding:8px 0 8px 10px;font-size:.88rem;box-shadow:inset 4px 0 0 ${colorCta(o.cuenta)};">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;">${etiquetaCta(o.cuenta)}<b>${o.skuBase}</b><span class="meta">${o.fecha} · ${o.unid} unid. · precio ${fmt(o.pcd)} · costo ${fmt(o.costoRev)}</span>
         <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">${o.packSug?`<span style="display:inline-flex;gap:4px;align-items:center;border:1px solid #CDBFE0;background:#F4EFFA;border-radius:8px;padding:2px 4px 2px 8px;color:#5b2a86;font-weight:700;font-size:.85rem;">📦 Pack de <input type="number" min="2" value="${o.packSug}" style="width:52px;height:28px;min-height:0;padding:2px 4px;border:1px solid #CDBFE0;border-radius:6px;font-weight:700;font-size:.85rem;box-sizing:border-box;" onkeydown="if(event.key==='Enter')this.nextElementSibling.click()"><button type="button" style="padding:3px 8px;border-radius:6px;border:none;background:#5b2a86;color:#fff;font-weight:700;cursor:pointer;" title="Solo esta venta" onclick="const n=parseInt(this.previousElementSibling.value,10);if(n>=2)packSoloVenta('${claveVenta(o).replace(/'/g,'')}',n)">Solo esta venta</button><button type="button" style="padding:3px 8px;border-radius:6px;border:1px solid #CDBFE0;background:#fff;color:#5b2a86;font-weight:700;cursor:pointer;" title="Todas las ventas de este SKU sin x N en esta cuenta" onclick="const n=parseInt(this.parentElement.querySelector('input').value,10);if(n>=2)aplicarPackSug('${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}',n)">Todas</button></span>`:''}<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid #BFDCC8;background:#EEF6F0;color:#2F7A47;font-weight:700;cursor:pointer;" onclick="confirmarVenta('${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">✓ Está bien</button>
         <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" data-op="${o.op}" onclick="pedirCambioSku(this,'${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">🔁 Cambiar SKU</button>
         <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="pedirCorregirCosto(this,'${String(o.skuBase).replace(/'/g,'')}')">✏️ Corregir costo</button>
         <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="verVentaAca(this,'${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">Ver venta</button></span></div>
       <div class="rev-det"></div>
-      <ul style="margin:4px 0 0 18px;padding:0;color:#A6432F;">${o.revisar.map(x=>`<li>${x}</li>`).join('')}</ul></div>`).join('')}
-    ${L.length>60?`<p class="note">Y ${L.length-60} más.</p>`:''}
+      <ul style="margin:4px 0 0 18px;padding:0;color:#A6432F;">${o.revisar.map(x=>`<li>${x}</li>`).join('')}</ul></div>`;
+      return Object.entries(G).sort((a,b)=>b[1].length-a[1].length).map(([s,os])=>{ const hs=COSTOS[s]||[], act=hs.length?hs[hs.length-1].costo:null;
+        const usados=[...new Set(os.map(o=>o.unid?Math.round(o.costoRev/o.unid):null).filter(x=>x!=null))];
+        const sq=s.replace(/'/g,''), abierto=(window.__revGrupos||{})[s];
+        return `<div style="border:1px solid var(--line);border-radius:12px;margin:8px 0;background:#fff;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 10px;">
+            <b>${s}</b><span class="meta">${NAMES[s]||''}</span>
+            <span style="color:#A6432F;font-weight:700;">${os.length} ${os.length===1?'venta':'ventas'} para revisar</span>
+            <span class="meta">costo usado ${usados.slice(0,3).map(fmt).join(' / ')}${usados.length>3?'…':''} · costo actual ${act!=null?fmt(act):'—'}</span>
+            <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;">
+              ${act!=null?`<button type="button" style="padding:4px 10px;border-radius:8px;border:none;background:#3d1466;color:#fff;font-weight:700;cursor:pointer;" onclick="aplicarCostoTodas('${sq}',${act})">Usar el costo actual en todas</button>`:''}
+              <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="const v=prompt('Costo por unidad para TODAS las ventas de ${sq}:','');const n=leerMonto(v);if(n>0)aplicarCostoTodas('${sq}',n);">✏️ Otro costo para todas</button>
+              <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="window.__revGrupos=window.__revGrupos||{};window.__revGrupos['${sq}']=!window.__revGrupos['${sq}'];renderRevisar();">${abierto?'Ocultar ventas':'Ver ventas'}</button></span></div>
+          ${abierto?`<div style="padding:0 10px 6px;">${os.map(item).join('')}</div>`:''}</div>`; }).join(''); })()}
     <p class="note">Si el número está bien, tocá <b>✓ Está bien</b> y pasa a contarse. Si está mal, corregí el costo, la unidad (docena) o la equivalencia y la alerta desaparece sola.</p></div></details>`;
 }
 // ===== Menu con tarjetas (como la app): cada seccion es una pantalla con Volver =====
@@ -1470,7 +1483,23 @@ function renderDiagnostico(){
       <div style="margin-top:3px;">Costo actual: <b>${f.act!=null?fmt(f.act):'—'}</b> por unidad</div>
       ${f.h0.length>1?`<div class="meta" style="margin-top:2px;">Historial: ${f.h0.map(x=>`<span style="${f.raros.includes(x)?'color:#A6432F;font-weight:700;':''}">${x.fecha.split('-').reverse().join('/')} ${fmt(x.costo)}${f.raros.includes(x)?` (×${(x.costo/f.act).toLocaleString('es-AR',{maximumFractionDigits:1})})`:''}</span>`).join(' · ')}</div>`:''}
       ${Object.keys(f.g.motivos).length?`<div class="meta" style="margin-top:2px;">Motivos: ${Object.entries(f.g.motivos).map(([m,n])=>`${m} (${n})`).join(' · ')}</div>`:''}
-      ${f.raros.length?`<button type="button" style="margin-top:6px;padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:.8rem;" onclick="corregirDudosos(['${f.s}'])">🛠️ Usar el costo actual para las ventas anteriores</button>`:''}</div>`).join('')||'<p class="note">No se encontraron costos dudosos.</p>'}</div>`;
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${f.raros.length?`<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:.8rem;" onclick="corregirDudosos(['${f.s}'])">🛠️ Usar el costo actual para las ventas anteriores</button>`:''}
+      <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:.8rem;" onclick="const v=prompt('Costo por unidad para TODAS las ventas de ${f.s}:','${f.act!=null?Math.round(f.act):''}');const n=leerMonto(v);if(n>0)aplicarCostoTodas('${f.s}',n);">✏️ Aplicar un costo a todas sus ventas</button></div></div>`).join('')||'<p class="note">No se encontraron costos dudosos.</p>'}</div>`;
+}
+// un mismo costo para TODAS las ventas de un SKU: todos sus registros del historial pasan a ese valor
+async function aplicarCostoTodas(sku, n){
+  sku=String(sku).toUpperCase(); n=+n; if(!(n>0))return;
+  const hs=COSTOS[sku]||[], ventas=allRows().filter(o=>String(o.skuBase||'').toUpperCase()===sku&&o.tipo==='Venta'&&o.pcd>0).length;
+  const cambia=hs.filter(x=>Math.abs(x.costo-n)>0.009);
+  if(!confirm(`¿Usar ${fmt(n)} por unidad como costo de TODAS las ventas de ${sku} (${ventas} ventas, todas las fechas)?\n\n${hs.length?`Se cambian ${cambia.length} de ${hs.length} registros del historial${cambia.length?':\n'+cambia.slice(0,12).map(x=>`${x.fecha.split('-').reverse().join('/')}: ${fmt(x.costo)} → ${fmt(n)}`).join('\n')+(cambia.length>12?'\n…':''):'.'}`:'No tenía costos registrados: se crea uno que rige para todas las fechas.'}`))return;
+  procesando('Aplicando el costo…');
+  try{
+    if(hs.length){const lote=db.batch();cambia.forEach(x=>{if(x.id)lote.set(db.collection('historial_costos').doc(x.id),{costo:n,costoAnterior:x.costo,corregido:new Date().toISOString()},{merge:true});});await lote.commit();cambia.forEach(x=>x.costo=n);}
+    else{const r=await db.collection('historial_costos').add({sku,fecha:'2000-01-01',costo:n,desglose:{reventa:true,desde:'resultados-ml todas'},creado:Date.now()});COSTOS[sku]=[{id:r&&r.id,fecha:'2000-01-01',costo:n,creado:Date.now()}];}
+    try{const d=await db.collection('config').doc('costos_reventa').get();const c=d.exists?(d.data().c||{}):{};if(c[sku]!==undefined||!hs.length){c[sku]=n;await db.collection('config').doc('costos_reventa').set({c,actualizado:new Date().toISOString()});}}catch(e){}
+    procesando.listo('✓ Costo aplicado a todas las ventas de '+sku);
+  }catch(e){procesando.error(e.message);alert('No se pudo guardar: '+e.message);return;}
+  render(); if(window.__pantallaML==='diag')renderDiagnostico();
 }
 // corrige en bloque los registros dudosos (mas de 3 veces distintos del actual): pasan a tener el costo actual
 async function corregirDudosos(skus){
@@ -1759,6 +1788,7 @@ async function emparejarFaltante(sku,id){
   render(); alertOk(sku+' → '+v);
 }
 async function costoFaltante(sku,id,modo){
+  if(modo==='todas'){ const n0=leerMonto(($(id).value||'').trim()); if(!(n0>0)){showErr('Escribí el costo por unidad.');return;} return aplicarCostoTodas(sku,n0); }
   const raw=($(id).value||'').trim(); const n=leerMonto(raw); if(!(n>0)){showErr('Escribí el costo por unidad.');return;}
   { const h0=COSTOS[sku], a=h0&&h0.length?h0[h0.length-1].costo:null; if(!confirm(`¿Guardar el costo de ${sku} en ${fmt(n)} por unidad?`+(a>0&&(n/a>5||a/n>5)?`\n\n¡Atención! Antes era ${fmt(a)}: cambia más de 5 veces.`:'')))return; }
   const hoy=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
