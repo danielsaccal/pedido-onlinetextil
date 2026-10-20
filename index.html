@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v272</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v273</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2329,7 +2329,7 @@ a.grilla-celda{display:block;}
           <div id="da-msgs" style="min-height:300px;max-height:60vh;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:10px;background:#FAF8F5;"></div>
           <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;" id="da-canales"></div>
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;"><input id="da-sku" list="da-skus" placeholder="🔍 Agregar producto (SKU o nombre)" style="flex:1;min-width:200px;padding:9px;border:1px solid var(--line);border-radius:10px;" oninput="if(window.__daOpts&&window.__daOpts.has(this.value))agregarProductoDA();"><datalist id="da-skus"></datalist>
-            <label class="btn-mini" style="cursor:pointer;">📎 Imagen<input type="file" accept="image/*" multiple style="display:none;" onchange="adjuntarImagenDA(this)"></label></div>
+            <label class="btn-mini" style="cursor:pointer;">📎 Adjuntar<input type="file" accept="image/*,application/pdf,.pdf,.txt,.csv,text/plain,text/csv" multiple style="display:none;" onchange="adjuntarImagenDA(this)"></label></div>
           <div id="da-adjuntos" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;"></div>
           <textarea id="da-texto" rows="3" placeholder="Escriba el pedido. Ej: 3 fotos para Mercado Libre de este producto" style="width:100%;box-sizing:border-box;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:10px;font:inherit;"></textarea>
           <button class="btn btn-gold" style="width:100%;margin-top:6px;" id="da-enviar" onclick="enviarDA()">Enviar</button>
@@ -11524,7 +11524,7 @@ async function llamarAgente(body){
 function renderChatsDA(){
   document.getElementById('da-chats').innerHTML = daChats.map(c => `<div onclick="abrirChatDA('${c._id}')" style="padding:8px;border-radius:10px;margin-bottom:4px;cursor:pointer;font-size:.85rem;${daChat && daChat._id === c._id ? 'background:#3D2B4E;color:#fff;' : 'background:#fff;border:1px solid var(--line);'}"><b>${escaparHtml(c.titulo || 'Sin título')}</b><div style="font-size:.72rem;opacity:.7;">${new Date(c.actualizado || c.creado).toLocaleString('es-AR')}</div></div>`).join('') || '<p class="note">Sin conversaciones.</p>';
 }
-function nuevoChatDA(){ daChat = null; daProds = []; daImgs = []; renderChatsDA(); renderMsgsDA(); renderAdjuntosDA(); }
+function nuevoChatDA(){ daChat = null; daProds = []; daImgs = []; daDocs = []; renderChatsDA(); renderMsgsDA(); renderAdjuntosDA(); }
 function abrirChatDA(id){ daChat = daChats.find(c => c._id === id) || null; renderChatsDA(); renderMsgsDA(); }
 function renderMsgsDA(){
   const box = document.getElementById('da-msgs'), ms = (daChat && daChat.mensajes) || [];
@@ -11556,10 +11556,25 @@ function agregarProductoDA(){
   const v = document.getElementById('da-sku').value, sku = v.split(' · ')[0].trim(); if(!sku) return;
   if(!daProds.includes(sku)) daProds.push(sku); document.getElementById('da-sku').value = ''; renderAdjuntosDA();
 }
-async function adjuntarImagenDA(inp){ for(const f of [...(inp.files || [])]){ try{ daImgs.push(await comprimirImagenAFotoBase64(f)); } catch(e){} } inp.value = ''; renderAdjuntosDA(); }
+// adjuntos: imagenes (se reducen), PDF (el agente los lee completos) y texto (.txt / .csv)
+let daDocs = [];
+const leerArchivoDA = (f, comoTexto) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); comoTexto ? r.readAsText(f) : r.readAsDataURL(f); });
+async function adjuntarImagenDA(inp){
+  for(const f of [...(inp.files || [])]){
+    if(f.size > 10 * 1024 * 1024){ alert(`"${f.name}" pesa más de 10 MB y no se puede enviar.`); continue; }
+    try{
+      if(/^image\//.test(f.type)) daImgs.push(await comprimirImagenAFotoBase64(f));
+      else if(f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) daDocs.push({ tipo: 'pdf', nombre: f.name, data: String(await leerArchivoDA(f)).split(',')[1] });
+      else if(/^text\//.test(f.type) || /\.(txt|csv)$/i.test(f.name)) daDocs.push({ tipo: 'texto', nombre: f.name, data: String(await leerArchivoDA(f, true)).slice(0, 200000) });
+      else alert(`"${f.name}": tipo de archivo no admitido. Use imágenes, PDF, TXT o CSV.`);
+    } catch(e){ alert(`No se pudo leer "${f.name}".`); }
+  }
+  inp.value = ''; renderAdjuntosDA();
+}
 function renderAdjuntosDA(){
   document.getElementById('da-adjuntos').innerHTML = daProds.map((s, i) => `<span style="background:#EEE8F7;border-radius:999px;padding:3px 10px;font-size:.8rem;">📦 ${escaparHtml(s)} <a href="#" onclick="event.preventDefault();daProds.splice(${i},1);renderAdjuntosDA();">✕</a></span>`).join('')
-    + daImgs.map((f, i) => `<span style="position:relative;"><img src="${f}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;"><a href="#" onclick="event.preventDefault();daImgs.splice(${i},1);renderAdjuntosDA();" style="position:absolute;top:-6px;right:-4px;">✕</a></span>`).join('');
+    + daImgs.map((f, i) => `<span style="position:relative;"><img src="${f}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;"><a href="#" onclick="event.preventDefault();daImgs.splice(${i},1);renderAdjuntosDA();" style="position:absolute;top:-6px;right:-4px;">✕</a></span>`).join('')
+    + daDocs.map((d, i) => `<span style="background:#F2F2F2;border-radius:8px;padding:4px 10px;font-size:.8rem;">📄 ${escaparHtml(d.nombre)} <a href="#" onclick="event.preventDefault();daDocs.splice(${i},1);renderAdjuntosDA();">✕</a></span>`).join('');
 }
 // imagen (ruta o data URL) a base64 jpeg reducida
 function imagenABase64DA(src){
@@ -11581,13 +11596,15 @@ async function enviarDA(){
     for(const S of daProds){ const r = buscarProductoPorSku(S); if(!r) continue; const fs = fotosDeSkuOProducto(S, r.ci, r.pi, r.producto).slice(0, 3);
       for(const f of fs){ const b64 = await imagenABase64DA(f); if(b64) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } }); } }
     for(const f of daImgs){ content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.split(',')[1] } }); }
+    for(const d of daDocs){ if(d.tipo === 'pdf') content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: d.data }, title: d.nombre }); else content.push({ type: 'text', text: `Archivo adjunto "${d.nombre}":\n${d.data}` }); }
     if(!daChat){ procesando.texto('Iniciando la conversación…'); const s = await llamarAgente({ accion: 'crear', titulo: texto.slice(0, 60) });
       const ref = await db.collection('agente_chats').add({ titulo: (daProds[0] ? daProds[0] + ' · ' : '') + texto.slice(0, 50), sessionId: s.id, creado: new Date().toISOString(), actualizado: new Date().toISOString(), mensajes: [] });
       daChat = { _id: ref.id, titulo: (daProds[0] ? daProds[0] + ' · ' : '') + texto.slice(0, 50), sessionId: s.id, mensajes: [] }; daChats.unshift(daChat); }
     const antes = await llamarAgente({ accion: 'eventos', session: daChat.sessionId }); const vistos = new Set(((antes && antes.data) || []).map(e => e.id));
     procesando.texto('Enviando…'); await llamarAgente({ accion: 'enviar', session: daChat.sessionId, content });
-    daChat.mensajes.push({ rol: 'user', texto: cuerpo + (content.length > 1 ? `\n(${content.length - 1} imágenes adjuntas)` : ''), fecha: new Date().toISOString() });
-    renderMsgsDA(); document.getElementById('da-texto').value = ''; daImgs = []; renderAdjuntosDA();
+    const nImg = content.filter(c => c.type === 'image').length;
+    daChat.mensajes.push({ rol: 'user', texto: cuerpo + (nImg ? `\n(${nImg} ${nImg === 1 ? 'imagen adjunta' : 'imágenes adjuntas'})` : '') + (daDocs.length ? `\n(archivos: ${daDocs.map(d => d.nombre).join(', ')})` : ''), fecha: new Date().toISOString() });
+    renderMsgsDA(); document.getElementById('da-texto').value = ''; daImgs = []; daDocs = []; renderAdjuntosDA();
     // esperar la respuesta: se consultan los eventos hasta que la sesion queda inactiva
     procesando.texto('El agente está trabajando…'); let resp = '', listo = false, t0 = Date.now();
     while(!listo && Date.now() - t0 < 300000){
@@ -19272,7 +19289,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v272';
+const APP_VERSION = '2026-10-02-v273';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
