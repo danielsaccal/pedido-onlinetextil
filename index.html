@@ -565,6 +565,26 @@ a.grilla-celda{display:block;}
 
   <!-- STEP: INICIO (iconos) -->
   <div class="step" id="step-inicio">
+<style>
+/* ===== Inicio con menu lateral y tarjetas (formato TFactura) ===== */
+#nav2{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;margin-top:10px;}
+#nav2 .n2-menu{background:#4A4A4F;border-radius:14px;padding:8px 0;align-self:start;position:sticky;top:10px;}
+#nav2 .n2-menu button{display:block;width:100%;text-align:left;background:none;border:none;color:#EDEDED;font:inherit;font-size:.95rem;padding:10px 16px;cursor:pointer;border-left:4px solid transparent;}
+#nav2 .n2-menu button:hover{background:#56565C;}
+#nav2 .n2-menu button.on{background:#5F5F66;color:var(--gold);border-left-color:var(--gold);font-weight:700;}
+#nav2 .n2-menu hr{border:none;border-top:1px solid var(--gold);margin:6px 12px;opacity:.7;}
+#nav2 .n2-tit{font-weight:800;letter-spacing:.06em;color:#55555A;font-size:1rem;margin:4px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--gold);}
+#nav2 .n2-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;}
+#nav2 .n2-card{display:flex;align-items:center;gap:8px;background:#E4E4E4;border-radius:14px;min-height:62px;overflow:hidden;cursor:pointer;}
+#nav2 .n2-card:hover{background:#DADADA;}
+#nav2 .n2-card .n2-f{width:12px;align-self:stretch;flex:none;}
+#nav2 .n2-card .n2-n{flex:1;font-size:1rem;color:#2B2420;padding:10px 4px;}
+#nav2 .n2-card .n2-i{display:flex;gap:6px;padding-right:10px;}
+#nav2 .n2-card .n2-i button{width:34px;height:34px;border-radius:50%;border:none;background:#F2F2F2;cursor:pointer;font-size:.95rem;color:#55555A;}
+#nav2 .n2-card .n2-i button:hover{background:#fff;}
+#nav2 .n2-card .n2-i button.fav{color:#D9A300;}
+@media(max-width:700px){#nav2{grid-template-columns:1fr;}#nav2 .n2-menu{display:flex;overflow-x:auto;padding:4px;position:static;}#nav2 .n2-menu button{white-space:nowrap;width:auto;border-left:none;border-bottom:3px solid transparent;}#nav2 .n2-menu button.on{border-bottom-color:var(--gold);}#nav2 .n2-menu hr{display:none;}}
+</style>
     <div id="avisoCopia" style="display:none;"></div>
     <style>
       .ini-sec{font-size:0.78rem;font-weight:700;letter-spacing:.06em;color:#8A8072;margin:18px 0 10px;}
@@ -613,6 +633,8 @@ a.grilla-celda{display:block;}
       @media (max-width:640px){.ini-cols{grid-template-columns:1fr !important;}}
     </style>
     <div class="search-wrap"><input type="text" id="inicio-buscar" placeholder="Buscar producto o SKU..." oninput="buscarDesdeInicio(this.value)"></div>
+    <div id="nav2"></div>
+    <div id="ini-viejo" style="display:none;">
     <div id="ini-recientes-wrap" style="display:none;"><p class="ini-sec">LO ÚLTIMO QUE USASTE</p><div class="ini-recientes" id="ini-recientes"></div></div>
     <p class="ini-sec">PARA CLIENTES Y PÚBLICO</p>
     <div class="ini-grid ini-ext"><div class="ini-tile" id="ini-t-c" onclick="abrirGrupoInicio('c')"><div class="ini-ic">📣</div><b>Difusión</b><span>Compartir catálogo, enviar a clientes, redes, promociones, videos</span></div></div>
@@ -620,6 +642,8 @@ a.grilla-celda{display:block;}
     <p class="ini-sec">ADMINISTRACIÓN INTERNA</p>
     <div class="ini-grid"><div class="ini-tile" id="ini-t-d" onclick="abrirGrupoInicio('d')"><div class="ini-ic">🧾</div><b>Ventas</b><span>Armar pedidos, clientes, gastos y resultados ML</span></div><div class="ini-tile" id="ini-t-f" onclick="abrirGrupoInicio('f')"><div class="ini-ic">🏷️</div><b>Catálogo</b><span>Altas, edición, fotos, precios, aumentos</span></div><div class="ini-tile" id="ini-t-g" onclick="abrirGrupoInicio('g')"><div class="ini-ic">✂️</div><b>Producción</b><span>Telas, cortes, órdenes, talleres, stock</span></div></div>
     <div class="ini-sub" id="ini-sub-int" style="display:none;"></div>
+    </div>
+    <p style="text-align:center;margin-top:18px;"><a href="#" class="note" id="nav2-toggle" onclick="event.preventDefault();toggleInicioViejo();">Ver el inicio anterior</a></p>
   </div>
 
   <!-- STEP 1: CATALOGO -->
@@ -1597,7 +1621,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v269</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v270</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5844,11 +5868,106 @@ const GRUPOS_INICIO = {
     [['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']]
   ] },
 };
+// ===== Inicio nuevo: menu lateral + tarjetas con ⭐ favorito, ☰ listado y ⊕ nuevo (usa las mismas acciones que el inicio anterior) =====
+const N2_COLOR = { ventas: '#FFC107', ml: '#FFC107', produccion: '#FF5A36', catalogo: '#FFC107', costos: '#2F7A47', difusion: '#7E57C2', config: '#9E9E9E' };
+const N2_SECCIONES = [
+  ['ventas', 'Ventas', [
+    ['Pedidos', { abrir: 'irACatalogoDesdeInicio()', lista: 'abrirHistorial()', nuevo: 'irACatalogoDesdeInicio()' }],
+    ['Presupuestos', { abrir: 'abrirPresupuestos()', lista: 'abrirPresupuestos()', nuevo: 'abrirPresupuestos().then(() => nuevoPresupuesto())' }],
+    ['Pedido con IA (texto o foto)', { abrir: 'abrirPedidoIA()' }],
+    ['Pedido desde una foto', { abrir: "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)" }],
+    ['Pendientes de entrega', { abrir: 'abrirPendientesEntrega()' }],
+    ['Clientes', { abrir: 'abrirClientes()', lista: 'abrirClientes()' }],
+    ['Clientes inactivos', { abrir: 'abrirClientesInactivos()' }],
+    ['Ventas facturadas', { abrir: 'abrirFacturas()', lista: 'abrirFacturas()' }],
+  ]],
+  ['ml', 'Mercado Libre', [
+    ['Resultados Mercado Libre', { abrir: 'abrirResultadosML()' }],
+    ['Simulador de costos ML', { abrir: 'abrirCalculadoraML()' }],
+    ['Ventas Mercado Libre (carga diaria)', { abrir: 'abrirVentasML()' }],
+  ]],
+  ['produccion', 'Producción', [
+    ['Órdenes de trabajo', { abrir: 'abrirAsistenteOT()', lista: 'abrirHistorialOT()', nuevo: 'abrirAsistenteOT()' }],
+    ['Faltantes de stock', { abrir: 'abrirFaltantes()' }],
+    ['Stock y prioridades', { abrir: 'abrirStock()' }],
+    ['Trabajo a medida', { abrir: 'abrirTrabajoMedida()' }],
+    ['Ingreso a los talleres', { abrir: 'abrirEnviosTela()' }],
+    ['Tela pendiente de entrega', { abrir: 'abrirDeudaTela()' }],
+    ['Productos en producción', { abrir: 'abrirEnProduccion()' }],
+    ['Entregas del taller', { abrir: 'abrirIngresoTaller()', lista: 'abrirHistorialEntregas()', nuevo: 'abrirIngresoTaller()' }],
+    ['¿Cuándo hice este SKU?', { abrir: 'abrirHistorialSku()' }],
+    ['Telas', { abrir: 'abrirTelas()' }],
+  ]],
+  ['catalogo', 'Catálogo', [
+    ['Productos', { abrir: 'abrirEditarProducto()', lista: 'irACatalogoDesdeInicio()', nuevo: 'abrirNuevoProducto()' }],
+    ['Fotos de productos', { abrir: 'abrirActualizarFoto()' }],
+    ['Ordenar categorías', { abrir: 'abrirCategorias()' }],
+    ['Descripciones de reventa', { abrir: 'abrirReventa()' }],
+    ['Links de la web', { abrir: 'abrirLinksWeb()' }],
+    ['Aumentar precios', { abrir: 'abrirAumentoMasivo()' }],
+    ['Importar precios (Excel)', { abrir: 'abrirImportarExcel()' }],
+    ['Historial de precios', { abrir: 'abrirHistorialPrecios()' }],
+  ]],
+  ['costos', 'Costos', [
+    ['Productos que fabrico', { abrir: 'abrirProductosFabrico()' }],
+    ['Artículos y cortes', { abrir: 'abrirArticulosCortes()' }],
+    ['Costos de confección', { abrir: 'abrirConfeccion()' }],
+    ['Costos de reventa', { abrir: 'abrirCostosReventa()' }],
+    ['Gastos comerciales', { abrir: 'abrirGastos()', lista: 'abrirGastos()' }],
+    ['Calculadora de costos', { abrir: 'abrirCalculadoraCostos()' }],
+  ]],
+  ['difusion', 'Difusión', [
+    ['Compartir catálogo por rubro', { abrir: 'abrirCompartirRubro()' }],
+    ['Enviar catálogo a clientes', { abrir: 'abrirEnviarCatalogo()' }],
+    ['Nuevo ingreso (flyers)', { abrir: 'abrirNuevoIngreso()' }],
+    ['Anuncios y promociones', { abrir: 'abrirAnuncio()' }],
+    ['Crear video promocional', { abrir: 'abrirCrearVideo()' }],
+    ['Compartir video de producto', { abrir: 'abrirCompartirVideoProducto()' }],
+    ['Director de arte (IA)', { abrir: 'abrirDirectorArte()' }],
+  ]],
+  ['config', 'Configuración', [
+    ['Usuarios y permisos', { abrir: 'abrirUsuarios()' }],
+    ['Copia de seguridad', { abrir: 'abrirCopiaSeguridad()' }],
+    ['Avisos push', { abrir: 'abrirConfigPush()' }],
+    ['Listas y opciones', { abrir: 'abrirListas()' }],
+    ['Datos bancarios', { abrir: 'abrirDatosBancarios()' }],
+    ['Palabras de la app', { abrir: 'abrirGlosario()' }],
+    ['Tabla de consumo (anterior)', { abrir: 'abrirTablaConsumo()' }],
+    ['Instrucciones de corte (anterior)', { abrir: 'abrirInstruccionesCorte()' }],
+    ['Fichas por SKU (anterior)', { abrir: 'abrirFichasArticulos()' }],
+  ]],
+];
+// el permiso de cada accion es el mismo que en el inicio anterior (grupo de origen + accion)
+function n2GrupoDe(f){ for(const [k, g] of Object.entries(GRUPOS_INICIO)){ const items = g.columnas ? g.columnas.flat() : (g.items || []); if(items.some(([, ff]) => ff === f)) return k; } return null; }
+function n2Puede(f){ const k = n2GrupoDe(f); return (!k || puede(permisoDeGrupo(k))) && puede(permisoDeAccion(f)); }
+let n2Sec = null;
+function n2Favs(){ try{ const f = JSON.parse(localStorage.getItem('ot_favs2') || 'null'); if(Array.isArray(f)) return f; } catch(e){} return ['Pedidos', 'Presupuestos', 'Clientes', 'Resultados Mercado Libre']; }
+function n2Cards(sec){ return sec === 'favs' ? N2_SECCIONES.flatMap(([k, , cs]) => cs.map(c => [k, c])).filter(([, c]) => n2Favs().includes(c[0])) : (N2_SECCIONES.find(s => s[0] === sec) || [, , []])[2].map(c => [sec, c]); }
+function renderNav2(){
+  const box = document.getElementById('nav2'); if(!box) return;
+  if(document.getElementById('ini-viejo').style.display === 'block'){ box.style.display = 'none'; return; } box.style.display = '';
+  const secs = N2_SECCIONES.filter(([, , cs]) => cs.some(([, a]) => n2Puede(a.abrir)));
+  if(!n2Sec || (n2Sec !== 'favs' && !secs.some(s => s[0] === n2Sec))) n2Sec = 'favs';
+  window.__n2 = [];
+  const reg = f => { window.__n2.push(f); return window.__n2.length - 1; };
+  const tarjetas = n2Cards(n2Sec).filter(([, c]) => n2Puede(c[1].abrir));
+  const favs = n2Favs();
+  box.innerHTML = `<div class="n2-menu"><button type="button" class="${n2Sec === 'favs' ? 'on' : ''}" onclick="n2Sec='favs';renderNav2()">⭐ Favoritos</button>
+      ${secs.map(([k, t]) => `<button type="button" class="${n2Sec === k ? 'on' : ''}" onclick="n2Sec='${k}';renderNav2()">${t}</button>`).join('')}</div>
+    <div><div class="n2-tit">${n2Sec === 'favs' ? 'FAVORITOS' : (secs.find(s => s[0] === n2Sec) || [, ''])[1].toUpperCase()}</div>
+      <div class="n2-grid">${tarjetas.map(([k, [t, a]]) => { const iA = reg([t, a.abrir]);
+        return `<div class="n2-card" onclick="n2Usar(${iA})"><span class="n2-f" style="background:${N2_COLOR[k] || '#FFC107'};"></span><span class="n2-n">${escaparHtml(t)}</span>
+          <span class="n2-i" onclick="event.stopPropagation()"><button type="button" class="${favs.includes(t) ? 'fav' : ''}" title="${favs.includes(t) ? 'Quitar de favoritos' : 'Agregar a favoritos'}" onclick="n2Fav('${escapeAttr(t)}')">${favs.includes(t) ? '★' : '☆'}</button>${a.lista ? `<button type="button" title="Ver listado" onclick="n2Usar(${reg([t, a.lista])})">☰</button>` : ''}${a.nuevo ? `<button type="button" title="Nuevo" onclick="n2Usar(${reg([t, a.nuevo])})">⊕</button>` : ''}</span></div>`; }).join('') || '<p class="note">Todavía no marcó favoritos: toque ☆ en cualquier tarjeta.</p>'}</div></div>`;
+}
+function n2Usar(i){ const it = (window.__n2 || [])[i]; if(!it) return; window.__iniItems = window.__iniItems || []; window.__iniItems.push(it); usarItemInicio(window.__iniItems.length - 1); }
+function n2Fav(t){ let f = n2Favs(); f = f.includes(t) ? f.filter(x => x !== t) : f.concat([t]); try{ localStorage.setItem('ot_favs2', JSON.stringify(f)); } catch(e){} renderNav2(); }
+function toggleInicioViejo(){ const v = document.getElementById('ini-viejo'), abierto = v.style.display === 'block'; v.style.display = abierto ? 'none' : 'block'; document.getElementById('nav2-toggle').textContent = abierto ? 'Ver el inicio anterior' : 'Volver al inicio nuevo'; renderNav2(); }
 let grupoInicioAbierto = null;
 function irInicio(){
   const menu = document.querySelector('.menu-dropdown');
   if(menu) menu.classList.remove('open');
   mostrarPaso('step-inicio');
+  try{ renderNav2(); } catch(e){}
 }
 function abrirGrupoInicio(k){
   const g = GRUPOS_INICIO[k];
@@ -11026,6 +11145,7 @@ function puede(perm){
 }
 function permisoDeGrupo(k){ return { a: 'pedidos', c: 'difusion', g: 'produccion' }[k] || null; }
 function aplicarPermisosInicio(){
+  try{ renderNav2(); } catch(e){ console.error(e); }
   if(rolActual === 'dueño') return;
   ['a', 'c', 'd', 'f', 'g'].forEach(k => { const g = GRUPOS_INICIO[k], t = document.getElementById('ini-t-' + k); if(!g || !t) return;
     const items = g.columnas ? g.columnas.flat() : (g.items || []);
@@ -19126,7 +19246,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v269';
+const APP_VERSION = '2026-10-02-v270';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
