@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v280</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v281</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -7509,6 +7509,9 @@ function renderResultadoNegocio(){
       ${A.periodicos || (B && B.periodicos) ? fila('Otros gastos de Mercado Libre (cargados a mano)', A.periodicos, B && B.periodicos, { neg: true }) : ''}
       ${fila('Gastos comerciales', A.gastos, B && B.gastos, { neg: true, sub: 'sin los marcados como ya cobrados por Mercado Libre' })}
       ${fila('Resultado del mes', A.resultado, B && B.resultado, { tot: true, res: true })}
+      <tr style="border-top:1px solid var(--line);"><td style="padding:8px 6px;font-weight:700;">Resultado sobre el costo de mercadería<div class="note" style="text-align:left;margin:0;">resultado ÷ costo de mercadería (si el costo fue $ 1.000 y ganó $ 100 = 10 %)</div></td>
+        <td style="padding:8px 6px;text-align:right;font-weight:800;color:${A.resultado < 0 ? '#A6432F' : '#2F7A47'};">${A.costo > 0 ? (A.resultado / A.costo * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %' : '–'}</td><td></td>
+        ${B ? `<td style="padding:8px 6px;text-align:right;color:#8A8072;">${B.costo > 0 ? (B.resultado / B.costo * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %' : '–'}</td>` : ''}</tr>
     </table></div>
     <p class="note" style="text-align:left;margin-top:8px;">Mercado Libre: datos guardados al abrir Resultados ML${rnDatos.mlAct ? ' (última actualización ' + new Date(rnDatos.mlAct).toLocaleString('es-AR') + ')' : ''}. Facturas: costo vigente el día de cada factura.</p>`;
 }
@@ -19531,7 +19534,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v280';
+const APP_VERSION = '2026-10-02-v281';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
