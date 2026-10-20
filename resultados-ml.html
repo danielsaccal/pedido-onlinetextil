@@ -1456,18 +1456,37 @@ function renderDiagnostico(){
     filas.push({s,g,act,h0,raros}); });
   filas.sort((a,b)=>b.g.rev-a.g.rev||b.raros.length-a.raros.length);
   const conRaros=filas.filter(f=>f.raros.length), revTot=filas.reduce((a,f)=>a+f.g.rev,0), revRaros=conRaros.reduce((a,f)=>a+f.g.rev,0);
+  window.__diagFilas=filas;
   $('diagBox').innerHTML=`<div class="panel" style="padding:14px;">
-    <p class="note" style="margin-top:0;">SKU con ventas para revisar o con costos registrados en el pasado muy distintos (más de 3 veces) del costo actual. Solo muestra datos: no cambia nada. Respeta la cuenta elegida arriba.</p>
+    <p class="note" style="margin-top:0;">SKU con ventas para revisar o con costos registrados en el pasado muy distintos (más de 3 veces) del costo actual. Los botones de corrección piden confirmación antes de cambiar algo. Respeta la cuenta elegida arriba.</p>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:8px 0 12px;">
       <div style="border:1px solid var(--line);border-radius:12px;padding:8px 10px;"><small class="meta">Ventas para revisar</small><div style="font-weight:800;">${revTot.toLocaleString('es-AR')}</div></div>
       <div style="border:1px solid var(--line);border-radius:12px;padding:8px 10px;"><small class="meta">De SKU con costos viejos dudosos</small><div style="font-weight:800;color:#A6432F;">${revRaros.toLocaleString('es-AR')} (${conRaros.length} SKU)</div></div>
       <div style="border:1px solid var(--line);border-radius:12px;padding:8px 10px;"><small class="meta">Ventas sin costo</small><div style="font-weight:800;">${filas.reduce((a,f)=>a+f.g.sinC,0).toLocaleString('es-AR')}</div></div></div>
+    ${conRaros.length?`<button type="button" style="padding:9px 14px;border-radius:10px;border:none;background:#3d1466;color:#fff;font-weight:700;cursor:pointer;margin-bottom:10px;" onclick="corregirDudosos(window.__diagFilas.filter(f=>f.raros.length).map(f=>f.s))">🛠️ Corregir todos los SKU con costos dudosos (${conRaros.length})</button>`:''}
     ${filas.map(f=>`<div style="border-top:1px solid var(--line);padding:9px 0;font-size:.86rem;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;"><b>${f.s}</b><span class="meta">${NAMES[f.s]||''}</span>
         <span style="margin-left:auto;">${f.g.n} ventas${f.g.rev?` · <b style="color:#A6432F;">${f.g.rev} para revisar</b>`:''}${f.g.sinC?` · ${f.g.sinC} sin costo`:''}</span></div>
       <div style="margin-top:3px;">Costo actual: <b>${f.act!=null?fmt(f.act):'—'}</b> por unidad</div>
       ${f.h0.length>1?`<div class="meta" style="margin-top:2px;">Historial: ${f.h0.map(x=>`<span style="${f.raros.includes(x)?'color:#A6432F;font-weight:700;':''}">${x.fecha.split('-').reverse().join('/')} ${fmt(x.costo)}${f.raros.includes(x)?` (×${(x.costo/f.act).toLocaleString('es-AR',{maximumFractionDigits:1})})`:''}</span>`).join(' · ')}</div>`:''}
-      ${Object.keys(f.g.motivos).length?`<div class="meta" style="margin-top:2px;">Motivos: ${Object.entries(f.g.motivos).map(([m,n])=>`${m} (${n})`).join(' · ')}</div>`:''}</div>`).join('')||'<p class="note">No se encontraron costos dudosos.</p>'}</div>`;
+      ${Object.keys(f.g.motivos).length?`<div class="meta" style="margin-top:2px;">Motivos: ${Object.entries(f.g.motivos).map(([m,n])=>`${m} (${n})`).join(' · ')}</div>`:''}
+      ${f.raros.length?`<button type="button" style="margin-top:6px;padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:.8rem;" onclick="corregirDudosos(['${f.s}'])">🛠️ Usar el costo actual para las ventas anteriores</button>`:''}</div>`).join('')||'<p class="note">No se encontraron costos dudosos.</p>'}</div>`;
+}
+// corrige en bloque los registros dudosos (mas de 3 veces distintos del actual): pasan a tener el costo actual
+async function corregirDudosos(skus){
+  const filas=(window.__diagFilas||[]).filter(f=>skus.includes(f.s)&&f.raros.length);
+  const cambios=[]; filas.forEach(f=>f.raros.forEach(x=>{if(x.id)cambios.push({s:f.s,x,nuevo:f.act});}));
+  if(!cambios.length){alert('No hay registros para corregir.');return;}
+  const ventas=filas.reduce((a,f)=>a+f.g.n,0);
+  const det=cambios.slice(0,25).map(c=>`${c.s} · ${c.x.fecha.split('-').reverse().join('/')}: ${fmt(c.x.costo)} → ${fmt(c.nuevo)}`).join('\n')+(cambios.length>25?`\n… y ${cambios.length-25} más`:'');
+  if(!confirm(`Se van a corregir ${cambios.length} registro(s) del historial de ${filas.length} SKU (${ventas} ventas se recalculan):\n\n${det}\n\n¿Aplicar?`))return;
+  procesando('Corrigiendo costos…');
+  try{
+    for(let i=0;i<cambios.length;i+=400){const lote=db.batch();cambios.slice(i,i+400).forEach(c=>lote.set(db.collection('historial_costos').doc(c.x.id),{costo:c.nuevo,costoAnterior:c.x.costo,corregido:new Date().toISOString()},{merge:true}));await lote.commit();}
+    cambios.forEach(c=>{c.x.costo=c.nuevo;});
+    procesando.listo('✓ '+cambios.length+' registros corregidos');
+  }catch(e){procesando.error(e.message);alert('No se pudo corregir: '+e.message);return;}
+  render(); if(window.__pantallaML==='diag')renderDiagnostico();
 }
 // ===== Perdidas para reclamar: cancelaciones y devoluciones que te costaron plata =====
 function perdidasReclamo(){
