@@ -1597,7 +1597,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v267</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v268</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2314,6 +2314,27 @@ a.grilla-celda{display:block;}
         <button class="btn btn-ghost" style="color:#A6432F;border-color:#E3B8AE;" onclick="eliminarPresupuesto(presu && presu._id)">🗑️ Eliminar</button>
       </div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="abrirPresupuestos()">← Volver a presupuestos</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-director">
+    <style>@media(max-width:700px){#da-main{grid-template-columns:1fr !important;}}</style>
+    <div class="form-card" style="max-width:980px;">
+      <h2>🎨 Director de arte</h2>
+      <div id="da-config"></div>
+      <div style="display:grid;grid-template-columns:220px minmax(0,1fr);gap:12px;" id="da-main">
+        <div><button class="btn btn-gold" style="width:100%;margin-bottom:8px;" onclick="nuevoChatDA()">➕ Conversación nueva</button><div id="da-chats"></div></div>
+        <div>
+          <div id="da-msgs" style="min-height:300px;max-height:60vh;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:10px;background:#FAF8F5;"></div>
+          <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;" id="da-canales"></div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;"><input id="da-sku" list="da-skus" placeholder="🔍 Agregar producto (SKU o nombre)" style="flex:1;min-width:200px;padding:9px;border:1px solid var(--line);border-radius:10px;" oninput="if(window.__daOpts&&window.__daOpts.has(this.value))agregarProductoDA();"><datalist id="da-skus"></datalist>
+            <label class="btn-mini" style="cursor:pointer;">📎 Imagen<input type="file" accept="image/*" multiple style="display:none;" onchange="adjuntarImagenDA(this)"></label></div>
+          <div id="da-adjuntos" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;"></div>
+          <textarea id="da-texto" rows="3" placeholder="Escriba el pedido. Ej: 3 fotos para Mercado Libre de este producto" style="width:100%;box-sizing:border-box;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:10px;font:inherit;"></textarea>
+          <button class="btn btn-gold" style="width:100%;margin-top:6px;" id="da-enviar" onclick="enviarDA()">Enviar</button>
+        </div>
+      </div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
   </div>
 
@@ -5792,7 +5813,7 @@ const GRUPOS_INICIO = {
   c: { lado: 'ext', titulo: 'Difusión', titulosColumnas: ['1 · Catálogo a clientes', '2 · Videos', '3 · Redes y anuncios'], columnas: [
     [['🔗 Compartir por rubro', 'abrirCompartirRubro()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()']],
     [['🎬 Crear video promocional', 'abrirCrearVideo()'], ['🎞️ Compartir video de producto', 'abrirCompartirVideoProducto()']],
-    [['🖼️ Nuevo ingreso (flyers)', 'abrirNuevoIngreso()'], ['📣 Anuncios y promociones', 'abrirAnuncio()']],
+    [['🖼️ Nuevo ingreso (flyers)', 'abrirNuevoIngreso()'], ['📣 Anuncios y promociones', 'abrirAnuncio()'], ['🎨 Director de arte (IA)', 'abrirDirectorArte()']],
   ] },
   d: { lado: 'int', titulo: 'Ventas', titulosColumnas: ['1 · Tomar pedidos', '2 · Entregar', '3 · Clientes', '4 · Plata'], columnas: [
     [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['🧾 Presupuestos', 'abrirPresupuestos()'], ['📄 Pedido desde una foto', "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)"], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()'], ['📋 Historial de pedidos', 'abrirHistorial()']],
@@ -10990,6 +11011,7 @@ function permisoDeAccion(f){
   if(/setTimeout\(\(\) => document.getElementById\('pia-foto'\)/.test(s)) return 'pedidos';
   if(/abrirPedidoIA|abrirHistorial\(|abrirPendientesEntrega/.test(s)) return 'ventas';
   if(/abrirFaltantes/.test(s)) return 'produccion';
+  if(/abrirDirectorArte/.test(s)) return 'difusion';
   if(/abrirPresupuestos/.test(s)) return 'ventas';
   if(/abrirClientes/.test(s)) return 'clientes';
   if(/irACatalogoDesdeInicio|escaner/.test(s)) return 'pedidos';
@@ -11324,6 +11346,112 @@ async function convertirPresuEnPedido(){
   try{ actualizarResumen && actualizarResumen(); } catch(e){}
 }
 
+// ===== Director de arte: chat con el agente de Claude (la clave de la API vive en el Worker, nunca en la app) =====
+let daCfg = null, daChats = [], daChat = null, daProds = [], daImgs = [], daCanal = '';
+const DA_CANALES = ['Mercado Libre', 'Tienda Nube', 'Post 1:1', 'Post 4:5', 'Historia 9:16', 'Carrusel', 'Catálogo mayorista', 'Catálogo minorista'];
+async function abrirDirectorArte(){
+  mostrarPaso('step-director');
+  try{ const d = await db.collection('config').doc('agente').get(); daCfg = d.exists ? d.data() : {}; } catch(e){ daCfg = {}; }
+  pintarConfigDA();
+  const s = await db.collection('agente_chats').get(); daChats = s.docs.map(d => ({ _id: d.id, ...d.data() })).sort((a, b) => String(b.actualizado).localeCompare(String(a.actualizado)));
+  renderChatsDA(); if(!daChat && daChats[0]) abrirChatDA(daChats[0]._id); else renderMsgsDA();
+  document.getElementById('da-canales').innerHTML = DA_CANALES.map(c => `<button type="button" class="btn-mini da-canal" onclick="daCanal=daCanal==='${c}'?'':'${c}';document.querySelectorAll('.da-canal').forEach(b=>b.style.background=b.textContent===daCanal?'var(--gold)':'');">${c}</button>`).join('');
+  const ops = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => ops.push(v.sku + ' · ' + p.nombre + ' · ' + (v.desc || '')))));
+  document.getElementById('da-skus').innerHTML = ops.map(o => `<option value="${escapeAttr(o)}">`).join(''); window.__daOpts = new Set(ops);
+}
+function pintarConfigDA(){
+  const ok = daCfg && daCfg.url && daCfg.clave;
+  document.getElementById('da-config').innerHTML = ok ? `<p class="note" style="text-align:left;margin:0 0 8px;">Conectado al agente. ${esDueno() ? '<a href="#" onclick="event.preventDefault();configDA()">Cambiar conexión</a>' : ''}</p>`
+    : `<div style="background:#FFF8E6;border:1px solid #EBD9A8;border-radius:12px;padding:10px;margin-bottom:10px;">Falta conectar el agente. ${esDueno() ? '<button type="button" class="btn-mini" onclick="configDA()">Conectar</button>' : 'Pídale al dueño que lo conecte.'}</div>`;
+}
+async function configDA(){
+  const url = prompt('Dirección del Worker del agente (ej: https://agente-onlinetextil.xxxx.workers.dev):', (daCfg && daCfg.url) || ''); if(!url) return;
+  const clave = prompt('Clave de la app (la misma que cargó como CLAVE_APP en el Worker):', ''); if(!clave) return;
+  daCfg = { url: url.trim().replace(/\/$/, ''), clave: clave.trim() }; await db.collection('config').doc('agente').set(daCfg); pintarConfigDA();
+}
+async function llamarAgente(body){
+  const r = await fetch(daCfg.url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Clave-App': daCfg.clave }, body: JSON.stringify(body) });
+  const t = await r.text(); let j = null; try{ j = JSON.parse(t); } catch(e){}
+  if(!r.ok) throw new Error((j && j.error && (j.error.message || j.error)) || t.slice(0, 200) || ('Error ' + r.status));
+  return j;
+}
+function renderChatsDA(){
+  document.getElementById('da-chats').innerHTML = daChats.map(c => `<div onclick="abrirChatDA('${c._id}')" style="padding:8px;border-radius:10px;margin-bottom:4px;cursor:pointer;font-size:.85rem;${daChat && daChat._id === c._id ? 'background:#3D2B4E;color:#fff;' : 'background:#fff;border:1px solid var(--line);'}"><b>${escaparHtml(c.titulo || 'Sin título')}</b><div style="font-size:.72rem;opacity:.7;">${new Date(c.actualizado || c.creado).toLocaleString('es-AR')}</div></div>`).join('') || '<p class="note">Sin conversaciones.</p>';
+}
+function nuevoChatDA(){ daChat = null; daProds = []; daImgs = []; renderChatsDA(); renderMsgsDA(); renderAdjuntosDA(); }
+function abrirChatDA(id){ daChat = daChats.find(c => c._id === id) || null; renderChatsDA(); renderMsgsDA(); }
+function renderMsgsDA(){
+  const box = document.getElementById('da-msgs'), ms = (daChat && daChat.mensajes) || [];
+  box.innerHTML = ms.length ? ms.map((m, i) => m.rol === 'user'
+    ? `<div style="margin:8px 0 8px 15%;background:#3D2B4E;color:#fff;border-radius:12px;padding:8px 10px;white-space:pre-wrap;font-size:.88rem;">${escaparHtml(m.texto)}</div>`
+    : `<div style="margin:8px 15% 8px 0;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 10px;font-size:.88rem;">${htmlRespuestaDA(m.texto, i)}</div>`).join('')
+    : '<p class="note">Elija productos, el canal y escriba el pedido. El agente responde con conceptos y especificaciones listas para el generador de imágenes.</p>';
+  box.scrollTop = box.scrollHeight;
+}
+// cada bloque ESPECIFICACION con botones para copiar el bloque o solo la indicacion en ingles
+function htmlRespuestaDA(t, i){
+  const partes = String(t || '').split(/(?=ESPECIFICACI[ÓO]N)/);
+  return partes.map((p, k) => { if(!/^ESPECIFICACI/.test(p)) return `<div style="white-space:pre-wrap;">${escaparHtml(p)}</div>`;
+    const m = p.match(/Indicaci[óo]n para el generador[^:]*:\s*([\s\S]*?)(?=\n-\s|\n\n|$)/i), ev = p.match(/Evitar[^:]*:\s*([\s\S]*?)(?=\n-\s|\n\n|$)/i);
+    const prompt = m ? m[1].trim() + (ev ? '\n\nAvoid: ' + ev[1].trim() : '') : '';
+    window.__daCopias = window.__daCopias || {}; window.__daCopias[`${i}-${k}`] = { b: p.trim(), p: prompt };
+    return `<div style="border:1px solid #D9CCE6;background:#F7F3FB;border-radius:10px;padding:8px;margin:6px 0;"><div style="white-space:pre-wrap;">${escaparHtml(p.trim())}</div>
+      <div style="display:flex;gap:6px;margin-top:6px;"><button type="button" class="btn-mini" onclick="copiarDA('${i}-${k}','b',this)">📋 Copiar especificación</button>${prompt ? `<button type="button" class="btn-mini" onclick="copiarDA('${i}-${k}','p',this)">📋 Copiar prompt en inglés</button>` : ''}</div></div>`; }).join('');
+}
+function copiarDA(k, q, b){ const x = (window.__daCopias || {})[k]; if(!x) return; navigator.clipboard && navigator.clipboard.writeText(x[q]).then(() => { const t = b.textContent; b.textContent = '✓ Copiado'; setTimeout(() => b.textContent = t, 1500); }); }
+function agregarProductoDA(){
+  const v = document.getElementById('da-sku').value, sku = v.split(' · ')[0].trim(); if(!sku) return;
+  if(!daProds.includes(sku)) daProds.push(sku); document.getElementById('da-sku').value = ''; renderAdjuntosDA();
+}
+async function adjuntarImagenDA(inp){ for(const f of [...(inp.files || [])]){ try{ daImgs.push(await comprimirImagenAFotoBase64(f)); } catch(e){} } inp.value = ''; renderAdjuntosDA(); }
+function renderAdjuntosDA(){
+  document.getElementById('da-adjuntos').innerHTML = daProds.map((s, i) => `<span style="background:#EEE8F7;border-radius:999px;padding:3px 10px;font-size:.8rem;">📦 ${escaparHtml(s)} <a href="#" onclick="event.preventDefault();daProds.splice(${i},1);renderAdjuntosDA();">✕</a></span>`).join('')
+    + daImgs.map((f, i) => `<span style="position:relative;"><img src="${f}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;"><a href="#" onclick="event.preventDefault();daImgs.splice(${i},1);renderAdjuntosDA();" style="position:absolute;top:-6px;right:-4px;">✕</a></span>`).join('');
+}
+// imagen (ruta o data URL) a base64 jpeg reducida
+function imagenABase64DA(src){
+  return new Promise(res => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => { const s = Math.min(1, 1200 / Math.max(im.width, im.height)); const c = document.createElement('canvas'); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); try{ res(c.toDataURL('image/jpeg', 0.82).split(',')[1]); } catch(e){ res(null); } }; im.onerror = () => res(null); im.src = src; });
+}
+function fichaDA(S){
+  const r = buscarProductoPorSku(S); if(!r) return `SKU ${S}: no está en el catálogo.`;
+  const cat = (CATALOGO[r.ci] || {}).categoria || '', pr = parsePrice(r.variante.precio), u = unidadVentaSku(S) || 'unidad';
+  return [`SKU: ${S}`, `Producto: ${r.producto.nombre}`, `Categoría: ${cat}`, `Medida: ${r.variante.desc || ''}`, r.producto.composicion ? `Composición: ${r.producto.composicion}` : '', `Unidad de venta: ${u}`, pr ? `Precio: ${formatPrice(pr)} por ${u}` : 'Precio: sin precio'].filter(Boolean).join('\n');
+}
+async function enviarDA(){
+  if(!daCfg || !daCfg.url){ alert('Primero conecte el agente.'); return; }
+  const texto = document.getElementById('da-texto').value.trim(); if(!texto && !daProds.length){ alert('Escriba el pedido.'); return; }
+  const btn = document.getElementById('da-enviar'); btn.disabled = true;
+  try{
+    procesando('Preparando el pedido…');
+    let cuerpo = (daCanal ? `Canal: ${daCanal}\n` : '') + (daProds.length ? `Fichas de producto (desde la app):\n${daProds.map(fichaDA).join('\n\n')}\n\n` : '') + `Pedido: ${texto}`;
+    const content = [{ type: 'text', text: cuerpo }];
+    for(const S of daProds){ const r = buscarProductoPorSku(S); if(!r) continue; const fs = fotosDeSkuOProducto(S, r.ci, r.pi, r.producto).slice(0, 3);
+      for(const f of fs){ const b64 = await imagenABase64DA(f); if(b64) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } }); } }
+    for(const f of daImgs){ content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.split(',')[1] } }); }
+    if(!daChat){ procesando.texto('Iniciando la conversación…'); const s = await llamarAgente({ accion: 'crear', titulo: texto.slice(0, 60) });
+      const ref = await db.collection('agente_chats').add({ titulo: (daProds[0] ? daProds[0] + ' · ' : '') + texto.slice(0, 50), sessionId: s.id, creado: new Date().toISOString(), actualizado: new Date().toISOString(), mensajes: [] });
+      daChat = { _id: ref.id, titulo: (daProds[0] ? daProds[0] + ' · ' : '') + texto.slice(0, 50), sessionId: s.id, mensajes: [] }; daChats.unshift(daChat); }
+    const antes = await llamarAgente({ accion: 'eventos', session: daChat.sessionId }); const vistos = new Set(((antes && antes.data) || []).map(e => e.id));
+    procesando.texto('Enviando…'); await llamarAgente({ accion: 'enviar', session: daChat.sessionId, content });
+    daChat.mensajes.push({ rol: 'user', texto: cuerpo + (content.length > 1 ? `\n(${content.length - 1} imágenes adjuntas)` : ''), fecha: new Date().toISOString() });
+    renderMsgsDA(); document.getElementById('da-texto').value = ''; daImgs = []; renderAdjuntosDA();
+    // esperar la respuesta: se consultan los eventos hasta que la sesion queda inactiva
+    procesando.texto('El agente está trabajando…'); let resp = '', listo = false, t0 = Date.now();
+    while(!listo && Date.now() - t0 < 300000){
+      await new Promise(r => setTimeout(r, 2500));
+      const ev = await llamarAgente({ accion: 'eventos', session: daChat.sessionId }); const L = ((ev && ev.data) || []).filter(e => !vistos.has(e.id));
+      const userIdx = L.findIndex(e => e.type === 'user.message');
+      for(const e of L){ if(e.type === 'agent.message' && !e.__ok){ resp += (e.content || []).filter(b => b.type === 'text').map(b => b.text).join(''); vistos.add(e.id); e.__ok = true; }
+        if(e.type === 'session.status_idle' && (userIdx < 0 || L.indexOf(e) > userIdx)) listo = true;
+        if(e.type === 'session.error'){ throw new Error((e.error && e.error.message) || 'error del agente'); } }
+    }
+    daChat.mensajes.push({ rol: 'agente', texto: resp || (listo ? '(sin respuesta de texto)' : 'El agente sigue trabajando. Vuelva a abrir la conversación en un momento.'), fecha: new Date().toISOString() });
+    daChat.actualizado = new Date().toISOString();
+    await db.collection('agente_chats').doc(daChat._id).set({ titulo: daChat.titulo, sessionId: daChat.sessionId, mensajes: daChat.mensajes, actualizado: daChat.actualizado, creado: daChat.creado || daChat.actualizado }, { merge: true });
+    renderMsgsDA(); renderChatsDA(); procesando.listo('✓ Respuesta recibida');
+  } catch(e){ procesando.error(e.message); alert('No se pudo hablar con el agente: ' + e.message); }
+  btn.disabled = false;
+}
 // ===== Piezas de un juego → instrucciones propias =====
 // Al guardar la instruccion de un juego (ej: "Juego King" en 250 cm), cada pieza queda cargada
 // tambien como articulo suelto con su propia instruccion y bosquejo: "Plana" del "Juego King" se
@@ -18991,7 +19119,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v267';
+const APP_VERSION = '2026-10-02-v268';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
