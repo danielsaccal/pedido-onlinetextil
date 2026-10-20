@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v282</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v283</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2223,6 +2223,7 @@ a.grilla-celda{display:block;}
         <input id="gs-buscar" placeholder="🔍 Buscar" oninput="renderGastos()" style="flex:1;min-width:150px;padding:9px;border:1px solid var(--line);border-radius:10px;">
       </div>
       <div id="gs-resumen"></div>
+      <button type="button" class="btn-mini" style="margin:6px 0;" onclick="enviarAAuditar(['gastos'], (document.getElementById('gs-mes') || {}).value)">🧾 Enviar a auditar</button>
       <details id="gs-det" style="border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:#fff;"><summary style="cursor:pointer;font-weight:700;color:var(--purple);" id="gs-det-tit">📋 Ver el detalle de los gastos</summary><div id="gs-lista" style="margin-top:8px;"></div></details>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
@@ -2238,6 +2239,7 @@ a.grilla-celda{display:block;}
       <div id="fc-nuevas"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 8px;align-items:center;"><b style="flex:1;color:var(--purple);">Facturas guardadas</b><select id="fc-mes" onchange="renderFacturas()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"></select></div>
       <div id="fc-resumen"></div>
+      <button type="button" class="btn-mini" style="margin:6px 0;" onclick="enviarAAuditar(['facturas'], (document.getElementById('fc-mes') || {}).value)">🧾 Enviar a auditar</button>
       <div id="fc-barra" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
         <label style="display:flex;gap:6px;align-items:center;font-size:.85rem;cursor:pointer;"><input type="checkbox" id="fc-todas" onchange="document.querySelectorAll('.fc-sel').forEach(c => c.checked = this.checked); actualizarSelFact();" style="width:18px;height:18px;"> Seleccionar todas</label>
         <button type="button" id="fc-borrar-sel" class="btn-mini" style="display:none;color:#A6432F;border-color:#E3B8AE;" onclick="borrarFacturasSel()">🗑️ Borrar seleccionadas</button>
@@ -2322,7 +2324,8 @@ a.grilla-celda{display:block;}
   <div class="step" id="step-director">
     <style>@media(max-width:700px){#da-main{grid-template-columns:1fr !important;}}</style>
     <div class="form-card" style="max-width:980px;">
-      <h2>🎨 Director de arte</h2>
+      <h2 id="da-tit">🎨 Director de arte</h2>
+      <div id="da-aud" style="display:none;background:#F2F7FD;border:1px solid #B9D3EE;border-radius:12px;padding:10px;margin-bottom:10px;"></div>
       <div id="da-config"></div>
       <div style="display:grid;grid-template-columns:220px minmax(0,1fr);gap:12px;" id="da-main">
         <div><button class="btn btn-gold" style="width:100%;margin-bottom:8px;" onclick="nuevoChatDA()">➕ Conversación nueva</button><div id="da-chats"></div></div>
@@ -2358,6 +2361,7 @@ a.grilla-celda{display:block;}
       <p class="note" style="text-align:left;">Ventas facturadas + Mercado Libre − costo de mercadería − cargos de Mercado Libre − gastos comerciales. Todo con IVA.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><select id="rn-mes" onchange="renderResultadoNegocio()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"></select><select id="rn-cta" onchange="renderResultadoNegocio()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"><option value="">ML: ambas cuentas</option><option>Alberto</option><option>Rita</option></select></div>
       <div id="rn-body"></div>
+      <button type="button" class="btn btn-ghost" style="margin-top:10px;" onclick="enviarAAuditar(['negocio','ml','facturas','gastos'], document.getElementById('rn-mes').value)">🧾 Enviar a auditar este mes</button>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
   </div>
@@ -5846,7 +5850,7 @@ const GRUPOS_INICIO = {
     [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['🧾 Presupuestos', 'abrirPresupuestos()'], ['📄 Pedido desde una foto', "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)"], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()'], ['📋 Historial de pedidos', 'abrirHistorial()']],
     [['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']],
     [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']],
-    [['📊 Resultado del negocio', 'abrirResultadoNegocio()'], ['🧾 Ventas facturadas', 'abrirFacturas()'], ['💸 Gastos comerciales', 'abrirGastos()'], ['📈 Resultados Mercado Libre', 'abrirResultadosML()'], ['🧮 Simulador de costos ML', 'abrirCalculadoraML()']]
+    [['📊 Resultado del negocio', 'abrirResultadoNegocio()'], ['🧾 Auditor (IA)', 'abrirAuditor()'], ['🧾 Ventas facturadas', 'abrirFacturas()'], ['💸 Gastos comerciales', 'abrirGastos()'], ['📈 Resultados Mercado Libre', 'abrirResultadosML()'], ['🧮 Simulador de costos ML', 'abrirCalculadoraML()']]
   ] },
   f: { lado: 'int', titulo: 'Catálogo', titulosColumnas: ['1 · Productos', '2 · Fotos y textos', '3 · Precios'], columnas: [
     [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['🗂️ Ordenar categorías', 'abrirCategorias()']],
@@ -11435,7 +11439,7 @@ function permisoDeAccion(f){
   if(/setTimeout\(\(\) => document.getElementById\('pia-foto'\)/.test(s)) return 'pedidos';
   if(/abrirPedidoIA|abrirHistorial\(|abrirPendientesEntrega/.test(s)) return 'ventas';
   if(/abrirFaltantes/.test(s)) return 'produccion';
-  if(/abrirResultadoNegocio/.test(s)) return 'gastos';
+  if(/abrirResultadoNegocio|abrirAuditor/.test(s)) return 'gastos';
   if(/abrirDirectorArte/.test(s)) return 'difusion';
   if(/abrirPresupuestos/.test(s)) return 'ventas';
   if(/abrirClientes/.test(s)) return 'clientes';
@@ -11772,14 +11776,65 @@ async function convertirPresuEnPedido(){
   try{ actualizarResumen && actualizarResumen(); } catch(e){}
 }
 
+// ===== Auditor: paquetes de datos del mes, listos para auditar (se adjuntan como texto CSV) =====
+function pintarDatosAud(){
+  const box = document.getElementById('da-aud'); if(!box) return;
+  if(daAgente !== 'auditor'){ box.style.display = 'none'; return; } box.style.display = '';
+  const hoy = new Date(), mesDef = window.__audMes || `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+  const meses = []; for(let i = 0; i < 12; i++){ const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 15); meses.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); }
+  box.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><b style="font-size:.88rem;">Datos para auditar:</b>
+    <select id="aud-mes" onchange="window.__audMes=this.value" style="padding:6px;border:1px solid var(--line);border-radius:8px;">${meses.map(m => `<option value="${m}" ${m === mesDef ? 'selected' : ''}>${new Date(m + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</option>`).join('')}</select>
+    ${[['negocio', '📊 Resultado del negocio'], ['ml', '📈 Resultados ML'], ['facturas', '🧾 Ventas facturadas'], ['gastos', '💸 Gastos'], ['costos', '💲 Historial de costos']].map(([k, t]) => `<button type="button" class="btn-mini" onclick="adjuntarPaqueteAud('${k}')">${t}</button>`).join('')}</div>
+    <p class="note" style="text-align:left;margin:6px 0 0;">Cada botón adjunta los datos del mes elegido al próximo mensaje. Después escriba qué quiere revisar (o envíe solo "Auditar").</p>`;
+}
+const csvDA = filas => filas.map(r => r.map(v => { const s = String(v == null ? '' : v); return /[",;\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(';')).join('\n');
+async function datosRN(){ if(!rnDatos){ try{ await prepararCostosFacturas(); } catch(e){}
+  const [sf, sg, sp, sm] = await Promise.all([db.collection('ventas_facturadas').get(), db.collection('gastos').get(), db.collection('gastos_periodicos_ml').get().catch(() => ({ docs: [] })), db.collection('config').doc('ml_resumen_mensual').get()]);
+  rnDatos = { facturas: sf.docs.map(d => ({ _id: d.id, ...d.data() })), gastos: sg.docs.map(d => d.data()), periodicos: sp.docs.map(d => d.data()), ml: sm.exists ? (sm.data().m || {}) : {}, mlAct: sm.exists ? sm.data().actualizado : null }; } return rnDatos; }
+async function adjuntarPaqueteAud(tipo, mesForzado){
+  const mes = mesForzado || (document.getElementById('aud-mes') || {}).value || window.__audMes; if(!mes) return;
+  procesando('Preparando los datos…');
+  try{
+    await datosRN(); const D = rnDatos, nm = new Date(mes + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }); let nombre = '', txt = '';
+    const enMes = f => { const m = String(f.fecha || '').split('/'); return m.length === 3 && m[2] + '-' + m[1] === mes; };
+    if(tipo === 'negocio'){ const A = calcResultadoMes(mes, ''); nombre = `resultado-negocio-${mes}.csv`;
+      txt = csvDA([['Concepto', 'Monto con IVA'], ['Ventas facturadas', Math.round(A.vF)], ['Ventas Mercado Libre (ventas)', A.vML], ['Envíos cobrados ML', A.envML], ['Total vendido', Math.round(A.total)], ['Costo mercadería facturas', Math.round(A.cF)], ['Costo mercadería ML', A.cML], ['Margen bruto', Math.round(A.bruto)], ['Cargos ML', A.cargosML], ['Otros gastos ML cargados a mano', A.periodicos], ['Gastos variables', A.gVar], ['Contribución', Math.round(A.contrib)], ['Gastos fijos', A.gFijos], ['Resultado', Math.round(A.resultado)], ['Punto de equilibrio', A.equilibrio != null ? Math.round(A.equilibrio) : ''], [], ['Control', 'Valor'], ['Comprobantes', A.nFact], ['Renglones de facturas para revisar', A.revF], ['Renglones de facturas sin costo', A.sinCF], ['Ventas de facturas sin costo confiable', Math.round(A.vtaSinCF)], ['Ventas ML sin costo', A.sinCML], ['Ventas ML para revisar', A.revML], ['Gastos sin tipo', A.gSinTipo], ['Hay datos de ML del mes', A.hayML ? 'sí' : 'no']].concat(Object.entries(A.desglose).map(([k, v]) => ['Desglose ML: ' + k, v]))); }
+    else if(tipo === 'ml'){ nombre = `resultados-ml-${mes}.csv`; const L = Object.values(D.ml).filter(x => x.periodo === mes);
+      if(!L.length){ procesando.fin(); alert('No hay datos de Mercado Libre de ese mes: abra Resultados ML con el mes cargado.'); return; }
+      const cs = [...new Set(L.flatMap(x => Object.keys(x.desglose || {})))];
+      txt = csvDA([['Cuenta', 'Vendido', 'Envíos cobrados', 'Le quedó', 'Cargos ML', 'Costo mercadería', 'Ventas sin costo', 'Para revisar', ...cs]].concat(L.map(x => [x.cuenta, x.vendido, x.envios, x.quedo, x.cargosML, x.costo, x.sinCosto, x.revisar, ...cs.map(c => (x.desglose || {})[c] || 0)]))); }
+    else if(tipo === 'facturas'){ nombre = `ventas-facturadas-${mes}.csv`; const filas = [['Comprobante', 'Tipo', 'Fecha', 'Cliente', 'SKU', 'Descripción', 'Cantidad', 'Unidad de venta', 'Venta con IVA', 'Costo', 'Ganancia', 'Estado']];
+      D.facturas.filter(enMes).forEach(f => { const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0), fx = f.total && n0 > 0 ? f.total / n0 : 1.21, sg = signoFact(f);
+        (f.items || []).forEach((it, i) => { const v = it.neto * fx * sg, c = costoItemFactura(it, f), s = skuDeFactura(it.codigo); filas.push([(f.esNC ? 'NC ' : '') + f.numero, f.tipo || '', f.fecha, f.cliente || '', s, it.desc || '', it.cant, unidadVentaSku(s) || 'unidad', Math.round(v), c != null ? Math.round(c) : '', c != null ? Math.round(v - c) : '', c == null ? 'sin costo' : renglonRevFactura(f, i, v, c) ? 'para revisar' : 'ok']); }); });
+      if(filas.length === 1){ procesando.fin(); alert('No hay facturas de ese mes.'); return; } txt = csvDA(filas); }
+    else if(tipo === 'gastos'){ nombre = `gastos-${mes}.csv`; const L = D.gastos.filter(g => String(g.fecha || '').slice(0, 7) === mes);
+      txt = csvDA([['Fecha', 'Concepto', 'Monto', 'Tipo', 'Ya cobrado por ML', 'Medio', 'Quién', 'Nota']].concat(L.map(g => [g.fecha, g.concepto, g.monto, g.tipo || 'sin tipo', g.enML ? 'sí' : 'no', g.medio || '', g.quien || '', g.nota || '']))); }
+    else if(tipo === 'costos'){ nombre = 'historial-costos.csv'; const s = await db.collection('historial_costos').get();
+      const filas = [['SKU', 'Fecha', 'Costo por unidad', 'Costo actual por unidad', 'Unidad de venta', 'Corregido']];
+      s.docs.map(d => d.data()).sort((a, b) => String(a.sku).localeCompare(String(b.sku)) || String(a.fecha).localeCompare(String(b.fecha))).forEach(v => { const S = String(v.sku || '').toUpperCase(); let act = null; try{ act = costoUnidadSku(S); } catch(e){} filas.push([S, v.fecha, v.costo, act != null ? Math.round(act * 100) / 100 : '', unidadVentaSku(S) || 'unidad', v.corregido ? 'sí' : '']); });
+      txt = csvDA(filas); }
+    daDocs.push({ tipo: 'texto', nombre, data: `Datos de ${nm} (montos con IVA, separador ;)\n` + txt.slice(0, 190000) });
+    renderAdjuntosDA(); procesando.listo('✓ Datos adjuntados');
+  } catch(e){ procesando.error(e.message); }
+}
+// desde otras pantallas: abre el Auditor con los datos de ese mes
+async function enviarAAuditar(paquetes, mes){ window.__audMes = mes || window.__audMes; await abrirChatAgente('auditor'); for(const pq of paquetes) await adjuntarPaqueteAud(pq, window.__audMes); document.getElementById('da-texto').value = 'Auditar'; }
 // ===== Director de arte: chat con el agente de Claude (la clave de la API vive en el Worker, nunca en la app) =====
 let daCfg = null, daChats = [], daChat = null, daProds = [], daImgs = [], daCanal = '';
 const DA_CANALES = ['Mercado Libre', 'Tienda Nube', 'Post 1:1', 'Post 4:5', 'Historia 9:16', 'Carrusel', 'Catálogo mayorista', 'Catálogo minorista'];
-async function abrirDirectorArte(){
+let daAgente = 'arte';
+async function abrirDirectorArte(){ return abrirChatAgente('arte'); }
+async function abrirAuditor(paquetes){ await abrirChatAgente('auditor'); if(paquetes && paquetes.length) for(const pq of paquetes) await adjuntarPaqueteAud(pq); }
+async function abrirChatAgente(agente){
+  if(daAgente !== agente){ daChat = null; daProds = []; daImgs = []; daDocs = []; }
+  daAgente = agente;
   mostrarPaso('step-director');
+  document.getElementById('da-tit').textContent = agente === 'auditor' ? '🧾 Auditor contable' : '🎨 Director de arte';
+  document.getElementById('da-canales').style.display = agente === 'auditor' ? 'none' : '';
+  pintarDatosAud();
   try{ const d = await db.collection('config').doc('agente').get(); daCfg = d.exists ? d.data() : {}; } catch(e){ daCfg = {}; }
   pintarConfigDA();
-  const s = await db.collection('agente_chats').get(); daChats = s.docs.map(d => ({ _id: d.id, ...d.data() })).sort((a, b) => String(b.actualizado).localeCompare(String(a.actualizado)));
+  const s = await db.collection('agente_chats').get(); daChats = s.docs.map(d => ({ _id: d.id, ...d.data() })).filter(c => (c.agente || 'arte') === daAgente).sort((a, b) => String(b.actualizado).localeCompare(String(a.actualizado)));
   renderChatsDA(); if(!daChat && daChats[0]) abrirChatDA(daChats[0]._id); else renderMsgsDA();
   document.getElementById('da-canales').innerHTML = DA_CANALES.map(c => `<button type="button" class="btn-mini da-canal" onclick="daCanal=daCanal==='${c}'?'':'${c}';document.querySelectorAll('.da-canal').forEach(b=>b.style.background=b.textContent===daCanal?'var(--gold)':'');">${c}</button>`).join('');
   const ops = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => ops.push(v.sku + ' · ' + p.nombre + ' · ' + (v.desc || '')))));
@@ -11877,8 +11932,8 @@ async function enviarDA(){
       for(const f of fs){ const b64 = await imagenABase64DA(f); if(b64) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } }); } }
     for(const f of daImgs){ content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.split(',')[1] } }); }
     for(const d of daDocs){ if(d.tipo === 'pdf') content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: d.data }, title: d.nombre }); else content.push({ type: 'text', text: `Archivo adjunto "${d.nombre}":\n${d.data}` }); }
-    if(!daChat){ procesando.texto('Iniciando la conversación…'); const s = await llamarAgente({ accion: 'crear', titulo: texto.slice(0, 60) });
-      const ref = await db.collection('agente_chats').add({ titulo: (daProds[0] ? daProds[0] + ' · ' : '') + texto.slice(0, 50), sessionId: s.id, creado: new Date().toISOString(), actualizado: new Date().toISOString(), mensajes: [] });
+    if(!daChat){ procesando.texto('Iniciando la conversación…'); const s = await llamarAgente({ accion: 'crear', agente: daAgente, titulo: texto.slice(0, 60) });
+      const ref = await db.collection('agente_chats').add({ agente: daAgente, titulo: (daProds[0] ? daProds[0] + ' · ' : '') + texto.slice(0, 50), sessionId: s.id, creado: new Date().toISOString(), actualizado: new Date().toISOString(), mensajes: [] });
       daChat = { _id: ref.id, titulo: (daProds[0] ? daProds[0] + ' · ' : '') + texto.slice(0, 50), sessionId: s.id, mensajes: [] }; daChats.unshift(daChat); }
     const antes = await llamarAgente({ accion: 'eventos', session: daChat.sessionId }); const vistos = new Set(((antes && antes.data) || []).map(e => e.id));
     procesando.texto('Enviando…'); await llamarAgente({ accion: 'enviar', session: daChat.sessionId, content });
@@ -19569,7 +19624,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v282';
+const APP_VERSION = '2026-10-02-v283';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
