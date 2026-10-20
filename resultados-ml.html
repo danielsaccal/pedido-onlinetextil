@@ -903,6 +903,7 @@ function draw(){
   try{renderCuotas();}catch(e){console.error(e);}
   try{renderRevisar();}catch(e){console.error(e);}
   try{pintarCuenta();}catch(e){}
+  clearTimeout(window.__resT); window.__resT=setTimeout(guardarResumenMensual,1500);
   try{ if(!menuArmado) armarMenuML(); else { pintarMenuML(); if(window.__pantallaML){ abrirPantallaML(window.__pantallaML,true); } } }catch(e){console.error(e);}
   // lista
   $('count').textContent=r.length.toLocaleString('es-AR')+' operaciones';
@@ -1518,6 +1519,24 @@ async function corregirDudosos(skus){
     procesando.listo('✓ '+cambios.length+' registros corregidos');
   }catch(e){procesando.error(e.message);alert('No se pudo corregir: '+e.message);return;}
   render(); if(window.__pantallaML==='diag')renderDiagnostico();
+}
+// ===== Resumen mensual por cuenta para la pantalla "Resultado del negocio" de la app (config/ml_resumen_mensual) =====
+let __resGuardado = '';
+function resumenMensualML(){
+  const out={}, eIn=o=>o.envIn!==undefined?o.envIn:Math.max(o.envio||0,0);
+  const claves=new Set(); allRows().forEach(o=>{ if(o.periodo&&o.periodo!=='sin-fecha'&&!o.excl) claves.add(o.periodo+'|'+o.cuenta); });
+  claves.forEach(k=>{ const [p,c]=k.split('|'); const r=allRows().filter(o=>!o.excl&&o.periodo===p&&o.cuenta===c), v=r.filter(o=>o.tipo==='Venta'&&o.pcd>0);
+    const S=(a,f)=>a.reduce((x,o)=>x+(f(o)||0),0);
+    const vend=S(v,o=>o.pcd), envIn=S(r,eIn), quedo=S(r,o=>o.neto), costo=S(v.filter(o=>o.costo!=null),o=>o.costo)+S(r,o=>o.costoAj);
+    let C={}; try{ C=desgloseLineaML(p,c).C; }catch(e){}
+    out[k]={periodo:p,cuenta:c,vendido:Math.round(vend),envios:Math.round(envIn),quedo:Math.round(quedo),cargosML:Math.round(vend+envIn-quedo),costo:Math.round(costo),
+      sinCosto:v.filter(o=>o.costo==null&&o.costoRev==null).length, vendSinCosto:Math.round(S(v.filter(o=>o.costo==null),o=>o.pcd)), revisar:v.filter(o=>o.costoRev!=null).length,
+      desglose:Object.fromEntries(Object.entries(C).map(([a,b])=>[a,Math.round(b)]))}; });
+  return out;
+}
+function guardarResumenMensual(){
+  try{ const m=resumenMensualML(), s=JSON.stringify(m); if(s===__resGuardado||!Object.keys(m).length) return; __resGuardado=s;
+    db.collection('config').doc('ml_resumen_mensual').set({m,actualizado:new Date().toISOString()}).catch(()=>{}); }catch(e){}
 }
 // ===== Perdidas para reclamar: cancelaciones y devoluciones que te costaron plata =====
 function perdidasReclamo(){
