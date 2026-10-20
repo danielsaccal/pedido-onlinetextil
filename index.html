@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v277</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v278</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2347,6 +2347,7 @@ a.grilla-celda{display:block;}
       <div id="cp-fab" style="border-left:5px solid #2F7A47;padding-left:10px;margin-bottom:18px;"><div style="font-weight:800;color:#2F7A47;margin:2px 0 6px;">🏭 Lo que fabrico</div><div id="cp-fab-in"></div></div>
       <div id="cp-rev" style="border-left:5px solid #2E5A8C;padding-left:10px;"><div style="font-weight:800;color:#2E5A8C;margin:2px 0 6px;">🛒 Reventa</div><div id="cp-rev-in"></div></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
+      <div id="cp-guardar" style="display:none;position:sticky;bottom:70px;z-index:20;margin-top:12px;background:#3D2B4E;color:#fff;border-radius:14px;padding:10px 14px;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.25);"><span style="flex:1;"></span><button type="button" class="btn btn-gold" style="width:auto;padding:9px 18px;" onclick="guardarTodoCP()">💾 Guardar cambios</button></div>
     </div>
   </div>
 
@@ -7381,13 +7382,33 @@ async function corregirHistorialSel(){
 // ===== Precio y % sobre el costo enlazados (costo 100 y precio 120 = 20 %) =====
 const colorPct = m => m == null ? '#8A8072' : m < 0.25 ? '#A6432F' : m < 0.65 ? '#8A6417' : '#2F7A47';
 const idPP = S => String(S).toUpperCase().replace(/[^A-Z0-9]/g, '_');
+const ppPend = {}; // SKU -> precio nuevo, pendiente hasta "Guardar cambios"
 function celdaPrecioPct(S, costo, pr){
+  const SU = String(S).toUpperCase(); if(ppPend[SU] != null) pr = ppPend[SU];
   const k = idPP(S), m = costo > 0 && pr > 0 ? (pr - costo) / costo : null, inp = 'padding:4px 6px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;text-align:right;box-sizing:border-box;';
-  return { precio: `<span style="display:inline-flex;gap:4px;align-items:center;"><input id="pp-${k}" inputmode="decimal" value="${pr ? formatoPesos(Math.round(pr)) : ''}" placeholder="$" style="${inp}width:92px;" oninput="ppDesdePrecio('${k}',${costo || 0})"><button type="button" class="btn-mini" style="padding:2px 6px;" title="Guardar el precio" onclick="ppGuardar('${escapeAttr(S)}','${k}',${costo || 0})">💾</button></span>`,
+  return { precio: `<input id="pp-${k}" data-sku="${escapeAttr(SU)}" inputmode="decimal" value="${pr ? formatoPesos(Math.round(pr)) : ''}" placeholder="$" style="${inp}width:100px;${ppPend[SU] != null ? 'border-color:var(--gold);background:#FFF8E6;' : ''}" oninput="ppDesdePrecio('${k}',${costo || 0})">`,
     pct: `<span style="display:inline-flex;gap:2px;align-items:center;"><input id="pc-${k}" inputmode="decimal" value="${m != null ? Math.round(m * 100) : ''}" ${costo > 0 ? '' : 'disabled'} style="${inp}width:56px;color:${colorPct(m)};font-weight:700;" oninput="ppDesdePct('${k}',${costo || 0})">%</span>` };
 }
-function ppDesdePct(k, costo){ const p = numAr(document.getElementById('pc-' + k).value), e = document.getElementById('pp-' + k); if(costo > 0 && isFinite(p) && e){ e.value = formatoPesos(Math.ceil(costo * (1 + p / 100) / 10) * 10); } ppColor(k, costo); }
-function ppDesdePrecio(k, costo){ const n = numAr(document.getElementById('pp-' + k).value), e = document.getElementById('pc-' + k); if(costo > 0 && n > 0 && e) e.value = Math.round((n - costo) / costo * 100); ppColor(k, costo); }
+function ppMarcar(k){ const e = document.getElementById('pp-' + k); if(!e) return; const n = numAr(e.value), S = e.dataset.sku; if(n > 0) ppPend[S] = n; else delete ppPend[S]; e.style.borderColor = 'var(--gold)'; e.style.background = '#FFF8E6'; pintarBarraGuardarCP(); }
+function ppDesdePct(k, costo){ const p = numAr(document.getElementById('pc-' + k).value), e = document.getElementById('pp-' + k); if(costo > 0 && isFinite(p) && e){ e.value = formatoPesos(Math.ceil(costo * (1 + p / 100) / 10) * 10); ppMarcar(k); } ppColor(k, costo); }
+function ppDesdePrecio(k, costo){ const n = numAr(document.getElementById('pp-' + k).value), e = document.getElementById('pc-' + k); if(costo > 0 && n > 0 && e) e.value = Math.round((n - costo) / costo * 100); ppMarcar(k); ppColor(k, costo); }
+// un solo boton para guardar todo lo cambiado en la pantalla (precios y costos de reventa)
+function pintarBarraGuardarCP(){
+  const b = document.getElementById('cp-guardar'); if(!b) return;
+  const nP = Object.keys(ppPend).length, nC = typeof crPend !== 'undefined' ? Object.keys(crPend).length : 0;
+  b.style.display = nP || nC ? 'flex' : 'none';
+  b.querySelector('span').textContent = [nP ? `${nP} ${nP === 1 ? 'precio' : 'precios'}` : '', nC ? `${nC} ${nC === 1 ? 'costo' : 'costos'}` : ''].filter(Boolean).join(' y ') + ' sin guardar';
+}
+async function guardarTodoCP(){
+  const lista = Object.entries(ppPend).filter(([S]) => buscarProductoPorSku(S));
+  const bajos = lista.filter(([S, n]) => { let cu = null; try{ cu = costoUnidadSku(S); } catch(e){} return cu > 0 && n < cu * divisorVenta(S); });
+  if(bajos.length && !confirm(`¿Seguro? ${bajos.length} precio(s) quedan por debajo del costo:\n` + bajos.slice(0, 15).map(([S, n]) => `${S}: ${formatPrice(n)}`).join('\n'))) return;
+  try{
+    if(typeof crPend !== 'undefined' && Object.keys(crPend).length) await guardarCostosReventa();
+    if(lista.length){ const ok = await guardarPreciosSkus(lista); lista.forEach(([S]) => delete ppPend[S]); alert(`Listo: ${ok} ${ok === 1 ? 'precio guardado' : 'precios guardados'} en el catálogo.`); }
+  } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  try{ renderProductosFabrico(); } catch(e){} try{ if(esDueno()) renderCostosReventa(); } catch(e){} pintarBarraGuardarCP();
+}
 function ppColor(k, costo){ const n = numAr(document.getElementById('pp-' + k).value), e = document.getElementById('pc-' + k); if(e) e.style.color = colorPct(costo > 0 && n > 0 ? (n - costo) / costo : null); }
 // guarda precios en el catalogo (agrupando por producto)
 async function guardarPreciosSkus(lista){
@@ -9416,7 +9437,7 @@ function cambiosSinGuardar(paso){
   if(paso === 'step-reventa') return typeof rvPend !== 'undefined' && n(rvPend);
   if(paso === 'step-confeccion') return typeof cfPend !== 'undefined' && n(cfPend);
   if(paso === 'step-costos-reventa') return typeof crPend !== 'undefined' && n(crPend);
-  if(paso === 'step-costos-productos') return cambiosSinGuardar('step-costos-reventa') || cambiosSinGuardar('step-productos-fabrico');
+  if(paso === 'step-costos-productos') return cambiosSinGuardar('step-costos-reventa') || cambiosSinGuardar('step-productos-fabrico') || (typeof ppPend !== 'undefined' && n(ppPend));
   return false;
 }
 window.addEventListener('beforeunload', e => { const a = document.querySelector('.step.active'); if(a && cambiosSinGuardar(a.id)){ e.preventDefault(); e.returnValue = ''; } });
@@ -10533,7 +10554,7 @@ async function crUnidad(ek, u){
   try{ await db.collection('config').doc('unidades').set({ u: unidadesVenta }); renderCostosReventa(); try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){} registrarHistorialCostos().catch(() => {}); }
   catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
-function crMostrarGuardar(){ const n = Object.keys(crPend).length, b = document.getElementById('cr-guardar'); b.style.display = n ? 'block' : 'none'; b.querySelector('button').textContent = `💾 Guardar (${n} SKU)`; }
+function crMostrarGuardar(){ try{ pintarBarraGuardarCP(); } catch(e){} const n = Object.keys(crPend).length, b = document.getElementById('cr-guardar'); b.style.display = n && !(typeof cpMovido !== 'undefined' && cpMovido) ? 'block' : 'none'; b.querySelector('button').textContent = `💾 Guardar (${n} SKU)`; }
 function crCambiar(i, v){ crPend[window.__crSkus[i]] = v; crMostrarGuardar(); }
 function crTodo(pi, v){
   const q = normBusqueda(document.getElementById('cr-buscar').value), cat = document.getElementById('cr-cat').value;
@@ -19404,7 +19425,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v277';
+const APP_VERSION = '2026-10-02-v278';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
@@ -19462,7 +19483,7 @@ window.addEventListener('load', () => {
     ['abrirFacturas', 'Cargando facturas…'], ['leerFacturasPDF', 'Leyendo facturas…'], ['guardarFactura', 'Guardando la factura…'], ['borrarFacturasSel', 'Borrando facturas…'],
     ['importarLinksWeb', 'Leyendo el archivo de Tienda Nube…'], ['analizarPedidoIA', 'La IA está armando el pedido…'],
     ['generarFlyersNuevoIngreso', 'Generando las piezas…'], ['abrirResultadosML', 'Preparando Resultados ML…'], ['descargarCopia', 'Preparando la copia…'],
-    ['abrirFaltantes', 'Cargando faltantes…'], ['usarCostosActualesEnTodo', 'Actualizando el historial…'], ['abrirRevisarHistorial', 'Revisando el historial…'], ['corregirHistorialSel', 'Corrigiendo…'], ['abrirRevisarCostos', 'Cargando…'], ['ccAplicar', 'Actualizando precios…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
+    ['abrirFaltantes', 'Cargando faltantes…'], ['guardarTodoCP', 'Guardando…'], ['usarCostosActualesEnTodo', 'Actualizando el historial…'], ['abrirRevisarHistorial', 'Revisando el historial…'], ['corregirHistorialSel', 'Corrigiendo…'], ['abrirRevisarCostos', 'Cargando…'], ['ccAplicar', 'Actualizando precios…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
   ];
   setTimeout(() => W.forEach(([n, t]) => conProcesando(n, t)), 0);
 });
