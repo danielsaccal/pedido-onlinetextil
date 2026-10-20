@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v274</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v275</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2343,7 +2343,7 @@ a.grilla-celda{display:block;}
     <div class="form-card" style="max-width:1100px;">
       <h2>Costos de productos</h2>
       <input id="cp-buscar" placeholder="🔍 Buscar en fabrico y reventa: nombre, SKU, medida, tela…" oninput="cpBuscar(this.value)" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid var(--line);border-radius:12px;font-size:1rem;margin:4px 0 8px;">
-      <div style="display:flex;gap:6px;margin:4px 0 12px;flex-wrap:wrap;align-items:center;"><span id="cp-tabs" style="display:flex;gap:6px;"></span><button type="button" class="btn-mini" style="margin-left:auto;" onclick="abrirRevisarHistorial()">🩺 Revisar historial de costos</button></div>
+      <div style="display:flex;gap:6px;margin:4px 0 12px;flex-wrap:wrap;align-items:center;"><span id="cp-tabs" style="display:flex;gap:6px;"></span><button type="button" class="btn-mini" style="margin-left:auto;" onclick="abrirRevisarHistorial()">🩺 Revisar historial de costos</button><button type="button" class="btn-mini" id="cp-reset" style="display:none;background:var(--gold);" onclick="usarCostosActualesEnTodo()">Usar los costos de hoy en todo el historial (una sola vez)</button></div>
       <div id="cp-fab" style="border-left:5px solid #2F7A47;padding-left:10px;margin-bottom:18px;"><div style="font-weight:800;color:#2F7A47;margin:2px 0 6px;">🏭 Lo que fabrico</div><div id="cp-fab-in"></div></div>
       <div id="cp-rev" style="border-left:5px solid #2E5A8C;padding-left:10px;"><div style="font-weight:800;color:#2E5A8C;margin:2px 0 6px;">🛒 Reventa</div><div id="cp-rev-in"></div></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
@@ -7331,6 +7331,22 @@ async function actualizarTodasDescripciones(){
   renderProductosFabrico();
   alert(n ? `Listo: se revisaron los productos y se actualizaron las descripciones que no coincidían.` : 'Las descripciones ya estaban al día.');
 }
+// una sola vez: todo el historial de costos pasa a tener el costo actual de cada SKU (ventas facturadas y Resultados ML usan el costo de hoy para el pasado)
+async function pintarBotonReset(){ const b = document.getElementById('cp-reset'); if(!b) return; if(!esDueno()){ b.style.display = 'none'; return; }
+  try{ const d = await db.collection('config').doc('historial_reset').get(); b.style.display = d.exists ? 'none' : ''; } catch(e){ b.style.display = ''; } }
+async function usarCostosActualesEnTodo(){
+  try{ await prepararCostosFacturas(); } catch(e){}
+  const s = await db.collection('historial_costos').get(); const cambios = []; let sinCosto = 0;
+  s.docs.forEach(d => { const v = d.data(), S = String(v.sku || '').toUpperCase(); let act = null; try{ act = costoUnidadSku(S); } catch(e){}
+    if(!(act > 0)){ sinCosto++; return; } if(Math.abs((+v.costo || 0) - act) > 0.009) cambios.push({ id: d.id, antes: +v.costo, act }); });
+  if(!confirm(`Se va a usar el costo de HOY de cada SKU para todas las ventas pasadas (facturas y Mercado Libre).\n\nSe cambian ${cambios.length} registros del historial.${sinCosto ? `\n${sinCosto} registros de SKU sin costo actual no se tocan.` : ''}\n\nSe guarda el valor anterior de cada registro. ¿Continuar?`)) return;
+  try{
+    for(let i = 0; i < cambios.length; i += 400){ const b = db.batch(); cambios.slice(i, i + 400).forEach(c => b.set(db.collection('historial_costos').doc(c.id), { costo: c.act, costoAnterior: c.antes, corregido: new Date().toISOString(), motivo: 'costos de hoy en todo el historial' }, { merge: true })); await b.commit(); }
+    await db.collection('config').doc('historial_reset').set({ fecha: new Date().toISOString(), registros: cambios.length });
+  } catch(e){ alert('No se pudo completar: ' + e.message); return; }
+  histCostos = null; try{ await cargarHistCostos(); } catch(e){}
+  pintarBotonReset(); alert(`Listo: ${cambios.length} registros pasaron al costo de hoy. Abra Ventas facturadas o Resultados ML para ver los números recalculados.`);
+}
 // ===== Revisar el historial de costos de TODOS los SKU: registros que difieren x12, x6, x2 (o mas de 3 veces) del costo actual =====
 let rhFilas = [];
 async function abrirRevisarHistorial(){
@@ -7391,7 +7407,7 @@ async function abrirCostosProductos(tab){
   try{ await abrirProductosFabrico(); if(esDueno()) await abrirCostosReventa(); cpMover(); mostrarPaso('step-costos-productos'); }
   finally{ navVolviendo = nv; window.__cpCargando = false; }
   if(origen && origen !== 'step-costos-productos' && origen !== 'step-productos-fabrico' && origen !== 'step-costos-reventa'){ navStack.push(origen); if(navStack.length > 40) navStack.shift(); try{ history.pushState({ paso: 'step-costos-productos' }, ''); } catch(e){} }
-  cpTab = t; cpPintar();
+  cpTab = t; cpPintar(); pintarBotonReset();
 }
 async function abrirProductosFabrico(){
   mostrarPaso('step-productos-fabrico');
@@ -19330,7 +19346,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v274';
+const APP_VERSION = '2026-10-02-v275';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
@@ -19388,7 +19404,7 @@ window.addEventListener('load', () => {
     ['abrirFacturas', 'Cargando facturas…'], ['leerFacturasPDF', 'Leyendo facturas…'], ['guardarFactura', 'Guardando la factura…'], ['borrarFacturasSel', 'Borrando facturas…'],
     ['importarLinksWeb', 'Leyendo el archivo de Tienda Nube…'], ['analizarPedidoIA', 'La IA está armando el pedido…'],
     ['generarFlyersNuevoIngreso', 'Generando las piezas…'], ['abrirResultadosML', 'Preparando Resultados ML…'], ['descargarCopia', 'Preparando la copia…'],
-    ['abrirFaltantes', 'Cargando faltantes…'], ['abrirRevisarHistorial', 'Revisando el historial…'], ['corregirHistorialSel', 'Corrigiendo…'], ['abrirRevisarCostos', 'Cargando…'], ['ccAplicar', 'Actualizando precios…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
+    ['abrirFaltantes', 'Cargando faltantes…'], ['usarCostosActualesEnTodo', 'Actualizando el historial…'], ['abrirRevisarHistorial', 'Revisando el historial…'], ['corregirHistorialSel', 'Corrigiendo…'], ['abrirRevisarCostos', 'Cargando…'], ['ccAplicar', 'Actualizando precios…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
   ];
   setTimeout(() => W.forEach(([n, t]) => conProcesando(n, t)), 0);
 });
