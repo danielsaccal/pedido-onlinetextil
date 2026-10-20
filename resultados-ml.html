@@ -1836,7 +1836,8 @@ function renderFaltan(){
   const gs=Object.values(G).sort((a,b)=>b.vend-a.vend);
   const noApp=gs.filter(g=>!g.enApp), sinCosto=gs.filter(g=>g.enApp);
   const tot=vs.reduce((a,o)=>a+o.pcd,0);
-  $('ftCnt').textContent=gs.length?'· '+gs.length+' SKU · '+fmt(tot)+' facturado':'';
+  { const nSin=allRows().filter(o=>o.tipo==='Venta'&&o.pcd>0&&!o.skuBase&&(cur==='todo'||o.periodo===cur)&&(!fc||o.cuenta===fc)&&o.costo==null&&o.costoRev==null).length;
+    $('ftCnt').textContent=(gs.length?'· '+gs.length+' SKU · '+fmt(tot)+' facturado':'')+(nSin?` · ${nSin} sin SKU`:''); }
   // version compacta: una linea por SKU, con una etiqueta corta de lo que falta (el detalle, al tocarla)
   const corto=g=>{const m=MOTIVOS[g.k]||'';
     if(!g.enApp)return['No está en la app','#A6432F','El SKU de ML no coincide con ningún producto de la app. Asignale su código con 🔁 o cargalo en la app.'];
@@ -1853,8 +1854,29 @@ function renderFaltan(){
       <td style="padding:7px 6px;"><span title="${det.replace(/"/g,'&quot;')}" onclick="this.nextElementSibling.hidden=!this.nextElementSibling.hidden" style="cursor:pointer;font-size:.76rem;font-weight:700;color:${col};background:${col}14;border-radius:999px;padding:2px 9px;white-space:nowrap;">${t} ⓘ</span><div hidden style="font-size:.76rem;color:#6B6258;margin-top:4px;max-width:420px;">${det}</div></td>
       <td style="padding:7px 6px;text-align:right;white-space:nowrap;" title="${g.n} ventas · ${g.unid} unidades">${fmt(g.vend)}</td>
       <td style="padding:7px 6px;text-align:right;white-space:nowrap;">${accionFaltante(g,t,det)}</td></tr>`;}).join('');
-  $('ftBody').innerHTML=!gs.length?'<p class="note">✓ Todas las ventas de este período tienen su costo.</p>':
-    `<p class="note" style="margin:0 0 6px;">Completalo desde acá: el código de la app, el costo por unidad, o el link a la pantalla que falta. Tocá la etiqueta para ver el detalle.</p><div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;">${filas}</table></div>`;
+  // ventas sin SKU en la publicacion: no se pueden agrupar por SKU, se listan aparte para asignarles uno
+  const sinSku=allRows().filter(o=>o.tipo==='Venta'&&o.pcd>0&&!o.skuBase&&(cur==='todo'||o.periodo===cur)&&(!fc||o.cuenta===fc)&&o.costo==null&&o.costoRev==null);
+  const porTit={}; sinSku.forEach(o=>{const t=o.titulo||'(sin título en el reporte)';(porTit[t]=porTit[t]||[]).push(o);});
+  window.__sinSku=porTit;
+  const htmlSinSku=sinSku.length?`<div style="margin-top:14px;border-top:2px solid var(--line);padding-top:10px;"><b style="color:#A6432F;">Ventas sin SKU en la publicación (${sinSku.length})</b>
+    <p class="note" style="margin:4px 0 8px;">Asígneles el SKU de la app para tomar su costo. Para que no vuelva a pasar, cargue el SKU en la publicación de Mercado Libre.</p>
+    ${Object.entries(porTit).map(([t,os],gi)=>`<div style="border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:8px;background:#fff;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><b style="font-size:.88rem;">${t.replace(/</g,'&lt;')}</b><span class="meta">${os.length} ${os.length===1?'venta':'ventas'} · ${fmt(os.reduce((a,o)=>a+o.pcd,0))}</span>
+        ${os.length>1?`<span style="margin-left:auto;display:flex;gap:4px;align-items:center;"><input placeholder="SKU (ej: IA905 o IA905 x 3)" list="eqSinMatch" style="width:170px;height:30px;min-height:0;padding:3px 8px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;box-sizing:border-box;"><button type="button" style="padding:5px 10px;border-radius:8px;border:none;background:#3d1466;color:#fff;font-weight:700;cursor:pointer;" onclick="asignarSkuSinSku(${gi},null,this.previousElementSibling.value)">Asignar a todas las de esta publicación</button></span>`:''}</div>
+      ${os.map((o,k)=>`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px dashed var(--line);padding:5px 0;font-size:.84rem;box-shadow:inset 4px 0 0 ${colorCta(o.cuenta)};padding-left:8px;">${etiquetaCta(o.cuenta)}<span>${o.fecha}</span><span class="meta">Operación ${o.op} · ${o.cant||1} unid. · ${fmt(o.pcd)}</span>
+        <span style="margin-left:auto;display:flex;gap:4px;align-items:center;"><input placeholder="SKU" list="eqSinMatch" style="width:130px;height:28px;min-height:0;padding:3px 8px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;box-sizing:border-box;"><button type="button" style="padding:4px 9px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="asignarSkuSinSku(${gi},${k},this.previousElementSibling.value)">🔁 Asignar SKU</button></span></div>`).join('')}</div>`).join('')}</div>`:'';
+  $('ftBody').innerHTML=(!gs.length?(sinSku.length?'':'<p class="note">✓ Todas las ventas de este período tienen su costo.</p>'):
+    `<p class="note" style="margin:0 0 6px;">Completalo desde acá: el código de la app, el costo por unidad, o el link a la pantalla que falta. Tocá la etiqueta para ver el detalle.</p><div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;">${filas}</table></div>`)+htmlSinSku;
+}
+// asigna un SKU de la app a una venta sin SKU (o a todas las de la misma publicacion)
+async function asignarSkuSinSku(gi,k,valor){
+  const v=String(valor||'').trim().toUpperCase(); if(!v){showErr('Escriba el SKU.');return;}
+  const m=v.match(/^(.+?)(?:\s*X\s*(\d+))?$/), base=m[1].trim(), mult=m[2]?+m[2]:null;
+  if(!NAMES[base]&&!COSTOS[base]&&!confirm(`${base} no figura en la app. ¿Lo uso igual?`))return;
+  const grupos=Object.values(window.__sinSku||{}), os=k==null?grupos[gi]:[grupos[gi][k]];
+  os.forEach(o=>{UNI[claveVenta(o)]={sku:base,mult};});
+  try{await db.collection('config').doc('ml_unidades').set({u:UNI});}catch(e){showErr('No se pudo guardar: '+e.message);return;}
+  render(); renderFaltan(); alertOk(`${os.length===1?'Venta asignada':os.length+' ventas asignadas'} a ${v}.`);
 }
 // ===== Desglose de envios (Flex, correo), Full y publicidad =====
 function renderDesglose(){
