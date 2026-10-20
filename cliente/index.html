@@ -666,8 +666,8 @@ function renderCatalogo(filtro){
         variantesHtml += `
           <div class="variante">
             <div class="variante-fila">
-              <div class="desc">${descVarianteHtml(v.desc)}<span class="sku">SKU ${v.sku}</span>${rolloNota}</div>
-              <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioEfectivo) + sufijoPrecio(p)}</div>
+              <div class="desc" style="display:flex;gap:8px;align-items:flex-start;">${miniFotoSkuCli(v.sku)}<div>${descVarianteHtml(v.desc)}<span class="sku">SKU ${v.sku}</span>${rolloNota}</div></div>
+              <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioEfectivo) + sufijoPrecioSku(p, v.sku)}</div>
               ${precioNum===null ? '<div></div>' : `
               <div class="qty">
                 <button type="button" onclick="cambiarCantidad('${id}', -1, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioEfectivo})">−</button>
@@ -2086,13 +2086,30 @@ function sincronizarFotosRaw(){
   }));
 }
 
+var fotosSku = {};
 function cargarFotosOverride(){
   return db.collection('fotos').get().then(snap => {
     fotosOverride = {};
     fotosRaw = {};
     snap.docs.forEach(d => { const x = d.data(); fotosOverride[d.id] = (x.imagenesBase64 && x.imagenesBase64[0]) || x.imagenBase64; fotosRaw[d.id] = fotosOverride[d.id]; });
+    return db.collection('fotos_sku').get().then(s2 => { fotosSku = {}; s2.docs.forEach(d => { const a = d.data().imagenesBase64 || []; if(a.length) fotosSku[d.id] = a; }); }).catch(() => {});
   }).catch(e => console.error('Error cargando fotos override:', e));
 }
+// fotos propias de cada medida: miniatura y carrusel
+function miniFotoSkuCli(sku){ const S = String(sku).toUpperCase(), f = (window.fotosSku || {})[S]; if(!f || !f.length) return '';
+  return `<div style="position:relative;flex:none;"><img src="${f[0]}" alt="" loading="lazy" onclick="event.stopPropagation();galeriaSkuCli('${S}')" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid #E3DCD2;cursor:pointer;">${f.length > 1 ? `<span style="position:absolute;bottom:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;font-size:.6rem;padding:0 4px;border-radius:6px;">📷 ${f.length}</span>` : ''}</div>`; }
+function galeriaSkuCli(S){
+  const fotos = (window.fotosSku || {})[S] || []; if(!fotos.length) return; let i = 0;
+  const o = document.createElement('div'); o.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+  o.innerHTML = `<img id="gsc-img" src="${fotos[0]}" style="max-width:90vw;max-height:75vh;object-fit:contain;border-radius:10px;"><p style="color:#fff;margin-top:10px;">SKU ${S} — <span id="gsc-n">1 / ${fotos.length}</span></p>
+    <div style="display:flex;gap:14px;margin-top:10px;"><button type="button" id="gsc-a" style="width:44px;height:44px;border-radius:50%;border:none;font-size:1.2rem;">‹</button><button type="button" id="gsc-x" style="padding:0 18px;height:44px;border-radius:22px;border:none;font-weight:700;">Cerrar</button><button type="button" id="gsc-s" style="width:44px;height:44px;border-radius:50%;border:none;font-size:1.2rem;">›</button></div>`;
+  document.body.appendChild(o);
+  const ver = () => { o.querySelector('#gsc-img').src = fotos[i]; o.querySelector('#gsc-n').textContent = (i + 1) + ' / ' + fotos.length; };
+  o.querySelector('#gsc-a').onclick = () => { i = (i - 1 + fotos.length) % fotos.length; ver(); };
+  o.querySelector('#gsc-s').onclick = () => { i = (i + 1) % fotos.length; ver(); };
+  o.querySelector('#gsc-x').onclick = () => o.remove(); o.onclick = e => { if(e.target === o) o.remove(); };
+}
+function sufijoPrecioSku(p, sku){ if(p && p.metros) return ' /m'; const k = 'sku:' + String(sku).toUpperCase(); const uv = (typeof unidadesVenta === 'object' && unidadesVenta) || {}; if(uv[k] !== undefined) return uv[k] && uv[k] !== 'unidad' ? ' /' + uv[k] : ''; if(false) return unidadesVenta[k] && unidadesVenta[k] !== 'unidad' ? ' /' + unidadesVenta[k] : ''; return sufijoPrecio(p); }
 function imagenEfectiva(ci, pi, p){
   return fotosOverride[`${ci}-${pi}`] || p.imagen;
 }
