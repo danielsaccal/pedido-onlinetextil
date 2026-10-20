@@ -565,26 +565,6 @@ a.grilla-celda{display:block;}
 
   <!-- STEP: INICIO (iconos) -->
   <div class="step" id="step-inicio">
-<style>
-/* ===== Inicio con menu lateral y tarjetas (formato TFactura) ===== */
-#nav2{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;margin-top:10px;}
-#nav2 .n2-menu{background:#4A4A4F;border-radius:14px;padding:8px 0;align-self:start;position:sticky;top:10px;}
-#nav2 .n2-menu button{display:block;width:100%;text-align:left;background:none;border:none;color:#EDEDED;font:inherit;font-size:.95rem;padding:10px 16px;cursor:pointer;border-left:4px solid transparent;}
-#nav2 .n2-menu button:hover{background:#56565C;}
-#nav2 .n2-menu button.on{background:#5F5F66;color:var(--gold);border-left-color:var(--gold);font-weight:700;}
-#nav2 .n2-menu hr{border:none;border-top:1px solid var(--gold);margin:6px 12px;opacity:.7;}
-#nav2 .n2-tit{font-weight:800;letter-spacing:.06em;color:#55555A;font-size:1rem;margin:4px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--gold);}
-#nav2 .n2-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;}
-#nav2 .n2-card{display:flex;align-items:center;gap:8px;background:#E4E4E4;border-radius:14px;min-height:62px;overflow:hidden;cursor:pointer;}
-#nav2 .n2-card:hover{background:#DADADA;}
-#nav2 .n2-card .n2-f{width:12px;align-self:stretch;flex:none;}
-#nav2 .n2-card .n2-n{flex:1;font-size:1rem;color:#2B2420;padding:10px 4px;}
-#nav2 .n2-card .n2-i{display:flex;gap:6px;padding-right:10px;}
-#nav2 .n2-card .n2-i button{width:34px;height:34px;border-radius:50%;border:none;background:#F2F2F2;cursor:pointer;font-size:.95rem;color:#55555A;}
-#nav2 .n2-card .n2-i button:hover{background:#fff;}
-#nav2 .n2-card .n2-i button.fav{color:#D9A300;}
-@media(max-width:700px){#nav2{grid-template-columns:1fr;}#nav2 .n2-menu{display:flex;overflow-x:auto;padding:4px;position:static;}#nav2 .n2-menu button{white-space:nowrap;width:auto;border-left:none;border-bottom:3px solid transparent;}#nav2 .n2-menu button.on{border-bottom-color:var(--gold);}#nav2 .n2-menu hr{display:none;}}
-</style>
     <div id="avisoCopia" style="display:none;"></div>
     <style>
       .ini-sec{font-size:0.78rem;font-weight:700;letter-spacing:.06em;color:#8A8072;margin:18px 0 10px;}
@@ -633,8 +613,6 @@ a.grilla-celda{display:block;}
       @media (max-width:640px){.ini-cols{grid-template-columns:1fr !important;}}
     </style>
     <div class="search-wrap"><input type="text" id="inicio-buscar" placeholder="Buscar producto o SKU..." oninput="buscarDesdeInicio(this.value)"></div>
-    <div id="nav2"></div>
-    <div id="ini-viejo" style="display:none;">
     <div id="ini-recientes-wrap" style="display:none;"><p class="ini-sec">LO ÚLTIMO QUE USASTE</p><div class="ini-recientes" id="ini-recientes"></div></div>
     <p class="ini-sec">PARA CLIENTES Y PÚBLICO</p>
     <div class="ini-grid ini-ext"><div class="ini-tile" id="ini-t-c" onclick="abrirGrupoInicio('c')"><div class="ini-ic">📣</div><b>Difusión</b><span>Compartir catálogo, enviar a clientes, redes, promociones, videos</span></div></div>
@@ -642,8 +620,6 @@ a.grilla-celda{display:block;}
     <p class="ini-sec">ADMINISTRACIÓN INTERNA</p>
     <div class="ini-grid"><div class="ini-tile" id="ini-t-d" onclick="abrirGrupoInicio('d')"><div class="ini-ic">🧾</div><b>Ventas</b><span>Armar pedidos, clientes, gastos y resultados ML</span></div><div class="ini-tile" id="ini-t-f" onclick="abrirGrupoInicio('f')"><div class="ini-ic">🏷️</div><b>Catálogo</b><span>Altas, edición, fotos, precios, aumentos</span></div><div class="ini-tile" id="ini-t-g" onclick="abrirGrupoInicio('g')"><div class="ini-ic">✂️</div><b>Producción</b><span>Telas, cortes, órdenes, talleres, stock</span></div></div>
     <div class="ini-sub" id="ini-sub-int" style="display:none;"></div>
-    </div>
-    <p style="text-align:center;margin-top:18px;"><a href="#" class="note" id="nav2-toggle" onclick="event.preventDefault();toggleInicioViejo();">Ver el inicio anterior</a></p>
   </div>
 
   <!-- STEP 1: CATALOGO -->
@@ -1621,7 +1597,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v270</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v271</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2362,6 +2338,16 @@ a.grilla-celda{display:block;}
     </div>
   </div>
 
+  <div class="step" id="step-costos-productos">
+    <div class="form-card" style="max-width:1100px;">
+      <h2>Costos de productos</h2>
+      <div style="display:flex;gap:6px;margin:4px 0 12px;" id="cp-tabs"></div>
+      <div id="cp-fab" style="border-left:5px solid #2F7A47;padding-left:10px;margin-bottom:18px;"><div style="font-weight:800;color:#2F7A47;margin:2px 0 6px;">🏭 Lo que fabrico</div><div id="cp-fab-in"></div></div>
+      <div id="cp-rev" style="border-left:5px solid #2E5A8C;padding-left:10px;"><div style="font-weight:800;color:#2E5A8C;margin:2px 0 6px;">🛒 Reventa</div><div id="cp-rev-in"></div></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
+    </div>
+  </div>
+
   <div class="step" id="step-datos-bancarios">
     <div class="form-card">
       <h2>Datos bancarios</h2>
@@ -2784,8 +2770,9 @@ window.addEventListener('popstate', () => {
   volverUnPaso();
 });
 function mostrarPaso(id){
+  if(typeof cpMovido !== 'undefined' && cpMovido && (id === 'step-productos-fabrico' || id === 'step-costos-reventa')){ cpTab = id === 'step-costos-reventa' ? 'reventa' : 'fabrico'; id = 'step-costos-productos'; setTimeout(() => { try{ cpPintar(); } catch(e){} }, 0); }
   const actual = document.querySelector('.step.active');
-  if(actual && actual.id !== id && typeof cambiosSinGuardar === 'function' && cambiosSinGuardar(actual.id) && !confirm('Hay cambios sin guardar en esta pantalla. ¿Salir igual? (se pierden)')){ if(navVolviendo) try{ history.pushState({ paso: actual.id }, ''); navStack.push(id); } catch(e){} return false; }
+  if(actual && actual.id !== id && !window.__cpCargando && typeof cambiosSinGuardar === 'function' && cambiosSinGuardar(actual.id) && !confirm('Hay cambios sin guardar en esta pantalla. ¿Salir igual? (se pierden)')){ if(navVolviendo) try{ history.pushState({ paso: actual.id }, ''); navStack.push(id); } catch(e){} return false; }
   if(!navVolviendo && actual && actual.id !== id){
     navStack.push(actual.id);
     if(navStack.length > 40) navStack.shift();
@@ -5851,12 +5838,12 @@ const GRUPOS_INICIO = {
     [['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']]
   ] },
   g: { lado: 'int', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas', '💲 Costos'], colorColumnas: { 5: '#2F7A47' }, columnas: [
-    [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['🏷️ Productos que fabrico', 'abrirProductosFabrico()'], ['💰 Costos de confección', 'abrirConfeccion()']],
+    [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['💰 Costos de confección', 'abrirConfeccion()']],
     [['📦 Faltantes de stock', 'abrirFaltantes()'], ['📊 Stock y prioridades', 'abrirStock()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['📋 Nueva orden de trabajo', 'abrirAsistenteOT()']],
     [['🚚 Ingreso a los talleres', 'abrirEnviosTela()'], ['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🏭 Productos en producción', 'abrirEnProduccion()']],
     [['📥 Entregas del taller', 'abrirIngresoTaller()']],
     [['📦 Historial de órdenes', 'abrirHistorialOT()'], ['🗂️ Historial de entregas', 'abrirHistorialEntregas()'], ['🔎 ¿Cuándo hice este SKU?', 'abrirHistorialSku()']],
-    [['💲 Costos de reventa', 'abrirCostosReventa()']],
+    [['💲 Costos de productos (fabrico y reventa)', 'abrirCostosProductos()']],
   ] },
   h: { lado: 'int', titulo: 'Finanzas', titulosColumnas: ['1 · Mercado Libre', '2 · Herramientas'], columnas: [
     [['💰 Ventas Mercado Libre', 'abrirVentasML()']],
@@ -5868,106 +5855,11 @@ const GRUPOS_INICIO = {
     [['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']]
   ] },
 };
-// ===== Inicio nuevo: menu lateral + tarjetas con ⭐ favorito, ☰ listado y ⊕ nuevo (usa las mismas acciones que el inicio anterior) =====
-const N2_COLOR = { ventas: '#FFC107', ml: '#FFC107', produccion: '#FF5A36', catalogo: '#FFC107', costos: '#2F7A47', difusion: '#7E57C2', config: '#9E9E9E' };
-const N2_SECCIONES = [
-  ['ventas', 'Ventas', [
-    ['Pedidos', { abrir: 'irACatalogoDesdeInicio()', lista: 'abrirHistorial()', nuevo: 'irACatalogoDesdeInicio()' }],
-    ['Presupuestos', { abrir: 'abrirPresupuestos()', lista: 'abrirPresupuestos()', nuevo: 'abrirPresupuestos().then(() => nuevoPresupuesto())' }],
-    ['Pedido con IA (texto o foto)', { abrir: 'abrirPedidoIA()' }],
-    ['Pedido desde una foto', { abrir: "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)" }],
-    ['Pendientes de entrega', { abrir: 'abrirPendientesEntrega()' }],
-    ['Clientes', { abrir: 'abrirClientes()', lista: 'abrirClientes()' }],
-    ['Clientes inactivos', { abrir: 'abrirClientesInactivos()' }],
-    ['Ventas facturadas', { abrir: 'abrirFacturas()', lista: 'abrirFacturas()' }],
-  ]],
-  ['ml', 'Mercado Libre', [
-    ['Resultados Mercado Libre', { abrir: 'abrirResultadosML()' }],
-    ['Simulador de costos ML', { abrir: 'abrirCalculadoraML()' }],
-    ['Ventas Mercado Libre (carga diaria)', { abrir: 'abrirVentasML()' }],
-  ]],
-  ['produccion', 'Producción', [
-    ['Órdenes de trabajo', { abrir: 'abrirAsistenteOT()', lista: 'abrirHistorialOT()', nuevo: 'abrirAsistenteOT()' }],
-    ['Faltantes de stock', { abrir: 'abrirFaltantes()' }],
-    ['Stock y prioridades', { abrir: 'abrirStock()' }],
-    ['Trabajo a medida', { abrir: 'abrirTrabajoMedida()' }],
-    ['Ingreso a los talleres', { abrir: 'abrirEnviosTela()' }],
-    ['Tela pendiente de entrega', { abrir: 'abrirDeudaTela()' }],
-    ['Productos en producción', { abrir: 'abrirEnProduccion()' }],
-    ['Entregas del taller', { abrir: 'abrirIngresoTaller()', lista: 'abrirHistorialEntregas()', nuevo: 'abrirIngresoTaller()' }],
-    ['¿Cuándo hice este SKU?', { abrir: 'abrirHistorialSku()' }],
-    ['Telas', { abrir: 'abrirTelas()' }],
-  ]],
-  ['catalogo', 'Catálogo', [
-    ['Productos', { abrir: 'abrirEditarProducto()', lista: 'irACatalogoDesdeInicio()', nuevo: 'abrirNuevoProducto()' }],
-    ['Fotos de productos', { abrir: 'abrirActualizarFoto()' }],
-    ['Ordenar categorías', { abrir: 'abrirCategorias()' }],
-    ['Descripciones de reventa', { abrir: 'abrirReventa()' }],
-    ['Links de la web', { abrir: 'abrirLinksWeb()' }],
-    ['Aumentar precios', { abrir: 'abrirAumentoMasivo()' }],
-    ['Importar precios (Excel)', { abrir: 'abrirImportarExcel()' }],
-    ['Historial de precios', { abrir: 'abrirHistorialPrecios()' }],
-  ]],
-  ['costos', 'Costos', [
-    ['Productos que fabrico', { abrir: 'abrirProductosFabrico()' }],
-    ['Artículos y cortes', { abrir: 'abrirArticulosCortes()' }],
-    ['Costos de confección', { abrir: 'abrirConfeccion()' }],
-    ['Costos de reventa', { abrir: 'abrirCostosReventa()' }],
-    ['Gastos comerciales', { abrir: 'abrirGastos()', lista: 'abrirGastos()' }],
-    ['Calculadora de costos', { abrir: 'abrirCalculadoraCostos()' }],
-  ]],
-  ['difusion', 'Difusión', [
-    ['Compartir catálogo por rubro', { abrir: 'abrirCompartirRubro()' }],
-    ['Enviar catálogo a clientes', { abrir: 'abrirEnviarCatalogo()' }],
-    ['Nuevo ingreso (flyers)', { abrir: 'abrirNuevoIngreso()' }],
-    ['Anuncios y promociones', { abrir: 'abrirAnuncio()' }],
-    ['Crear video promocional', { abrir: 'abrirCrearVideo()' }],
-    ['Compartir video de producto', { abrir: 'abrirCompartirVideoProducto()' }],
-    ['Director de arte (IA)', { abrir: 'abrirDirectorArte()' }],
-  ]],
-  ['config', 'Configuración', [
-    ['Usuarios y permisos', { abrir: 'abrirUsuarios()' }],
-    ['Copia de seguridad', { abrir: 'abrirCopiaSeguridad()' }],
-    ['Avisos push', { abrir: 'abrirConfigPush()' }],
-    ['Listas y opciones', { abrir: 'abrirListas()' }],
-    ['Datos bancarios', { abrir: 'abrirDatosBancarios()' }],
-    ['Palabras de la app', { abrir: 'abrirGlosario()' }],
-    ['Tabla de consumo (anterior)', { abrir: 'abrirTablaConsumo()' }],
-    ['Instrucciones de corte (anterior)', { abrir: 'abrirInstruccionesCorte()' }],
-    ['Fichas por SKU (anterior)', { abrir: 'abrirFichasArticulos()' }],
-  ]],
-];
-// el permiso de cada accion es el mismo que en el inicio anterior (grupo de origen + accion)
-function n2GrupoDe(f){ for(const [k, g] of Object.entries(GRUPOS_INICIO)){ const items = g.columnas ? g.columnas.flat() : (g.items || []); if(items.some(([, ff]) => ff === f)) return k; } return null; }
-function n2Puede(f){ const k = n2GrupoDe(f); return (!k || puede(permisoDeGrupo(k))) && puede(permisoDeAccion(f)); }
-let n2Sec = null;
-function n2Favs(){ try{ const f = JSON.parse(localStorage.getItem('ot_favs2') || 'null'); if(Array.isArray(f)) return f; } catch(e){} return ['Pedidos', 'Presupuestos', 'Clientes', 'Resultados Mercado Libre']; }
-function n2Cards(sec){ return sec === 'favs' ? N2_SECCIONES.flatMap(([k, , cs]) => cs.map(c => [k, c])).filter(([, c]) => n2Favs().includes(c[0])) : (N2_SECCIONES.find(s => s[0] === sec) || [, , []])[2].map(c => [sec, c]); }
-function renderNav2(){
-  const box = document.getElementById('nav2'); if(!box) return;
-  if(document.getElementById('ini-viejo').style.display === 'block'){ box.style.display = 'none'; return; } box.style.display = '';
-  const secs = N2_SECCIONES.filter(([, , cs]) => cs.some(([, a]) => n2Puede(a.abrir)));
-  if(!n2Sec || (n2Sec !== 'favs' && !secs.some(s => s[0] === n2Sec))) n2Sec = 'favs';
-  window.__n2 = [];
-  const reg = f => { window.__n2.push(f); return window.__n2.length - 1; };
-  const tarjetas = n2Cards(n2Sec).filter(([, c]) => n2Puede(c[1].abrir));
-  const favs = n2Favs();
-  box.innerHTML = `<div class="n2-menu"><button type="button" class="${n2Sec === 'favs' ? 'on' : ''}" onclick="n2Sec='favs';renderNav2()">⭐ Favoritos</button>
-      ${secs.map(([k, t]) => `<button type="button" class="${n2Sec === k ? 'on' : ''}" onclick="n2Sec='${k}';renderNav2()">${t}</button>`).join('')}</div>
-    <div><div class="n2-tit">${n2Sec === 'favs' ? 'FAVORITOS' : (secs.find(s => s[0] === n2Sec) || [, ''])[1].toUpperCase()}</div>
-      <div class="n2-grid">${tarjetas.map(([k, [t, a]]) => { const iA = reg([t, a.abrir]);
-        return `<div class="n2-card" onclick="n2Usar(${iA})"><span class="n2-f" style="background:${N2_COLOR[k] || '#FFC107'};"></span><span class="n2-n">${escaparHtml(t)}</span>
-          <span class="n2-i" onclick="event.stopPropagation()"><button type="button" class="${favs.includes(t) ? 'fav' : ''}" title="${favs.includes(t) ? 'Quitar de favoritos' : 'Agregar a favoritos'}" onclick="n2Fav('${escapeAttr(t)}')">${favs.includes(t) ? '★' : '☆'}</button>${a.lista ? `<button type="button" title="Ver listado" onclick="n2Usar(${reg([t, a.lista])})">☰</button>` : ''}${a.nuevo ? `<button type="button" title="Nuevo" onclick="n2Usar(${reg([t, a.nuevo])})">⊕</button>` : ''}</span></div>`; }).join('') || '<p class="note">Todavía no marcó favoritos: toque ☆ en cualquier tarjeta.</p>'}</div></div>`;
-}
-function n2Usar(i){ const it = (window.__n2 || [])[i]; if(!it) return; window.__iniItems = window.__iniItems || []; window.__iniItems.push(it); usarItemInicio(window.__iniItems.length - 1); }
-function n2Fav(t){ let f = n2Favs(); f = f.includes(t) ? f.filter(x => x !== t) : f.concat([t]); try{ localStorage.setItem('ot_favs2', JSON.stringify(f)); } catch(e){} renderNav2(); }
-function toggleInicioViejo(){ const v = document.getElementById('ini-viejo'), abierto = v.style.display === 'block'; v.style.display = abierto ? 'none' : 'block'; document.getElementById('nav2-toggle').textContent = abierto ? 'Ver el inicio anterior' : 'Volver al inicio nuevo'; renderNav2(); }
 let grupoInicioAbierto = null;
 function irInicio(){
   const menu = document.querySelector('.menu-dropdown');
   if(menu) menu.classList.remove('open');
   mostrarPaso('step-inicio');
-  try{ renderNav2(); } catch(e){}
 }
 function abrirGrupoInicio(k){
   const g = GRUPOS_INICIO[k];
@@ -7434,6 +7326,32 @@ async function actualizarTodasDescripciones(){
   const n = await aplicarDescripcionAutomatica(skus);
   renderProductosFabrico();
   alert(n ? `Listo: se revisaron los productos y se actualizaron las descripciones que no coincidían.` : 'Las descripciones ya estaban al día.');
+}
+// ===== Costos de productos: lo que fabrico y reventa en una sola pantalla, separados y con filtro =====
+let cpTab = 'todos', cpMovido = false;
+function cpMover(){
+  if(cpMovido) return; cpMovido = true;
+  const f = document.querySelector('#step-productos-fabrico .form-card'), r = document.querySelector('#step-costos-reventa .form-card');
+  if(f){ f.style.maxWidth = 'none'; f.style.boxShadow = 'none'; f.style.padding = '0'; document.getElementById('cp-fab-in').appendChild(f); }
+  if(r){ r.style.maxWidth = 'none'; r.style.boxShadow = 'none'; r.style.padding = '0'; document.getElementById('cp-rev-in').appendChild(r); }
+  document.querySelectorAll('#cp-fab-in h2, #cp-rev-in h2').forEach(x => x.style.display = 'none');
+  document.querySelectorAll('#cp-fab-in .form-card > .btn.btn-ghost, #cp-rev-in .form-card > .btn.btn-ghost').forEach(b => { if(/Volver/.test(b.textContent)) b.style.display = 'none'; });
+}
+function cpPintar(){
+  const rev = esDueno(); if(!rev && cpTab === 'reventa') cpTab = 'fabrico';
+  const tabs = [['todos', 'Todos'], ['fabrico', '🏭 Fabrico'], ['reventa', '🛒 Reventa']].filter(([k]) => rev || k === 'fabrico');
+  document.getElementById('cp-tabs').innerHTML = tabs.map(([k, t]) => `<button type="button" onclick="cpTab='${k}';cpPintar()" style="padding:7px 14px;border-radius:999px;border:1px solid ${cpTab === k ? 'var(--purple)' : 'var(--line)'};background:${cpTab === k ? 'var(--purple)' : '#fff'};color:${cpTab === k ? '#fff' : 'var(--purple)'};font-weight:700;cursor:pointer;">${t}</button>`).join('');
+  document.getElementById('cp-fab').style.display = cpTab === 'reventa' ? 'none' : '';
+  document.getElementById('cp-rev').style.display = (cpTab === 'fabrico' || !rev) ? 'none' : '';
+}
+async function abrirCostosProductos(tab){
+  const t = tab || cpTab, origen = (document.querySelector('.step.active') || {}).id;
+  // se cargan las dos pantallas por dentro sin tocar el historial de "Volver" ni pedir confirmaciones
+  window.__cpCargando = true; const nv = navVolviendo; navVolviendo = true;
+  try{ await abrirProductosFabrico(); if(esDueno()) await abrirCostosReventa(); cpMover(); mostrarPaso('step-costos-productos'); }
+  finally{ navVolviendo = nv; window.__cpCargando = false; }
+  if(origen && origen !== 'step-costos-productos' && origen !== 'step-productos-fabrico' && origen !== 'step-costos-reventa'){ navStack.push(origen); if(navStack.length > 40) navStack.shift(); try{ history.pushState({ paso: 'step-costos-productos' }, ''); } catch(e){} }
+  cpTab = t; cpPintar();
 }
 async function abrirProductosFabrico(){
   mostrarPaso('step-productos-fabrico');
@@ -9405,6 +9323,7 @@ function cambiosSinGuardar(paso){
   if(paso === 'step-reventa') return typeof rvPend !== 'undefined' && n(rvPend);
   if(paso === 'step-confeccion') return typeof cfPend !== 'undefined' && n(cfPend);
   if(paso === 'step-costos-reventa') return typeof crPend !== 'undefined' && n(crPend);
+  if(paso === 'step-costos-productos') return cambiosSinGuardar('step-costos-reventa') || cambiosSinGuardar('step-productos-fabrico');
   return false;
 }
 window.addEventListener('beforeunload', e => { const a = document.querySelector('.step.active'); if(a && cambiosSinGuardar(a.id)){ e.preventDefault(); e.returnValue = ''; } });
@@ -10474,7 +10393,7 @@ function crValor(s){
 function renderCostosReventa(){
   const q = normBusqueda(document.getElementById('cr-buscar').value), cat = document.getElementById('cr-cat').value, sin = document.getElementById('cr-sin').checked;
   const prods = productosReventaConCosto().filter(x => (!cat || x.cat === cat) && (!q || normBusqueda(x.p.nombre + ' ' + x.p.variantes.map(v => v.sku).join(' ')).includes(q)));
-  window.__crSkus = [];
+  window.__crSkus = []; window.__crVis = [];
   const html = prods.map((x, pi) => {
     const vs = x.p.variantes.filter(v => !sin || !crValor(String(v.sku).toUpperCase()));
     if(!vs.length) return '';
@@ -10482,14 +10401,36 @@ function renderCostosReventa(){
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;"><b style="flex:1;">${escaparHtml(x.p.nombre)}</b><span class="note" style="margin:0;">${escaparHtml(x.cat)}</span>
         ${x.p.variantes.every(v => codTela(v.sku)) ? '<span style="font-size:0.8rem;color:#2E5A8C;background:#F2F7FD;border-radius:8px;padding:5px 8px;">🧵 por metro</span>' : ''}<select title="Precio y costo por…" onchange="crUnidad('${escapeAttr(x.p._editKey)}', this.value)" style="padding:5px;border:1px solid var(--line);border-radius:8px;font-size:0.8rem;${x.p.variantes.every(v => codTela(v.sku)) ? 'display:none;' : ''}">${['', 'docena', 'media docena', 'par', 'juego', 'pack'].map(u => `<option value="${u}" ${(unidadesVenta[x.p._editKey] || '') === u ? 'selected' : ''}>${u ? 'por ' + u : 'por unidad'}</option>`).join('')}</select>
         <input type="text" inputmode="decimal" placeholder="mismo costo para todas" style="width:150px;padding:6px;border:1px solid var(--line);border-radius:8px;font-size:0.8rem;" onkeydown="if(event.key==='Enter'){crTodo(${pi}, this.value); this.value='';}"><span class="note" style="margin:0;">↵</span></div>
-      ${vs.map(v => { const s = String(v.sku).toUpperCase(); const i = window.__crSkus.push(s) - 1; const pr = parsePrice(v.precio), c = kitsDatos && kitsDatos[s] ? (costoUnidadSku(s) || 0) * cantUnidadVenta(unidadVentaSku(s)) : numAr(crValor(s)); const mg = c > 0 && pr > 0 ? (pr - c) / c : null;
-        return `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 110px 120px 70px;gap:6px;align-items:center;padding:4px 0;border-top:1px solid var(--line);font-size:0.85rem;">
-          <b>${escaparHtml(s)}</b><span style="color:#6B6258;">${escaparHtml(v.desc || '')}</span><span style="text-align:right;">${pr ? formatPrice(pr) + `<small class="meta">${sufijoPrecioSku(x.p, s)}</small>` : ''}</span>
+      ${vs.map(v => { const s = String(v.sku).toUpperCase(); const i = window.__crSkus.push(s) - 1; if(!(kitsDatos && kitsDatos[s])) window.__crVis.push(s); const pr = parsePrice(v.precio), c = kitsDatos && kitsDatos[s] ? (costoUnidadSku(s) || 0) * cantUnidadVenta(unidadVentaSku(s)) : numAr(crValor(s)); const mg = c > 0 && pr > 0 ? (pr - c) / c : null;
+        return `<div style="display:grid;grid-template-columns:22px 90px minmax(0,1fr) 110px 120px 70px;gap:6px;align-items:center;padding:4px 0;border-top:1px solid var(--line);font-size:0.85rem;">
+          ${kitsDatos && kitsDatos[s] ? '<span></span>' : `<input type="checkbox" ${crSel.has(s) ? 'checked' : ''} onchange="crSel[this.checked ? 'add' : 'delete']('${escapeAttr(s)}');renderCrMasivo()" style="width:16px;height:16px;">`}<b>${escaparHtml(s)}</b><span style="color:#6B6258;">${escaparHtml(v.desc || '')}</span><span style="text-align:right;">${pr ? formatPrice(pr) + `<small class="meta">${sufijoPrecioSku(x.p, s)}</small>` : ''}</span>
           ${kitsDatos && kitsDatos[s] ? `<div style="text-align:right;"><b>${costoUnidadSku(s) != null ? formatPrice(costoUnidadSku(s) * cantUnidadVenta(unidadVentaSku(s))) : '—'}</b><small style="display:block;font-size:0.66rem;color:#6B4FA0;">🧩 ${escaparHtml(kitsDatos[s])}</small></div>` : `<div style="position:relative;"><input inputmode="decimal" value="${escapeAttr(crValor(s))}" placeholder="costo" oninput="crCambiar(${i}, this.value)" style="padding:7px;border:1px solid ${codTela(s) ? '#B9D3EE' : 'var(--line)'};border-radius:8px;text-align:right;width:100%;box-sizing:border-box;${codTela(s) ? 'background:#F2F7FD;' : ''}" title="${codTela(s) ? 'Costo por metro de la pantalla Telas (se cambia en los dos lados)' : ''}">${codTela(s) ? '<small style="display:block;text-align:right;font-size:0.66rem;color:#2E5A8C;margin-top:2px;">🧵 de Telas · por metro</small>' : ''}</div>`}
           <span style="text-align:right;font-weight:700;color:${mg == null ? '#A89E90' : mg < 0.2 ? '#A6432F' : mg < 0.4 ? '#8A6417' : '#2F7A47'};" title="Margen sobre el costo">${mg == null ? '—' : Math.round(mg * 100) + ' %'}</span>
-          <div style="grid-column:2/-1;text-align:right;">${htmlPrecioML(kitsDatos && kitsDatos[s] ? costoUnidadSku(s) : (c > 0 ? c / cantUnidadVenta(unidadVentaSku(s)) : 0))}</div></div>`; }).join('')}</div>`;
+          <div style="grid-column:3/-1;text-align:right;">${htmlPrecioML(kitsDatos && kitsDatos[s] ? costoUnidadSku(s) : (c > 0 ? c / cantUnidadVenta(unidadVentaSku(s)) : 0))}</div></div>`; }).join('')}</div>`;
   }).join('');
-  document.getElementById('cr-lista').innerHTML = html ? `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 110px 120px 70px;gap:6px;font-size:0.72rem;color:#8A8072;padding:0 10px 4px;"><span>SKU</span><span>Descripción</span><span style="text-align:right;">Precio lista</span><span style="text-align:right;">Costo de compra $</span><span style="text-align:right;">Margen</span></div>` + html : '<p class="empty-msg">No hay productos con ese filtro.</p>';
+  document.getElementById('cr-lista').innerHTML = html ? `<div id="cr-masivo"></div><div style="display:grid;grid-template-columns:22px 90px minmax(0,1fr) 110px 120px 70px;gap:6px;font-size:0.72rem;color:#8A8072;padding:0 10px 4px;align-items:center;"><input type="checkbox" title="Seleccionar todos los visibles" onchange="(window.__crVis||[]).forEach(s => crSel[this.checked ? 'add' : 'delete'](s));renderCostosReventa()" style="width:16px;height:16px;"><span>SKU</span><span>Descripción</span><span style="text-align:right;">Precio lista</span><span style="text-align:right;">Costo de compra $</span><span style="text-align:right;">Margen</span></div>` + html : '<p class="empty-msg">No hay productos con ese filtro.</p>';
+  renderCrMasivo();
+}
+// seleccion masiva en reventa: mismo costo, subir o bajar %, borrar costo o "se vende por" (queda pendiente hasta Guardar)
+const crSel = new Set();
+function renderCrMasivo(){
+  const box = document.getElementById('cr-masivo'); if(!box) return; const n = crSel.size;
+  box.innerHTML = n ? `<div style="background:#F2F7FD;border:1px solid #B9D3EE;border-radius:12px;padding:10px;margin-bottom:10px;">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><b>✏️ ${n} SKU seleccionados</b><a href="#" style="margin-left:auto;" onclick="event.preventDefault();crSel.clear();renderCostosReventa();">Quitar selección</a></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;">
+      <input id="crm-costo" inputmode="decimal" placeholder="Mismo costo $" style="width:130px;padding:7px;border:1px solid var(--line);border-radius:8px;"><button type="button" class="btn-mini" onclick="crMasivo('costo')">Poner este costo</button>
+      <input id="crm-pct" inputmode="decimal" placeholder="% (ej: 10 o -5)" style="width:120px;padding:7px;border:1px solid var(--line);border-radius:8px;"><button type="button" class="btn-mini" onclick="crMasivo('pct')">Subir/bajar %</button>
+      <select id="crm-uv" style="padding:7px;border:1px solid var(--line);border-radius:8px;"><option value="">Se vende por…</option><option value="unidad">unidad</option><option value="par">par</option><option value="media docena">media docena</option><option value="docena">docena</option></select><button type="button" class="btn-mini" onclick="crMasivo('uv')">Aplicar</button>
+      <button type="button" class="btn-mini" style="color:#A6432F;" onclick="crMasivo('borrar')">🗑️ Borrar costo</button></div>
+    <p class="note" style="text-align:left;margin:6px 0 0;">Los cambios de costo quedan pendientes: se guardan con el botón 💾 Guardar.</p></div>` : '';
+}
+async function crMasivo(acc){
+  const skus = [...crSel]; if(!skus.length) return;
+  if(acc === 'costo'){ const v = numAr(document.getElementById('crm-costo').value); if(!(v > 0)){ alert('Escriba el costo.'); return; } skus.forEach(s => crPend[s] = String(v)); }
+  else if(acc === 'pct'){ const p = numAr(document.getElementById('crm-pct').value); if(!p){ alert('Escriba el porcentaje.'); return; } let sin = 0; skus.forEach(s => { const c = numAr(crValor(s)); if(c > 0) crPend[s] = String(Math.round(c * (1 + p / 100) * 100) / 100); else sin++; }); if(sin) alert(sin + ' SKU no tenían costo y no se modificaron.'); }
+  else if(acc === 'borrar'){ if(!confirm(`¿Borrar el costo de ${skus.length} SKU? (se guarda con 💾 Guardar)`)) return; skus.forEach(s => crPend[s] = ''); }
+  else if(acc === 'uv'){ const u = document.getElementById('crm-uv').value; if(!u){ alert('Elija la unidad.'); return; } skus.forEach(s => unidadesVenta['sku:' + s] = u); try{ await db.collection('config').doc('unidades').set({ u: unidadesVenta }); } catch(e){ alert('No se pudo guardar: ' + e.message); return; } registrarHistorialCostos().catch(() => {}); }
+  renderCostosReventa(); crMostrarGuardar();
 }
 async function crUnidad(ek, u){
   if(u) unidadesVenta[ek] = u; else delete unidadesVenta[ek];
@@ -11145,7 +11086,6 @@ function puede(perm){
 }
 function permisoDeGrupo(k){ return { a: 'pedidos', c: 'difusion', g: 'produccion' }[k] || null; }
 function aplicarPermisosInicio(){
-  try{ renderNav2(); } catch(e){ console.error(e); }
   if(rolActual === 'dueño') return;
   ['a', 'c', 'd', 'f', 'g'].forEach(k => { const g = GRUPOS_INICIO[k], t = document.getElementById('ini-t-' + k); if(!g || !t) return;
     const items = g.columnas ? g.columnas.flat() : (g.items || []);
@@ -19246,7 +19186,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v270';
+const APP_VERSION = '2026-10-02-v271';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
