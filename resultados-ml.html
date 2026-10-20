@@ -507,7 +507,8 @@ function parseWorkbook(wb,cuenta,file){
     ec:col('Envío pagado por el comprador'),cc:col('Costo por ofrecer cuotas pagado'),bruto:col('Monto bruto (='),
     ret:col('Monto total de retenciones'),pos:col('Monto total de cargos pospagos'),neto:col('Monto neto después'),
     det:col('Detalles de cargos'),envNum:col('Número del envío'),metodo:col('Método de envío'),paq:H.findIndex(h=>h.startsWith('Número del paquete')),pago:H.findIndex(h=>h.startsWith('Detalles del pago')),
-    tit:H.findIndex(h=>/^t[ií]tulo|^descripci[oó]n de la publicaci|^publicaci[oó]n$/i.test(String(h).trim())),
+    tit:H.findIndex(h=>/^t[ií]tulo|^descripci[oó]n de la publicaci|^publicaci[oó]n$|^producto$/i.test(String(h).trim())),
+    pid:H.findIndex(h=>/^id del producto$/i.test(String(h).trim())),
     reb:H.findIndex(h=>h.startsWith('Descuentos de Mercado Libre')),dv:H.findIndex(h=>h.startsWith('Descuento del vendedor')),fv:H.findIndex(h=>h.startsWith('Fecha de la venta'))};
   const raw=aoa.slice(hi+1).filter(r=>String(r[C.tipo]).trim()!=='');
   // reintegros Flex en filas "Envío"
@@ -538,7 +539,8 @@ function parseWorkbook(wb,cuenta,file){
     o.pct=o.pcd>0?o.acred/o.pcd:null;
     const sp=splitSku(o.sku); o.skuBase=sp.base; o.mult=sp.mult; o.variante=sp.variante;
     // si el SKU no dice cuantas unidades trae, se intenta leer del titulo (ej: "Pack x 3", "Set de 3 toallas", "3 unidades")
-    if(C.tit>=0){o.titulo=String(r[C.tit]||'').trim();if(sp.mult===1){const n=unidadesDelTitulo(o.titulo);if(n>1){o.mult=n;o.multTitulo=true;}}}
+    if(C.pid>=0){o.pubId=String(r[C.pid]||'').trim();}
+    if(C.tit>=0){o.titulo=String(r[C.tit]||'').trim();if(sp.mult===1&&!/^producto$/i.test(String(H[C.tit]).trim())){const n=unidadesDelTitulo(o.titulo);if(n>1){o.mult=n;o.multTitulo=true;}}}
     o.unid=o.cant?o.cant*o.mult:null;
     o.pUnit=o.unid&&o.pcd>0?o.pcd/o.unid:null; o.aUnit=o.unid&&o.pcd>0?o.acred/o.unid:null;
     // Flex
@@ -1856,12 +1858,12 @@ function renderFaltan(){
       <td style="padding:7px 6px;text-align:right;white-space:nowrap;">${accionFaltante(g,t,det)}</td></tr>`;}).join('');
   // ventas sin SKU en la publicacion: no se pueden agrupar por SKU, se listan aparte para asignarles uno
   const sinSku=allRows().filter(o=>o.tipo==='Venta'&&o.pcd>0&&!o.skuBase&&(cur==='todo'||o.periodo===cur)&&(!fc||o.cuenta===fc)&&o.costo==null&&o.costoRev==null);
-  const porTit={}; sinSku.forEach(o=>{const t=o.titulo||'(sin título en el reporte)';(porTit[t]=porTit[t]||[]).push(o);});
+  const porTit={}; sinSku.forEach(o=>{const t=(o.titulo||'(sin título: vuelva a cargar el reporte de este mes)')+(o.pubId?' ·· '+o.pubId:'');(porTit[t]=porTit[t]||[]).push(o);});
   window.__sinSku=porTit;
   const htmlSinSku=sinSku.length?`<div style="margin-top:14px;border-top:2px solid var(--line);padding-top:10px;"><b style="color:#A6432F;">Ventas sin SKU en la publicación (${sinSku.length})</b>
     <p class="note" style="margin:4px 0 8px;">Asígneles el SKU de la app para tomar su costo. Para que no vuelva a pasar, cargue el SKU en la publicación de Mercado Libre.</p>
     ${Object.entries(porTit).map(([t,os],gi)=>`<div style="border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:8px;background:#fff;">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><b style="font-size:.88rem;">${t.replace(/</g,'&lt;')}</b><span class="meta">${os.length} ${os.length===1?'venta':'ventas'} · ${fmt(os.reduce((a,o)=>a+o.pcd,0))}</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><b style="font-size:.88rem;">${t.split(' ·· ')[0].replace(/</g,'&lt;')}</b>${os[0].pubId?`<a href="https://articulo.mercadolibre.com.ar/${os[0].pubId.replace(/^MLA/,'MLA-')}" target="_blank" class="meta">${os[0].pubId} ↗</a>`:''}<span class="meta">${os.length} ${os.length===1?'venta':'ventas'} · ${fmt(os.reduce((a,o)=>a+o.pcd,0))}</span>
         ${os.length>1?`<span style="margin-left:auto;display:flex;gap:4px;align-items:center;"><input placeholder="SKU (ej: IA905 o IA905 x 3)" list="eqSinMatch" style="width:170px;height:30px;min-height:0;padding:3px 8px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;box-sizing:border-box;"><button type="button" style="padding:5px 10px;border-radius:8px;border:none;background:#3d1466;color:#fff;font-weight:700;cursor:pointer;" onclick="asignarSkuSinSku(${gi},null,this.previousElementSibling.value)">Asignar a todas las de esta publicación</button></span>`:''}</div>
       ${os.map((o,k)=>`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px dashed var(--line);padding:5px 0;font-size:.84rem;box-shadow:inset 4px 0 0 ${colorCta(o.cuenta)};padding-left:8px;">${etiquetaCta(o.cuenta)}<span>${o.fecha}</span><span class="meta">Operación ${o.op} · ${o.cant||1} unid. · ${fmt(o.pcd)}</span>
         <span style="margin-left:auto;display:flex;gap:4px;align-items:center;"><input placeholder="SKU" list="eqSinMatch" style="width:130px;height:28px;min-height:0;padding:3px 8px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;box-sizing:border-box;"><button type="button" style="padding:4px 9px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="asignarSkuSinSku(${gi},${k},this.previousElementSibling.value)">🔁 Asignar SKU</button></span></div>`).join('')}</div>`).join('')}</div>`:'';
