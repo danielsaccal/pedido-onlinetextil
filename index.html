@@ -1597,7 +1597,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v265</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v266</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2591,7 +2591,7 @@ function renderCatalogo(filtro){
           <div class="variante">
             <div class="variante-fila">
               <div class="desc" onclick="mostrarFotoSku('${escapeAttr(v.sku)}', ${ci}, ${pi}, this)" ${fotosSku[String(v.sku).toUpperCase()] ? 'style="cursor:pointer;"' : ''}>${descVarianteHtml(v.desc)}<span class="sku">SKU ${v.sku}${fotosSku[String(v.sku).toUpperCase()] ? ' · 📷' : ''}</span>${rolloNota}</div>
-              <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioNum) + sufijoPrecio(p)}</div>
+              <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioNum) + sufijoPrecioSku(p, v.sku)}</div>
               ${precioNum===null ? '<div></div>' : `
               <div class="qty">
                 <button type="button" onclick="cambiarCantidad('${id}', -1, '${escapeAttr(v.sku)}', '${escapeAttr(v.desc)}', '${escapeAttr(p.nombre)}', ${precioEfectivo})">−</button>
@@ -7331,7 +7331,7 @@ function filasProductosFabrico(){
 // costo por unidad de venta (pieza x docena, etc.) segun el producto donde se publica o el SKU
 function costoPorUnidadVenta(S, prod){
   const c = costosDeSku(String(S).toUpperCase()), x = c && c.porTela.find(y => y.total != null); if(!x) return null;
-  const u = prod ? (unidadesVenta[prod._editKey] || '') : unidadVentaSku(S); return { costo: x.total * cantUnidadVenta(u), pieza: x.total, cant: cantUnidadVenta(u), u: u || 'unidad' };
+  const ks = 'sku:' + String(S).toUpperCase(); const u = unidadesVenta[ks] !== undefined ? (unidadesVenta[ks] === 'unidad' ? '' : unidadesVenta[ks]) : (prod ? (unidadesVenta[prod._editKey] || '') : unidadVentaSku(S)); return { costo: x.total * cantUnidadVenta(u), pieza: x.total, cant: cantUnidadVenta(u), u: u || 'unidad' };
 }
 // control de seguridad: precio por debajo del costo por unidad de venta
 function precioBajoCostoOk(S, precio, prod){
@@ -7341,11 +7341,9 @@ function precioBajoCostoOk(S, precio, prod){
 // "Se vende por": se guarda en el producto del catalogo (o por SKU si no esta publicado)
 async function pfUnidad(sku, v, sel){
   if(v === '__otra'){ const n = prompt('¿Cuántas unidades trae lo que vende? (número)', ''); const k = parseInt(n, 10); if(!(k >= 1)){ renderProductosFabrico(); return; } v = k === 1 ? '' : k + ' unidades'; }
-  const r = buscarProductoPorSku(sku), key = r ? r.producto._editKey : 'sku:' + String(sku).toUpperCase();
-  if(!key){ alert('No se pudo guardar.'); return; }
-  if(v) unidadesVenta[key] = v; else delete unidadesVenta[key];
+  const key = 'sku:' + String(sku).toUpperCase();
+  unidadesVenta[key] = v || 'unidad'; // propia de este SKU (aunque el producto tenga otra)
   try{ await db.collection('config').doc('unidades').set({ u: unidadesVenta }); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
-  if(r && r.producto.variantes.length > 1) setTimeout(() => alert(`Se aplicó a todas las medidas de "${r.producto.nombre}", porque la unidad de venta es del producto.`), 50);
   renderProductosFabrico(); try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){} registrarHistorialCostos().catch(() => {});
 }
 function renderProductosFabrico(){
@@ -8097,9 +8095,9 @@ function sugerenciasPublicar(sku){
   }
   // precio sugerido: con el margen promedio de ese producto (o 50 %) sobre el costo; si no hay costo, el de otro SKU del mismo articulo
   let precio = null, motivo = '';
-  const kv = costoPorUnidadVenta(S, prod), costo = kv ? kv.costo : null, divP = prod ? cantUnidadVenta(unidadesVenta[prod._editKey]) : 1;
+  const kv = costoPorUnidadVenta(S, prod), costo = kv ? kv.costo : null, divP = 1;
   if(costo){
-    const mgs = prod ? prod.variantes.map(v => { const cc = costosDeSku(String(v.sku).toUpperCase()), x = cc && cc.porTela.find(y => y.total != null), pr = parsePrice(v.precio); return x && pr ? (pr - x.total * divP) / pr : null; }).filter(x => x != null && x > 0 && x < 0.9) : [];
+    const mgs = prod ? prod.variantes.map(v => { const cc = costosDeSku(String(v.sku).toUpperCase()), x = cc && cc.porTela.find(y => y.total != null), pr = parsePrice(v.precio); return x && pr ? (pr - x.total * cantUnidadVenta(unidadVentaSku(v.sku)) * divP) / pr : null; }).filter(x => x != null && x > 0 && x < 0.9) : [];
     const mg = mgs.length ? mgs.reduce((a, b) => a + b, 0) / mgs.length : 0.5;
     precio = Math.round(costo / (1 - mg) / 10) * 10;
     motivo = `costo por ${kv.u} $ ${formatoPesos(Math.round(costo))}${kv.cant > 1 ? ` (${kv.cant} × $ ${formatoPesos(Math.round(kv.pieza))})` : ''} con margen ${Math.round(mg * 100)} %${mgs.length ? ' (el promedio de ese producto)' : ''}${kv.cant === 1 ? '. Si se vende por docena u otra cantidad, márquelo en "Se vende por" y el precio se recalcula' : ''}`;
@@ -8687,10 +8685,9 @@ async function guardarSkuCompleto(S){
         await db.collection('config').doc('telas').set(JSON.parse(JSON.stringify(telasDatos))); } } }
     // 3. venta: descripcion, precio y unidad
     const r = buscarProductoPorSku(S), uvN = val('es-uv') || '';
-    const key = r ? r.producto._editKey : 'sku:' + S;
-    if(key && (unidadesVenta[key] || '') !== uvN){ if(uvN) unidadesVenta[key] = uvN; else delete unidadesVenta[key]; await db.collection('config').doc('unidades').set({ u: unidadesVenta }); }
+    if(unidadVentaSku(S) !== uvN){ unidadesVenta['sku:' + S] = uvN || 'unidad'; await db.collection('config').doc('unidades').set({ u: unidadesVenta }); }
     if(r){ const d = val('es-desc'), pr = numAr(val('es-precio'));
-      if(pr > 0 && !precioBajoCostoOk(S, pr, r.producto)) return;
+      if(pr > 0 && !precioBajoCostoOk(S, pr, null)) return;
       if((d != null && d !== (r.variante.desc || '')) || (pr > 0 && Math.abs(pr - parsePrice(r.variante.precio)) > 0.01)){
         r.producto.variantes = r.producto.variantes.map(vv => String(vv.sku).toUpperCase() === S ? { ...vv, desc: d != null ? d : vv.desc, precio: pr > 0 ? precioTxt(pr) : vv.precio } : vv);
         await guardarProductoCatalogo(r.producto); } }
@@ -9646,8 +9643,9 @@ var categoriasCfg = { extra: [], mover: [] }, fotosMapa = {}, fotosRaw = {}, vid
 var unidadesVenta = {};
 // cuantas unidades trae lo que se vende: docena 12, media docena 6, par 2, "10 unidades" 10; si no se aclara, 1
 function cantUnidadVenta(u){ const s = String(u || '').trim().toLowerCase(); const m = s.match(/^(\d+)/); if(m) return +m[1] || 1; return ({ 'docena': 12, 'media docena': 6, 'par': 2 })[s] || 1; }
-function unidadVentaSku(S){ const r = buscarProductoPorSku(S); return r ? (unidadesVenta[r.producto._editKey] || '') : (unidadesVenta['sku:' + String(S).toUpperCase()] || ''); }
+function unidadVentaSku(S){ const k = 'sku:' + String(S).toUpperCase(); if(unidadesVenta[k] !== undefined) return unidadesVenta[k] === 'unidad' ? '' : unidadesVenta[k]; const r = buscarProductoPorSku(S); return r ? (unidadesVenta[r.producto._editKey] || '') : ''; }
 async function cargarUnidadesVenta(){ try{ const d = await db.collection('config').doc('unidades').get(); unidadesVenta = d.exists ? (d.data().u || {}) : {}; } catch(e){} }
+function sufijoPrecioSku(p, sku){ if(p && p.metros) return ' /m'; const u = unidadVentaSku(sku); return u ? ' /' + u : ''; }
 function sufijoPrecio(p){ if(p && p.metros) return ' /m'; const u = p && (typeof unidadesVenta === 'object' && unidadesVenta ? unidadesVenta : {})[p._editKey]; return u ? ' /' + u : ''; }
 async function cargarCategoriasCfg(){
   await cargarUnidadesVenta();
@@ -10237,7 +10235,7 @@ async function registrarHistorialCostos(){
     const DIV = { 'docena': 12, 'media docena': 6, 'par': 2 };
     Object.entries(costosReventa || {}).forEach(([S, c0]) => {
       if(fabricados.has(S) || !(c0 > 0) || esCodigoTela(S) || (kitsDatos && kitsDatos[S])) return;
-      const r = buscarProductoPorSku(S), u = r ? (unidadesVenta[r.producto._editKey] || '') : '';
+      const u = unidadVentaSku(S);
       const c = Math.round(c0 / cantUnidadVenta(u) * 100) / 100;
       if(ult[S] == null || Math.abs(ult[S] - c) >= 0.5){ if(ult[S] > 0 && Math.abs(ult[S] - c) / ult[S] >= 0.005) cambiosCosto.push({ sku: S, antes: ult[S], ahora: c }); nuevos.push({ sku: S, fecha: hoy, costo: c, desglose: { reventa: true, costoCargado: c0, por: u || 'unidad' } }); ult[S] = c; }
     });
@@ -10344,12 +10342,12 @@ function renderCostosReventa(){
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;"><b style="flex:1;">${escaparHtml(x.p.nombre)}</b><span class="note" style="margin:0;">${escaparHtml(x.cat)}</span>
         ${x.p.variantes.every(v => codTela(v.sku)) ? '<span style="font-size:0.8rem;color:#2E5A8C;background:#F2F7FD;border-radius:8px;padding:5px 8px;">🧵 por metro</span>' : ''}<select title="Precio y costo por…" onchange="crUnidad('${escapeAttr(x.p._editKey)}', this.value)" style="padding:5px;border:1px solid var(--line);border-radius:8px;font-size:0.8rem;${x.p.variantes.every(v => codTela(v.sku)) ? 'display:none;' : ''}">${['', 'docena', 'media docena', 'par', 'juego', 'pack'].map(u => `<option value="${u}" ${(unidadesVenta[x.p._editKey] || '') === u ? 'selected' : ''}>${u ? 'por ' + u : 'por unidad'}</option>`).join('')}</select>
         <input type="text" inputmode="decimal" placeholder="mismo costo para todas" style="width:150px;padding:6px;border:1px solid var(--line);border-radius:8px;font-size:0.8rem;" onkeydown="if(event.key==='Enter'){crTodo(${pi}, this.value); this.value='';}"><span class="note" style="margin:0;">↵</span></div>
-      ${vs.map(v => { const s = String(v.sku).toUpperCase(); const i = window.__crSkus.push(s) - 1; const pr = parsePrice(v.precio), c = kitsDatos && kitsDatos[s] ? (costoUnidadSku(s) || 0) * cantUnidadVenta(unidadesVenta[x.p._editKey]) : numAr(crValor(s)); const mg = c > 0 && pr > 0 ? (pr - c) / c : null;
+      ${vs.map(v => { const s = String(v.sku).toUpperCase(); const i = window.__crSkus.push(s) - 1; const pr = parsePrice(v.precio), c = kitsDatos && kitsDatos[s] ? (costoUnidadSku(s) || 0) * cantUnidadVenta(unidadVentaSku(s)) : numAr(crValor(s)); const mg = c > 0 && pr > 0 ? (pr - c) / c : null;
         return `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 110px 120px 70px;gap:6px;align-items:center;padding:4px 0;border-top:1px solid var(--line);font-size:0.85rem;">
-          <b>${escaparHtml(s)}</b><span style="color:#6B6258;">${escaparHtml(v.desc || '')}</span><span style="text-align:right;">${pr ? formatPrice(pr) + `<small class="meta">${sufijoPrecio(x.p)}</small>` : ''}</span>
-          ${kitsDatos && kitsDatos[s] ? `<div style="text-align:right;"><b>${costoUnidadSku(s) != null ? formatPrice(costoUnidadSku(s) * cantUnidadVenta(unidadesVenta[x.p._editKey])) : '—'}</b><small style="display:block;font-size:0.66rem;color:#6B4FA0;">🧩 ${escaparHtml(kitsDatos[s])}</small></div>` : `<div style="position:relative;"><input inputmode="decimal" value="${escapeAttr(crValor(s))}" placeholder="costo" oninput="crCambiar(${i}, this.value)" style="padding:7px;border:1px solid ${codTela(s) ? '#B9D3EE' : 'var(--line)'};border-radius:8px;text-align:right;width:100%;box-sizing:border-box;${codTela(s) ? 'background:#F2F7FD;' : ''}" title="${codTela(s) ? 'Costo por metro de la pantalla Telas (se cambia en los dos lados)' : ''}">${codTela(s) ? '<small style="display:block;text-align:right;font-size:0.66rem;color:#2E5A8C;margin-top:2px;">🧵 de Telas · por metro</small>' : ''}</div>`}
+          <b>${escaparHtml(s)}</b><span style="color:#6B6258;">${escaparHtml(v.desc || '')}</span><span style="text-align:right;">${pr ? formatPrice(pr) + `<small class="meta">${sufijoPrecioSku(x.p, s)}</small>` : ''}</span>
+          ${kitsDatos && kitsDatos[s] ? `<div style="text-align:right;"><b>${costoUnidadSku(s) != null ? formatPrice(costoUnidadSku(s) * cantUnidadVenta(unidadVentaSku(s))) : '—'}</b><small style="display:block;font-size:0.66rem;color:#6B4FA0;">🧩 ${escaparHtml(kitsDatos[s])}</small></div>` : `<div style="position:relative;"><input inputmode="decimal" value="${escapeAttr(crValor(s))}" placeholder="costo" oninput="crCambiar(${i}, this.value)" style="padding:7px;border:1px solid ${codTela(s) ? '#B9D3EE' : 'var(--line)'};border-radius:8px;text-align:right;width:100%;box-sizing:border-box;${codTela(s) ? 'background:#F2F7FD;' : ''}" title="${codTela(s) ? 'Costo por metro de la pantalla Telas (se cambia en los dos lados)' : ''}">${codTela(s) ? '<small style="display:block;text-align:right;font-size:0.66rem;color:#2E5A8C;margin-top:2px;">🧵 de Telas · por metro</small>' : ''}</div>`}
           <span style="text-align:right;font-weight:700;color:${mg == null ? '#A89E90' : mg < 0.2 ? '#A6432F' : mg < 0.4 ? '#8A6417' : '#2F7A47'};" title="Margen sobre el costo">${mg == null ? '—' : Math.round(mg * 100) + ' %'}</span>
-          <div style="grid-column:2/-1;text-align:right;">${htmlPrecioML(kitsDatos && kitsDatos[s] ? costoUnidadSku(s) : (c > 0 ? c / cantUnidadVenta(unidadesVenta[x.p._editKey]) : 0))}</div></div>`; }).join('')}</div>`;
+          <div style="grid-column:2/-1;text-align:right;">${htmlPrecioML(kitsDatos && kitsDatos[s] ? costoUnidadSku(s) : (c > 0 ? c / cantUnidadVenta(unidadVentaSku(s)) : 0))}</div></div>`; }).join('')}</div>`;
   }).join('');
   document.getElementById('cr-lista').innerHTML = html ? `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) 110px 120px 70px;gap:6px;font-size:0.72rem;color:#8A8072;padding:0 10px 4px;"><span>SKU</span><span>Descripción</span><span style="text-align:right;">Precio lista</span><span style="text-align:right;">Costo de compra $</span><span style="text-align:right;">Margen</span></div>` + html : '<p class="empty-msg">No hay productos con ese filtro.</p>';
 }
@@ -10446,7 +10444,7 @@ function costoUnidadSku(S, prof){
   if(kitsDatos && kitsDatos[S]){ let t = 0; for(const p of partesKit(kitsDatos[S])){ const c = costoUnidadSku(p.sku, prof + 1); if(c == null) return null; t += c * p.n; } return Math.round(t * 100) / 100; }
   if(fabricacion && fabricacion.vinculos[S] && fabricacion.vinculos[S].articulo){ const a = costoActualSku(S); if(a) return a.costo; }
   const ct = codTela(S); if(ct){ const pm = precioMetroTela(ct); if(pm > 0) return Math.round(pm * 100) / 100; }
-  const c0 = (costosReventa || {})[S]; if(c0 > 0){ const r = buscarProductoPorSku(S), u = r ? (unidadesVenta[r.producto._editKey] || '') : ''; return Math.round(c0 / cantUnidadVenta(u) * 100) / 100; }
+  const c0 = (costosReventa || {})[S]; if(c0 > 0){ const u = unidadVentaSku(S); return Math.round(c0 / cantUnidadVenta(u) * 100) / 100; }
   return null;
 }
 function renderKits(){
@@ -18965,7 +18963,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v265';
+const APP_VERSION = '2026-10-02-v266';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
