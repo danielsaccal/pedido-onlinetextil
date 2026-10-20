@@ -1597,7 +1597,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v268</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v269</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -11384,7 +11384,8 @@ function renderMsgsDA(){
   const box = document.getElementById('da-msgs'), ms = (daChat && daChat.mensajes) || [];
   box.innerHTML = ms.length ? ms.map((m, i) => m.rol === 'user'
     ? `<div style="margin:8px 0 8px 15%;background:#3D2B4E;color:#fff;border-radius:12px;padding:8px 10px;white-space:pre-wrap;font-size:.88rem;">${escaparHtml(m.texto)}</div>`
-    : `<div style="margin:8px 15% 8px 0;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 10px;font-size:.88rem;">${htmlRespuestaDA(m.texto, i)}</div>`).join('')
+    : `<div style="margin:8px 15% 8px 0;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 10px;font-size:.88rem;">${htmlRespuestaDA(m.texto, i)}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:6px;border-top:1px dashed var(--line);">${Object.keys(window.__daCopias || {}).some(k => k.startsWith(i + '-') && window.__daCopias[k].p) ? `<button type="button" class="btn-mini" onclick="copiarTodosDA(${i},this)">📋 Copiar todos los prompts</button>` : ''}<button type="button" class="btn-mini" onclick="copiarRespuestaDA(${i},this)">📋 Copiar respuesta completa</button></div></div>`).join('')
     : '<p class="note">Elija productos, el canal y escriba el pedido. El agente responde con conceptos y especificaciones listas para el generador de imágenes.</p>';
   box.scrollTop = box.scrollHeight;
 }
@@ -11398,6 +11399,12 @@ function htmlRespuestaDA(t, i){
     return `<div style="border:1px solid #D9CCE6;background:#F7F3FB;border-radius:10px;padding:8px;margin:6px 0;"><div style="white-space:pre-wrap;">${escaparHtml(p.trim())}</div>
       <div style="display:flex;gap:6px;margin-top:6px;"><button type="button" class="btn-mini" onclick="copiarDA('${i}-${k}','b',this)">📋 Copiar especificación</button>${prompt ? `<button type="button" class="btn-mini" onclick="copiarDA('${i}-${k}','p',this)">📋 Copiar prompt en inglés</button>` : ''}</div></div>`; }).join('');
 }
+function copiarTexto(t, b){ navigator.clipboard && navigator.clipboard.writeText(t).then(() => { const x = b.textContent; b.textContent = '✓ Copiado'; setTimeout(() => b.textContent = x, 1500); }); }
+function copiarTodosDA(i, b){
+  const ks = Object.keys(window.__daCopias || {}).filter(k => k.startsWith(i + '-') && window.__daCopias[k].p).sort((x, y) => +x.split('-')[1] - +y.split('-')[1]);
+  copiarTexto(ks.map((k, n) => `Imagen ${n + 1}:\n${window.__daCopias[k].p}`).join('\n\n'), b);
+}
+function copiarRespuestaDA(i, b){ const m = ((daChat && daChat.mensajes) || [])[i]; if(m) copiarTexto(m.texto, b); }
 function copiarDA(k, q, b){ const x = (window.__daCopias || {})[k]; if(!x) return; navigator.clipboard && navigator.clipboard.writeText(x[q]).then(() => { const t = b.textContent; b.textContent = '✓ Copiado'; setTimeout(() => b.textContent = t, 1500); }); }
 function agregarProductoDA(){
   const v = document.getElementById('da-sku').value, sku = v.split(' · ')[0].trim(); if(!sku) return;
@@ -19119,7 +19126,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v268';
+const APP_VERSION = '2026-10-02-v269';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
