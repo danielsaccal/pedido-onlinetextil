@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v275</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v276</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -7378,6 +7378,44 @@ async function corregirHistorialSel(){
   try{ if(document.getElementById('step-facturas').classList.contains('active')) renderFacturas(); } catch(e){}
   alert(`Listo: ${n} registro(s) corregidos.`); abrirRevisarHistorial();
 }
+// ===== Precio y % sobre el costo enlazados (costo 100 y precio 120 = 20 %) =====
+const colorPct = m => m == null ? '#8A8072' : m < 0.25 ? '#A6432F' : m < 0.65 ? '#8A6417' : '#2F7A47';
+const idPP = S => String(S).toUpperCase().replace(/[^A-Z0-9]/g, '_');
+function celdaPrecioPct(S, costo, pr){
+  const k = idPP(S), m = costo > 0 && pr > 0 ? (pr - costo) / costo : null, inp = 'padding:4px 6px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;text-align:right;box-sizing:border-box;';
+  return { precio: `<span style="display:inline-flex;gap:4px;align-items:center;"><input id="pp-${k}" inputmode="decimal" value="${pr ? formatoPesos(Math.round(pr)) : ''}" placeholder="$" style="${inp}width:92px;" oninput="ppDesdePrecio('${k}',${costo || 0})"><button type="button" class="btn-mini" style="padding:2px 6px;" title="Guardar el precio" onclick="ppGuardar('${escapeAttr(S)}','${k}',${costo || 0})">💾</button></span>`,
+    pct: `<span style="display:inline-flex;gap:2px;align-items:center;"><input id="pc-${k}" inputmode="decimal" value="${m != null ? Math.round(m * 100) : ''}" ${costo > 0 ? '' : 'disabled'} style="${inp}width:56px;color:${colorPct(m)};font-weight:700;" oninput="ppDesdePct('${k}',${costo || 0})">%</span>` };
+}
+function ppDesdePct(k, costo){ const p = numAr(document.getElementById('pc-' + k).value), e = document.getElementById('pp-' + k); if(costo > 0 && isFinite(p) && e){ e.value = formatoPesos(Math.ceil(costo * (1 + p / 100) / 10) * 10); } ppColor(k, costo); }
+function ppDesdePrecio(k, costo){ const n = numAr(document.getElementById('pp-' + k).value), e = document.getElementById('pc-' + k); if(costo > 0 && n > 0 && e) e.value = Math.round((n - costo) / costo * 100); ppColor(k, costo); }
+function ppColor(k, costo){ const n = numAr(document.getElementById('pp-' + k).value), e = document.getElementById('pc-' + k); if(e) e.style.color = colorPct(costo > 0 && n > 0 ? (n - costo) / costo : null); }
+// guarda precios en el catalogo (agrupando por producto)
+async function guardarPreciosSkus(lista){
+  const porProd = new Map(); lista.forEach(([S, n]) => { const r = buscarProductoPorSku(S); if(r) (porProd.get(r.producto) || porProd.set(r.producto, []).get(r.producto)).push([String(S).toUpperCase(), n]); });
+  let ok = 0;
+  for(const [prod, xs] of porProd){ const variantes = prod.variantes.map(v => { const x = xs.find(y => y[0] === String(v.sku).toUpperCase()); return x ? { ...v, precio: precioTxt(x[1]) } : v; });
+    await guardarProductoCatalogo({ ...prod, variantes }); prod.variantes = variantes; ok += xs.length; }
+  try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+  return ok;
+}
+async function ppGuardar(S, k, costo){
+  const n = numAr(document.getElementById('pp-' + k).value); if(!(n > 0)){ alert('Escriba el precio.'); return; }
+  if(!buscarProductoPorSku(S)){ alert(S + ' no está publicado en el catálogo: primero publíquelo.'); return; }
+  if(!precioBajoCostoOk(S, n, null)) return;
+  try{ await guardarPreciosSkus([[S, n]]); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  try{ renderProductosFabrico(); } catch(e){} try{ if(esDueno()) renderCostosReventa(); } catch(e){}
+}
+// masivo: poner el precio de varios SKU con un % sobre su propio costo
+async function aplicarPctMasivo(skus, pct){
+  if(!isFinite(pct)){ alert('Escriba el porcentaje.'); return; }
+  const lista = [], sinCosto = [], sinPub = [];
+  skus.forEach(S => { const r = buscarProductoPorSku(S); if(!r){ sinPub.push(S); return; } let cu = null; try{ cu = costoUnidadSku(S); } catch(e){} if(!(cu > 0)){ sinCosto.push(S); return; }
+    lista.push([S, Math.ceil(cu * divisorVenta(S) * (1 + pct / 100) / 10) * 10]); });
+  if(!lista.length){ alert('Ningún SKU seleccionado tiene costo y está publicado.'); return; }
+  if(!confirm(`¿Poner el precio de ${lista.length} SKU con ${pct} % sobre su costo?\n\n` + lista.slice(0, 15).map(([S, n]) => `${S}: ${formatPrice(n)}`).join('\n') + (lista.length > 15 ? '\n…' : '') + (sinCosto.length ? `\n\nSin costo (no se tocan): ${sinCosto.join(', ')}` : '') + (sinPub.length ? `\nSin publicar (no se tocan): ${sinPub.join(', ')}` : ''))) return;
+  try{ const ok = await guardarPreciosSkus(lista); alert(`Listo: ${ok} precios actualizados.`); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  try{ renderProductosFabrico(); } catch(e){} try{ if(esDueno()) renderCostosReventa(); } catch(e){}
+}
 // ===== Costos de productos: lo que fabrico y reventa en una sola pantalla, separados y con filtro =====
 let cpTab = 'todos', cpMovido = false;
 function cpMover(){
@@ -7475,7 +7513,7 @@ function renderProductosFabrico(){
   const nombreArt = a => a ? (a.startsWith('ficha:') ? nombreFicha(a.slice(6)) : a) : '';
   cont.innerHTML = `<label style="display:inline-flex;gap:6px;align-items:center;font-size:0.82rem;color:#6B6258;margin-bottom:8px;cursor:pointer;"><input type="checkbox" ${pfDetalle ? 'checked' : ''} onchange="pfDetalle=this.checked; renderProductosFabrico();"> Ver detalle (artículo de corte y tela)</label>
     <div class="${pfDetalle ? '' : 'pf-simple'}" style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;"><table style="width:100%;border-collapse:collapse;font-size:0.86rem;">
-    <thead><tr style="background:var(--cream);"><th style="padding:7px 4px 7px 8px;width:24px;"><input type="checkbox" title="Seleccionar todos los de la lista" onchange="pfSeleccionarTodos(this.checked)" ${filas.length && filas.every(f => pfSel.has(f.sku)) ? 'checked' : ''}></th><th style="padding:7px 8px;text-align:left;">SKU</th><th style="padding:7px 8px;text-align:left;">Medida</th><th class="pf-det" style="padding:7px 8px;text-align:left;">Artículo de corte</th><th class="pf-det" style="padding:7px 8px;text-align:left;">Tela</th><th style="padding:7px 8px;text-align:left;">Se vende por</th><th style="padding:7px 8px;text-align:right;">Costo por unidad</th><th style="padding:7px 8px;text-align:right;">Costo por unidad de venta</th><th style="padding:7px 8px;text-align:right;">Precio de venta</th><th style="padding:7px 8px;text-align:right;">Margen</th><th style="padding:7px 8px;text-align:center;">Estado</th></tr></thead><tbody>
+    <thead><tr style="background:var(--cream);"><th style="padding:7px 4px 7px 8px;width:24px;"><input type="checkbox" title="Seleccionar todos los de la lista" onchange="pfSeleccionarTodos(this.checked)" ${filas.length && filas.every(f => pfSel.has(f.sku)) ? 'checked' : ''}></th><th style="padding:7px 8px;text-align:left;">SKU</th><th style="padding:7px 8px;text-align:left;">Medida</th><th class="pf-det" style="padding:7px 8px;text-align:left;">Artículo de corte</th><th class="pf-det" style="padding:7px 8px;text-align:left;">Tela</th><th style="padding:7px 8px;text-align:left;">Se vende por</th><th style="padding:7px 8px;text-align:right;">Costo por unidad</th><th style="padding:7px 8px;text-align:right;">Costo por unidad de venta</th><th style="padding:7px 8px;text-align:right;">Precio de venta</th><th style="padding:7px 8px;text-align:right;">% s/costo</th><th style="padding:7px 8px;text-align:center;">Estado</th></tr></thead><tbody>
     ${filas.map(f => {
       let cab = '';
       if(f.producto !== prodPrev){
@@ -7495,14 +7533,14 @@ function renderProductosFabrico(){
           // si el precio de lista es por docena (u otra unidad), el costo se lleva a esa misma unidad
           const uv = unidadVentaSku(f.sku), div = cantUnidadVenta(uv);
           const costo = x ? x.total * div : null;
-          const mg = costo != null && pr ? (pr - costo) / pr : null;
+          const pp = celdaPrecioPct(f.sku, costo, pr);
           const opts = [['', 'unidad (1)'], ['par', 'par (2)'], ['media docena', 'media docena (6)'], ['docena', 'docena (12)']];
           const esOtra = uv && !opts.some(o => o[0] === uv);
           return `<td style="padding:7px 8px;"><select onchange="pfUnidad('${escapeAttr(f.sku)}', this.value, this)" style="padding:4px 6px;border:1px solid var(--line);border-radius:8px;font-size:0.8rem;width:auto;">${opts.map(([v, t]) => `<option value="${v}" ${uv === v ? 'selected' : ''}>${t}</option>`).join('')}${esOtra ? `<option value="${escapeAttr(uv)}" selected>${escaparHtml(uv)} (${div})</option>` : ''}<option value="__otra">otra cantidad…</option></select></td>
             <td style="padding:7px 8px;text-align:right;white-space:nowrap;" title="${escapeAttr(textoCostoSku(f.sku))}">${x ? '$ ' + formatoPesos(Math.round(x.total)) : '<span class="note">—</span>'}</td>
             <td style="padding:7px 8px;text-align:right;white-space:nowrap;font-weight:700;">${costo != null ? '$ ' + formatoPesos(Math.round(costo)) : '<span class="note">—</span>'}</td>
-            <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${pr ? '$ ' + formatoPesos(Math.round(pr)) : '<span class="note">sin publicar</span>'}</td>
-            <td style="padding:7px 8px;text-align:right;white-space:nowrap;font-weight:700;color:${mg == null ? '#8A8072' : mg < 0.2 ? '#A6432F' : mg < 0.4 ? '#8A6417' : '#2F7A47'};">${mg != null ? Math.round(mg * 100) + ' %' : '—'}</td>`;
+            <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${r ? pp.precio : '<span class="note">sin publicar</span>'}</td>
+            <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${r ? pp.pct : '—'}</td>`;
         })()}
         <td style="padding:7px 8px;text-align:center;white-space:nowrap;">${ok ? '✅' : `<button type="button" class="btn-mini" onclick="completarSkuPf('${escapeAttr(f.sku)}')">⚠️ Completar</button>`}</td></tr>`;
     }).join('')}</tbody></table></div>
@@ -8074,6 +8112,7 @@ function renderPfMasivo(){
       <div class="field" style="margin:0;"><label>Categoría (al publicar)</label><select id="pm-cat">${nc}${CATALOGO.map(c => `<option value="${escapeAttr(c.categoria)}">${escaparHtml(c.categoria)}</option>`).join('')}</select></div>
     </div>
     <div id="pf-fotos"></div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px;"><b style="font-size:.85rem;">Precio de venta:</b><input id="pm-pct" inputmode="decimal" placeholder="% sobre el costo" style="width:140px;padding:7px;border:1px solid var(--line);border-radius:8px;"><button type="button" class="btn-mini" onclick="aplicarPctMasivo([...pfSel], numAr(document.getElementById('pm-pct').value))">Poner el precio con ese %</button></div>
     <button class="btn btn-gold" style="width:auto;padding:10px 18px;margin-top:10px;" onclick="aplicarPfMasivo()">Aplicar a los ${pfSel.size} SKU</button>
     ${[...pfSel].some(s => !buscarProductoPorSku(s)) ? `<button class="btn btn-ghost" style="width:auto;padding:10px 18px;margin-top:10px;margin-left:6px;" onclick="abrirPublicarVarios([...pfSel])">📸 Publicar en el catálogo los que no están</button>` : ''}
     ${[...pfSel].some(s => buscarProductoPorSku(s)) ? `<button class="btn btn-ghost" style="width:auto;padding:10px 18px;margin-top:10px;margin-left:6px;" onclick="abrirMoverSkus([...pfSel])">📦 Mover a otro producto</button>` : ''}
@@ -8189,7 +8228,8 @@ async function aplicarPfMasivo(){
 
 // ===== Publicar en el catalogo un SKU nuevo (desde Articulos y cortes) =====
 let pubSku = null;
-function sugerenciasPublicar(sku){
+function sugerenciasPublicar(sku){ const s = sugerenciasPublicarBase(sku); return { ...s, precio: null, motivo: '' }; } // sin sugerencias de precio (pedido del duenio)
+function sugerenciasPublicarBase(sku){
   const S = String(sku).toUpperCase();
   const art = articuloDeSku(S), cal = calidadDeSku(S);
   // producto donde ya estan otros SKU de la misma calidad (ej: otra medida de la misma sabana) o del mismo articulo
@@ -8635,10 +8675,7 @@ function npfRecalcular(soloFila){
     const prev = fabricacion.vinculos[f.sku];
     fabricacion.vinculos[f.sku] = { articulo: f.articulo, calidad: cal };
     if(!f.descManual){ f.desc = descripcionVarianteFab(f.sku) || nombreLindoArticulo(f.articulo); const el = document.getElementById('npf-desc-' + i); if(el) el.value = f.desc; }
-    if(!f.precioManual){
-      const c = costosDeSku(f.sku), x = c && c.porTela.find(y => y.total != null);
-      if(x){ f.precio = formatoPesos(Math.round(x.total / 0.5 / 10) * 10); const el = document.getElementById('npf-precio-' + i); if(el){ el.value = f.precio; el.title = `Sugerido: costo $ ${formatoPesos(Math.round(x.total))} con margen 50 %`; } }
-    }
+    // sin sugerencia de precio: el precio lo escribe el duenio
     if(prev) fabricacion.vinculos[f.sku] = prev; else delete fabricacion.vinculos[f.sku];
   });
 }
@@ -8769,7 +8806,7 @@ function editarSkuCompleto(s){
     ${x ? `<div class="field" style="margin:0;"><label>Precio de la tela ${escaparHtml(x.tela)} (${usd ? 'US$' : '$'} por ${porKg ? 'kg' : 'metro'})</label><input id="es-tela" inputmode="decimal" value="${String(usd ? t.precioUsd : (t.precio || '')).replace('.', ',')}"></div>
       <p class="note" style="text-align:left;margin:4px 0 0;">Cambia el costo de los ${nTela} SKU que usan esta tela.</p>` : '<p class="note" style="text-align:left;">Sin tela con precio: el costo no se puede calcular.</p>'}
     <div style="background:#FAF8F5;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:10px;font-size:.88rem;">
-      Hoy: costo por unidad <b>${x ? formatPrice(x.total) : '—'}</b> · por unidad de venta <b>${x ? formatPrice(x.total * cantUnidadVenta(uv)) : '—'}</b>${r ? ` · precio <b>${formatPrice(parsePrice(v.precio))}</b> · margen <b>${x && parsePrice(v.precio) ? Math.round((1 - x.total * cantUnidadVenta(uv) / parsePrice(v.precio)) * 100) + ' %' : '—'}</b>` : ''}</div>
+      Hoy: costo por unidad <b>${x ? formatPrice(x.total) : '—'}</b> · por unidad de venta <b>${x ? formatPrice(x.total * cantUnidadVenta(uv)) : '—'}</b>${r ? ` · precio <b>${formatPrice(parsePrice(v.precio))}</b> · <b>${x && parsePrice(v.precio) ? Math.round((parsePrice(v.precio) / (x.total * cantUnidadVenta(uv)) - 1) * 100) + ' %' : '—'}</b> sobre el costo` : ''}</div>
     <p class="error" id="pub-error" style="display:none;"></p>
     <div style="display:flex;gap:8px;margin-top:12px;"><button class="btn btn-gold" style="flex:1;" onclick="guardarSkuCompleto('${escapeAttr(S)}')">💾 Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`;
   ['es-art', 'es-cal'].forEach(id => { const sel = document.getElementById(id); hacerSelectBuscable(sel); if(sel._sync) sel._sync(); });
@@ -10459,13 +10496,14 @@ function renderCostosReventa(){
         ${x.p.variantes.every(v => codTela(v.sku)) ? '<span style="font-size:0.8rem;color:#2E5A8C;background:#F2F7FD;border-radius:8px;padding:5px 8px;">🧵 por metro</span>' : ''}<select title="Precio y costo por…" onchange="crUnidad('${escapeAttr(x.p._editKey)}', this.value)" style="padding:5px;border:1px solid var(--line);border-radius:8px;font-size:0.8rem;${x.p.variantes.every(v => codTela(v.sku)) ? 'display:none;' : ''}">${['', 'docena', 'media docena', 'par', 'juego', 'pack'].map(u => `<option value="${u}" ${(unidadesVenta[x.p._editKey] || '') === u ? 'selected' : ''}>${u ? 'por ' + u : 'por unidad'}</option>`).join('')}</select>
         <input type="text" inputmode="decimal" placeholder="mismo costo para todas" style="width:150px;padding:6px;border:1px solid var(--line);border-radius:8px;font-size:0.8rem;" onkeydown="if(event.key==='Enter'){crTodo(${pi}, this.value); this.value='';}"><span class="note" style="margin:0;">↵</span></div>
       ${vs.map(v => { const s = String(v.sku).toUpperCase(); const i = window.__crSkus.push(s) - 1; if(!(kitsDatos && kitsDatos[s])) window.__crVis.push(s); const pr = parsePrice(v.precio), c = kitsDatos && kitsDatos[s] ? (costoUnidadSku(s) || 0) * cantUnidadVenta(unidadVentaSku(s)) : numAr(crValor(s)); const mg = c > 0 && pr > 0 ? (pr - c) / c : null;
-        return `<div style="display:grid;grid-template-columns:22px 90px minmax(0,1fr) 110px 120px 70px;gap:6px;align-items:center;padding:4px 0;border-top:1px solid var(--line);font-size:0.85rem;">
-          ${kitsDatos && kitsDatos[s] ? '<span></span>' : `<input type="checkbox" ${crSel.has(s) ? 'checked' : ''} onchange="crSel[this.checked ? 'add' : 'delete']('${escapeAttr(s)}');renderCrMasivo()" style="width:16px;height:16px;">`}<b>${escaparHtml(s)}</b><span style="color:#6B6258;">${escaparHtml(v.desc || '')}</span><span style="text-align:right;">${pr ? formatPrice(pr) + `<small class="meta">${sufijoPrecioSku(x.p, s)}</small>` : ''}</span>
+        const ppR = celdaPrecioPct(s, c > 0 ? c : 0, pr);
+        return `<div style="display:grid;grid-template-columns:22px 90px minmax(0,1fr) 140px 120px 80px;gap:6px;align-items:center;padding:4px 0;border-top:1px solid var(--line);font-size:0.85rem;">
+          ${kitsDatos && kitsDatos[s] ? '<span></span>' : `<input type="checkbox" ${crSel.has(s) ? 'checked' : ''} onchange="crSel[this.checked ? 'add' : 'delete']('${escapeAttr(s)}');renderCrMasivo()" style="width:16px;height:16px;">`}<b>${escaparHtml(s)}</b><span style="color:#6B6258;">${escaparHtml(v.desc || '')}</span><span style="text-align:right;">${ppR.precio}</span>
           ${kitsDatos && kitsDatos[s] ? `<div style="text-align:right;"><b>${costoUnidadSku(s) != null ? formatPrice(costoUnidadSku(s) * cantUnidadVenta(unidadVentaSku(s))) : '—'}</b><small style="display:block;font-size:0.66rem;color:#6B4FA0;">🧩 ${escaparHtml(kitsDatos[s])}</small></div>` : `<div style="position:relative;"><input inputmode="decimal" value="${escapeAttr(crValor(s))}" placeholder="costo" oninput="crCambiar(${i}, this.value)" style="padding:7px;border:1px solid ${codTela(s) ? '#B9D3EE' : 'var(--line)'};border-radius:8px;text-align:right;width:100%;box-sizing:border-box;${codTela(s) ? 'background:#F2F7FD;' : ''}" title="${codTela(s) ? 'Costo por metro de la pantalla Telas (se cambia en los dos lados)' : ''}">${codTela(s) ? '<small style="display:block;text-align:right;font-size:0.66rem;color:#2E5A8C;margin-top:2px;">🧵 de Telas · por metro</small>' : ''}</div>`}
-          <span style="text-align:right;font-weight:700;color:${mg == null ? '#A89E90' : mg < 0.2 ? '#A6432F' : mg < 0.4 ? '#8A6417' : '#2F7A47'};" title="Margen sobre el costo">${mg == null ? '—' : Math.round(mg * 100) + ' %'}</span>
+          <span style="text-align:right;">${ppR.pct}</span>
           <div style="grid-column:3/-1;text-align:right;">${htmlPrecioML(kitsDatos && kitsDatos[s] ? costoUnidadSku(s) : (c > 0 ? c / cantUnidadVenta(unidadVentaSku(s)) : 0))}</div></div>`; }).join('')}</div>`;
   }).join('');
-  document.getElementById('cr-lista').innerHTML = html ? `<div id="cr-masivo"></div><div style="display:grid;grid-template-columns:22px 90px minmax(0,1fr) 110px 120px 70px;gap:6px;font-size:0.72rem;color:#8A8072;padding:0 10px 4px;align-items:center;"><input type="checkbox" title="Seleccionar todos los visibles" onchange="(window.__crVis||[]).forEach(s => crSel[this.checked ? 'add' : 'delete'](s));renderCostosReventa()" style="width:16px;height:16px;"><span>SKU</span><span>Descripción</span><span style="text-align:right;">Precio lista</span><span style="text-align:right;">Costo de compra $</span><span style="text-align:right;">Margen</span></div>` + html : '<p class="empty-msg">No hay productos con ese filtro.</p>';
+  document.getElementById('cr-lista').innerHTML = html ? `<div id="cr-masivo"></div><div style="display:grid;grid-template-columns:22px 90px minmax(0,1fr) 140px 120px 80px;gap:6px;font-size:0.72rem;color:#8A8072;padding:0 10px 4px;align-items:center;"><input type="checkbox" title="Seleccionar todos los visibles" onchange="(window.__crVis||[]).forEach(s => crSel[this.checked ? 'add' : 'delete'](s));renderCostosReventa()" style="width:16px;height:16px;"><span>SKU</span><span>Descripción</span><span style="text-align:right;">Precio de venta</span><span style="text-align:right;">Costo de compra $</span><span style="text-align:right;">% s/costo</span></div>` + html : '<p class="empty-msg">No hay productos con ese filtro.</p>';
   renderCrMasivo();
 }
 // seleccion masiva en reventa: mismo costo, subir o bajar %, borrar costo o "se vende por" (queda pendiente hasta Guardar)
@@ -10479,6 +10517,7 @@ function renderCrMasivo(){
       <input id="crm-pct" inputmode="decimal" placeholder="% (ej: 10 o -5)" style="width:120px;padding:7px;border:1px solid var(--line);border-radius:8px;"><button type="button" class="btn-mini" onclick="crMasivo('pct')">Subir/bajar %</button>
       <select id="crm-uv" style="padding:7px;border:1px solid var(--line);border-radius:8px;"><option value="">Se vende por…</option><option value="unidad">unidad</option><option value="par">par</option><option value="media docena">media docena</option><option value="docena">docena</option></select><button type="button" class="btn-mini" onclick="crMasivo('uv')">Aplicar</button>
       <button type="button" class="btn-mini" style="color:#A6432F;" onclick="crMasivo('borrar')">🗑️ Borrar costo</button></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;"><b style="font-size:.85rem;">Precio de venta:</b><input id="crm-ppct" inputmode="decimal" placeholder="% sobre el costo" style="width:140px;padding:7px;border:1px solid var(--line);border-radius:8px;"><button type="button" class="btn-mini" onclick="aplicarPctMasivo([...crSel], numAr(document.getElementById('crm-ppct').value))">Poner el precio con ese %</button></div>
     <p class="note" style="text-align:left;margin:6px 0 0;">Los cambios de costo quedan pendientes: se guardan con el botón 💾 Guardar.</p></div>` : '';
 }
 async function crMasivo(acc){
@@ -11103,15 +11142,15 @@ let ccFilas = [];
 async function abrirRevisarCostos(){
   let pres = []; try{ const s = await db.collection('presupuestos').get(); pres = s.docs.map(d => d.data()).filter(p => !p.pedido); } catch(e){}
   ccFilas = ccPend.map(c => { const r = buscarProductoPorSku(c.sku); if(!r) return null; const pr = parsePrice(r.variante.precio); if(!(pr > 0)) return null;
-    const sug = Math.ceil(pr * c.ahora / c.antes / 10) * 10, np = pres.filter(p => (p.items || []).some(it => String(it.sku || '').toUpperCase() === c.sku)).length;
-    return { ...c, r, pr, sug, np, u: unidadVentaSku(c.sku) || 'unidad' }; }).filter(Boolean);
+    const pctAntes = (pr - c.antes) / c.antes, sug = Math.ceil(c.ahora * (1 + pctAntes) / 10) * 10, np = pres.filter(p => (p.items || []).some(it => String(it.sku || '').toUpperCase() === c.sku)).length;
+    return { ...c, r, pr, sug, pctAntes, np, u: unidadVentaSku(c.sku) || 'unidad' }; }).filter(Boolean);
   const t = document.getElementById('pub-titulo'); if(t) t.textContent = '💲 Revisar cambios de costo';
   renderRevisarCostos(); document.getElementById('pub-modal').style.display = 'block';
 }
 function renderRevisarCostos(){
-  const mg = (pr, c) => pr > 0 ? Math.round((pr - c) / pr * 100) + ' %' : '—';
+  const mg = (pr, c) => c > 0 ? Math.round((pr - c) / c * 100) + ' %' : '—';
   document.getElementById('pub-cont').innerHTML = !ccFilas.length ? '<p class="note">No hay cambios de costo pendientes.</p>' : `
-    <p class="note" style="text-align:left;margin:0 0 8px;">Costos por unidad de venta. El precio sugerido mantiene el margen que tenía; se puede editar.</p>
+    <p class="note" style="text-align:left;margin:0 0 8px;">Costos por unidad de venta. A la derecha, el % sobre el costo que tenía: cámbielo o escriba el precio directamente.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
       <label style="display:flex;gap:6px;align-items:center;font-size:.85rem;"><input type="checkbox" id="cc-todos" checked onchange="document.querySelectorAll('.cc-sel').forEach(x => x.checked = this.checked)"> Todos</label>
       <select id="cc-red" style="padding:6px;border:1px solid var(--line);border-radius:8px;font-size:.85rem;"><option value="10">Redondear a $ 10</option><option value="100">a $ 100</option><option value="1000">a $ 1.000</option></select><button type="button" class="btn-mini" onclick="ccRedondear()">Redondear seleccionados</button></div>
@@ -11119,13 +11158,15 @@ function renderRevisarCostos(){
       <div style="display:grid;grid-template-columns:22px minmax(0,1fr) 120px;gap:8px;align-items:center;">
         <input type="checkbox" class="cc-sel" data-i="${i}" checked>
         <span><b>${escaparHtml(f.sku)}</b> <span class="note" style="margin:0;">${escaparHtml(f.r.producto.nombre)} · ${escaparHtml(f.r.variante.desc || '')} · por ${escaparHtml(f.u)}</span><br>
-          costo ${formatPrice(f.antes)} → <b>${formatPrice(f.ahora)}</b> (${f.ahora > f.antes ? '+' : ''}${Math.round((f.ahora / f.antes - 1) * 100)} %) · precio ${formatPrice(f.pr)} · margen ${mg(f.pr, f.antes)} → <b style="color:${(f.pr - f.ahora) / f.pr < 0.2 ? '#A6432F' : '#2F7A47'};">${mg(f.pr, f.ahora)}</b></span>
-        <span><input class="cc-pr" data-i="${i}" inputmode="decimal" value="${f.sug}" oninput="ccMargen(${i}, this.value)" style="width:100%;box-sizing:border-box;padding:6px;border:1px solid var(--line);border-radius:8px;text-align:right;"><small id="cc-mg-${i}" class="meta" style="display:block;text-align:right;">margen ${mg(f.sug, f.ahora)}</small></span></div>
+          costo ${formatPrice(f.antes)} → <b>${formatPrice(f.ahora)}</b> (${f.ahora > f.antes ? '+' : ''}${Math.round((f.ahora / f.antes - 1) * 100)} %) · precio ${formatPrice(f.pr)} · sobre el costo ${mg(f.pr, f.antes)} → <b style="color:${colorPct((f.pr - f.ahora) / f.ahora)};">${mg(f.pr, f.ahora)}</b></span>
+        <span style="display:flex;flex-direction:column;gap:4px;"><span style="display:flex;gap:3px;align-items:center;"><input class="cc-pct" data-i="${i}" inputmode="decimal" value="${Math.round(f.pctAntes * 100)}" oninput="ccDesdePct(${i}, this.value)" style="width:60px;padding:6px;border:1px solid var(--line);border-radius:8px;text-align:right;">% s/costo</span>
+          <input class="cc-pr" data-i="${i}" inputmode="decimal" value="${f.sug}" oninput="ccMargen(${i}, this.value)" style="width:100%;box-sizing:border-box;padding:6px;border:1px solid var(--line);border-radius:8px;text-align:right;"></span></div>
       ${f.np ? `<div class="note" style="text-align:left;margin:3px 0 0 30px;color:#8A6417;">Está en ${f.np} presupuesto${f.np === 1 ? '' : 's'} abierto${f.np === 1 ? '' : 's'}: <a href="#" onclick="event.preventDefault();cerrarPublicar();abrirPresupuestos();">revisar</a></div>` : ''}
       <div style="margin:2px 0 0 30px;">${(() => { try{ return htmlPrecioML(f.ahora / (cantUnidadVenta(f.u === 'unidad' ? '' : f.u) || 1)); } catch(e){ return ''; } })()}</div></div>`).join('')}</div>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;"><button class="btn btn-gold" style="flex:1;" onclick="ccAplicar()">Aplicar al catálogo los seleccionados</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="ccDejar()">Dejar como está</button></div>`;
 }
-function ccMargen(i, v){ const f = ccFilas[i], n = numAr(v), e = document.getElementById('cc-mg-' + i); if(e) e.textContent = n > 0 ? 'margen ' + Math.round((n - f.ahora) / n * 100) + ' %' : ''; }
+function ccMargen(i, v){ const f = ccFilas[i], n = numAr(v), e = document.querySelector(`.cc-pct[data-i="${i}"]`); if(e && n > 0) e.value = Math.round((n - f.ahora) / f.ahora * 100); }
+function ccDesdePct(i, v){ const f = ccFilas[i], p = numAr(v), e = document.querySelector(`.cc-pr[data-i="${i}"]`); if(e && isFinite(p)) e.value = Math.ceil(f.ahora * (1 + p / 100) / 10) * 10; }
 function ccRedondear(){ const m = +document.getElementById('cc-red').value || 10; document.querySelectorAll('.cc-sel:checked').forEach(x => { const i = +x.dataset.i, inp = document.querySelector(`.cc-pr[data-i="${i}"]`), n = numAr(inp.value); if(n > 0){ inp.value = Math.ceil(n / m) * m; ccMargen(i, inp.value); } }); }
 async function ccMarcarRevisados(skus){ const act = costosVentaActuales(); skus.forEach(s => { if(act[s] != null) ccBase[s] = act[s]; }); await db.collection('config').doc('costos_base').set({ b: ccBase, actualizado: new Date().toISOString() }); ccPend = ccPend.filter(c => !skus.includes(c.sku)); pintarAvisoCostos(); }
 async function ccDejar(){
@@ -11380,7 +11421,8 @@ function skusSinPublicarPresu(){
 }
 // costo por unidad de venta (docena, etc.) y precio sugerido con el margen promedio de ese articulo (o 50 %)
 function costoVentaSku(S){ try{ const cu = costoUnidadSku(S); return cu != null ? cu * divisorVenta(S) : null; } catch(e){ return null; } }
-function precioSugeridoPresu(S){
+function precioSugeridoPresu(S){ return null; } // sin sugerencias de precio
+function precioSugeridoPresuBase(S){
   S = String(S).toUpperCase(); const costo = costoVentaSku(S); if(!costo) return null;
   const art = articuloDeSku(S), mgs = [];
   if(art) CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => { const s = String(v.sku).toUpperCase(); if(s === S || articuloDeSku(s) !== art) return; const cc = costoVentaSku(s), pr = parsePrice(v.precio); if(cc && pr && pr > cc) mgs.push((pr - cc) / pr); })));
@@ -11475,7 +11517,7 @@ function renderTotalesPresu(){
   leerItemsPresu(); presu.descTotal = numAr(document.getElementById('pe-desc').value) || 0; presu.descTotalTipo = document.getElementById('pe-desc-tipo').value;
   document.querySelectorAll('#pe-items .pi-row').forEach((tr, i) => { const it = presu.items[i]; const c = tr.querySelector('.pi-sub'); if(it && c) c.textContent = formatPrice(it.cant * it.precio * (1 - Math.min(100, it.descPct || 0) / 100));
     const k = tr.querySelector('.pi-costo'); if(k){ const co = esDueno() && it && it.sku ? costoVentaSku(String(it.sku).toUpperCase()) : null; const pn = it ? it.precio * (1 - Math.min(100, it.descPct || 0) / 100) : 0;
-      k.textContent = co ? `Costo ${formatPrice(co)} · margen ${pn > 0 ? Math.round((pn - co) / pn * 100) + ' %' : '–'} (solo usted lo ve)` : (esDueno() && it && it.sku ? 'Sin costo cargado' : ''); } });
+      k.textContent = co ? `Costo ${formatPrice(co)} · ${pn > 0 ? Math.round((pn - co) / co * 100) + ' %' : '–'} sobre el costo (solo usted lo ve)` : (esDueno() && it && it.sku ? 'Sin costo cargado' : ''); } });
   const t = totalesPresu(presu);
   document.getElementById('pe-totales').innerHTML = `<div>Subtotal: ${formatPrice(t.sub)}</div>${t.dItems > 0.5 ? `<div>Descuentos por renglón: −${formatPrice(t.dItems)}</div>` : ''}${t.dTot > 0.5 ? `<div>Descuento sobre el total: −${formatPrice(t.dTot)}</div>` : ''}<div style="font-size:1.25rem;font-weight:800;color:var(--purple);margin-top:4px;">Total: ${formatPrice(t.total)}</div><div class="note" style="text-align:right;margin:0;">IVA incluido</div>`;
 }
@@ -19346,7 +19388,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v275';
+const APP_VERSION = '2026-10-02-v276';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
