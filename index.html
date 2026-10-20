@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v278</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v279</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2348,6 +2348,16 @@ a.grilla-celda{display:block;}
       <div id="cp-rev" style="border-left:5px solid #2E5A8C;padding-left:10px;"><div style="font-weight:800;color:#2E5A8C;margin:2px 0 6px;">🛒 Reventa</div><div id="cp-rev-in"></div></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
       <div id="cp-guardar" style="display:none;position:sticky;bottom:70px;z-index:20;margin-top:12px;background:#3D2B4E;color:#fff;border-radius:14px;padding:10px 14px;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.25);"><span style="flex:1;"></span><button type="button" class="btn btn-gold" style="width:auto;padding:9px 18px;" onclick="guardarTodoCP()">💾 Guardar cambios</button></div>
+    </div>
+  </div>
+
+  <div class="step" id="step-resultado-negocio">
+    <div class="form-card" style="max-width:900px;">
+      <h2>Resultado del negocio</h2>
+      <p class="note" style="text-align:left;">Ventas facturadas + Mercado Libre − costo de mercadería − cargos de Mercado Libre − gastos comerciales. Todo con IVA.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><select id="rn-mes" onchange="renderResultadoNegocio()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"></select><select id="rn-cta" onchange="renderResultadoNegocio()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"><option value="">ML: ambas cuentas</option><option>Alberto</option><option>Rita</option></select></div>
+      <div id="rn-body"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
   </div>
 
@@ -5835,7 +5845,7 @@ const GRUPOS_INICIO = {
     [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['🧾 Presupuestos', 'abrirPresupuestos()'], ['📄 Pedido desde una foto', "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)"], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()'], ['📋 Historial de pedidos', 'abrirHistorial()']],
     [['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']],
     [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']],
-    [['🧾 Ventas facturadas', 'abrirFacturas()'], ['💸 Gastos comerciales', 'abrirGastos()'], ['📈 Resultados Mercado Libre', 'abrirResultadosML()'], ['🧮 Simulador de costos ML', 'abrirCalculadoraML()']]
+    [['📊 Resultado del negocio', 'abrirResultadoNegocio()'], ['🧾 Ventas facturadas', 'abrirFacturas()'], ['💸 Gastos comerciales', 'abrirGastos()'], ['📈 Resultados Mercado Libre', 'abrirResultadosML()'], ['🧮 Simulador de costos ML', 'abrirCalculadoraML()']]
   ] },
   f: { lado: 'int', titulo: 'Catálogo', titulosColumnas: ['1 · Productos', '2 · Fotos y textos', '3 · Precios'], columnas: [
     [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['🗂️ Ordenar categorías', 'abrirCategorias()']],
@@ -7436,6 +7446,71 @@ async function aplicarPctMasivo(skus, pct){
   if(!confirm(`¿Poner el precio de ${lista.length} SKU con ${pct} % sobre su costo?\n\n` + lista.slice(0, 15).map(([S, n]) => `${S}: ${formatPrice(n)}`).join('\n') + (lista.length > 15 ? '\n…' : '') + (sinCosto.length ? `\n\nSin costo (no se tocan): ${sinCosto.join(', ')}` : '') + (sinPub.length ? `\nSin publicar (no se tocan): ${sinPub.join(', ')}` : ''))) return;
   try{ const ok = await guardarPreciosSkus(lista); alert(`Listo: ${ok} precios actualizados.`); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   try{ renderProductosFabrico(); } catch(e){} try{ if(esDueno()) renderCostosReventa(); } catch(e){}
+}
+// ===== Resultado del negocio: facturas + Mercado Libre + gastos, con IVA, mes por mes =====
+let rnDatos = null;
+async function abrirResultadoNegocio(){
+  if(!esDueno() && !puede('gastos')){ alert('No tiene permiso para ver esta pantalla.'); return; }
+  mostrarPaso('step-resultado-negocio'); document.getElementById('rn-body').innerHTML = '<p class="empty-msg">Cargando…</p>';
+  try{ await prepararCostosFacturas(); } catch(e){}
+  const [sf, sg, sp, sm] = await Promise.all([db.collection('ventas_facturadas').get(), db.collection('gastos').get(), db.collection('gastos_periodicos_ml').get().catch(() => ({ docs: [] })), db.collection('config').doc('ml_resumen_mensual').get()]);
+  rnDatos = { facturas: sf.docs.map(d => ({ _id: d.id, ...d.data() })), gastos: sg.docs.map(d => d.data()), periodicos: sp.docs.map(d => d.data()), ml: sm.exists ? (sm.data().m || {}) : {}, mlAct: sm.exists ? sm.data().actualizado : null };
+  const meses = new Set();
+  rnDatos.facturas.forEach(f => { const m = String(f.fecha || '').split('/'); if(m.length === 3) meses.add(m[2] + '-' + m[1]); });
+  rnDatos.gastos.forEach(g => { if(g.fecha) meses.add(String(g.fecha).slice(0, 7)); });
+  Object.values(rnDatos.ml).forEach(x => meses.add(x.periodo));
+  const L = [...meses].filter(m => /^\d{4}-\d{2}$/.test(m)).sort().reverse();
+  const sel = document.getElementById('rn-mes'), prev = sel.value;
+  sel.innerHTML = L.map(m => `<option value="${m}">${new Date(m + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</option>`).join('');
+  if(prev && L.includes(prev)) sel.value = prev;
+  renderResultadoNegocio();
+}
+function calcResultadoMes(mes, cta){
+  const R = { vF: 0, cF: 0, revF: 0, sinCF: 0, vtaSinCF: 0, nFact: 0, vML: 0, envML: 0, cML: 0, cargosML: 0, sinCML: 0, revML: 0, hayML: false, gastos: 0, periodicos: 0, desglose: {} };
+  rnDatos.facturas.forEach(f => { const m = String(f.fecha || '').split('/'); if(m.length !== 3 || m[2] + '-' + m[1] !== mes) return; R.nFact++;
+    const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0), fx = f.total && n0 > 0 ? f.total / n0 : 1.21, sg = signoFact(f); // con IVA (incluye el descuento general)
+    f.items.forEach((it, i) => { const v = it.neto * fx * sg; R.vF += v; const c = costoItemFactura(it, f);
+      if(c == null){ R.sinCF++; R.vtaSinCF += v; } else if(renglonRevFactura(f, i, v, c)){ R.revF++; R.vtaSinCF += v; } else R.cF += c; }); });
+  Object.values(rnDatos.ml).forEach(x => { if(x.periodo !== mes || (cta && x.cuenta !== cta)) return; R.hayML = true;
+    R.vML += x.vendido; R.envML += x.envios; R.cML += x.costo; R.cargosML += x.cargosML; R.sinCML += x.sinCosto; R.revML += x.revisar;
+    Object.entries(x.desglose || {}).forEach(([k, v]) => R.desglose[k] = (R.desglose[k] || 0) + v); });
+  rnDatos.gastos.forEach(g => { if(String(g.fecha || '').slice(0, 7) === mes && !g.enML) R.gastos += +g.monto || 0; });
+  rnDatos.periodicos.forEach(g => { if(g.mes === mes && (!cta || g.cuenta === cta)) R.periodicos += +g.monto || 0; });
+  R.total = R.vF + R.vML + R.envML; R.costo = R.cF + R.cML; R.bruto = R.total - R.costo; R.resultado = R.bruto - R.cargosML - R.gastos - R.periodicos;
+  return R;
+}
+function renderResultadoNegocio(){
+  const mes = document.getElementById('rn-mes').value, cta = document.getElementById('rn-cta').value; if(!mes){ document.getElementById('rn-body').innerHTML = '<p class="empty-msg">No hay datos cargados.</p>'; return; }
+  const meses = [...document.getElementById('rn-mes').options].map(o => o.value), ant = meses[meses.indexOf(mes) + 1] || null;
+  const A = calcResultadoMes(mes, cta), B = ant ? calcResultadoMes(ant, cta) : null;
+  const pc = (x, t) => t ? (x / t * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %' : '–';
+  const fila = (t, a, b, o = {}) => `<tr style="${o.tot ? 'font-weight:800;border-top:2px solid var(--purple);' : 'border-top:1px solid var(--line);'}${o.res ? 'background:' + (a < 0 ? '#FDEBE7' : '#EEF6F0') + ';' : ''}">
+    <td style="padding:8px 6px;">${t}${o.sub ? `<div class="note" style="text-align:left;margin:0;">${o.sub}</div>` : ''}</td>
+    <td style="padding:8px 6px;text-align:right;white-space:nowrap;color:${o.neg ? '#A6432F' : o.res ? (a < 0 ? '#A6432F' : '#2F7A47') : 'inherit'};">${o.neg ? (Math.round(a) ? '− ' + formatPrice(a) : formatPrice(0)) : formatPrice(a)}</td>
+    <td style="padding:8px 6px;text-align:right;color:#8A8072;">${pc(a, A.total)}</td>
+    ${B ? `<td style="padding:8px 6px;text-align:right;color:#8A8072;white-space:nowrap;">${o.neg && Math.round(b || 0) ? '− ' : ''}${formatPrice(b || 0)}</td>` : ''}</tr>`;
+  const desg = Object.entries(A.desglose).filter(([, v]) => Math.abs(v) >= 1).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}: ${formatPrice(v)}`).join(' · ');
+  const avisos = [
+    !A.hayML ? `No hay datos de Mercado Libre de este mes: abra <a href="#" onclick="event.preventDefault();abrirResultadosML()">Resultados ML</a> con el mes cargado para actualizarlos.` : '',
+    A.revF || A.sinCF ? `Facturas: ${A.revF ? A.revF + ' renglones para revisar' : ''}${A.revF && A.sinCF ? ' y ' : ''}${A.sinCF ? A.sinCF + ' sin costo' : ''} (${formatPrice(A.vtaSinCF)} de ventas sin su costo): el resultado queda más alto hasta corregirlos.` : '',
+    A.sinCML || A.revML ? `Mercado Libre: ${A.sinCML ? A.sinCML + ' ventas sin costo' : ''}${A.sinCML && A.revML ? ' y ' : ''}${A.revML ? A.revML + ' para revisar' : ''}.` : ''
+  ].filter(Boolean);
+  document.getElementById('rn-body').innerHTML = `
+    ${avisos.length ? `<div style="background:#FFF8E6;border:1px solid #EBD9A8;border-radius:12px;padding:8px 12px;margin-bottom:10px;font-size:.85rem;">${avisos.map(a => '⚠️ ' + a).join('<br>')}</div>` : ''}
+    <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.92rem;">
+      <tr style="color:#8A8072;font-size:.72rem;text-transform:uppercase;"><td style="padding:6px;">Concepto</td><td style="padding:6px;text-align:right;">$ (con IVA)</td><td style="padding:6px;text-align:right;">% de lo vendido</td>${B ? `<td style="padding:6px;text-align:right;">Mes anterior</td>` : ''}</tr>
+      ${fila('Ventas facturadas', A.vF, B && B.vF, { sub: `${A.nFact} comprobantes · Tango/TFactura, sin Mercado Libre` })}
+      ${fila('Ventas Mercado Libre', A.vML + A.envML, B && (B.vML + B.envML), { sub: `ventas ${formatPrice(A.vML)} + envíos cobrados ${formatPrice(A.envML)}${cta ? ' · cuenta ' + cta : ''}` })}
+      ${fila('Total vendido', A.total, B && B.total, { tot: true })}
+      ${fila('Costo de mercadería (facturas)', A.cF, B && B.cF, { neg: true })}
+      ${fila('Costo de mercadería (Mercado Libre)', A.cML, B && B.cML, { neg: true })}
+      ${fila('Margen bruto', A.bruto, B && B.bruto, { tot: true })}
+      ${fila('Cargos de Mercado Libre', A.cargosML, B && B.cargosML, { neg: true, sub: desg })}
+      ${A.periodicos || (B && B.periodicos) ? fila('Otros gastos de Mercado Libre (cargados a mano)', A.periodicos, B && B.periodicos, { neg: true }) : ''}
+      ${fila('Gastos comerciales', A.gastos, B && B.gastos, { neg: true, sub: 'sin los marcados como ya cobrados por Mercado Libre' })}
+      ${fila('Resultado del mes', A.resultado, B && B.resultado, { tot: true, res: true })}
+    </table></div>
+    <p class="note" style="text-align:left;margin-top:8px;">Mercado Libre: datos guardados al abrir Resultados ML${rnDatos.mlAct ? ' (última actualización ' + new Date(rnDatos.mlAct).toLocaleString('es-AR') + ')' : ''}. Facturas: costo vigente el día de cada factura.</p>`;
 }
 // ===== Costos de productos: lo que fabrico y reventa en una sola pantalla, separados y con filtro =====
 let cpTab = 'todos', cpMovido = false;
@@ -11292,6 +11367,7 @@ function permisoDeAccion(f){
   if(/setTimeout\(\(\) => document.getElementById\('pia-foto'\)/.test(s)) return 'pedidos';
   if(/abrirPedidoIA|abrirHistorial\(|abrirPendientesEntrega/.test(s)) return 'ventas';
   if(/abrirFaltantes/.test(s)) return 'produccion';
+  if(/abrirResultadoNegocio/.test(s)) return 'gastos';
   if(/abrirDirectorArte/.test(s)) return 'difusion';
   if(/abrirPresupuestos/.test(s)) return 'ventas';
   if(/abrirClientes/.test(s)) return 'clientes';
@@ -19425,7 +19501,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v278';
+const APP_VERSION = '2026-10-02-v279';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
@@ -19483,7 +19559,7 @@ window.addEventListener('load', () => {
     ['abrirFacturas', 'Cargando facturas…'], ['leerFacturasPDF', 'Leyendo facturas…'], ['guardarFactura', 'Guardando la factura…'], ['borrarFacturasSel', 'Borrando facturas…'],
     ['importarLinksWeb', 'Leyendo el archivo de Tienda Nube…'], ['analizarPedidoIA', 'La IA está armando el pedido…'],
     ['generarFlyersNuevoIngreso', 'Generando las piezas…'], ['abrirResultadosML', 'Preparando Resultados ML…'], ['descargarCopia', 'Preparando la copia…'],
-    ['abrirFaltantes', 'Cargando faltantes…'], ['guardarTodoCP', 'Guardando…'], ['usarCostosActualesEnTodo', 'Actualizando el historial…'], ['abrirRevisarHistorial', 'Revisando el historial…'], ['corregirHistorialSel', 'Corrigiendo…'], ['abrirRevisarCostos', 'Cargando…'], ['ccAplicar', 'Actualizando precios…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
+    ['abrirFaltantes', 'Cargando faltantes…'], ['abrirResultadoNegocio', 'Calculando el resultado…'], ['guardarTodoCP', 'Guardando…'], ['usarCostosActualesEnTodo', 'Actualizando el historial…'], ['abrirRevisarHistorial', 'Revisando el historial…'], ['corregirHistorialSel', 'Corrigiendo…'], ['abrirRevisarCostos', 'Cargando…'], ['ccAplicar', 'Actualizando precios…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
   ];
   setTimeout(() => W.forEach(([n, t]) => conProcesando(n, t)), 0);
 });
