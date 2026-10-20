@@ -1597,7 +1597,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v266</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v267</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2590,7 +2590,7 @@ function renderCatalogo(filtro){
         variantesHtml += `
           <div class="variante">
             <div class="variante-fila">
-              <div class="desc" onclick="mostrarFotoSku('${escapeAttr(v.sku)}', ${ci}, ${pi}, this)" ${fotosSku[String(v.sku).toUpperCase()] ? 'style="cursor:pointer;"' : ''}>${descVarianteHtml(v.desc)}<span class="sku">SKU ${v.sku}${fotosSku[String(v.sku).toUpperCase()] ? ' · 📷' : ''}</span>${rolloNota}</div>
+              <div class="desc" style="display:flex;gap:8px;align-items:flex-start;">${miniFotoSku(v.sku, ci, pi)}<div onclick="mostrarFotoSku('${escapeAttr(v.sku)}', ${ci}, ${pi}, this)" ${fotosSku[String(v.sku).toUpperCase()] ? 'style="cursor:pointer;"' : ''}>${descVarianteHtml(v.desc)}<span class="sku">SKU ${v.sku}</span>${rolloNota}</div></div>
               <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioNum) + sufijoPrecioSku(p, v.sku)}</div>
               ${precioNum===null ? '<div></div>' : `
               <div class="qty">
@@ -2642,7 +2642,7 @@ function renderCatalogo(filtro){
   });
 
   document.getElementById('sin-resultados').style.display = totalVisible === 0 ? 'block' : 'none';
-  try{ const q = String(filtro || '').trim().toUpperCase(); if(q && fotosSku[q]) document.querySelectorAll('.variante .desc').forEach(d => { if(d.textContent.includes('SKU ' + q)) d.click(); }); } catch(e){}
+  try{ const q = String(filtro || '').trim().toUpperCase(); if(q && fotosSku[q]) document.querySelectorAll('.variante .desc > div:last-child').forEach(d => { if(d.textContent.includes('SKU ' + q)) d.click(); }); } catch(e){}
 }
 
 function escapeAttr(s){ return String(s).replace(/'/g, "\\'"); }
@@ -15923,6 +15923,34 @@ function cargarProductosEditados(){
   }).catch(e => console.error('Error cargando productos editados:', e));
 }
 
+// ===== Miniatura de las fotos propias de cada medida (y edicion rapida para el duenio) =====
+function miniFotoSku(sku, ci, pi){
+  const S = String(sku).toUpperCase(), f = fotosSku[S], d = typeof esDueno === 'function' && esDueno();
+  if(f && f.length) return `<div style="position:relative;flex:none;"><img src="${f[0]}" alt="" loading="lazy" onclick="event.stopPropagation();abrirGaleriaCatalogo(${ci},${pi},'${escapeAttr(S)}')" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer;">${f.length > 1 ? `<span style="position:absolute;bottom:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;font-size:.6rem;padding:0 4px;border-radius:6px;">📷 ${f.length}</span>` : ''}${d ? `<button type="button" title="Editar fotos de ${S}" onclick="event.stopPropagation();editarFotosSku('${escapeAttr(S)}')" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:.65rem;cursor:pointer;padding:0;">✏️</button>` : ''}</div>`;
+  return d ? `<button type="button" onclick="event.stopPropagation();editarFotosSku('${escapeAttr(S)}')" style="flex:none;width:52px;height:52px;border-radius:8px;border:1.5px dashed #C9BFD6;background:transparent;color:#8A8072;font-size:.7rem;cursor:pointer;line-height:1.1;">+ foto</button>` : '';
+}
+// editor de fotos de un SKU en una ventana (agregar, quitar, ordenar, principal); se guarda al tocar Guardar
+let efsFotos = [], efsSku = '';
+function editarFotosSku(S){
+  efsSku = String(S).toUpperCase(); efsFotos = [...(fotosSku[efsSku] || [])];
+  const t = document.getElementById('pub-titulo'); if(t) t.textContent = '📷 Fotos de ' + efsSku;
+  renderEditarFotosSku(); document.getElementById('pub-modal').style.display = 'block';
+}
+function renderEditarFotosSku(){
+  document.getElementById('pub-cont').innerHTML = `<p class="note" style="text-align:left;margin:0 0 8px;">Fotos solo de esta medida. Si no tiene, se muestran las del producto. La primera es la principal.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">${efsFotos.map((f, i) => `<div style="width:118px;" draggable="true" ondragstart="window.__efsDrag=${i}" ondragover="event.preventDefault()" ondrop="event.preventDefault();efsMover(window.__efsDrag,${i})"><img src="${f}" style="width:118px;height:118px;object-fit:cover;border-radius:8px;border:${i === 0 ? '3px solid var(--gold)' : '1px solid var(--line)'};">
+      <div style="display:flex;justify-content:space-between;margin-top:2px;"><button type="button" class="btn-mini" style="padding:1px 6px;" onclick="efsMover(${i},${i - 1})">◀</button><button type="button" class="btn-mini" style="padding:1px 6px;" onclick="efsMover(${i},0)">⭐</button><button type="button" class="btn-mini" style="padding:1px 6px;" onclick="efsMover(${i},${i + 1})">▶</button><button type="button" class="btn-mini" style="padding:1px 6px;color:#A6432F;" onclick="efsFotos.splice(${i},1);renderEditarFotosSku()">✕</button></div></div>`).join('') || '<span class="note" style="margin:0;">Sin fotos propias.</span>'}</div>
+    <label class="btn-mini" style="display:inline-block;margin-top:10px;cursor:pointer;">➕ Agregar fotos<input type="file" accept="image/*" multiple style="display:none;" onchange="efsAgregar(this)"></label>
+    <div style="display:flex;gap:8px;margin-top:12px;"><button class="btn btn-gold" style="flex:1;" onclick="guardarFotosSkuModal()">💾 Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`;
+}
+function efsMover(de, a){ if(a < 0 || a >= efsFotos.length || de === a) return; const [f] = efsFotos.splice(de, 1); efsFotos.splice(a, 0, f); renderEditarFotosSku(); }
+async function efsAgregar(inp){ for(const f of [...(inp.files || [])]){ try{ efsFotos.push(await comprimirImagenAFotoBase64(f)); } catch(e){} } renderEditarFotosSku(); }
+async function guardarFotosSkuModal(){
+  try{ if(efsFotos.length){ await db.collection('fotos_sku').doc(efsSku).set({ imagenesBase64: efsFotos, actualizado: new Date().toISOString() }); fotosSku[efsSku] = [...efsFotos]; }
+    else { await db.collection('fotos_sku').doc(efsSku).delete(); delete fotosSku[efsSku]; } }
+  catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  cerrarPublicar(); try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+}
 function mostrarFotoSku(sku, ci, pi, el){
   const card = el && el.closest('.producto'); if(!card) return; const img = card.querySelector('img.producto-img'); if(!img) return;
   const p = CATALOGO[ci].productos[pi], S = String(sku).toUpperCase(), propias = fotosSku[S];
@@ -18963,7 +18991,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v266';
+const APP_VERSION = '2026-10-02-v267';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
@@ -19021,7 +19049,7 @@ window.addEventListener('load', () => {
     ['abrirFacturas', 'Cargando facturas…'], ['leerFacturasPDF', 'Leyendo facturas…'], ['guardarFactura', 'Guardando la factura…'], ['borrarFacturasSel', 'Borrando facturas…'],
     ['importarLinksWeb', 'Leyendo el archivo de Tienda Nube…'], ['analizarPedidoIA', 'La IA está armando el pedido…'],
     ['generarFlyersNuevoIngreso', 'Generando las piezas…'], ['abrirResultadosML', 'Preparando Resultados ML…'], ['descargarCopia', 'Preparando la copia…'],
-    ['abrirFaltantes', 'Cargando faltantes…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
+    ['abrirFaltantes', 'Cargando faltantes…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
   ];
   setTimeout(() => W.forEach(([n, t]) => conProcesando(n, t)), 0);
 });
