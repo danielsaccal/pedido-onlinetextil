@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v276</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v277</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -10922,7 +10922,8 @@ async function leerFacturasPDF(inp){
   const box = document.getElementById('fc-nuevas'); box.innerHTML = '<p class="empty-msg">Leyendo facturas…</p>';
   facturasNuevas = [];
   for(const f of files){
-    try{ const fa = parsearFactura(await lineasPDF(f), f.name); fa.yaEsta = (facturas || []).some(x => x.numero === fa.numero); facturasNuevas.push(fa); }
+    try{ const fa = parsearFactura(await lineasPDF(f), f.name); const k = claveComprobante(fa);
+      fa.yaEsta = (facturas || []).some(x => claveComprobante(x) === k); fa.repetidaEnLote = facturasNuevas.some(x => !x.error && claveComprobante(x) === k); facturasNuevas.push(fa); }
     catch(e){ facturasNuevas.push({ error: e.message, archivo: f.name, items: [] }); }
   }
   renderFacturasNuevas();
@@ -10965,7 +10966,10 @@ function renderFacturasNuevas(){
       ${fa.esNC ? `<label style="display:flex;gap:6px;align-items:center;font-size:.85rem;background:#FFF4D6;border-radius:10px;padding:6px 10px;margin:4px 0;"><input type="checkbox" ${fa.devolvieron !== false ? 'checked' : ''} onchange="facturasNuevas[${i}].devolvieron=this.checked;renderFacturasNuevas();"> Devolvieron la mercadería (si no, es solo un descuento: resta la venta pero no el costo)</label>` : ''}
       ${fa.hojas ? `<div class="note" style="text-align:left;margin:2px 0 6px;">📄 ${fa.hojas.total} ${fa.hojas.total === 1 ? 'hoja' : 'hojas'} en el PDF · leí ${fa.hojas.originales} ${fa.hojas.originales === 1 ? 'hoja original' : 'hojas originales'}${fa.hojas.total > fa.hojas.originales ? ' (el resto son duplicados)' : ''} · ${fa.items.length} renglones</div>` : ''}
       ${fa.items.length ? tablaFactura(fa, true, i) : '<p class="note">No encontré renglones en esta factura.</p>'}
-      ${fa.yaEsta ? `<p class="note" style="color:#A6432F;text-align:left;">Esta factura ya está guardada. <a href="#" onclick="event.preventDefault();borrarFactura('${escapeAttr(String(fa.numero).replace(/\//g, '-'))}')">🗑️ Quitarla de la app</a></p>` : (fa.items.length && fa.controlOk !== false ? `<button class="btn btn-gold" style="margin-top:8px;" onclick="guardarFactura(${i})">💾 Guardar esta factura</button>` : '')}
+      ${fa.repetidaEnLote ? `<div style="background:#FDEBE7;color:#A6432F;border-radius:10px;padding:8px 10px;margin-top:8px;font-size:.88rem;">⚠️ Este comprobante (mismo punto de venta y número) aparece dos veces en los archivos que subió. No se guarda dos veces.</div>`
+        : fa.yaEsta ? `<div style="background:#FDEBE7;color:#A6432F;border-radius:10px;padding:8px 10px;margin-top:8px;font-size:.88rem;">⚠️ Ya hay un comprobante guardado con el <b>mismo punto de venta y número</b> (${escaparHtml(fa.tipo || '')} ${escaparHtml(fa.numero)}). No se va a guardar de nuevo.
+            ${fa.items.length && fa.controlOk !== false ? `<div style="margin-top:6px;"><button type="button" class="btn-mini" onclick="guardarFactura(${i}, true)">🔁 Reemplazar la guardada por esta</button></div>` : ''}</div>`
+        : (fa.items.length && fa.controlOk !== false ? `<button class="btn btn-gold" style="margin-top:8px;" onclick="guardarFactura(${i})">💾 Guardar esta factura</button>` : '')}
     </div>`).join('');
 }
 async function equivFactura(cod, v){
@@ -10974,11 +10978,23 @@ async function equivFactura(cod, v){
   try{ await db.collection('config').doc('fact_equivalencias').set({ m: fcEquiv }); } catch(e){ alert('No se pudo guardar: ' + e.message); }
   renderFacturasNuevas(); renderFacturas();
 }
-async function guardarFactura(i){
+// mismo comprobante = mismo tipo (factura o nota de credito), letra, punto de venta y numero
+function claveComprobante(f){ const m = String(f.numero || '').match(/(\d+)\D+(\d+)/); const pv = m ? +m[1] : 0, nro = m ? +m[2] : +String(f.numero || '').replace(/\D/g, '') || 0;
+  return `${f.esNC ? 'NC' : 'FC'}-${String(f.tipo || '').toUpperCase()}-${pv}-${nro}`; }
+async function guardarFactura(i, reemplazar){
   const fa = facturasNuevas[i]; if(!fa) return;
+  const k = claveComprobante(fa), previas = (facturas || []).filter(x => claveComprobante(x) === k);
+  if(fa.repetidaEnLote && !reemplazar){ alert('Este mismo comprobante aparece dos veces en los archivos que subió. Guarde solo uno.'); return; }
+  if(previas.length && !reemplazar){ alert(`Ya hay un comprobante guardado con el mismo punto de venta y número (${fa.tipo || ''} ${fa.numero}). No se guardó. Si quiere reemplazarlo, use "Reemplazar la guardada".`); return; }
+  if(previas.length && reemplazar){
+    if(!confirm(`¿Reemplazar el comprobante ${fa.tipo || ''} ${fa.numero} ya guardado (${previas[0].fecha || ''}${previas[0].cliente ? ' · ' + previas[0].cliente : ''}) por este? El anterior se borra.`)) return;
+    try{ for(const x of previas){ await db.collection('ventas_facturadas').doc(x._id || String(x.numero).replace(/\//g, '-')).delete(); } } catch(e){ alert('No se pudo reemplazar: ' + e.message); return; }
+    facturas = (facturas || []).filter(x => claveComprobante(x) !== k);
+  }
   const items = fa.items.map(it => { const c = costoItemFactura(it, fa); return { ...it, sku: skuDeFactura(it.codigo), costo: c, gan: c != null ? it.neto * signoFact(fa) - c : null }; });
   const doc = { confirmados: fa.confirmados || [], esNC: !!fa.esNC, devolvieron: fa.devolvieron !== false, numero: fa.numero, tipo: fa.tipo, fecha: fa.fecha, cliente: fa.cliente, total: fa.total, items, neto: items.reduce((a, x) => a + x.neto, 0), costo: items.reduce((a, x) => a + (x.costo || 0), 0), archivo: fa.archivo, guardado: new Date().toISOString() };
-  try{ await db.collection('ventas_facturadas').doc(String(fa.numero).replace(/\//g, '-') || undefined).set(doc); fa.yaEsta = true; (facturas = facturas || []).push(doc); renderFacturasNuevas(); renderFacturas(); }
+  const idDoc = (String(fa.numero).replace(/\//g, '-') || String(Date.now())) + (fa.esNC ? '-NC' : '');
+  try{ await db.collection('ventas_facturadas').doc(idDoc).set(doc); fa.yaEsta = true; fa.repetidaEnLote = false; (facturas = facturas || []).push({ ...doc, _id: idDoc }); renderFacturasNuevas(); renderFacturas(); }
   catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 function actualizarSelFact(){
@@ -10993,13 +11009,13 @@ async function borrarFacturasSel(){
   catch(e){ alert('No se pudieron borrar: ' + e.message); return; }
   const s = new Set(ids);
   facturas = facturas.filter(f => !s.has(f._id || String(f.numero).replace(/\//g, '-')));
-  facturasNuevas.forEach(fa => { if(s.has(String(fa.numero).replace(/\//g, '-'))) fa.yaEsta = false; });
+  facturasNuevas.forEach(fa => { if(!fa.error) fa.yaEsta = (facturas || []).some(x => claveComprobante(x) === claveComprobante(fa)); });
   document.getElementById('fc-todas').checked = false; renderFacturasNuevas(); renderFacturas(); actualizarSelFact();
 }
 async function borrarFactura(id){ if(!confirm('¿Quitar esta factura de la app? (en TFactura no se toca)')) return;
   try{ await db.collection('ventas_facturadas').doc(id).delete(); } catch(e){ alert('No se pudo borrar: ' + e.message); return; }
   facturas = facturas.filter(f => (f._id || String(f.numero).replace(/\//g, '-')) !== id);
-  facturasNuevas.forEach(fa => { if(String(fa.numero).replace(/\//g, '-') === id) fa.yaEsta = false; });
+  facturasNuevas.forEach(fa => { if(!fa.error) fa.yaEsta = (facturas || []).some(x => claveComprobante(x) === claveComprobante(fa)); });
   renderFacturasNuevas(); renderFacturas(); }
 function renderFacturas(){
   const mes = document.getElementById('fc-mes').value;
@@ -19388,7 +19404,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v276';
+const APP_VERSION = '2026-10-02-v277';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
