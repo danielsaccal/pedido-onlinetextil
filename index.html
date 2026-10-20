@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v281</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v282</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2211,6 +2211,7 @@ a.grilla-celda{display:block;}
           <div class="field" style="margin:0;grid-column:span 2;"><label>A quién le pagué</label><input id="gs-quien" list="gs-quienes" placeholder="Ej: Transporte Rápido"></div>
           <div class="field" style="margin:0;grid-column:1/-1;"><label>Detalle (opcional)</label><input id="gs-nota" placeholder="Ej: envío a Corrientes, factura 0001-2345"></div>
           <div class="field" style="margin:0;grid-column:1/-1;"><label>📎 Comprobante (foto o PDF, opcional)</label><input type="file" id="gs-comp" accept="image/*,application/pdf"></div>
+          <div class="field" style="grid-column:1/-1;margin:0;"><label>Tipo de gasto</label><select id="gs-tipo"><option value="">— elegir —</option><option value="fijo">Fijo (no depende de la venta: sueldos, alquiler, servicios)</option><option value="variable">Variable (sube o baja con la venta: fletes, comisiones, embalaje)</option></select></div>
           <label style="grid-column:1/-1;display:flex;gap:8px;align-items:flex-start;font-size:.85rem;background:#EEE8F7;border-radius:10px;padding:8px 10px;"><input type="checkbox" id="gs-enml" style="margin-top:3px;"> <span><b>Ya está descontado en Resultados ML</b> (ej: pago a cadetes Flex). Se registra igual, pero no se vuelve a restar en los totales para no contarlo dos veces.</span></label>
         </div>
         <datalist id="gs-conceptos"></datalist><datalist id="gs-medios"></datalist><datalist id="gs-quienes"></datalist>
@@ -7474,9 +7475,13 @@ function calcResultadoMes(mes, cta){
   Object.values(rnDatos.ml).forEach(x => { if(x.periodo !== mes || (cta && x.cuenta !== cta)) return; R.hayML = true;
     R.vML += x.vendido; R.envML += x.envios; R.cML += x.costo; R.cargosML += x.cargosML; R.sinCML += x.sinCosto; R.revML += x.revisar;
     Object.entries(x.desglose || {}).forEach(([k, v]) => R.desglose[k] = (R.desglose[k] || 0) + v); });
-  rnDatos.gastos.forEach(g => { if(String(g.fecha || '').slice(0, 7) === mes && !g.enML) R.gastos += +g.monto || 0; });
+  R.gFijos = 0; R.gVar = 0; R.gSinTipo = 0;
+  rnDatos.gastos.forEach(g => { if(String(g.fecha || '').slice(0, 7) !== mes || g.enML) return; const m = +g.monto || 0; R.gastos += m;
+    if(g.tipo === 'variable') R.gVar += m; else { R.gFijos += m; if(g.tipo !== 'fijo') R.gSinTipo++; } }); // sin tipo: se toma como fijo
   rnDatos.periodicos.forEach(g => { if(g.mes === mes && (!cta || g.cuenta === cta)) R.periodicos += +g.monto || 0; });
-  R.total = R.vF + R.vML + R.envML; R.costo = R.cF + R.cML; R.bruto = R.total - R.costo; R.resultado = R.bruto - R.cargosML - R.gastos - R.periodicos;
+  R.total = R.vF + R.vML + R.envML; R.costo = R.cF + R.cML; R.bruto = R.total - R.costo;
+  R.contrib = R.bruto - R.cargosML - R.periodicos - R.gVar; R.resultado = R.contrib - R.gFijos;
+  R.equilibrio = R.total > 0 && R.contrib > 0 ? R.gFijos / (R.contrib / R.total) : null;
   return R;
 }
 function renderResultadoNegocio(){
@@ -7493,6 +7498,7 @@ function renderResultadoNegocio(){
   const avisos = [
     !A.hayML ? `No hay datos de Mercado Libre de este mes: abra <a href="#" onclick="event.preventDefault();abrirResultadosML()">Resultados ML</a> con el mes cargado para actualizarlos.` : '',
     A.revF || A.sinCF ? `Facturas: ${A.revF ? A.revF + ' renglones para revisar' : ''}${A.revF && A.sinCF ? ' y ' : ''}${A.sinCF ? A.sinCF + ' sin costo' : ''} (${formatPrice(A.vtaSinCF)} de ventas sin su costo): el resultado queda más alto hasta corregirlos.` : '',
+    A.gSinTipo ? `Gastos: ${A.gSinTipo} sin tipo (fijo o variable); se toman como fijos. Márquelos en <a href="#" onclick="event.preventDefault();abrirGastos()">Gastos comerciales</a>.` : '',
     A.sinCML || A.revML ? `Mercado Libre: ${A.sinCML ? A.sinCML + ' ventas sin costo' : ''}${A.sinCML && A.revML ? ' y ' : ''}${A.revML ? A.revML + ' para revisar' : ''}.` : ''
   ].filter(Boolean);
   document.getElementById('rn-body').innerHTML = `
@@ -7507,11 +7513,16 @@ function renderResultadoNegocio(){
       ${fila('Margen bruto', A.bruto, B && B.bruto, { tot: true })}
       ${fila('Cargos de Mercado Libre', A.cargosML, B && B.cargosML, { neg: true, sub: desg })}
       ${A.periodicos || (B && B.periodicos) ? fila('Otros gastos de Mercado Libre (cargados a mano)', A.periodicos, B && B.periodicos, { neg: true }) : ''}
-      ${fila('Gastos comerciales', A.gastos, B && B.gastos, { neg: true, sub: 'sin los marcados como ya cobrados por Mercado Libre' })}
+      ${fila('Gastos variables', A.gVar, B && B.gVar, { neg: true, sub: 'fletes, comisiones, embalaje… (suben o bajan con la venta)' })}
+      ${fila('Contribución', A.contrib, B && B.contrib, { tot: true, sub: 'lo que queda para pagar los gastos fijos' })}
+      ${fila('Gastos fijos', A.gFijos, B && B.gFijos, { neg: true, sub: 'sueldos, alquiler, servicios…' + (A.gSinTipo ? ` · incluye ${A.gSinTipo} gasto(s) sin tipo` : '') })}
       ${fila('Resultado del mes', A.resultado, B && B.resultado, { tot: true, res: true })}
       <tr style="border-top:1px solid var(--line);"><td style="padding:8px 6px;font-weight:700;">Resultado sobre el costo de mercadería<div class="note" style="text-align:left;margin:0;">resultado ÷ costo de mercadería (si el costo fue $ 1.000 y ganó $ 100 = 10 %)</div></td>
         <td style="padding:8px 6px;text-align:right;font-weight:800;color:${A.resultado < 0 ? '#A6432F' : '#2F7A47'};">${A.costo > 0 ? (A.resultado / A.costo * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %' : '–'}</td><td></td>
         ${B ? `<td style="padding:8px 6px;text-align:right;color:#8A8072;">${B.costo > 0 ? (B.resultado / B.costo * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' %' : '–'}</td>` : ''}</tr>
+      <tr style="border-top:1px solid var(--line);"><td style="padding:8px 6px;font-weight:700;">Punto de equilibrio<div class="note" style="text-align:left;margin:0;">venta mensual necesaria para no perder: gastos fijos ÷ % de contribución</div></td>
+        <td style="padding:8px 6px;text-align:right;font-weight:800;">${A.equilibrio != null ? formatPrice(A.equilibrio) : '–'}</td><td style="padding:8px 6px;text-align:right;color:#8A8072;">${A.equilibrio != null && A.total > 0 ? (A.total >= A.equilibrio ? 'vendió ' + Math.round((A.total / A.equilibrio - 1) * 100) + ' % más' : 'faltó ' + Math.round((1 - A.total / A.equilibrio) * 100) + ' %') : ''}</td>
+        ${B ? `<td style="padding:8px 6px;text-align:right;color:#8A8072;">${B.equilibrio != null ? formatPrice(B.equilibrio) : '–'}</td>` : ''}</tr>
     </table></div>
     <p class="note" style="text-align:left;margin-top:8px;">Mercado Libre: datos guardados al abrir Resultados ML${rnDatos.mlAct ? ' (última actualización ' + new Date(rnDatos.mlAct).toLocaleString('es-AR') + ')' : ''}. Facturas: costo vigente el día de cada factura.</p>`;
 }
@@ -10772,10 +10783,29 @@ function listasGastos(){
   const fc = document.getElementById('gs-fconc'), v = fc.value;
   fc.innerHTML = '<option value="">Todos los conceptos</option>' + u('concepto', []).map(x => `<option ${x === v ? 'selected' : ''}>${escaparHtml(x)}</option>`).join('');
 }
-document.addEventListener('input', e => { if(e.target && e.target.id === 'gs-concepto'){ const c = document.getElementById('gs-enml'); if(c && /cadete|flex/i.test(e.target.value)) c.checked = true; } });
+document.addEventListener('input', e => { if(e.target && e.target.id === 'gs-concepto'){ const c = document.getElementById('gs-enml'); if(c && /cadete|flex/i.test(e.target.value)) c.checked = true;
+  const t = document.getElementById('gs-tipo'); if(t && !t.dataset.manual){ const sug = tipoGastoSugerido(e.target.value); if(sug) t.value = sug; } } });
+document.addEventListener('change', e => { if(e.target && e.target.id === 'gs-tipo') e.target.dataset.manual = '1'; });
+// tipo de un concepto: el que se uso la ultima vez; si es nuevo, por la palabra
+function tipoGastoSugerido(concepto){
+  const k = normBusqueda(concepto).trim(); if(!k) return '';
+  const prev = (gastos || []).filter(g => g.tipo && normBusqueda(g.concepto || '').trim() === k).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))[0];
+  if(prev) return prev.tipo;
+  if(/flete|envio|comision|embalaje|bolsa|etiqueta|publicidad|cadete|packaging|caja/.test(k)) return 'variable';
+  if(/sueldo|alquiler|luz|gas|agua|internet|telefono|contador|abono|seguro|cochera|municipal|expensa|sistema|software/.test(k)) return 'fijo';
+  return '';
+}
+const gsSel = new Set();
+async function marcarTipoGastos(tipo){
+  const ids = [...gsSel]; if(!ids.length) return;
+  if(!confirm(`¿Marcar ${ids.length} gasto(s) como ${tipo}?`)) return;
+  try{ const b = db.batch(); ids.forEach(id => b.set(db.collection('gastos').doc(id), { tipo }, { merge: true })); await b.commit(); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  gastos.forEach(g => { if(gsSel.has(g._id)) g.tipo = tipo; }); gsSel.clear(); renderGastos();
+}
 function limpiarGasto(){
+  { const t = document.getElementById('gs-tipo'); if(t) delete t.dataset.manual; }
   gastoEditando = null;
-  { const c = document.getElementById('gs-enml'); if(c) c.checked = false; }
+  { const c = document.getElementById('gs-enml'); if(c) c.checked = false; const t = document.getElementById('gs-tipo'); if(t) t.value = ''; }
   document.getElementById('gs-fecha').value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   ['gs-monto', 'gs-concepto', 'gs-medio', 'gs-quien', 'gs-nota', 'gs-comp'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('gs-form-tit').textContent = '➕ Cargar un gasto';
@@ -10789,8 +10819,9 @@ function leerComprobante(file){
   return new Promise((res, rej) => { if(file.size > 700000){ rej(new Error('El PDF es muy grande (máximo 700 KB). Sacale una foto o comprimilo.')); return; } const r = new FileReader(); r.onload = () => res({ tipo: 'pdf', data: r.result, nombre: file.name }); r.onerror = rej; r.readAsDataURL(file); });
 }
 async function guardarGasto(){
-  const g = { fecha: document.getElementById('gs-fecha').value, monto: numAr(document.getElementById('gs-monto').value), concepto: document.getElementById('gs-concepto').value.trim(), medio: document.getElementById('gs-medio').value.trim(), quien: document.getElementById('gs-quien').value.trim(), nota: document.getElementById('gs-nota').value.trim(), enML: document.getElementById('gs-enml').checked };
+  const g = { fecha: document.getElementById('gs-fecha').value, monto: numAr(document.getElementById('gs-monto').value), concepto: document.getElementById('gs-concepto').value.trim(), medio: document.getElementById('gs-medio').value.trim(), quien: document.getElementById('gs-quien').value.trim(), nota: document.getElementById('gs-nota').value.trim(), enML: document.getElementById('gs-enml').checked, tipo: document.getElementById('gs-tipo').value };
   if(!g.fecha || !(g.monto > 0) || !g.concepto){ alert('Completá fecha, monto y concepto.'); return; }
+  if(!g.tipo && !g.enML){ alert('Elegí el tipo de gasto: fijo o variable.'); return; }
   const btn = document.getElementById('gs-btn'); btn.disabled = true; btn.textContent = 'Guardando…';
   try{
     const comp = await leerComprobante(document.getElementById('gs-comp').files[0]);
@@ -10806,7 +10837,7 @@ function editarGasto(id){
   const g = gastos.find(x => x._id === id); if(!g) return;
   gastoEditando = id;
   document.getElementById('gs-fecha').value = g.fecha; document.getElementById('gs-monto').value = String(g.monto).replace('.', ',');
-  document.getElementById('gs-concepto').value = g.concepto || ''; document.getElementById('gs-medio').value = g.medio || ''; document.getElementById('gs-quien').value = g.quien || ''; document.getElementById('gs-nota').value = g.nota || ''; document.getElementById('gs-enml').checked = !!g.enML;
+  document.getElementById('gs-concepto').value = g.concepto || ''; document.getElementById('gs-medio').value = g.medio || ''; document.getElementById('gs-quien').value = g.quien || ''; document.getElementById('gs-nota').value = g.nota || ''; document.getElementById('gs-enml').checked = !!g.enML; document.getElementById('gs-tipo').value = g.tipo || '';
   document.getElementById('gs-form').open = true; document.getElementById('gs-form-tit').textContent = '✏️ Editar gasto'; document.getElementById('gs-btn').textContent = '💾 Guardar cambios'; document.getElementById('gs-cancelar').style.display = 'inline-block';
   document.getElementById('gs-form').scrollIntoView({ behavior: 'smooth' });
 }
@@ -10842,10 +10873,14 @@ function renderGastos(){
       <div style="background:#3D2B4E;color:#fff;border-radius:14px;padding:12px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline;"><b>Total de egresos</b><span><b style="font-size:1.3rem;">${formatPrice(tot + totME)}</b><small style="display:block;opacity:.8;font-size:.75rem;text-align:right;">gastos ${formatPrice(tot)} + Mercado Libre ${formatPrice(totME)}</small></span></div>` :
       (mes ? '<p class="note" style="text-align:left;">No hay reportes de Mercado Libre cargados para este mes (se cargan en Resultados ML).</p>' : ''); }
   { const t = document.getElementById('gs-det-tit'); if(t) t.textContent = `📋 Ver el detalle de los gastos (${L.length})`; }
-  document.getElementById('gs-lista').innerHTML = L.length ? L.map(g => `<div style="display:grid;grid-template-columns:86px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:12px;margin-bottom:6px;background:#fff;">
+  window.__gsVis = L.map(g => g._id);
+  document.getElementById('gs-lista').innerHTML = (L.length ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;"><label style="display:flex;gap:6px;align-items:center;font-size:.85rem;"><input type="checkbox" onchange="(window.__gsVis||[]).forEach(id => gsSel[this.checked ? 'add' : 'delete'](id));renderGastos()"> Seleccionar todos</label>
+      ${gsSel.size ? `<b style="font-size:.85rem;">${gsSel.size} seleccionados:</b><button type="button" class="btn-mini" onclick="marcarTipoGastos('fijo')">Marcar como fijo</button><button type="button" class="btn-mini" onclick="marcarTipoGastos('variable')">Marcar como variable</button><a href="#" onclick="event.preventDefault();gsSel.clear();renderGastos();">quitar selección</a>` : ''}
+      ${L.some(g => !g.tipo && !g.enML) ? `<span style="font-size:.8rem;color:#A6432F;margin-left:auto;">⚠️ ${L.filter(g => !g.tipo && !g.enML).length} sin tipo</span>` : ''}</div>` : '') + (L.length ? L.map(g => `<div style="display:grid;grid-template-columns:22px 86px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:12px;margin-bottom:6px;background:#fff;">
+      <input type="checkbox" ${gsSel.has(g._id) ? 'checked' : ''} onchange="gsSel[this.checked ? 'add' : 'delete']('${g._id}');renderGastos()">
       <span style="font-size:.82rem;color:#6B6258;">${new Date(g.fecha + 'T12:00:00').toLocaleDateString('es-AR')}</span>
-      <div><b>${escaparHtml(g.concepto || '')}</b> <span class="meta">· ${escaparHtml(g.quien || '')}</span>${g.enML ? ' <span style="font-size:.7rem;background:#EEE8F7;color:#5b2a86;border-radius:999px;padding:1px 7px;">ya en Resultados ML</span>' : ''}<div style="font-size:.78rem;color:#8A8072;">${escaparHtml(g.medio || '')}${g.nota ? ' · ' + escaparHtml(g.nota) : ''}</div></div>
-      <div style="text-align:right;white-space:nowrap;"><b>${formatPrice(+g.monto || 0)}</b><div style="display:flex;gap:4px;justify-content:flex-end;margin-top:4px;">${g.comprobante ? `<button type="button" class="btn-mini" onclick="verComprobante('${g._id}')" title="Ver comprobante">📎</button>` : ''}<button type="button" class="btn-mini" onclick="editarGasto('${g._id}')">✏️</button><button type="button" class="btn-mini" onclick="borrarGasto('${g._id}')">🗑️</button></div></div></div>`).join('') : '<p class="empty-msg">No hay gastos con este filtro.</p>';
+      <div><b>${escaparHtml(g.concepto || '')}</b> <span class="meta">· ${escaparHtml(g.quien || '')}</span>${g.enML ? ' <span style="font-size:.7rem;background:#EEE8F7;color:#5b2a86;border-radius:999px;padding:1px 7px;">ya en Resultados ML</span>' : g.tipo ? ` <span style="font-size:.7rem;background:${g.tipo === 'fijo' ? '#EAF1FA' : '#FFF4D6'};color:${g.tipo === 'fijo' ? '#2E5A8C' : '#8A6417'};border-radius:999px;padding:1px 7px;">${g.tipo}</span>` : ' <span style="font-size:.7rem;background:#FDEBE7;color:#A6432F;border-radius:999px;padding:1px 7px;">sin tipo</span>'}<div style="font-size:.78rem;color:#8A8072;">${escaparHtml(g.medio || '')}${g.nota ? ' · ' + escaparHtml(g.nota) : ''}</div></div>
+      <div style="text-align:right;white-space:nowrap;"><b>${formatPrice(+g.monto || 0)}</b><div style="display:flex;gap:4px;justify-content:flex-end;margin-top:4px;">${g.comprobante ? `<button type="button" class="btn-mini" onclick="verComprobante('${g._id}')" title="Ver comprobante">📎</button>` : ''}<button type="button" class="btn-mini" onclick="editarGasto('${g._id}')">✏️</button><button type="button" class="btn-mini" onclick="borrarGasto('${g._id}')">🗑️</button></div></div></div>`).join('') : '<p class="empty-msg">No hay gastos con este filtro.</p>');
 }
 
 // ===== Ventas facturadas (PDF de TFactura): renglones, costo y ganancia =====
@@ -19534,7 +19569,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v281';
+const APP_VERSION = '2026-10-02-v282';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
