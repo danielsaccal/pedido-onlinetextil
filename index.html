@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v279</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v280</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2233,7 +2233,7 @@ a.grilla-celda{display:block;}
       <p class="note" style="text-align:left;">Subí las facturas de TFactura (PDF). La app lee cada renglón, lo cruza con el costo de cada producto <b>vigente el día de la factura</b> y te muestra la ganancia. El precio de cada producto ya tiene aplicados los <b>descuentos y bonificaciones</b> de la factura.</p>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;"><b style="font-size:.88rem;">Calcular la ganancia:</b>
         <select id="fc-modo" onchange="cambiarModoIvaFact(this.value)" style="padding:7px;border:1px solid var(--line);border-radius:10px;"><option value="con">con IVA (los costos están con IVA)</option><option value="sin">sin IVA</option></select></div>
-      <label class="btn btn-gold" style="display:block;text-align:center;cursor:pointer;margin:10px 0;">📄 Subir facturas (PDF)<input type="file" id="fc-file" accept="application/pdf" multiple style="display:none;" onchange="leerFacturasPDF(this)"></label>
+      <label class="btn btn-gold" style="display:block;text-align:center;cursor:pointer;margin:10px 0;">📄 Subir facturas (PDF o Excel de TFactura)<input type="file" id="fc-file" accept="application/pdf,.pdf,.xlsx,.xls,.csv" multiple style="display:none;" onchange="leerFacturasPDF(this)"></label>
       <div id="fc-nuevas"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 8px;align-items:center;"><b style="flex:1;color:var(--purple);">Facturas guardadas</b><select id="fc-mes" onchange="renderFacturas()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"></select></div>
       <div id="fc-resumen"></div>
@@ -11017,9 +11017,12 @@ async function leerFacturasPDF(inp){
   const files = [...inp.files]; inp.value = ''; if(!files.length) return;
   const box = document.getElementById('fc-nuevas'); box.innerHTML = '<p class="empty-msg">Leyendo facturas…</p>';
   facturasNuevas = [];
+  const marcar = fa => { const k = claveComprobante(fa); fa.yaEsta = (facturas || []).some(x => claveComprobante(x) === k); fa.repetidaEnLote = facturasNuevas.some(x => !x.error && claveComprobante(x) === k); facturasNuevas.push(fa); };
   for(const f of files){
-    try{ const fa = parsearFactura(await lineasPDF(f), f.name); const k = claveComprobante(fa);
-      fa.yaEsta = (facturas || []).some(x => claveComprobante(x) === k); fa.repetidaEnLote = facturasNuevas.some(x => !x.error && claveComprobante(x) === k); facturasNuevas.push(fa); }
+    try{
+      if(/\.(xlsx|xls|csv)$/i.test(f.name)) (await facturasDesdeExcel(f)).forEach(marcar); // informe de TFactura renglon por renglon
+      else marcar(parsearFactura(await lineasPDF(f), f.name));
+    }
     catch(e){ facturasNuevas.push({ error: e.message, archivo: f.name, items: [] }); }
   }
   renderFacturasNuevas();
@@ -11073,6 +11076,33 @@ async function equivFactura(cod, v){
   fcEquiv[String(cod).toUpperCase()] = v;
   try{ await db.collection('config').doc('fact_equivalencias').set({ m: fcEquiv }); } catch(e){ alert('No se pudo guardar: ' + e.message); }
   renderFacturasNuevas(); renderFacturas();
+}
+// ===== Facturas desde el Excel de TFactura (un renglon por producto): cada comprobante pasa a ser una factura =====
+async function facturasDesdeExcel(file){
+  const buf = await file.arrayBuffer(), wb = XLSX.read(buf, { type: 'array', cellDates: true }), ws = wb.Sheets[wb.SheetNames[0]];
+  const filas = XLSX.utils.sheet_to_json(ws, { defval: '' });
+  if(!filas.length) throw new Error('El archivo no tiene renglones.');
+  const col = (r, ...ns) => { for(const n of ns){ const k = Object.keys(r).find(x => normBusqueda(x).replace(/\s/g, '') === normBusqueda(n).replace(/\s/g, '')); if(k != null && r[k] !== '') return r[k]; } return ''; };
+  if(!col(filas[0], 'NumeroComprobante', 'NumeroFactura')) throw new Error('No reconozco el formato: falta la columna NumeroComprobante.');
+  const n = v => { if(typeof v === 'number') return v; const s = String(v).trim(); return /,\d{1,2}$/.test(s) ? numAr(s) : parseFloat(s.replace(/,/g, '')) || 0; };
+  const fechaTxt = v => { if(v instanceof Date) return [v.getDate(), v.getMonth() + 1, v.getFullYear()].map((x, i) => String(x).padStart(i < 2 ? 2 : 4, '0')).join('/'); const m = String(v).match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/); if(m) return `${m[1].padStart(2, '0')}/${m[2].padStart(2, '0')}/${m[3]}`; const m2 = String(v).match(/(\d{4})-(\d{2})-(\d{2})/); return m2 ? `${m2[3]}/${m2[2]}/${m2[1]}` : String(v); };
+  const G = new Map();
+  filas.forEach(r => {
+    if(!col(r, 'NumeroComprobante') && !col(r, 'NumeroFactura')) return; // filas vacias o de totales
+    if(!col(r, 'SKU') && !col(r, 'Producto') && !n(col(r, 'PrecioTotalRenglon'))) return;
+    const nro = String(col(r, 'NumeroComprobante') || (String(col(r, 'PuntoVenta')).padStart(5, '0') + '-' + String(col(r, 'NumeroFactura')).padStart(8, '0'))).trim(); if(!nro) return;
+    const tipoC = String(col(r, 'TipoComprobante')), esNC = /cr[eé]dito/i.test(tipoC);
+    if(!G.has(nro)) G.set(nro, { numero: nro, tipo: String(col(r, 'Letra') || '').toUpperCase(), fecha: fechaTxt(col(r, 'Fecha')), cliente: String(col(r, 'ClienteProveedor', 'Cliente')).trim(), total: Math.abs(n(col(r, 'TotalComprobante'))) || 0, items: [], archivo: file.name, esNC, devolvieron: true, controlOk: true, malos: 0, deExcel: true });
+    let cod = String(col(r, 'SKU')).trim().toUpperCase(), cant = Math.abs(n(col(r, 'Cantidad')));
+    const mx = cod.match(/^(.+?)\s*X\s*(\d+)$/); if(mx){ cod = mx[1].trim(); cant = cant * +mx[2]; } // "GR140C x 3" = 3 unidades de GR140C
+    const imp = Math.abs(n(col(r, 'PrecioTotalRenglon')));
+    const fa0 = G.get(nro), sinIva = fa0.tipo === 'B' || fa0.tipo === 'C' ? imp / 1.21 : imp; // en la factura B el renglon trae el IVA incluido; la app guarda el neto
+    fa0.items.push({ codigo: cod, desc: String(col(r, 'Producto')).trim(), cant, neto: Math.round(sinIva * 100) / 100, importe: Math.round(sinIva * 100) / 100, ok: true });
+  });
+  const L = [...G.values()];
+  L.forEach(fa => { const s = fa.items.reduce((a, x) => a + x.neto, 0), conIva = fa.tipo === 'B' || fa.tipo === 'C' ? s * 1.21 : null; if(!fa.total) fa.total = conIva || s * 1.21; fa.subtotal = s;
+    if(conIva != null && Math.abs(conIva - fa.total) > Math.max(2, fa.total * 0.002)){ fa.controlOk = false; fa.mensajeControl = `La suma de los renglones (${formatPrice(conIva)}) no coincide con el total del comprobante (${formatPrice(fa.total)}).`; } });
+  return L;
 }
 // mismo comprobante = mismo tipo (factura o nota de credito), letra, punto de venta y numero
 function claveComprobante(f){ const m = String(f.numero || '').match(/(\d+)\D+(\d+)/); const pv = m ? +m[1] : 0, nro = m ? +m[2] : +String(f.numero || '').replace(/\D/g, '') || 0;
@@ -19501,7 +19531,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v279';
+const APP_VERSION = '2026-10-02-v280';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
