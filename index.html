@@ -566,6 +566,7 @@ a.grilla-celda{display:block;}
   <!-- STEP: INICIO (iconos) -->
   <div class="step" id="step-inicio">
     <div id="avisoCopia" style="display:none;"></div>
+    <div id="avisoCostos" style="display:none;"></div>
     <style>
       .ini-sec{font-size:0.78rem;font-weight:700;letter-spacing:.06em;color:#8A8072;margin:18px 0 10px;}
       .ini-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
@@ -1597,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v271</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v272</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2341,6 +2342,7 @@ a.grilla-celda{display:block;}
   <div class="step" id="step-costos-productos">
     <div class="form-card" style="max-width:1100px;">
       <h2>Costos de productos</h2>
+      <input id="cp-buscar" placeholder="🔍 Buscar en fabrico y reventa: nombre, SKU, medida, tela…" oninput="cpBuscar(this.value)" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid var(--line);border-radius:12px;font-size:1rem;margin:4px 0 8px;">
       <div style="display:flex;gap:6px;margin:4px 0 12px;" id="cp-tabs"></div>
       <div id="cp-fab" style="border-left:5px solid #2F7A47;padding-left:10px;margin-bottom:18px;"><div style="font-weight:800;color:#2F7A47;margin:2px 0 6px;">🏭 Lo que fabrico</div><div id="cp-fab-in"></div></div>
       <div id="cp-rev" style="border-left:5px solid #2E5A8C;padding-left:10px;"><div style="font-weight:800;color:#2E5A8C;margin:2px 0 6px;">🛒 Reventa</div><div id="cp-rev-in"></div></div>
@@ -5333,6 +5335,8 @@ async function borrarDuplicadoAC(a){
 // coinciden (sin importar mayusculas ni tildes). El <select> sigue existiendo oculto, asi que el resto
 // del codigo lo lee igual que siempre.
 function normBusqueda(t){ return String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+// busqueda palabra por palabra: "repasador barras" encuentra "Repasador de cocina barras"
+function coincideBusqueda(texto, q){ const t = normBusqueda(texto); return normBusqueda(q).split(/\s+/).filter(Boolean).every(w => t.includes(w)); }
 function hacerSelectBuscable(sel){
   if(sel._buscable) return;
   sel._buscable = true;
@@ -6462,7 +6466,7 @@ function renderTelas(){
     `<select class="${tlFiltroComp ? 'activo' : ''}" onchange="tlFiltroComp=this.value; renderTelas();"><option value="">Composición</option>${COMPOSICIONES_TELA.map(c => `<option value="${c}" ${tlFiltroComp === c ? 'selected' : ''}>${c}</option>`).join('')}</select>`;
   const q = normBusqueda(document.getElementById('tl-buscar').value);
   const lista = Object.entries(telasDatos.telas)
-    .filter(([c, t]) => (!tlFiltroUso || (t.usos || []).includes(tlFiltroUso)) && (!tlFiltroComp || t.composicion === tlFiltroComp) && (!q || normBusqueda(c + ' ' + (t.nombre || '') + ' ' + (t.color || '') + ' ' + (t.composicion || '') + ' ' + (t.proveedor || '')).includes(q)))
+    .filter(([c, t]) => (!tlFiltroUso || (t.usos || []).includes(tlFiltroUso)) && (!tlFiltroComp || t.composicion === tlFiltroComp) && (!q || coincideBusqueda(c + ' ' + (t.nombre || '') + ' ' + (t.color || '') + ' ' + (t.composicion || '') + ' ' + (t.proveedor || ''), q)))
     .sort((a, b) => grupoNombreTela(a[1]).localeCompare(grupoNombreTela(b[1])) || normBusqueda(a[1].proveedor || '').localeCompare(normBusqueda(b[1].proveedor || '')) || (a[1].hilos || 0) - (b[1].hilos || 0) || (a[1].ancho || 0) - (b[1].ancho || 0) || a[0].localeCompare(b[0]));
   const cuantos = {}, provs = {};
   lista.forEach(([c, t]) => { const f = grupoNombreTela(t); cuantos[f] = (cuantos[f] || 0) + 1; (provs[f] = provs[f] || new Set()).add(t.proveedor || ''); });
@@ -7335,7 +7339,12 @@ function cpMover(){
   if(f){ f.style.maxWidth = 'none'; f.style.boxShadow = 'none'; f.style.padding = '0'; document.getElementById('cp-fab-in').appendChild(f); }
   if(r){ r.style.maxWidth = 'none'; r.style.boxShadow = 'none'; r.style.padding = '0'; document.getElementById('cp-rev-in').appendChild(r); }
   document.querySelectorAll('#cp-fab-in h2, #cp-rev-in h2').forEach(x => x.style.display = 'none');
+  ['pf-buscar', 'cr-buscar'].forEach(id => { const e = document.getElementById(id); if(e) e.style.display = 'none'; }); // los reemplaza el buscador unico
   document.querySelectorAll('#cp-fab-in .form-card > .btn.btn-ghost, #cp-rev-in .form-card > .btn.btn-ghost').forEach(b => { if(/Volver/.test(b.textContent)) b.style.display = 'none'; });
+}
+function cpBuscar(v){
+  ['pf-buscar', 'cr-buscar'].forEach(id => { const e = document.getElementById(id); if(e) e.value = v; });
+  try{ renderProductosFabrico(); } catch(e){} if(esDueno()) try{ renderCostosReventa(); } catch(e){}
 }
 function cpPintar(){
   const rev = esDueno(); if(!rev && cpTab === 'reventa') cpTab = 'fabrico';
@@ -7410,7 +7419,7 @@ function renderProductosFabrico(){
   const completo = f => f.articulo && f.calidad;
   const chip = (v, t, n) => `<span onclick="pfFiltro='${v}'; renderProductosFabrico();" style="cursor:pointer;font-size:0.82rem;padding:5px 12px;border-radius:14px;border:1px solid var(--line);${pfFiltro === v ? 'background:var(--purple);color:#fff;border-color:var(--purple);' : ''}">${t} (${n})</span>`;
   document.getElementById('pf-filtros').innerHTML = chip('todos', 'Todos', todas.length) + chip('completos', '✓ Completos', todas.filter(completo).length) + chip('faltan', '⚠️ Les falta algo', todas.filter(f => !completo(f)).length);
-  const filas = todas.filter(f => (pfFiltro === 'todos' || (pfFiltro === 'completos' ? completo(f) : !completo(f))) && (!q || normBusqueda(`${f.producto} ${f.sku} ${f.desc} ${f.articulo || ''} ${f.calidad}`).includes(q)));
+  const filas = todas.filter(f => (pfFiltro === 'todos' || (pfFiltro === 'completos' ? completo(f) : !completo(f))) && (!q || coincideBusqueda(`${f.producto} ${f.sku} ${f.desc} ${f.articulo || ''} ${f.calidad}`, q)));
   window.__pfVisibles = filas.map(f => f.sku);
   renderPfMasivo();
   const cont = document.getElementById('pf-lista');
@@ -7613,7 +7622,7 @@ function renderHistorialEntregas(){
   const q = normBusqueda(document.getElementById('he-buscar').value);
   const desde = hePeriodo ? Date.now() - hePeriodo * 86400000 : 0;
   const lista = (entregasTaller || []).filter(x => (!heTaller || x.taller === heTaller) && (!desde || new Date(x.fecha).getTime() >= desde) &&
-    (!q || normBusqueda(`${x.taller} ${x.nota || ''} ${(x.detalle || []).map(d => `${d.articulo} ${d.sku} ${d.orden}`).join(' ')}`).includes(q)));
+    (!q || coincideBusqueda(`${x.taller} ${x.nota || ''} ${(x.detalle || []).map(d => `${d.articulo} ${d.sku} ${d.orden}`).join(' ')}`, q)));
   const sum = (x, k) => (x.detalle || []).reduce((a, d) => a + (+d[k] || 0), 0);
   const tb = lista.reduce((s, x) => s + sum(x, 'buenas'), 0), tf = lista.reduce((s, x) => s + sum(x, 'falladas'), 0);
   const kpi = (n, t, color) => `<div class="he-kpi"><b${color ? ` style="color:${color};"` : ''}>${n}</b><span>${t}</span></div>`;
@@ -7853,7 +7862,7 @@ function renderStock(){
   const cuenta = [0, 1, 2, 3].map(n => todas.filter(f => f.nivel === n).length);
   document.getElementById('sk-kpis').innerHTML = NIVELES_STOCK.map(([c, t], n) => `<div class="sk-kpi${skFiltro === String(n) ? ' on' : ''}" onclick="skFiltro = skFiltro === '${n}' ? '' : '${n}'; renderStock();"><b style="color:${c};">${cuenta[n]}</b><span>${t}</span></div>`).join('');
   const q = normBusqueda(document.getElementById('sk-buscar').value);
-  const lista = todas.filter(f => (skFiltro === '' || String(f.nivel) === skFiltro) && (!q || normBusqueda(f.sku + ' ' + f.nombre).includes(q)));
+  const lista = todas.filter(f => (skFiltro === '' || String(f.nivel) === skFiltro) && (!q || coincideBusqueda(f.sku + ' ' + f.nombre, q)));
   const cont = document.getElementById('sk-lista');
   if(!todas.length){ cont.innerHTML = '<p class="empty-msg">Todavía no hay SKU de fabricación propia. Se vinculan en Artículos y cortes.</p>'; return; }
   if(!lista.length){ cont.innerHTML = '<p class="empty-msg">No hay SKU con ese filtro.</p>'; return; }
@@ -8971,7 +8980,7 @@ async function abrirReventa(){
 }
 function renderReventa(){
   const q = normBusqueda(document.getElementById('rv-buscar').value), cat = document.getElementById('rv-cat').value;
-  const todas = productosReventa().filter(x => (!cat || x.cat === cat) && (!q || normBusqueda(x.p.nombre + ' ' + x.p.variantes.map(v => v.sku + ' ' + v.desc).join(' ')).includes(q)));
+  const todas = productosReventa().filter(x => (!cat || x.cat === cat) && (!q || coincideBusqueda(x.p.nombre + ' ' + x.p.variantes.map(v => v.sku + ' ' + v.desc).join(' '), q)));
   const porPag = 20, lista = todas.slice(0, rvPagina * porPag);
   window.__rvVisibles = todas.map(x => x.p._editKey);
   renderReventaMasivo();
@@ -9020,7 +9029,7 @@ function rvCambiarV(sku, campo, valor){
 function rvCompletarDesdeCatalogo(){
   const q = normBusqueda(document.getElementById('rv-buscar').value), cat = document.getElementById('rv-cat').value;
   let n = 0;
-  productosReventa().filter(x => (!cat || x.cat === cat) && (!q || normBusqueda(x.p.nombre + ' ' + x.p.variantes.map(v => v.sku + ' ' + v.desc).join(' ')).includes(q))).forEach(({ p }) => {
+  productosReventa().filter(x => (!cat || x.cat === cat) && (!q || coincideBusqueda(x.p.nombre + ' ' + x.p.variantes.map(v => v.sku + ' ' + v.desc).join(' '), q))).forEach(({ p }) => {
     const k = p._editKey;
     if(!rvDatoP(p, 'material') && p.composicion){ rvPend['p:' + k] = { ...(rvPend['p:' + k] || {}), material: p.composicion }; n++; }
     p.variantes.forEach(v => {
@@ -9766,7 +9775,7 @@ function renderCategoriasMover(){
   const cat = document.getElementById('oc-cat').value, q = normBusqueda(document.getElementById('oc-buscar').value);
   const cont = document.getElementById('oc-lista');
   cont.innerHTML = CATALOGO.filter(c => !cat || c.categoria === cat).map(c => {
-    const ps = (c.productos || []).filter(p => Array.isArray(p.variantes) && (!q || normBusqueda(p.nombre + ' ' + p.variantes.map(v => v.sku).join(' ')).includes(q)));
+    const ps = (c.productos || []).filter(p => Array.isArray(p.variantes) && (!q || coincideBusqueda(p.nombre + ' ' + p.variantes.map(v => v.sku).join(' '), q)));
     if(!ps.length && (q || cat === '')) return c.productos.length ? '' : `<div class="gb-sec">${escaparHtml(c.categoria)} · vacía</div>`;
     return `<div class="gb-sec">${escaparHtml(c.categoria)} · ${c.productos.length}</div>` + ps.map(p => `<label style="display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;background:${ocSel.has(p._editKey) ? '#F3EEF7' : '#fff'};cursor:pointer;">
         <input type="checkbox" ${ocSel.has(p._editKey) ? 'checked' : ''} onchange="ocToggle('${escapeAttr(p._editKey)}', this.checked)">
@@ -9831,7 +9840,7 @@ async function abrirConfeccion(){
 function cfValor(a, campo){ const p = cfPend[a]; if(p && p[campo] !== undefined) return p[campo]; const e = ((tablaConsumo.empaque || {})[a] || {}); return e[campo] ? String(e[campo]).replace('.', ',') : ''; }
 function renderConfeccion(){
   const q = normBusqueda(document.getElementById('cf-buscar').value), sin = document.getElementById('cf-sin').checked;
-  const arts = articulosAC().sort((a, b) => a.localeCompare(b, 'es')).filter(a => (!q || normBusqueda(a).includes(q)) && (!sin || !cfValor(a, 'confeccion')));
+  const arts = articulosAC().sort((a, b) => a.localeCompare(b, 'es')).filter(a => (!q || coincideBusqueda(a, q)) && (!sin || !cfValor(a, 'confeccion')));
   window.__cfVisibles = arts;
   document.getElementById('cf-lista').innerHTML = arts.length ? `<div style="display:grid;grid-template-columns:minmax(0,1fr) 120px 120px;gap:6px;font-size:0.72rem;color:#8A8072;padding:0 4px 4px;"><span>Artículo</span><span style="text-align:right;">Confección $</span><span style="text-align:right;">Otros insumos $</span></div>` + arts.map((a, i) => `<div style="display:grid;grid-template-columns:minmax(0,1fr) 120px 120px;gap:6px;align-items:center;padding:6px 4px;border-top:1px solid var(--line);">
       <span style="font-size:0.88rem;">${escaparHtml(a)}</span>
@@ -9992,7 +10001,7 @@ function videoPorProductos(){
 function vpPintar(){
   const q = normBusqueda(document.getElementById('vp-q').value);
   const out = [];
-  CATALOGO.forEach((c, ci) => (c.productos || []).forEach((p, pi) => { if(!Array.isArray(p.variantes) || !imagenesEfectivas(ci, pi, p).length) return; if(q && !normBusqueda(p.nombre + ' ' + p.variantes.map(v => v.sku).join(' ')).includes(q)) return; out.push({ ci, pi, p, k: ci + '-' + pi }); }));
+  CATALOGO.forEach((c, ci) => (c.productos || []).forEach((p, pi) => { if(!Array.isArray(p.variantes) || !imagenesEfectivas(ci, pi, p).length) return; if(q && !coincideBusqueda(p.nombre + ' ' + p.variantes.map(v => v.sku).join(' '), q)) return; out.push({ ci, pi, p, k: ci + '-' + pi }); }));
   document.getElementById('vp-lista').innerHTML = out.slice(0, 80).map(x => `<label style="display:flex;gap:8px;align-items:center;padding:6px;border-bottom:1px solid var(--line);cursor:pointer;">
     <input type="checkbox" ${vpSel.has(x.k) ? 'checked' : ''} onchange="this.checked ? vpSel.add('${x.k}') : vpSel.delete('${x.k}'); document.getElementById('vp-btn').textContent='🎬 Armar video (' + vpSel.size + ')'">
     <img src="${escapeAttr(imagenesEfectivas(x.ci, x.pi, x.p)[0])}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">
@@ -10197,6 +10206,7 @@ auth.onAuthStateChanged(async u => {
     resolverSesion(u);
     setTimeout(aplicarPermisosInicio, 0);
     setTimeout(() => { try{ pintarAvisoCopia(); } catch(e){} }, 300);
+    setTimeout(() => { detectarCambiosCosto().catch(() => {}); }, 1500);
     if(rol === 'dueño') setTimeout(() => registrarHistorialCostos().catch(e => console.error('historial de costos', e)), 8000);
 
   } catch(e){ mostrarLogin('No se pudo verificar la cuenta: ' + escaparHtml(e.message), true); }
@@ -10314,7 +10324,7 @@ async function registrarHistorialCostos(){
     const ahora = Date.now();
     for(let i = 0; i < nuevos.length; i += 400){ const b = db.batch(); nuevos.slice(i, i + 400).forEach(x => b.set(db.collection('historial_costos').doc(), { ...x, creado: ahora })); await b.commit(); }
     if(nuevos.length) await ref.set({ c: ult, actualizado: new Date().toISOString() });
-    if(cambiosCosto.length) setTimeout(() => proponerPreciosPorCosto(cambiosCosto), 300);
+    setTimeout(() => { detectarCambiosCosto().then(hay => { if(hay) abrirRevisarCostos(); }).catch(() => {}); }, 300);
     return nuevos.length;
   })();
   try{ return await registrandoCostos; } finally { registrandoCostos = null; }
@@ -10392,7 +10402,7 @@ function crValor(s){
 }
 function renderCostosReventa(){
   const q = normBusqueda(document.getElementById('cr-buscar').value), cat = document.getElementById('cr-cat').value, sin = document.getElementById('cr-sin').checked;
-  const prods = productosReventaConCosto().filter(x => (!cat || x.cat === cat) && (!q || normBusqueda(x.p.nombre + ' ' + x.p.variantes.map(v => v.sku).join(' ')).includes(q)));
+  const prods = productosReventaConCosto().filter(x => (!cat || x.cat === cat) && (!q || coincideBusqueda(x.p.nombre + ' ' + x.p.variantes.map(v => v.sku + ' ' + (v.desc || '')).join(' '), q)));
   window.__crSkus = []; window.__crVis = [];
   const html = prods.map((x, pi) => {
     const vs = x.p.variantes.filter(v => !sin || !crValor(String(v.sku).toUpperCase()));
@@ -10441,7 +10451,7 @@ function crMostrarGuardar(){ const n = Object.keys(crPend).length, b = document.
 function crCambiar(i, v){ crPend[window.__crSkus[i]] = v; crMostrarGuardar(); }
 function crTodo(pi, v){
   const q = normBusqueda(document.getElementById('cr-buscar').value), cat = document.getElementById('cr-cat').value;
-  const prods = productosReventaConCosto().filter(x => (!cat || x.cat === cat) && (!q || normBusqueda(x.p.nombre + ' ' + x.p.variantes.map(w => w.sku).join(' ')).includes(q)));
+  const prods = productosReventaConCosto().filter(x => (!cat || x.cat === cat) && (!q || coincideBusqueda(x.p.nombre + ' ' + x.p.variantes.map(w => w.sku).join(' '), q)));
   const x = prods[pi]; if(!x || !v.trim()) return;
   x.p.variantes.forEach(w => { crPend[String(w.sku).toUpperCase()] = v.trim(); });
   renderCostosReventa(); crMostrarGuardar();
@@ -10626,7 +10636,7 @@ function verComprobante(id){
 }
 function renderGastos(){
   const mes = document.getElementById('gs-mes').value, fc = document.getElementById('gs-fconc').value, q = normBusqueda(document.getElementById('gs-buscar').value);
-  const L = (gastos || []).filter(g => (!mes || String(g.fecha).startsWith(mes)) && (!fc || g.concepto === fc) && (!q || normBusqueda([g.concepto, g.medio, g.quien, g.nota].join(' ')).includes(q)));
+  const L = (gastos || []).filter(g => (!mes || String(g.fecha).startsWith(mes)) && (!fc || g.concepto === fc) && (!q || coincideBusqueda([g.concepto, g.medio, g.quien, g.nota].join(' '), q)));
   const tot = L.filter(g => !g.enML).reduce((a, g) => a + (+g.monto || 0), 0), totML = L.filter(g => g.enML).reduce((a, g) => a + (+g.monto || 0), 0), por = {};
   const claveC = c => normBusqueda(c).replace(/s$/, ''), nomC = {};
   L.filter(g => !g.enML).forEach(g => { const k = claveC(g.concepto); if(!nomC[k]) nomC[k] = String(g.concepto).charAt(0).toUpperCase() + String(g.concepto).slice(1); por[nomC[k]] = (por[nomC[k]] || 0) + (+g.monto || 0); });
@@ -11004,6 +11014,82 @@ async function importarLinksWeb(inp){
     ${soloWeb.length ? `<details style="margin:6px 0;"><summary style="cursor:pointer;"><b>${soloWeb.length}</b> SKU de la web que no están en el catálogo de la app</summary><p class="note" style="text-align:left;">${soloWeb.map(escaparHtml).join(', ')}</p></details>` : ''}`;
 }
 
+// ===== Cambios de costo: se comparan con el ultimo costo revisado (por unidad de venta) y quedan pendientes hasta revisarlos =====
+let ccBase = null, ccPend = [];
+async function cargarBaseCostos(){ if(ccBase) return; try{ const d = await db.collection('config').doc('costos_base').get(); ccBase = d.exists ? (d.data().b || {}) : null; } catch(e){ ccBase = null; } }
+function costosVentaActuales(){
+  const m = {}; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => { const S = String(v.sku).toUpperCase(), pr = parsePrice(v.precio); if(!(pr > 0)) return;
+    let cu = null; try{ cu = costoUnidadSku(S); } catch(e){} if(cu > 0) m[S] = Math.round(cu * divisorVenta(S) * 100) / 100; })));
+  return m;
+}
+async function detectarCambiosCosto(){
+  if(!esDueno()) return;
+  try{ await prepararCostosFacturas(); } catch(e){}
+  await cargarBaseCostos(); const act = costosVentaActuales();
+  if(!ccBase){ ccBase = act; await db.collection('config').doc('costos_base').set({ b: ccBase, actualizado: new Date().toISOString() }); ccPend = []; pintarAvisoCostos(); return; } // primera vez: punto de partida, sin avisos
+  let nuevosBase = false;
+  Object.entries(act).forEach(([S, c]) => { if(ccBase[S] == null){ ccBase[S] = c; nuevosBase = true; } });           // SKU nuevo: no es un cambio
+  if(nuevosBase) await db.collection('config').doc('costos_base').set({ b: ccBase, actualizado: new Date().toISOString() });
+  const antes = ccPend.length;
+  ccPend = Object.entries(act).filter(([S, c]) => ccBase[S] > 0 && Math.abs(c - ccBase[S]) / ccBase[S] >= 0.005).map(([S, c]) => ({ sku: S, antes: ccBase[S], ahora: c }));
+  pintarAvisoCostos();
+  return ccPend.length > antes;
+}
+function pintarAvisoCostos(){
+  const box = document.getElementById('avisoCostos'); if(!box) return;
+  if(!esDueno() || !ccPend.length){ box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#FFF8E6;border:1px solid #EBD9A8;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:.9rem;">
+    <span style="flex:1;">💲 <b>${ccPend.length}</b> ${ccPend.length === 1 ? 'SKU cambió' : 'SKU cambiaron'} de costo.</span><button type="button" class="btn-mini" onclick="abrirRevisarCostos()">Revisar</button></div>`;
+}
+let ccFilas = [];
+async function abrirRevisarCostos(){
+  let pres = []; try{ const s = await db.collection('presupuestos').get(); pres = s.docs.map(d => d.data()).filter(p => !p.pedido); } catch(e){}
+  ccFilas = ccPend.map(c => { const r = buscarProductoPorSku(c.sku); if(!r) return null; const pr = parsePrice(r.variante.precio); if(!(pr > 0)) return null;
+    const sug = Math.ceil(pr * c.ahora / c.antes / 10) * 10, np = pres.filter(p => (p.items || []).some(it => String(it.sku || '').toUpperCase() === c.sku)).length;
+    return { ...c, r, pr, sug, np, u: unidadVentaSku(c.sku) || 'unidad' }; }).filter(Boolean);
+  const t = document.getElementById('pub-titulo'); if(t) t.textContent = '💲 Revisar cambios de costo';
+  renderRevisarCostos(); document.getElementById('pub-modal').style.display = 'block';
+}
+function renderRevisarCostos(){
+  const mg = (pr, c) => pr > 0 ? Math.round((pr - c) / pr * 100) + ' %' : '—';
+  document.getElementById('pub-cont').innerHTML = !ccFilas.length ? '<p class="note">No hay cambios de costo pendientes.</p>' : `
+    <p class="note" style="text-align:left;margin:0 0 8px;">Costos por unidad de venta. El precio sugerido mantiene el margen que tenía; se puede editar.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+      <label style="display:flex;gap:6px;align-items:center;font-size:.85rem;"><input type="checkbox" id="cc-todos" checked onchange="document.querySelectorAll('.cc-sel').forEach(x => x.checked = this.checked)"> Todos</label>
+      <select id="cc-red" style="padding:6px;border:1px solid var(--line);border-radius:8px;font-size:.85rem;"><option value="10">Redondear a $ 10</option><option value="100">a $ 100</option><option value="1000">a $ 1.000</option></select><button type="button" class="btn-mini" onclick="ccRedondear()">Redondear seleccionados</button></div>
+    <div style="max-height:52vh;overflow:auto;">${ccFilas.map((f, i) => `<div style="border-top:1px solid var(--line);padding:8px 2px;font-size:.85rem;">
+      <div style="display:grid;grid-template-columns:22px minmax(0,1fr) 120px;gap:8px;align-items:center;">
+        <input type="checkbox" class="cc-sel" data-i="${i}" checked>
+        <span><b>${escaparHtml(f.sku)}</b> <span class="note" style="margin:0;">${escaparHtml(f.r.producto.nombre)} · ${escaparHtml(f.r.variante.desc || '')} · por ${escaparHtml(f.u)}</span><br>
+          costo ${formatPrice(f.antes)} → <b>${formatPrice(f.ahora)}</b> (${f.ahora > f.antes ? '+' : ''}${Math.round((f.ahora / f.antes - 1) * 100)} %) · precio ${formatPrice(f.pr)} · margen ${mg(f.pr, f.antes)} → <b style="color:${(f.pr - f.ahora) / f.pr < 0.2 ? '#A6432F' : '#2F7A47'};">${mg(f.pr, f.ahora)}</b></span>
+        <span><input class="cc-pr" data-i="${i}" inputmode="decimal" value="${f.sug}" oninput="ccMargen(${i}, this.value)" style="width:100%;box-sizing:border-box;padding:6px;border:1px solid var(--line);border-radius:8px;text-align:right;"><small id="cc-mg-${i}" class="meta" style="display:block;text-align:right;">margen ${mg(f.sug, f.ahora)}</small></span></div>
+      ${f.np ? `<div class="note" style="text-align:left;margin:3px 0 0 30px;color:#8A6417;">Está en ${f.np} presupuesto${f.np === 1 ? '' : 's'} abierto${f.np === 1 ? '' : 's'}: <a href="#" onclick="event.preventDefault();cerrarPublicar();abrirPresupuestos();">revisar</a></div>` : ''}
+      <div style="margin:2px 0 0 30px;">${(() => { try{ return htmlPrecioML(f.ahora / (cantUnidadVenta(f.u === 'unidad' ? '' : f.u) || 1)); } catch(e){ return ''; } })()}</div></div>`).join('')}</div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;"><button class="btn btn-gold" style="flex:1;" onclick="ccAplicar()">Aplicar al catálogo los seleccionados</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="ccDejar()">Dejar como está</button></div>`;
+}
+function ccMargen(i, v){ const f = ccFilas[i], n = numAr(v), e = document.getElementById('cc-mg-' + i); if(e) e.textContent = n > 0 ? 'margen ' + Math.round((n - f.ahora) / n * 100) + ' %' : ''; }
+function ccRedondear(){ const m = +document.getElementById('cc-red').value || 10; document.querySelectorAll('.cc-sel:checked').forEach(x => { const i = +x.dataset.i, inp = document.querySelector(`.cc-pr[data-i="${i}"]`), n = numAr(inp.value); if(n > 0){ inp.value = Math.ceil(n / m) * m; ccMargen(i, inp.value); } }); }
+async function ccMarcarRevisados(skus){ const act = costosVentaActuales(); skus.forEach(s => { if(act[s] != null) ccBase[s] = act[s]; }); await db.collection('config').doc('costos_base').set({ b: ccBase, actualizado: new Date().toISOString() }); ccPend = ccPend.filter(c => !skus.includes(c.sku)); pintarAvisoCostos(); }
+async function ccDejar(){
+  const sel = [...document.querySelectorAll('.cc-sel:checked')].map(x => ccFilas[+x.dataset.i]); if(!sel.length) return;
+  if(!confirm(`¿Dejar el precio como está en ${sel.length} SKU? Dejan de aparecer como pendientes.`)) return;
+  await ccMarcarRevisados(sel.map(f => f.sku)); ccFilas = ccFilas.filter(f => !sel.includes(f)); renderRevisarCostos();
+}
+async function ccAplicar(){
+  const sel = [...document.querySelectorAll('.cc-sel:checked')].map(x => { const i = +x.dataset.i; return { ...ccFilas[i], nuevo: numAr(document.querySelector(`.cc-pr[data-i="${i}"]`).value) }; }).filter(f => f.nuevo > 0);
+  if(!sel.length){ alert('No hay precios seleccionados.'); return; }
+  const bajos = sel.filter(f => f.nuevo < f.ahora); if(bajos.length && !confirm(`¿Seguro? ${bajos.length} precio(s) quedan por debajo del costo:\n` + bajos.map(f => `${f.sku}: ${formatPrice(f.nuevo)} < costo ${formatPrice(f.ahora)}`).join('\n'))) return;
+  const porProd = new Map(); sel.forEach(f => { const p = f.r.producto; (porProd.get(p) || porProd.set(p, []).get(p)).push(f); });
+  let ok = 0;
+  for(const [p, fs] of porProd){
+    const variantes = p.variantes.map(v => { const f = fs.find(x => String(x.sku).toUpperCase() === String(v.sku).toUpperCase()); return f ? { ...v, precio: precioTxt(f.nuevo) } : v; });
+    try{ await guardarProductoCatalogo({ ...p, variantes }); p.variantes = variantes; ok += fs.length; } catch(e){ console.error(e); }
+  }
+  await ccMarcarRevisados(sel.map(f => f.sku)); ccFilas = ccFilas.filter(f => !sel.some(s => s.sku === f.sku));
+  try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+  renderRevisarCostos(); alert(`Listo: ${ok} ${ok === 1 ? 'precio actualizado' : 'precios actualizados'} en el catálogo.`);
+}
 // ===== Cuando cambia el costo de lo que fabricas: proponer el precio nuevo del catalogo, manteniendo el mismo margen =====
 function precioTxt(n){ return Math.round(n * 100) / 100 === Math.round(n) ? formatoPesos(Math.round(n)) + ',00' : (Math.round(n * 100) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function vistosCambiosCosto(){ try{ return JSON.parse(localStorage.getItem('cambiosCostoVistos') || '{}'); } catch(e){ return {}; } }
@@ -11177,7 +11263,7 @@ function enConfeccionPorSku(){
 }
 function renderFaltantes(){
   const q = normBusqueda(document.getElementById('fs-buscar').value), conf = enConfeccionPorSku();
-  const L = (faltantes || []).filter(f => f.estado !== 'repuesto' && (!q || normBusqueda(`${f.sku} ${f.producto} ${f.desc}`).includes(q)));
+  const L = (faltantes || []).filter(f => f.estado !== 'repuesto' && (!q || coincideBusqueda(`${f.sku} ${f.producto} ${f.desc}`, q)));
   const item = f => { const c = conf[String(f.sku).toUpperCase()], rs = f.reportes || [];
     const quedan = rs.map(r => r.quedan).filter(x => x !== '' && x != null && !isNaN(x));
     return `<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:.9rem;">
@@ -11262,7 +11348,7 @@ function totalesPresu(p){
 }
 function renderPresupuestos(){
   const q = normBusqueda(document.getElementById('pr-buscar').value);
-  const L = (presupuestos || []).filter(p => !q || normBusqueda(`${numPresu(p.numero)} ${(p.cliente || {}).nombre || ''}`).includes(q));
+  const L = (presupuestos || []).filter(p => !q || coincideBusqueda(`${numPresu(p.numero)} ${(p.cliente || {}).nombre || ''}`, q));
   document.getElementById('pr-lista').innerHTML = L.length ? L.map(p => { const t = totalesPresu(p);
     return `<div style="display:grid;grid-template-columns:90px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:12px;margin-bottom:6px;background:#fff;">
       <b>${numPresu(p.numero)}</b><div><b>${escaparHtml((p.cliente || {}).nombre || 'Sin nombre')}</b><div class="note" style="text-align:left;margin:0;">${new Date(p.fecha).toLocaleDateString('es-AR')} · ${(p.items || []).length} renglones${p.pedido ? ' · 🛒 convertido en pedido' : ''}</div></div>
@@ -16194,7 +16280,7 @@ function renderGrillaFotos(){
   const items = [];
   CATALOGO.forEach((c, ci) => { if(cat !== '' && String(ci) !== cat) return; (c.productos || []).forEach((p, pi) => {
     if(!Array.isArray(p.variantes)) return;
-    if(q && !normBusqueda(p.nombre + ' ' + p.variantes.map(v => v.sku).join(' ')).includes(q)) return;
+    if(q && !coincideBusqueda(p.nombre + ' ' + p.variantes.map(v => v.sku).join(' '), q)) return;
     const fotos = imagenesEfectivas(ci, pi, p) || [];
     if(soloPocas && fotos.length > 1) return;
     items.push({ ci, pi, p, fotos });
@@ -19186,7 +19272,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v271';
+const APP_VERSION = '2026-10-02-v272';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
@@ -19244,7 +19330,7 @@ window.addEventListener('load', () => {
     ['abrirFacturas', 'Cargando facturas…'], ['leerFacturasPDF', 'Leyendo facturas…'], ['guardarFactura', 'Guardando la factura…'], ['borrarFacturasSel', 'Borrando facturas…'],
     ['importarLinksWeb', 'Leyendo el archivo de Tienda Nube…'], ['analizarPedidoIA', 'La IA está armando el pedido…'],
     ['generarFlyersNuevoIngreso', 'Generando las piezas…'], ['abrirResultadosML', 'Preparando Resultados ML…'], ['descargarCopia', 'Preparando la copia…'],
-    ['abrirFaltantes', 'Cargando faltantes…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
+    ['abrirFaltantes', 'Cargando faltantes…'], ['abrirRevisarCostos', 'Cargando…'], ['ccAplicar', 'Actualizando precios…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
   ];
   setTimeout(() => W.forEach(([n, t]) => conProcesando(n, t)), 0);
 });
