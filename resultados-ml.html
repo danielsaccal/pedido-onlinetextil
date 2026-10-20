@@ -1313,13 +1313,14 @@ function armarMenuML(){
   if(sec){ let n=sec.nextElementSibling; sec.remove(); while(n){const x=n.nextElementSibling; aj.appendChild(n); n=x;} }
   cont.appendChild(aj);
   ['revisarBox'].forEach(id=>{const e=$(id); if(e) cont.appendChild(e);});
-  { const pb=document.createElement('div'); pb.id='perdidasBox'; cont.appendChild(pb); }
+  { const pb=document.createElement('div'); pb.id='perdidasBox'; cont.appendChild(pb); const db2=document.createElement('div'); db2.id='diagBox'; cont.appendChild(db2); }
   ['glosario','ranking'].forEach(k=>{const e=document.querySelector('details[data-k='+k+']'); if(e) cont.appendChild(e);});
   const menu=document.createElement('div'); menu.id='menuML';
   const vol=document.createElement('div'); vol.id='volverML'; vol.innerHTML='<button type="button" onclick="volverMenuML()">← Volver</button><b id="volverTit"></b>';
   const res=$('resumen'); res.after(menu); menu.after(vol); vol.after(cont);
   window.__pantallas=[
     ['revisar','⚠️','Ventas para revisar','Números dudosos: confirmalos o corregilos',()=>$('revisarBox')],
+    ['diag','🩺','Diagnóstico de costos','Costos viejos dudosos y ventas para revisar',()=>{renderDiagnostico();return $('diagBox');}],
     ['perdidas','💸','Pérdidas para reclamar','Cancelaciones y devoluciones que te costaron plata',()=>{renderPerdidas();return $('perdidasBox');}],
     ['ranking','🏆','¿Qué productos me dejan más plata?','Ranking y ficha de cada SKU',()=>document.querySelector('details[data-k=ranking]')],
     ['cuotas','💳','Con cuotas o sin cuotas','Qué te deja más, mes por mes',()=>document.querySelector('details[data-k=cuotas]')],
@@ -1444,6 +1445,30 @@ function htmlDesgloseML(per,fc){
     <small class="meta" style="display:block;margin-top:4px;">"pts": diferencia contra ${ant?mesTxt(ant):'el mes anterior'} en % de lo que entró. Los montos negativos son a favor.</small></div>`;
 }
 function toggleDesgloseML(){window.__mlDesgOpen=!window.__mlDesgOpen;renderResumen();}
+// ===== Diagnostico de costos: registros del historial muy distintos del costo actual (posibles errores viejos) =====
+function renderDiagnostico(){
+  const fc=$('fCuenta').value, v=allRows().filter(o=>o.tipo==='Venta'&&o.pcd>0&&!o.excl&&(!fc||o.cuenta===fc));
+  const porSku={}; v.forEach(o=>{const s=String(o.skuBase||'').toUpperCase(); if(!s)return; const g=porSku[s]=porSku[s]||{n:0,rev:0,sinC:0,motivos:{}}; g.n++; if(o.revisar&&!(CONFIRMADAS&&CONFIRMADAS[claveVenta(o)])){g.rev++; const m=String(o.revisar).split(/[·,]/)[0].replace(/\$?\s?[\d.,]+\s?%?/g,'…').replace(/\s+/g,' ').trim().slice(0,50); g.motivos[m]=(g.motivos[m]||0)+1;} if(o.costo==null&&o.costoRev==null)g.sinC++;});
+  const filas=[];
+  Object.entries(porSku).forEach(([s,g])=>{ const h0=COSTOS[s]||[]; if(!h0.length&&!g.sinC)return; const act=h0.length?h0[h0.length-1].costo:null;
+    const raros=act?h0.slice(0,-1).filter(x=>x.costo>0&&(x.costo/act>3||act/x.costo>3)):[];
+    if(!raros.length&&!g.rev&&!g.sinC)return;
+    filas.push({s,g,act,h0,raros}); });
+  filas.sort((a,b)=>b.g.rev-a.g.rev||b.raros.length-a.raros.length);
+  const conRaros=filas.filter(f=>f.raros.length), revTot=filas.reduce((a,f)=>a+f.g.rev,0), revRaros=conRaros.reduce((a,f)=>a+f.g.rev,0);
+  $('diagBox').innerHTML=`<div class="panel" style="padding:14px;">
+    <p class="note" style="margin-top:0;">SKU con ventas para revisar o con costos registrados en el pasado muy distintos (más de 3 veces) del costo actual. Solo muestra datos: no cambia nada. Respeta la cuenta elegida arriba.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:8px 0 12px;">
+      <div style="border:1px solid var(--line);border-radius:12px;padding:8px 10px;"><small class="meta">Ventas para revisar</small><div style="font-weight:800;">${revTot.toLocaleString('es-AR')}</div></div>
+      <div style="border:1px solid var(--line);border-radius:12px;padding:8px 10px;"><small class="meta">De SKU con costos viejos dudosos</small><div style="font-weight:800;color:#A6432F;">${revRaros.toLocaleString('es-AR')} (${conRaros.length} SKU)</div></div>
+      <div style="border:1px solid var(--line);border-radius:12px;padding:8px 10px;"><small class="meta">Ventas sin costo</small><div style="font-weight:800;">${filas.reduce((a,f)=>a+f.g.sinC,0).toLocaleString('es-AR')}</div></div></div>
+    ${filas.map(f=>`<div style="border-top:1px solid var(--line);padding:9px 0;font-size:.86rem;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;"><b>${f.s}</b><span class="meta">${NAMES[f.s]||''}</span>
+        <span style="margin-left:auto;">${f.g.n} ventas${f.g.rev?` · <b style="color:#A6432F;">${f.g.rev} para revisar</b>`:''}${f.g.sinC?` · ${f.g.sinC} sin costo`:''}</span></div>
+      <div style="margin-top:3px;">Costo actual: <b>${f.act!=null?fmt(f.act):'—'}</b> por unidad</div>
+      ${f.h0.length>1?`<div class="meta" style="margin-top:2px;">Historial: ${f.h0.map(x=>`<span style="${f.raros.includes(x)?'color:#A6432F;font-weight:700;':''}">${x.fecha.split('-').reverse().join('/')} ${fmt(x.costo)}${f.raros.includes(x)?` (×${(x.costo/f.act).toLocaleString('es-AR',{maximumFractionDigits:1})})`:''}</span>`).join(' · ')}</div>`:''}
+      ${Object.keys(f.g.motivos).length?`<div class="meta" style="margin-top:2px;">Motivos: ${Object.entries(f.g.motivos).map(([m,n])=>`${m} (${n})`).join(' · ')}</div>`:''}</div>`).join('')||'<p class="note">No se encontraron costos dudosos.</p>'}</div>`;
+}
 // ===== Perdidas para reclamar: cancelaciones y devoluciones que te costaron plata =====
 function perdidasReclamo(){
   const fc=$('fCuenta').value, G={};
