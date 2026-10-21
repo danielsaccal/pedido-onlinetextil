@@ -1536,7 +1536,22 @@ function resumenMensualML(){
 }
 function guardarResumenMensual(){
   try{ const m=resumenMensualML(), s=JSON.stringify(m); if(s===__resGuardado||!Object.keys(m).length) return; __resGuardado=s;
-    db.collection('config').doc('ml_resumen_mensual').set({m,actualizado:new Date().toISOString()}).catch(()=>{}); }catch(e){}
+    db.collection('config').doc('ml_resumen_mensual').set({m,actualizado:new Date().toISOString()}).catch(()=>{}); guardarDetalleML(); }catch(e){}
+}
+// detalle venta por venta de cada mes y cuenta, para que el Auditor de la app lo pueda leer (coleccion ml_detalle)
+const __detGuardado={};
+function guardarDetalleML(){
+  try{
+    const eIn=o=>o.envIn!==undefined?o.envIn:Math.max(o.envio||0,0), r2=x=>x==null?'':Math.round(x);
+    const cab=['fecha','cuenta','operacion','tipo','estado','sku_ml','sku_app','unidades','precio','envio_cobrado','cargos_ml','cadete','le_queda','costo','resultado','para_revisar','logistica'];
+    const G={}; allRows().forEach(o=>{ if(o.excl||!o.periodo||o.periodo==='sin-fecha') return; if(!(o.tipo==='Venta'||o.esDevol)) return; (G[o.periodo+'|'+o.cuenta]=G[o.periodo+'|'+o.cuenta]||[]).push(o); });
+    Object.entries(G).forEach(([k,rs])=>{
+      const filas=rs.map(o=>{ const env=eIn(o)||0, c=o.costo!=null?o.costo:(o.costoRev!=null?o.costoRev:(o.costoAj!=null?o.costoAj:null));
+        return [o.fecha,o.cuenta,o.op,o.tipo,o.estado||'',o.sku||'',o.skuBase||'',o.unid||'',r2(o.pcd),r2(env),r2((o.pcd>0?o.pcd:0)+env-(o.neto||0)),r2(o.cad),r2(o.neto),r2(c),c!=null?r2((o.neto||0)-c):'',o.costoRev!=null&&o.revisar?String(o.revisar[0]||'').replace(/[;\n]/g,' '):'',o.log||''].map(v=>String(v).replace(/[;\n]/g,' ')).join(';'); });
+      const csv=cab.join(';')+'\n'+filas.join('\n'); if(__detGuardado[k]===csv.length+':'+rs.length) return; __detGuardado[k]=csv.length+':'+rs.length;
+      db.collection('ml_detalle').doc(k.replace('|','_')).set({periodo:k.split('|')[0],cuenta:k.split('|')[1],csv:csv.slice(0,900000),filas:rs.length,actualizado:new Date().toISOString()}).catch(()=>{});
+    });
+  }catch(e){console.error(e);}
 }
 // ===== Perdidas para reclamar: cancelaciones y devoluciones que te costaron plata =====
 function perdidasReclamo(){
