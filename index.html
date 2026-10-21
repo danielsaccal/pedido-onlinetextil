@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v288</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v289</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -10408,6 +10408,11 @@ auth.onAuthStateChanged(async u => {
     setTimeout(aplicarPermisosInicio, 0);
     setTimeout(() => { try{ pintarAvisoCopia(); } catch(e){} }, 300);
     setTimeout(() => { detectarCambiosCosto().catch(() => {}); }, 1500);
+    if(ES_PESTANA_AGENTE) setTimeout(async () => { try{ const q = new URLSearchParams(location.search), paq = (q.get('paq') || '').split(',').filter(Boolean);
+      document.title = (ES_PESTANA_AGENTE === 'auditor' ? 'Auditor' : 'Director de arte') + ' · OnLineTextil';
+      if(q.get('mes')) window.__audMes = q.get('mes');
+      if(!puede(permisoDeAccion(ES_PESTANA_AGENTE === 'auditor' ? 'abrirAuditor()' : 'abrirDirectorArte()'))){ alert('No tiene permiso para este agente.'); return; }
+      await abrirChatAgente(ES_PESTANA_AGENTE); for(const pq of paq) await adjuntarPaqueteAud(pq, q.get('mes') || undefined); if(paq.length) document.getElementById('da-texto').value = 'Auditar'; } catch(e){ console.error(e); } }, 600);
     if(rol === 'dueño') setTimeout(() => registrarHistorialCostos().catch(e => console.error('historial de costos', e)), 8000);
 
   } catch(e){ mostrarLogin('No se pudo verificar la cuenta: ' + escaparHtml(e.message), true); }
@@ -11832,13 +11837,18 @@ async function adjuntarPaqueteAud(tipo, mesForzado){
   } catch(e){ procesando.error(e.message); }
 }
 // desde otras pantallas: abre el Auditor con los datos de ese mes
-async function enviarAAuditar(paquetes, mes){ window.__audMes = mes || window.__audMes; await abrirChatAgente('auditor'); for(const pq of paquetes) await adjuntarPaqueteAud(pq, window.__audMes); document.getElementById('da-texto').value = 'Auditar'; }
+async function enviarAAuditar(paquetes, mes){
+  if(!ES_PESTANA_AGENTE && abrirAgenteEnPestana('auditor', { paq: paquetes.join(','), mes: mes || '' })) return;
+  window.__audMes = mes || window.__audMes; await abrirChatAgente('auditor'); for(const pq of paquetes) await adjuntarPaqueteAud(pq, window.__audMes); document.getElementById('da-texto').value = 'Auditar'; }
 // ===== Director de arte: chat con el agente de Claude (la clave de la API vive en el Worker, nunca en la app) =====
 let daCfg = null, daChats = [], daChat = null, daProds = [], daImgs = [], daCanal = '';
 const DA_CANALES = ['Mercado Libre', 'Tienda Nube', 'Post 1:1', 'Post 4:5', 'Historia 9:16', 'Carrusel', 'Catálogo mayorista', 'Catálogo minorista'];
 let daAgente = 'arte';
-async function abrirDirectorArte(){ return abrirChatAgente('arte'); }
-async function abrirAuditor(paquetes){ await abrirChatAgente('auditor'); if(paquetes && paquetes.length) for(const pq of paquetes) await adjuntarPaqueteAud(pq); }
+// los agentes se abren en otra pestana, para seguir usando la app en esta
+const ES_PESTANA_AGENTE = new URLSearchParams(location.search).get('agente');
+function abrirAgenteEnPestana(agente, extra){ const q = new URLSearchParams({ agente, ...(extra || {}) }); const w = window.open(location.pathname + '?' + q.toString(), 'agente-' + agente); if(!w) return false; try{ w.focus(); } catch(e){} return true; }
+async function abrirDirectorArte(){ if(!ES_PESTANA_AGENTE && abrirAgenteEnPestana('arte')) return; return abrirChatAgente('arte'); }
+async function abrirAuditor(paquetes){ if(!ES_PESTANA_AGENTE && abrirAgenteEnPestana('auditor', paquetes && paquetes.length ? { paq: paquetes.join(',') } : {})) return; await abrirChatAgente('auditor'); if(paquetes && paquetes.length) for(const pq of paquetes) await adjuntarPaqueteAud(pq); }
 async function abrirChatAgente(agente){
   if(daAgente !== agente){ daChat = null; daProds = []; daImgs = []; daDocs = []; }
   daAgente = agente;
@@ -19671,7 +19681,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v288';
+const APP_VERSION = '2026-10-02-v289';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
