@@ -754,7 +754,8 @@ async function saveEntry(d){
     return true;
   }catch(e){showErr('Se ve en pantalla, pero no se pudo guardar en la base: '+e.message);return false;}
 }
-async function borrarMes(idViejo){const d=DATA.find(x=>x.id===idViejo)||{};const id=d.cuenta?idMes(d):idViejo;await borrarBloques(id);await db.collection('mlMeses').doc(id).delete();}
+async function borrarMes(idViejo){const d=DATA.find(x=>x.id===idViejo)||(()=>{const [c,p]=String(idViejo).split('|');return c&&p?{cuenta:c,periodo:p}:{};})();
+  MESES_META=MESES_META.filter(x=>x.cuenta+'|'+x.periodo!==idViejo);const id=d.cuenta?idMes(d):idViejo;await borrarBloques(id);await db.collection('mlMeses').doc(id).delete();}
 function normEntry(d){
   d.rows.forEach(o=>{
     if(o.zb===undefined&&o.flexMonto!=null){if(/^Reintegro completo|^Paga comprador/.test(o.flex))o.zb=Math.round(o.flexMonto);else if(o.flex==='Reintegro 10 %')o.zb=Math.round(o.flexMonto*10);}
@@ -766,13 +767,31 @@ function normEntry(d){
   d.rows.forEach(o=>o.periodo=d.periodo);
   return d;
 }
+// ===== Carga por meses: solo se descargan los meses elegidos (y el anterior, para comparar y para devoluciones) =====
+let MESES_META=[]; // todos los meses guardados (solo los datos generales, sin las operaciones)
+let SEL_MESES=(()=>{try{return JSON.parse(localStorage.getItem('ml.selMeses')||'null');}catch(e){return null;}})();
+const mesAnt=p=>{const [y,m]=p.split('-').map(Number);const d=new Date(y,m-2,15);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');};
+function periodosACargar(){
+  const todos=[...new Set(MESES_META.map(x=>x.periodo))].sort();
+  let sel=(SEL_MESES||[]).filter(p=>todos.includes(p)); if(!sel.length&&todos.length) sel=[todos[todos.length-1]];
+  const s=new Set(sel); sel.forEach(p=>{const a=mesAnt(p); if(todos.includes(a)) s.add(a);});
+  return {sel, cargar:[...s]};
+}
+async function cargarPeriodos(lista){
+  const faltan=MESES_META.filter(x=>lista.includes(x.periodo)&&!DATA.some(d=>d.cuenta===x.cuenta&&d.periodo===x.periodo));
+  let hechos=0;
+  await Promise.all(faltan.map(async x=>{ const bs=await x.ref.collection('bloques').get();
+    const rows=bs.docs.sort((a,b)=>a.id.localeCompare(b.id)).flatMap(b=>b.data().rows||[]);
+    DATA.push(normEntry({file:x.file,cuenta:x.cuenta,periodo:x.periodo,rows})); hechos++;
+    try{procesando.texto('Cargando meses… '+hechos+' de '+faltan.length);}catch(e){} }));
+  DATA.sort((a,b)=>a.periodo.localeCompare(b.periodo));
+}
 async function load(){
   DATA=[];
   try{
     const ms=await db.collection('mlMeses').get();
-    for(const m of ms.docs){const x=m.data();const bs=await m.ref.collection('bloques').get();
-      const rows=bs.docs.sort((a,b)=>a.id.localeCompare(b.id)).flatMap(b=>b.data().rows||[]);
-      DATA.push({file:x.file,cuenta:x.cuenta,periodo:x.periodo,rows});}
+    MESES_META=ms.docs.map(m=>({ref:m.ref,docId:m.id,...m.data()})).filter(x=>x.periodo);
+    await cargarPeriodos(periodosACargar().cargar);
   }catch(e){showErr('No se pudieron leer los meses guardados: '+e.message);}
   DATA.forEach(normEntry);
   // meses que estaban guardados solo en este navegador (version anterior): se suben a la base
@@ -785,6 +804,33 @@ async function load(){
   DATA.forEach(normEntry);
   DATA.sort((a,b)=>a.periodo.localeCompare(b.periodo));
 }
+function pintarBarraMeses(){
+  let b=$('mesesBar'); if(!b){ b=document.createElement('div'); b.id='mesesBar'; b.style.cssText='max-width:1100px;margin:10px auto 0;padding:0 18px;'; const m=document.querySelector('main'); if(m) m.prepend(b); }
+  const {sel}=periodosACargar(); const nm=p=>new Date(p+'-15').toLocaleDateString('es-AR',{month:'long',year:'numeric'});
+  b.innerHTML=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-size:.9rem;">
+    <span>📅 Mostrando: <b>${sel.length?sel.map(nm).join(', '):'sin meses'}</b></span><button type="button" onclick="abrirSelectorMeses()" style="margin-left:auto;padding:6px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer;font-weight:700;color:#3d1466;">Cambiar meses</button></div>`;
+}
+function abrirSelectorMeses(){
+  const todos=[...new Set(MESES_META.map(x=>x.periodo))].sort().reverse(), {sel}=periodosACargar();
+  const nm=p=>new Date(p+'-15').toLocaleDateString('es-AR',{month:'long',year:'numeric'});
+  const m=document.createElement('div'); m.id='selMesesModal'; m.style.cssText='position:fixed;inset:0;background:rgba(20,8,35,.55);z-index:400;display:flex;align-items:center;justify-content:center;padding:12px;';
+  m.innerHTML=`<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:16px;max-height:85vh;overflow:auto;">
+    <b style="font-size:1.05rem;color:#3d1466;">¿Qué meses quiere ver?</b>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0;">${[['Último mes',1],['Últimos 3',3],['Últimos 6',6],['Todos',999]].map(([t,n])=>`<button type="button" style="padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="document.querySelectorAll('.sm-p').forEach((c,i)=>c.checked=i<${n})">${t}</button>`).join('')}</div>
+    ${todos.map(p=>`<label style="display:flex;gap:8px;align-items:center;padding:6px 2px;border-top:1px solid var(--line);"><input type="checkbox" class="sm-p" value="${p}" ${sel.includes(p)?'checked':''} style="width:18px;height:18px;"><span style="flex:1;">${nm(p)}</span><span class="meta">${MESES_META.filter(x=>x.periodo===p).map(x=>x.cuenta).join(' · ')}</span></label>`).join('')}
+    <p class="note" style="margin:8px 0;">Se carga también el mes anterior a cada uno, para comparar y para las devoluciones.</p>
+    <div style="display:flex;gap:8px;"><button type="button" style="flex:1;padding:10px;border:none;border-radius:10px;background:#3d1466;color:#fff;font-weight:700;cursor:pointer;" onclick="aplicarSelectorMeses()">Ver estos meses</button><button type="button" style="padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer;" onclick="document.getElementById('selMesesModal').remove()">Cancelar</button></div></div>`;
+  document.body.appendChild(m);
+}
+async function aplicarSelectorMeses(){
+  const ps=[...document.querySelectorAll('.sm-p:checked')].map(c=>c.value); if(!ps.length){alert('Elija al menos un mes.');return;}
+  SEL_MESES=ps; try{localStorage.setItem('ml.selMeses',JSON.stringify(ps));}catch(e){}
+  document.getElementById('selMesesModal').remove();
+  procesando('Cargando meses…');
+  try{ const {cargar}=periodosACargar(); DATA=DATA.filter(d=>cargar.includes(d.periodo)); await cargarPeriodos(cargar); }catch(e){ procesando.error(e.message); return; }
+  render(); pintarBarraMeses(); procesando.listo('✓ Listo');
+  const ult=ps.slice().sort().pop(); if($('resMes')&&[...$('resMes').options].some(o=>o.value===ult)){ $('resMes').value=ult; try{renderResumen();}catch(e){} }
+}
 function showErr(m){const e=$('err');e.textContent=m;e.style.display=m?'block':'none';}
 
 $('file').addEventListener('change',async ev=>{
@@ -794,6 +840,7 @@ $('file').addEventListener('change',async ev=>{
     const buf=await f.arrayBuffer(); const wb=XLSX.read(buf,{type:'array'});
     let cuenta=$('cuenta').value; let rows=parseWorkbook(wb,cuenta,f.name);
     let d=normEntry({file:f.name,cuenta,rows});
+    try{ await cargarPeriodos([d.periodo, mesAnt(d.periodo)]); }catch(e){}
     // control: ¿el reporte es de la cuenta elegida? Si ese mes ya estaba y no coincide ninguna operacion, o si coincide con la otra cuenta, avisa
     {const ops=new Set(rows.map(o=>String(o.op)).filter(Boolean));
      const coincide=c=>{const e=DATA.find(x=>x.cuenta===c&&x.periodo===d.periodo);if(!e)return null;const n=e.rows.filter(o=>ops.has(String(o.op))).length;return n/Math.max(1,Math.min(e.rows.length,ops.size));};
@@ -815,6 +862,8 @@ $('file').addEventListener('change',async ev=>{
     alertOk(mesTxt(d.periodo)+' de '+cuenta+': '+rows.length.toLocaleString('es-AR')+' operaciones leídas. Guardando en la base… no cierres la página.');
     procesando.texto('Guardando '+mesTxt(d.periodo)+' de '+cuenta+' · '+rows.length.toLocaleString('es-AR')+' operaciones…');
     const ok=await saveEntry(d);
+    if(ok){ MESES_META=MESES_META.filter(x=>!(x.cuenta===d.cuenta&&x.periodo===d.periodo)); MESES_META.push({ref:db.collection('mlMeses').doc(idMes(d)),cuenta:d.cuenta,periodo:d.periodo,file:d.file,n:d.rows.length});
+      SEL_MESES=[...new Set([...(periodosACargar().sel), d.periodo])]; try{localStorage.setItem('ml.selMeses',JSON.stringify(SEL_MESES));}catch(e){} try{pintarBarraMeses(); render();}catch(e){} }
     if(ok) alertOk('✓ '+mesTxt(d.periodo)+' de '+cuenta+(existed?' reemplazado con el reporte nuevo.':' guardado.')+' ('+rows.length.toLocaleString('es-AR')+' operaciones)');
     if(ok) procesando.listo('✓ '+mesTxt(d.periodo)+' guardado'); else procesando.error('No se pudo guardar');
   }catch(e){showErr('No se pudo leer el archivo: '+(e.message||e));procesando.error('No se pudo leer el archivo');}
@@ -839,7 +888,7 @@ function render(){
   const has=DATA.length>0;
   $('empty').hidden=has; $('app').hidden=!has; $('filesPanel').hidden=!has;
   // meses guardados: lista con casillas, igual que en la app (seleccionar y borrar varios)
-  const orden=DATA.slice().sort((x,y)=>(x.cuenta+x.periodo).localeCompare(y.cuenta+y.periodo));
+  const orden=(MESES_META.length?MESES_META.map(x=>({id:x.cuenta+'|'+x.periodo,cuenta:x.cuenta,periodo:x.periodo,file:x.file,rows:{length:x.n||0}})):DATA.slice()).sort((x,y)=>(x.cuenta+x.periodo).localeCompare(y.cuenta+y.periodo));
   $('files').style.display='block';
   $('files').innerHTML=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
       <label style="display:flex;gap:6px;align-items:center;font-size:.88rem;cursor:pointer;"><input type="checkbox" id="mgTodos" style="width:18px;height:18px;"> Seleccionar todos</label>
@@ -1536,7 +1585,8 @@ function resumenMensualML(){
 }
 function guardarResumenMensual(){
   try{ const m=resumenMensualML(), s=JSON.stringify(m); if(s===__resGuardado||!Object.keys(m).length) return; __resGuardado=s;
-    db.collection('config').doc('ml_resumen_mensual').set({m,actualizado:new Date().toISOString()}).catch(()=>{}); guardarDetalleML(); }catch(e){}
+    const ref=db.collection('config').doc('ml_resumen_mensual'); // se combina con lo ya guardado: los meses que no se abrieron se conservan
+    ref.get().then(d=>{ const prev=d.exists?(d.data().m||{}):{}; return ref.set({m:{...prev,...m},actualizado:new Date().toISOString()}); }).catch(()=>{}); guardarDetalleML(); }catch(e){}
 }
 // detalle venta por venta de cada mes y cuenta, para que el Auditor de la app lo pueda leer (coleccion ml_detalle)
 const __detGuardado={};
@@ -2234,7 +2284,8 @@ firebase.auth().onAuthStateChanged(async u=>{
   await cargarUnidades();
   await load();
   $('cargando').hidden=true;
-  render(); procesando.fin();
+  render(); procesando.fin(); pintarBarraMeses();
+  { const {sel}=periodosACargar(), ult=sel.slice().sort().pop(); if(ult&&$('resMes')&&[...$('resMes').options].some(o=>o.value===ult)){ $('resMes').value=ult; try{renderResumen();}catch(e){} } }
   if(/calcu=1/.test(location.search)){ // solo la calculadora
     document.querySelectorAll('#app > *').forEach(el=>{ if(el.id!=='calcuBox') el.style.display='none'; });
     document.querySelectorAll('main > *').forEach(el=>{ if(el.id!=='app'&&el.id!=='err') el.style.display='none'; });
