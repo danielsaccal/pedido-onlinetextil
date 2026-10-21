@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v291</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v292</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -7481,12 +7481,12 @@ async function abrirRankings(){
   rnDatos.facturas.forEach(f => { const m = String(f.fecha || '').split('/'); if(m.length !== 3) return; const per = m[2] + '-' + m[1];
     const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0), fx = f.total && n0 > 0 ? f.total / n0 : 1.21, sg = signoFact(f);
     (f.items || []).forEach((it, i) => { const S = skuDeFactura(it.codigo), v = it.neto * fx * sg, c = costoItemFactura(it, f), rev = c != null && renglonRevFactura(f, i, v, c);
-      rkFilas.push({ canal: 'fact', per, cli: f.cliente || 'Sin nombre', sku: S, desc: it.desc || '', unid: (+it.cant || 0) * divisorVenta(S) * sg, venta: v, costo: rev ? null : c, sinC: c == null, rev }); }); });
+      rkFilas.push({ canal: 'fact', per, fecha: f.fecha, cli: f.cliente || 'Sin nombre', sku: S, desc: it.desc || '', unid: (+it.cant || 0) * divisorVenta(S) * sg, venta: v, costo: rev ? null : c, sinC: c == null, rev }); }); });
   // Mercado Libre: detalle guardado desde Resultados ML (solo ventas)
   sd.docs.forEach(d => { const x = d.data(), L = String(x.csv || '').split('\n'), cab = (L.shift() || '').split(';'), ix = k => cab.indexOf(k);
     L.forEach(l => { const r = l.split(';'); if(r[ix('tipo')] !== 'Venta') return; const venta = +r[ix('precio')] || 0; if(!(venta > 0)) return;
       const costo = r[ix('costo')] === '' ? null : +r[ix('costo')], quedo = +r[ix('le_queda')] || 0, rev = !!r[ix('para_revisar')];
-      rkFilas.push({ canal: 'ml', per: x.periodo, cli: x.cuenta, sku: String(r[ix('sku_app')] || r[ix('sku_ml')] || '').toUpperCase(), desc: '', unid: +r[ix('unidades')] || 0, venta, quedo, costo: rev ? null : costo, sinC: costo == null, rev }); }); });
+      rkFilas.push({ canal: 'ml', per: x.periodo, fecha: r[ix('fecha')], op: r[ix('operacion')], cli: x.cuenta, sku: String(r[ix('sku_app')] || r[ix('sku_ml')] || '').toUpperCase(), desc: '', unid: +r[ix('unidades')] || 0, venta, quedo, costo: rev ? null : costo, sinC: costo == null, rev }); }); });
   const pers = [...new Set(rkFilas.map(f => f.per))].sort(), nm = p => new Date(p + '-15').toLocaleDateString('es-AR', { month: 'short', year: 'numeric' });
   ['rk-desde', 'rk-hasta'].forEach((id, k) => { const s = document.getElementById(id); s.innerHTML = pers.map(p => `<option value="${p}">${k ? 'hasta ' : 'desde '}${nm(p)}</option>`).join(''); s.value = k ? pers[pers.length - 1] || '' : pers[Math.max(0, pers.length - 1)] || ''; });
   renderRankings();
@@ -7497,7 +7497,7 @@ function renderRankings(){
   const F = rkFilas.filter(f => (canal === 'ambos' || f.canal === canal) && (!d || f.per >= d) && (!ha || f.per <= ha));
   // ganancia: facturas = venta - costo; ML = le queda - costo
   const gan = f => f.costo == null ? null : (f.canal === 'ml' ? f.quedo : f.venta) - f.costo;
-  const tabs = [['productos', '🏆 Productos'], ['origen', '🏭 Fabricado vs reventa'], ['clientes', '👥 Clientes'], ['meses', '📅 Mes por mes']].concat(canal === 'ambos' ? [['canales', '📊 Canales']] : []);
+  const tabs = [['productos', '🏆 Productos'], ['origen', '🏭 Fabricado vs reventa'], ['clientes', '👥 Clientes'], ['meses', '📅 Mes por mes'], ['dias', '📆 Día de la semana']].concat(canal === 'ambos' ? [['canales', '📊 Canales']] : []);
   if(!tabs.some(t => t[0] === rkTab)) rkTab = 'productos';
   document.getElementById('rk-tabs').innerHTML = tabs.map(([k, t]) => `<button type="button" onclick="rkTab='${k}';renderRankings()" style="padding:7px 12px;border-radius:999px;border:1px solid ${rkTab === k ? 'var(--purple)' : 'var(--line)'};background:${rkTab === k ? 'var(--purple)' : '#fff'};color:${rkTab === k ? '#fff' : 'var(--purple)'};font-weight:700;cursor:pointer;">${t}</button>`).join('');
   const agrupar = key => { const G = {}; F.forEach(f => { const k = key(f); const g = G[k] = G[k] || { k, venta: 0, unid: 0, costo: 0, gan: 0, vC: 0, sinC: 0, rev: 0, fact: 0, ml: 0 };
@@ -7520,6 +7520,24 @@ function renderRankings(){
   } else if(rkTab === 'origen'){ html += tabla(ord(agrupar(f => origenSku(f.sku))), 'Origen'); }
   else if(rkTab === 'clientes'){ const L = agrupar(f => f.canal === 'ml' ? 'Mercado Libre · ' + f.cli : f.cli); html += tabla(ord(L).slice(0, 100), 'Cliente'); }
   else if(rkTab === 'meses'){ const L = agrupar(f => f.per).sort((a, b) => a.k.localeCompare(b.k)); L.forEach(g => { g.sub = canal === 'ambos' ? `Facturado ${fP(g.fact)} · ML ${fP(g.ml)}` : ''; g.k = new Date(g.k + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }); }); html += tabla(L, 'Mes'); }
+  else if(rkTab === 'dias'){
+    // cuantas veces aparece cada dia en el periodo (hasta hoy si el periodo llega al mes actual)
+    const ini = new Date(d + '-01T12:00:00'), [hy, hm] = (ha || d).split('-').map(Number), fin0 = new Date(hy, hm, 0, 12), hoy = new Date(); const fin = fin0 > hoy ? hoy : fin0;
+    const veces = [0, 0, 0, 0, 0, 0, 0]; for(let x = new Date(ini); x <= fin; x.setDate(x.getDate() + 1)) veces[x.getDay()]++;
+    const dia = f => { const m = String(f.fecha || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? new Date(+m[3], +m[2] - 1, +m[1], 12).getDay() : null; };
+    const nombres = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'], orden = [1, 2, 3, 4, 5, 6, 0];
+    const bloque = (titulo, filas) => { const G = orden.map(k => ({ k, ops: new Set(), venta: 0, gan: 0, costo: 0, unid: 0 }));
+      filas.forEach(f => { const k = dia(f); if(k == null) return; const g = G.find(x => x.k === k); g.ops.add(f.canal === 'ml' ? f.op : f.fecha + f.cli); g.venta += f.venta; g.unid += f.unid; const gg = gan(f); if(gg != null){ g.gan += gg; g.costo += f.costo; } });
+      const tv = G.reduce((a, g) => a + g.venta, 0) || 1, mxp = Math.max(...G.map(g => veces[g.k] ? g.venta / veces[g.k] : 0), 1);
+      return `<div style="font-weight:800;color:var(--purple);margin:10px 0 4px;">${titulo}</div><div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.86rem;">
+        <tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:6px;">Día</td><td style="padding:6px;text-align:right;">${titulo.includes('Mercado') ? 'Ventas' : 'Comprob.'}</td><td style="padding:6px;text-align:right;">Facturación</td><td style="padding:6px;text-align:right;">Ganancia</td><td style="padding:6px;text-align:right;">% s/costo</td><td style="padding:6px;">Promedio por día</td><td style="padding:6px;text-align:right;">% del total</td></tr>
+        ${G.map(g => { const prom = veces[g.k] ? g.venta / veces[g.k] : 0, p = g.costo > 0 ? Math.round(g.gan / g.costo * 100) : null; return `<tr style="border-top:1px solid var(--line);"><td style="padding:6px;"><b>${nombres[g.k]}</b><div class="note" style="text-align:left;margin:0;">${veces[g.k]} en el período</div></td>
+          <td style="padding:6px;text-align:right;">${g.ops.size.toLocaleString('es-AR')}</td><td style="padding:6px;text-align:right;">${fP(g.venta)}</td><td style="padding:6px;text-align:right;color:${g.gan < 0 ? '#A6432F' : '#2F7A47'};font-weight:700;">${fP(g.gan)}</td><td style="padding:6px;text-align:right;color:${colorPct(p != null ? p / 100 : null)};">${p != null ? p + ' %' : '–'}</td>
+          <td style="padding:6px;min-width:170px;"><div style="display:flex;gap:6px;align-items:center;"><span style="flex:1;background:#F2F2F2;border-radius:6px;height:12px;overflow:hidden;"><span style="display:block;height:100%;width:${Math.max(2, prom / mxp * 100)}%;background:${titulo.includes('Mercado') ? '#FFE600' : 'var(--purple)'};"></span></span><span style="font-size:.78rem;white-space:nowrap;">${fP(prom)}</span></div></td>
+          <td style="padding:6px;text-align:right;color:#8A8072;">${Math.round(g.venta / tv * 100)} %</td></tr>`; }).join('')}</table></div>`; };
+    const ml = F.filter(f => f.canal === 'ml'), fa = F.filter(f => f.canal === 'fact');
+    html += `<p class="note" style="text-align:left;">Mercado Libre: fecha de la venta. Facturadas: fecha de la factura. "Promedio por día" = facturación ÷ cantidad de ese día en el período.</p>`
+      + (ml.length ? bloque('🟡 Mercado Libre', ml) : '') + (fa.length ? bloque('🧾 Facturadas', fa) : '') + (!ml.length && !fa.length ? '<p class="empty-msg">Sin ventas en el período.</p>' : ''); }
   else if(rkTab === 'canales'){ const L = agrupar(f => f.sku || '(sin SKU)').filter(g => g.fact && g.ml); L.forEach(g => { const r = buscarProductoPorSku(g.k); g.sub = r ? r.producto.nombre : ''; });
     html += `<p class="note" style="text-align:left;">SKU que se venden en los dos canales: qué parte de la facturación es mayorista (facturado) y cuál de Mercado Libre.</p>` + tabla(ord(L).slice(0, 100), 'Producto', [['Facturado', g => Math.round(g.fact / g.venta * 100) + ' %'], ['ML', g => Math.round(g.ml / g.venta * 100) + ' %']]); }
   document.getElementById('rk-body').innerHTML = html;
@@ -19750,7 +19768,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v291';
+const APP_VERSION = '2026-10-02-v292';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
