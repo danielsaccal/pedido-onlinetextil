@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v287</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v288</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -11787,7 +11787,13 @@ function pintarDatosAud(){
   const meses = []; for(let i = 0; i < 12; i++){ const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 15); meses.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); }
   box.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><b style="font-size:.88rem;">Datos para auditar:</b>
     <select id="aud-mes" onchange="window.__audMes=this.value" style="padding:6px;border:1px solid var(--line);border-radius:8px;">${meses.map(m => `<option value="${m}" ${m === mesDef ? 'selected' : ''}>${new Date(m + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</option>`).join('')}</select>
-    ${[['negocio', '📊 Resultado del negocio'], ['ml', '📈 ML: resumen del mes'], ['mldet', '🔎 ML: venta por venta (detalle)'], ['facturas', '🧾 Ventas facturadas (detalle)'], ['gastos', '💸 Gastos (detalle)'], ['costos', '💲 Historial de costos']].map(([k, t]) => `<button type="button" class="btn-mini" onclick="adjuntarPaqueteAud('${k}')">${t}</button>`).join('')}</div>
+</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:8px;">
+      <div><div style="font-size:.72rem;font-weight:800;letter-spacing:.06em;color:#8A6417;margin-bottom:4px;">MERCADO LIBRE</div>
+        ${[['ml', '📈 Resumen del mes'], ['mldet', '🔎 Venta por venta (detalle)']].map(([k, t]) => `<button type="button" onclick="adjuntarPaqueteAud('${k}')" style="display:block;width:100%;text-align:left;margin-bottom:6px;padding:8px 10px;border:none;border-radius:10px;background:#FFE600;color:#2D3277;font-weight:700;cursor:pointer;">${t}</button>`).join('')}</div>
+      <div><div style="font-size:.72rem;font-weight:800;letter-spacing:.06em;color:#6B6258;margin-bottom:4px;">NEGOCIO Y FACTURACIÓN</div>
+        ${[['negocio', '📊 Resultado del negocio'], ['facturas', '🧾 Ventas facturadas (detalle)'], ['gastos', '💸 Gastos (detalle)'], ['costos', '💲 Historial de costos']].map(([k, t]) => `<button type="button" class="btn-mini" onclick="adjuntarPaqueteAud('${k}')" style="display:block;width:100%;text-align:left;margin-bottom:6px;">${t}</button>`).join('')}</div>
+    </div>
     <p class="note" style="text-align:left;margin:6px 0 0;">Cada botón adjunta los datos del mes elegido al próximo mensaje. Después escriba qué quiere revisar (o envíe solo "Auditar").</p>`;
 }
 const csvDA = filas => filas.map(r => r.map(v => { const s = String(v == null ? '' : v); return /[",;\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(';')).join('\n');
@@ -19665,7 +19671,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v287';
+const APP_VERSION = '2026-10-02-v288';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
