@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v286</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v287</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -11787,7 +11787,7 @@ function pintarDatosAud(){
   const meses = []; for(let i = 0; i < 12; i++){ const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 15); meses.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); }
   box.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><b style="font-size:.88rem;">Datos para auditar:</b>
     <select id="aud-mes" onchange="window.__audMes=this.value" style="padding:6px;border:1px solid var(--line);border-radius:8px;">${meses.map(m => `<option value="${m}" ${m === mesDef ? 'selected' : ''}>${new Date(m + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</option>`).join('')}</select>
-    ${[['negocio', '📊 Resultado del negocio'], ['ml', '📈 Resultados ML'], ['facturas', '🧾 Ventas facturadas'], ['gastos', '💸 Gastos'], ['costos', '💲 Historial de costos']].map(([k, t]) => `<button type="button" class="btn-mini" onclick="adjuntarPaqueteAud('${k}')">${t}</button>`).join('')}</div>
+    ${[['negocio', '📊 Resultado del negocio'], ['ml', '📈 ML: resumen del mes'], ['mldet', '🔎 ML: venta por venta (detalle)'], ['facturas', '🧾 Ventas facturadas (detalle)'], ['gastos', '💸 Gastos (detalle)'], ['costos', '💲 Historial de costos']].map(([k, t]) => `<button type="button" class="btn-mini" onclick="adjuntarPaqueteAud('${k}')">${t}</button>`).join('')}</div>
     <p class="note" style="text-align:left;margin:6px 0 0;">Cada botón adjunta los datos del mes elegido al próximo mensaje. Después escriba qué quiere revisar (o envíe solo "Auditar").</p>`;
 }
 const csvDA = filas => filas.map(r => r.map(v => { const s = String(v == null ? '' : v); return /[",;\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(';')).join('\n');
@@ -11806,6 +11806,11 @@ async function adjuntarPaqueteAud(tipo, mesForzado){
       if(!L.length){ procesando.fin(); alert('No hay datos de Mercado Libre de ese mes: abra Resultados ML con el mes cargado.'); return; }
       const cs = [...new Set(L.flatMap(x => Object.keys(x.desglose || {})))];
       txt = csvDA([['Cuenta', 'Vendido', 'Envíos cobrados', 'Le quedó', 'Cargos ML', 'Costo mercadería', 'Ventas sin costo', 'Para revisar', ...cs]].concat(L.map(x => [x.cuenta, x.vendido, x.envios, x.quedo, x.cargosML, x.costo, x.sinCosto, x.revisar, ...cs.map(c => (x.desglose || {})[c] || 0)]))); }
+    else if(tipo === 'mldet'){
+      const s = await db.collection('ml_detalle').where('periodo', '==', mes).get(); const docs = s.docs.map(d => d.data()).filter(d => d.periodo === mes);
+      if(!docs.length){ procesando.fin(); alert('No hay detalle de Mercado Libre de ese mes: abra Resultados ML con el mes cargado (se guarda solo).'); return; }
+      docs.forEach(d => daDocs.push({ tipo: 'texto', nombre: `ml-detalle-${d.cuenta}-${mes}.csv`, data: `Ventas de Mercado Libre, cuenta ${d.cuenta}, ${nm}: una fila por operación (montos con IVA, separador ;). ${d.filas} filas.\n` + d.csv }));
+      renderAdjuntosDA(); procesando.listo('✓ Detalle de ML adjuntado'); return; }
     else if(tipo === 'facturas'){ nombre = `ventas-facturadas-${mes}.csv`; const filas = [['Comprobante', 'Tipo', 'Fecha', 'Cliente', 'SKU', 'Descripción', 'Cantidad', 'Unidad de venta', 'Venta con IVA', 'Costo', 'Ganancia', 'Estado']];
       D.facturas.filter(enMes).forEach(f => { const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0), fx = f.total && n0 > 0 ? f.total / n0 : 1.21, sg = signoFact(f);
         (f.items || []).forEach((it, i) => { const v = it.neto * fx * sg, c = costoItemFactura(it, f), s = skuDeFactura(it.codigo); filas.push([(f.esNC ? 'NC ' : '') + f.numero, f.tipo || '', f.fecha, f.cliente || '', s, it.desc || '', it.cant, unidadVentaSku(s) || 'unidad', Math.round(v), c != null ? Math.round(c) : '', c != null ? Math.round(v - c) : '', c == null ? 'sin costo' : renglonRevFactura(f, i, v, c) ? 'para revisar' : 'ok']); }); });
@@ -19660,7 +19665,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v286';
+const APP_VERSION = '2026-10-02-v287';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
