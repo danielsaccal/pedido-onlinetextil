@@ -780,10 +780,14 @@ function periodosACargar(){
 async function cargarPeriodos(lista){
   const faltan=MESES_META.filter(x=>lista.includes(x.periodo)&&!DATA.some(d=>d.cuenta===x.cuenta&&d.periodo===x.periodo));
   let hechos=0;
-  await Promise.all(faltan.map(async x=>{ const bs=await x.ref.collection('bloques').get();
+  const fallas=[];
+  await Promise.all(faltan.map(async x=>{ try{
+    const bs=await Promise.race([x.ref.collection('bloques').get(), new Promise((_,rej)=>setTimeout(()=>rej(new Error('tardó demasiado')),60000))]);
     const rows=bs.docs.sort((a,b)=>a.id.localeCompare(b.id)).flatMap(b=>b.data().rows||[]);
-    DATA.push(normEntry({file:x.file,cuenta:x.cuenta,periodo:x.periodo,rows})); hechos++;
-    try{procesando.texto('Cargando meses… '+hechos+' de '+faltan.length);}catch(e){} }));
+    DATA.push(normEntry({file:x.file,cuenta:x.cuenta,periodo:x.periodo,rows})); }
+    catch(e){ console.error(e); fallas.push(x.cuenta+' '+x.periodo+' ('+(e.message||e)+')'); }
+    hechos++; try{procesando.texto('Cargando meses… '+hechos+' de '+faltan.length);}catch(e){} }));
+  if(fallas.length) showErr('No se pudieron cargar: '+fallas.join(', ')+'. Recargue la página; si se repite, envíe una captura.');
   DATA.sort((a,b)=>a.periodo.localeCompare(b.periodo));
 }
 async function load(){
@@ -828,7 +832,8 @@ async function aplicarSelectorMeses(){
   document.getElementById('selMesesModal').remove();
   procesando('Cargando meses…');
   try{ const {cargar}=periodosACargar(); DATA=DATA.filter(d=>cargar.includes(d.periodo)); await cargarPeriodos(cargar); }catch(e){ procesando.error(e.message); return; }
-  render(); pintarBarraMeses(); procesando.listo('✓ Listo');
+  try{ render(); }catch(e){ console.error(e); showErr('Error al mostrar los resultados: '+(e.message||e)+' — envíe una captura de este mensaje.'); }
+  pintarBarraMeses(); procesando.listo('✓ Listo');
   const ult=ps.slice().sort().pop(); if($('resMes')&&[...$('resMes').options].some(o=>o.value===ult)){ $('resMes').value=ult; try{renderResumen();}catch(e){} }
 }
 function showErr(m){const e=$('err');e.textContent=m;e.style.display=m?'block':'none';}
@@ -1240,7 +1245,7 @@ function calcularQueda(){
     ${fila('Flex','🛵')}${fila('Correo','📦')}${fila('Full','🏬')}</table>
     <p class="note" style="margin-top:6px;">Promedio de tus ventas reales ${con?'con cuotas':'sin cuotas'} de precio parecido: comisión, cargo fijo, cuotas, envío, cadete Flex (con reintegros) e impuestos. Antes de restar tu costo.</p>`;
 }
-// ===== Control automatico: ventas con numeros sospechosos quedan afuera de los totales hasta confirmarlas =====
+// ===== Control automatico: ventas con numeros sospechosos quedan MARCADAS para revisar (se suman igual) =====
 let CONFIRMADAS={};
 async function cargarConfirmadas(){try{const d=await db.collection('config').doc('ml_confirmadas').get();CONFIRMADAS=d.exists?(d.data().ops||{}):{};}catch(e){CONFIRMADAS={};}}
 let PACKS={};
@@ -1263,7 +1268,7 @@ function marcarSospechosas(){
     if(!m.length)continue;
     o.revisar=m;
     const k=String(o.op||'')+'|'+String(o.skuBaseML||o.skuBase);
-    if(!CONFIRMADAS[k]){o.costoRev=o.costo;o.ganRev=o.gan;o.ganPctRev=o.ganPct;o.costo=null;o.gan=null;o.ganPct=null;}
+    if(!CONFIRMADAS[k]){o.costoRev=o.costo;o.ganRev=o.gan;o.ganPctRev=o.ganPct;} // queda marcada para revisar, pero se suma
   }
 }
 // ===== Corregir el costo de cualquier SKU (este o no en el catalogo) =====
@@ -1274,9 +1279,9 @@ function pedirCorregirCosto(btn,sku){
   const h0=COSTOS[String(sku).toUpperCase()], act=h0&&h0.length?h0[h0.length-1].costo:null, id='cc-'+Math.random().toString(36).slice(2,8);
   f=document.createElement('div'); f.className='corr-form';
   f.style.cssText='display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;background:#FAF8F5;border:1px solid var(--line);border-radius:10px;padding:8px;';
-  f.innerHTML=`<span style="font-size:.85rem;">Costo por unidad de <b>${sku}</b>${act!=null?` (hoy: ${fmt(act)})`:''}:</span>
-    <span><input id="${id}" placeholder="costo $ c/u" value="" style="width:130px;height:30px;min-height:0;padding:3px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box;"></span>
-    <select id="${id}-m" style="padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;width:auto;"><option value="error">Era un error de carga: corregir también las ventas anteriores</option><option value="cambio">El costo cambió: rige desde hoy</option><option value="todas">Aplicar a TODAS las ventas de este SKU (todas las fechas)</option></select>
+  f.innerHTML=`<span style="font-size:.85rem;">Costo por <b>${uvTxt(sku)}</b> de <b>${sku}</b>${act!=null?` (hoy: ${fmt(act*cantUV(sku))} por ${uvTxt(sku)})`:''}:</span>
+    <span><input id="${id}" placeholder="$ por ${uvTxt(sku)}" value="" style="width:130px;height:30px;min-height:0;padding:3px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box;"></span>
+    <select id="${id}-m" style="padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;width:auto;"><option value="error">Era un error de carga: corregir también las ventas anteriores</option><option value="cambio">El costo cambió: rige desde hoy</option><option value="todas">Corregir un costo mal cargado (elijo qué fechas)</option></select>
     <button type="button" style="padding:5px 12px;border-radius:8px;border:none;background:#3d1466;color:#fff;font-weight:700;cursor:pointer;" onclick="costoFaltante('${String(sku).replace(/'/g,'')}','${id}',document.getElementById('${id}-m').value)">Guardar</button>
     <small class="meta" style="width:100%;">"Era un error" reemplaza el último costo cargado (las ventas desde esa fecha toman el valor corregido). "Cambió" lo registra con fecha de hoy: las ventas anteriores conservan su costo.</small>`;
   cont.appendChild(f); f.querySelector('input').focus();
@@ -1339,7 +1344,7 @@ function renderRevisar(){
   const box=$('revisarBox'); if(!box)return;
   if(!L.length){box.innerHTML='<p class="note">✓ No hay ventas para revisar.</p>';return;}
   const abierta=!!(box.querySelector('details')&&box.querySelector('details').open)||window.__revAbierta;
-  box.innerHTML=`<details class="pleg" style="margin:10px 0;" ${abierta?'open':''} ontoggle="window.__revAbierta=this.open"><summary style="background:#FDEBE7;border-color:#E3B8AE;color:#A6432F;">⚠️ ${L.length} ${L.length===1?'venta para revisar':'ventas para revisar'} <small style="color:#A6432F;">· no se cuentan en la ganancia hasta que las confirmes</small></summary><div class="pleg-body">
+  box.innerHTML=`<details class="pleg" style="margin:10px 0;" ${abierta?'open':''} ontoggle="window.__revAbierta=this.open"><summary style="background:#FDEBE7;border-color:#E3B8AE;color:#A6432F;">⚠️ ${L.length} ${L.length===1?'venta para revisar':'ventas para revisar'} <small style="color:#A6432F;">· se suman igual; revisá el costo o la unidad y corregilo</small></summary><div class="pleg-body">
     ${(()=>{ const G={}; L.forEach(o=>{const s=String(o.skuBase||'').toUpperCase();(G[s]=G[s]||[]).push(o);});
       const item=o=>`<div style="border-bottom:1px solid var(--line);padding:8px 0 8px 10px;font-size:.88rem;box-shadow:inset 4px 0 0 ${colorCta(o.cuenta)};">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;">${etiquetaCta(o.cuenta)}<b>${o.skuBase}</b><span class="meta">${o.fecha} · ${o.unid} unid. · precio ${fmt(o.pcd)} · costo ${fmt(o.costoRev)}</span>
@@ -1358,8 +1363,8 @@ function renderRevisar(){
             <span style="color:#A6432F;font-weight:700;">${os.length} ${os.length===1?'venta':'ventas'} para revisar</span>
             <span class="meta">costo usado ${usados.slice(0,3).map(fmt).join(' / ')}${usados.length>3?'…':''} · costo actual ${act!=null?fmt(act):'—'}</span>
             <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;">
-              ${act!=null?`<button type="button" style="padding:4px 10px;border-radius:8px;border:none;background:#3d1466;color:#fff;font-weight:700;cursor:pointer;" onclick="aplicarCostoTodas('${sq}',${act})">Usar el costo actual en todas</button>`:''}
-              <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="const v=prompt('Costo por unidad para TODAS las ventas de ${sq}:','');const n=leerMonto(v);if(n>0)aplicarCostoTodas('${sq}',n);">✏️ Otro costo para todas</button>
+              ${act!=null?`<button type="button" style="padding:4px 10px;border-radius:8px;border:none;background:#3d1466;color:#fff;font-weight:700;cursor:pointer;" onclick="aplicarCostoTodas('${sq}',${act}*cantUV('${sq}'))">Corregir con el costo actual</button>`:''}
+              <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="const v=prompt('Costo correcto de ${sq} por '+uvTxt('${sq}')+':','');const n=leerMonto(v);if(n>0)aplicarCostoTodas('${sq}',n);">✏️ Corregir costo mal cargado</button>
               <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="window.__revGrupos=window.__revGrupos||{};window.__revGrupos['${sq}']=!window.__revGrupos['${sq}'];renderRevisar();">${abierto?'Ocultar ventas':'Ver ventas'}</button></span></div>
           ${abierto?`<div style="padding:0 10px 6px;">${os.map(item).join('')}</div>`:''}</div>`; }).join(''); })()}
     <p class="note">Si el número está bien, tocá <b>✓ Está bien</b> y pasa a contarse. Si está mal, corregí el costo, la unidad (docena) o la equivalencia y la alerta desaparece sola.</p></div></details>`;
@@ -1442,6 +1447,9 @@ async function guardarReclamo(k,campo,valor){
 const ESTADOS_REC=[['','Sin reclamar'],['reclamado','Reclamado, esperando respuesta'],['total','Devuelto total'],['parcial','Devuelto parcial'],['rechazado','Rechazado']];
 function recuperado(x){const r=RECLAMOS[x.k]||{};return r.estado==='total'?-x.net:r.estado==='parcial'?Math.min(-x.net,+r.monto||0):0;}
 // montos escritos a mano: "24591.02", "24591,02" y "24.591,02" valen lo mismo
+let UV={}; // SKU -> cuantas unidades trae su unidad de venta (docena = 12); lo guarda la app
+const cantUV=s=>{const n=+UV[String(s||'').toUpperCase()];return n>0?n:1;};
+const uvTxt=s=>{const n=cantUV(s);return n===12?'docena':n===6?'media docena':n===2?'par':n===1?'unidad':n+' unidades';};
 const leerMonto=s=>{let t=String(s==null?'':s).trim().replace(/[$\s]/g,'');if(!t)return NaN;const lp=t.lastIndexOf('.'),lc=t.lastIndexOf(',');
   if(lp>=0&&lc>=0){const dec=lp>lc?'.':',',mil=dec==='.'?',':'.';return parseFloat(t.split(mil).join('').replace(dec,'.'));}
   if(lc>=0){return parseFloat(t.slice(0,lc).replace(/,/g,'')+'.'+t.slice(lc+1));}
@@ -1536,22 +1544,33 @@ function renderDiagnostico(){
       ${f.h0.length>1?`<div class="meta" style="margin-top:2px;">Historial: ${f.h0.map(x=>`<span style="${f.raros.includes(x)?'color:#A6432F;font-weight:700;':''}">${x.fecha.split('-').reverse().join('/')} ${fmt(x.costo)}${f.raros.includes(x)?` (×${(x.costo/f.act).toLocaleString('es-AR',{maximumFractionDigits:1})})`:''}</span>`).join(' · ')}</div>`:''}
       ${Object.keys(f.g.motivos).length?`<div class="meta" style="margin-top:2px;">Motivos: ${Object.entries(f.g.motivos).map(([m,n])=>`${m} (${n})`).join(' · ')}</div>`:''}
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${f.raros.length?`<button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:.8rem;" onclick="corregirDudosos(['${f.s}'])">🛠️ Usar el costo actual para las ventas anteriores</button>`:''}
-      <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:.8rem;" onclick="const v=prompt('Costo por unidad para TODAS las ventas de ${f.s}:','${f.act!=null?Math.round(f.act):''}');const n=leerMonto(v);if(n>0)aplicarCostoTodas('${f.s}',n);">✏️ Aplicar un costo a todas sus ventas</button></div></div>`).join('')||'<p class="note">No se encontraron costos dudosos.</p>'}</div>`;
+      <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:.8rem;" onclick="const v=prompt('Costo correcto de ${f.s} por '+uvTxt('${f.s}')+':','${f.act!=null?Math.round(f.act*cantUV(f.s)):''}');const n=leerMonto(v);if(n>0)aplicarCostoTodas('${f.s}',n);">✏️ Corregir costo mal cargado</button></div></div>`).join('')||'<p class="note">No se encontraron costos dudosos.</p>'}</div>`;
 }
 // un mismo costo para TODAS las ventas de un SKU: todos sus registros del historial pasan a ese valor
-async function aplicarCostoTodas(sku, n){
-  sku=String(sku).toUpperCase(); n=+n; if(!(n>0))return;
-  const hs=COSTOS[sku]||[], ventas=allRows().filter(o=>String(o.skuBase||'').toUpperCase()===sku&&o.tipo==='Venta'&&o.pcd>0).length;
-  const cambia=hs.filter(x=>Math.abs(x.costo-n)>0.009);
-  if(!confirm(`¿Usar ${fmt(n)} por unidad como costo de TODAS las ventas de ${sku} (${ventas} ventas, todas las fechas)?\n\n${hs.length?`Se cambian ${cambia.length} de ${hs.length} registros del historial${cambia.length?':\n'+cambia.slice(0,12).map(x=>`${x.fecha.split('-').reverse().join('/')}: ${fmt(x.costo)} → ${fmt(n)}`).join('\n')+(cambia.length>12?'\n…':''):'.'}`:'No tenía costos registrados: se crea uno que rige para todas las fechas.'}`))return;
-  procesando('Aplicando el costo…');
-  try{
-    if(hs.length){const lote=db.batch();cambia.forEach(x=>{if(x.id)lote.set(db.collection('historial_costos').doc(x.id),{costo:n,costoAnterior:x.costo,corregido:new Date().toISOString()},{merge:true});});await lote.commit();cambia.forEach(x=>x.costo=n);}
-    else{const r=await db.collection('historial_costos').add({sku,fecha:'2000-01-01',costo:n,desglose:{reventa:true,desde:'resultados-ml todas'},creado:Date.now()});COSTOS[sku]=[{id:r&&r.id,fecha:'2000-01-01',costo:n,creado:Date.now()}];}
-    try{const d=await db.collection('config').doc('costos_reventa').get();const c=d.exists?(d.data().c||{}):{};if(c[sku]!==undefined||!hs.length){c[sku]=n;await db.collection('config').doc('costos_reventa').set({c,actualizado:new Date().toISOString()});}}catch(e){}
-    procesando.listo('✓ Costo aplicado a todas las ventas de '+sku);
-  }catch(e){procesando.error(e.message);alert('No se pudo guardar: '+e.message);return;}
-  render(); if(window.__pantallaML==='diag')renderDiagnostico();
+// corregir un costo mal cargado: muestra los registros del historial y se corrigen SOLO los que se tildan (nUV = costo por unidad de venta)
+async function aplicarCostoTodas(sku, nUV){
+  sku=String(sku).toUpperCase(); nUV=+nUV; if(!(nUV>0))return; const k=cantUV(sku), n=Math.round(nUV/k*10000)/10000;
+  const hs=(COSTOS[sku]||[]).slice();
+  const m=document.createElement('div'); m.id='corrModal'; m.style.cssText='position:fixed;inset:0;background:rgba(20,8,35,.55);z-index:400;display:flex;align-items:center;justify-content:center;padding:12px;';
+  m.innerHTML=`<div style="background:#fff;border-radius:16px;max-width:460px;width:100%;padding:16px;max-height:85vh;overflow:auto;">
+    <b style="color:#3d1466;">Corregir el costo de ${sku}</b>
+    <p class="note" style="margin:6px 0;">Costo correcto: <b>${fmt(nUV)} por ${uvTxt(sku)}</b>. Tilde solo los registros que estaban mal cargados; los demás se conservan (cada venta sigue usando el costo de su fecha).</p>
+    ${hs.length?hs.map((x,i)=>{const mal=Math.abs(x.costo-n)/n>0.5;return `<label style="display:flex;gap:8px;align-items:center;padding:6px 2px;border-top:1px solid var(--line);"><input type="checkbox" class="cm-r" value="${i}" ${mal?'checked':''} style="width:18px;height:18px;"><span style="flex:1;">${String(x.fecha).split('-').reverse().join('/')}</span><b style="color:${mal?'#A6432F':'inherit'};">${fmt(x.costo*k)}</b><span class="meta">por ${uvTxt(sku)}</span></label>`;}).join(''):'<p class="note">No tenía costos registrados: se crea uno que rige para todas las fechas.</p>'}
+    <div style="display:flex;gap:8px;margin-top:10px;"><button type="button" id="cm-ok" style="flex:1;padding:10px;border:none;border-radius:10px;background:#3d1466;color:#fff;font-weight:700;cursor:pointer;">Corregir los tildados</button><button type="button" style="padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer;" onclick="document.getElementById('corrModal').remove()">Cancelar</button></div></div>`;
+  document.body.appendChild(m);
+  m.querySelector('#cm-ok').onclick=async()=>{
+    const sel=[...m.querySelectorAll('.cm-r:checked')].map(c=>hs[+c.value]); if(hs.length&&!sel.length){alert('No tildó ningún registro.');return;}
+    m.remove(); procesando('Corrigiendo el costo…');
+    try{
+      if(hs.length){ const sinId=sel.filter(x=>!x.id); if(sinId.length) throw new Error('faltan datos del historial: recargue la página (Ctrl + Shift + R) y vuelva a intentar');
+        const lote=db.batch(); sel.forEach(x=>lote.set(db.collection('historial_costos').doc(x.id),{costo:n,costoAnterior:x.costo,corregido:new Date().toISOString()},{merge:true})); await lote.commit(); sel.forEach(x=>x.costo=n); }
+      else{ const r=await db.collection('historial_costos').add({sku,fecha:'2000-01-01',costo:n,desglose:{reventa:true,desde:'resultados-ml corregir'},creado:Date.now()}); COSTOS[sku]=[{id:r&&r.id,fecha:'2000-01-01',costo:n,creado:Date.now()}]; }
+      const ultimo=(COSTOS[sku]||[]).slice(-1)[0];
+      if(!hs.length||sel.includes(ultimo)){ const d=await db.collection('config').doc('costos_reventa').get(); const c=d.exists?(d.data().c||{}):{}; if(c[sku]!==undefined||!hs.length){ c[sku]=nUV; await db.collection('config').doc('costos_reventa').set({c,actualizado:new Date().toISOString()}); } }
+      procesando.listo('✓ '+(hs.length?sel.length+' registro(s) corregidos':'Costo creado'));
+    }catch(e){procesando.error(e.message);alert('No se pudo guardar: '+e.message);return;}
+    render(); if(window.__pantallaML==='diag')renderDiagnostico();
+  };
 }
 // corrige en bloque los registros dudosos (mas de 3 veces distintos del actual): pasan a tener el costo actual
 async function corregirDudosos(skus){
@@ -1705,7 +1724,7 @@ async function cargarEquivalencias(){try{const d=await db.collection('config').d
       const hoy=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
       const ref=db.collection('config').doc('costos_reventa');const d2=await ref.get();const c=d2.exists?(d2.data().c||{}):{};
       for(const [k,v] of malos){const sku=k.includes('|')?k.split('|')[1]:k;const n=parseFloat(String(v).replace(/[$\s]/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',','.'));
-        if(n>0){c[sku]=n;await db.collection('historial_costos').add({sku,fecha:hoy,costo:n,desglose:{reventa:true,desde:'arreglo equivalencia'},creado:Date.now()});(COSTOS[sku]=COSTOS[sku]||[]).push({fecha:hoy,costo:n,creado:Date.now()});}
+        if(n>0){c[sku]=n;const nU=Math.round(n/cantUV(sku)*10000)/10000;const r0=await db.collection('historial_costos').add({sku,fecha:hoy,costo:nU,desglose:{reventa:true,desde:'arreglo equivalencia'},creado:Date.now()});(COSTOS[sku]=COSTOS[sku]||[]).push({id:r0&&r0.id,fecha:hoy,costo:nU,creado:Date.now()});}
         delete EQ[k];}
       await ref.set({c,actualizado:new Date().toISOString()});await guardarEquivalencias();
       setTimeout(()=>alertOk('Arreglé '+malos.length+' casos donde se había escrito un precio como código: quedaron como costo.'),1500);
@@ -1862,8 +1881,8 @@ function renderOrigen(){
 // accion directa para cada SKU sin costo: emparejar, cargar costo o abrir la pantalla de la app que corresponde
 function accionFaltante(g,t,det){
   const id='fa-'+g.k.replace(/[^A-Z0-9]/gi,'_'), inp=(ph,fn)=>`<input id="${id}" placeholder="${ph}" style="width:120px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;text-transform:uppercase;" onkeydown="if(event.key==='Enter')${fn}"> <button type="button" style="padding:5px 10px;border-radius:8px;border:none;background:#f4c430;color:#3d1466;font-weight:700;cursor:pointer;font-size:.8rem;" onclick="${fn}">OK</button>`;
-  if(!g.enApp)return inp('código en la app',`emparejarFaltante('${g.k}','${id}')`)+`<div style="margin-top:4px;"><input id="${id}-c" placeholder="o costo $ c/u" style="width:120px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;" onkeydown="if(event.key==='Enter')costoFaltante('${g.k}','${id}-c')"> <button type="button" style="padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:#3d1466;font-weight:700;cursor:pointer;font-size:.8rem;" onclick="costoFaltante('${g.k}','${id}-c')">OK</button></div>`;
-  if(t==='Sin costo')return inp('costo $ c/u',`costoFaltante('${g.k}','${id}')`)+`<div><a href="#" onclick="event.preventDefault();abrirEnApp('completar','sku','${g.k}')" style="font-size:.74rem;">o lo fabrico: elegir artículo y tela</a></div>`;
+  if(!g.enApp)return inp('código en la app',`emparejarFaltante('${g.k}','${id}')`)+`<div style="margin-top:4px;"><input id="${id}-c" placeholder="o costo $ por ${uvTxt(g.k)}" style="width:120px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;" onkeydown="if(event.key==='Enter')costoFaltante('${g.k}','${id}-c')"> <button type="button" style="padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:#3d1466;font-weight:700;cursor:pointer;font-size:.8rem;" onclick="costoFaltante('${g.k}','${id}-c')">OK</button></div>`;
+  if(t==='Sin costo')return inp('costo $ por '+uvTxt(g.k),`costoFaltante('${g.k}','${id}')`)+`<div><a href="#" onclick="event.preventDefault();abrirEnApp('completar','sku','${g.k}')" style="font-size:.74rem;">o lo fabrico: elegir artículo y tela</a></div>`;
   if(/tela sin precio|tela no cargada/i.test(t)){const m=det.match(/La tela ([A-Z0-9]+)/i);return `<a href="#" onclick="event.preventDefault();abrirEnApp('telas','q','${m?m[1]:''}')" style="font-size:.82rem;font-weight:700;">🧵 Cargar precio de la tela</a>`;}
   return `<a href="#" onclick="event.preventDefault();abrirEnApp('completar','sku','${g.k}')" style="font-size:.82rem;font-weight:700;">✏️ Completar artículo y tela</a>`;
 }
@@ -1874,13 +1893,14 @@ async function emparejarFaltante(sku,id){
   render(); alertOk(sku+' → '+v);
 }
 async function costoFaltante(sku,id,modo){
-  if(modo==='todas'){ const n0=leerMonto(($(id).value||'').trim()); if(!(n0>0)){showErr('Escribí el costo por unidad.');return;} return aplicarCostoTodas(sku,n0); }
-  const raw=($(id).value||'').trim(); const n=leerMonto(raw); if(!(n>0)){showErr('Escribí el costo por unidad.');return;}
-  { const h0=COSTOS[sku], a=h0&&h0.length?h0[h0.length-1].costo:null; if(!confirm(`¿Guardar el costo de ${sku} en ${fmt(n)} por unidad?`+(a>0&&(n/a>5||a/n>5)?`\n\n¡Atención! Antes era ${fmt(a)}: cambia más de 5 veces.`:'')))return; }
+  if(modo==='todas'){ const n0=leerMonto(($(id).value||'').trim()); if(!(n0>0)){showErr('Escribí el costo por '+uvTxt(sku)+'.');return;} return aplicarCostoTodas(sku,n0); }
+  const raw=($(id).value||'').trim(); const nUV=leerMonto(raw); if(!(nUV>0)){showErr('Escribí el costo por '+uvTxt(sku)+'.');return;}
+  const n=Math.round(nUV/cantUV(sku)*10000)/10000; // el historial guarda el costo por pieza; costos de reventa, por unidad de venta
+  { const h0=COSTOS[sku], a=h0&&h0.length?h0[h0.length-1].costo:null; if(!confirm(`¿Guardar el costo de ${sku} en ${fmt(nUV)} por ${uvTxt(sku)}?`+(cantUV(sku)>1?` (${fmt(n)} por pieza)`:'')+(a>0&&(n/a>5||a/n>5)?`\n\n¡Atención! Antes era ${fmt(a*cantUV(sku))} por ${uvTxt(sku)}: cambia más de 5 veces.`:'')))return; }
   const hoy=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
   try{
     const ref=db.collection('config').doc('costos_reventa'); const d=await ref.get(); const c=d.exists?(d.data().c||{}):{};
-    c[sku]=n; await ref.set({c,actualizado:new Date().toISOString()});
+    c[sku]=nUV; await ref.set({c,actualizado:new Date().toISOString()});
     const hs=COSTOS[sku]||[], ultimo=hs.length?hs[hs.length-1]:null;
     if(modo==='error'&&ultimo&&ultimo.id){ // corrige el registro equivocado: las ventas desde esa fecha toman el valor correcto
       await db.collection('historial_costos').doc(ultimo.id).set({costo:n,corregido:new Date().toISOString()},{merge:true}); ultimo.costo=n;
@@ -1888,7 +1908,7 @@ async function costoFaltante(sku,id,modo){
       const r=await db.collection('historial_costos').add({sku,fecha:hoy,costo:n,desglose:{reventa:true,desde:'resultados-ml'},creado:Date.now()});
       (COSTOS[sku]=COSTOS[sku]||[]).push({id:r&&r.id,fecha:hoy,costo:n,creado:Date.now()});
     }
-    render(); alertOk('Costo de '+sku+' guardado: '+fmt(n)+' por unidad.');
+    render(); alertOk('Costo de '+sku+' guardado: '+fmt(nUV)+' por '+uvTxt(sku)+'.');
   }catch(e){showErr('No se pudo guardar: '+e.message);}
 }
 // la app adentro de una ventana: se completa sin salir de esta pagina
@@ -1903,7 +1923,8 @@ function abrirEnApp(ir,param,valor){
 function cerrarApp(){const m=$('appModal');if(m){m.style.display='none';$('appFrame').src='about:blank';}refrescarCostos();}
 async function refrescarCostos(){
   try{NAMES=(await idbApp('nombres_sku'))||NAMES;MOTIVOS=(await idbApp('motivos_sin_costo'))||{};TIPO=(await idbApp('tipo_sku'))||TIPO;KITS=(await idbApp('kits_sku'))||KITS;}catch(e){}
-  try{const s=await db.collection('historial_costos').get();const m={};s.docs.forEach(x=>{const v=x.data();const k=String(v.sku||'').toUpperCase();(m[k]=m[k]||[]).push({fecha:v.fecha,costo:+v.costo,creado:+v.creado||0});});
+  try{UV=(await idbApp('unidad_venta_sku'))||UV;}catch(e){}
+  try{const s=await db.collection('historial_costos').get();const m={};s.docs.forEach(x=>{const v=x.data();const k=String(v.sku||'').toUpperCase();(m[k]=m[k]||[]).push({id:x.id,fecha:v.fecha,costo:+v.costo,creado:+v.creado||0});});
     Object.values(m).forEach(a=>a.sort((x,y)=>x.fecha.localeCompare(y.fecha)||x.creado-y.creado));COSTOS=m;}catch(e){}
   render();
 }
@@ -2267,6 +2288,7 @@ firebase.auth().onAuthStateChanged(async u=>{
   MOTIVOS=(await idbApp('motivos_sin_costo'))||{};
   TIPO=(await idbApp('tipo_sku'))||{};
   KITS=(await idbApp('kits_sku'))||{};
+  try{UV=(await idbApp('unidad_venta_sku'))||{};}catch(e){UV={};}
   {const s=$('modoCosto');if(s)s.value=MODO_COSTO;}
   try{const s=await db.collection('historial_costos').get();const m={};s.docs.forEach(x=>{const v=x.data();const k=String(v.sku||'').toUpperCase();(m[k]=m[k]||[]).push({id:x.id,fecha:v.fecha,costo:+v.costo,creado:+v.creado||0});});
     let ult={};try{const u=await db.collection('config').doc('costos_ultimo').get();ult=u.exists?(u.data().c||{}):{};}catch(e){}
@@ -2282,9 +2304,10 @@ firebase.auth().onAuthStateChanged(async u=>{
   await cargarEquivalencias();
   await cargarConfirmadas();
   await cargarUnidades();
-  await load();
+  try{ await load(); }catch(e){ showErr('No se pudieron leer los meses: '+(e.message||e)); }
   $('cargando').hidden=true;
-  render(); procesando.fin(); pintarBarraMeses();
+  try{ render(); }catch(e){ console.error(e); showErr('Error al mostrar los resultados: '+(e.message||e)+' — envíe una captura de este mensaje.'); }
+  procesando.fin(); try{ pintarBarraMeses(); }catch(e){}
   { const {sel}=periodosACargar(), ult=sel.slice().sort().pop(); if(ult&&$('resMes')&&[...$('resMes').options].some(o=>o.value===ult)){ $('resMes').value=ult; try{renderResumen();}catch(e){} } }
   if(/calcu=1/.test(location.search)){ // solo la calculadora
     document.querySelectorAll('#app > *').forEach(el=>{ if(el.id!=='calcuBox') el.style.display='none'; });
