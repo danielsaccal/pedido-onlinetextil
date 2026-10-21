@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v290</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v291</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -7509,13 +7509,13 @@ function renderRankings(){
   const cab = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px;">${[['Facturación', fP(tot.venta)], ['Unidades', Math.round(tot.unid).toLocaleString('es-AR')], ['Ganancia', fP(tot.gan)], ['% s/costo', pct(tot) != null ? pct(tot) + ' %' : '–']].map(([t, v]) => `<div style="border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:#fff;"><small class="note" style="margin:0;">${t}</small><div style="font-weight:800;font-size:1.05rem;">${v}</div></div>`).join('')}</div>${aviso}`;
   const tabla = (filas, colK, extra) => `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.86rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:6px;">#</td><td style="padding:6px;">${colK}</td>${extra ? extra.map(e => `<td style="padding:6px;text-align:right;">${e[0]}</td>`).join('') : ''}<td style="padding:6px;text-align:right;">Unid.</td><td style="padding:6px;text-align:right;">Facturación</td><td style="padding:6px;text-align:right;">Ganancia</td><td style="padding:6px;text-align:right;">% s/costo</td></tr>
     ${filas.map((g, i) => { const p = pct(g); return `<tr style="border-top:1px solid var(--line);"><td style="padding:6px;color:#8A8072;">${i + 1}</td><td style="padding:6px;"><b>${escaparHtml(g.k)}</b>${g.sub ? `<div class="note" style="text-align:left;margin:0;">${escaparHtml(g.sub)}</div>` : ''}${g.sinC || g.rev ? `<div style="font-size:.72rem;color:#8A6417;">${g.sinC ? g.sinC + ' sin costo' : ''}${g.sinC && g.rev ? ' · ' : ''}${g.rev ? g.rev + ' para revisar' : ''}</div>` : ''}</td>${extra ? extra.map(e => `<td style="padding:6px;text-align:right;">${e[1](g)}</td>`).join('') : ''}<td style="padding:6px;text-align:right;">${Math.round(g.unid).toLocaleString('es-AR')}</td><td style="padding:6px;text-align:right;">${fP(g.venta)}</td><td style="padding:6px;text-align:right;font-weight:700;color:${g.gan < 0 ? '#A6432F' : '#2F7A47'};">${fP(g.gan)}</td><td style="padding:6px;text-align:right;color:${colorPct(p != null ? p / 100 : null)};">${p != null ? p + ' %' : '–'}</td></tr>`; }).join('')}</table></div>`;
-  const ord = L => L.sort((a, b) => rkOrden === 'venta' ? b.venta - a.venta : rkOrden === 'unid' ? b.unid - a.unid : rkOrden === 'pct' ? (pct(b) ?? -1e9) - (pct(a) ?? -1e9) : b.gan - a.gan);
+  const ord = L => L.sort((a, b) => rkOrden === 'venta' ? b.venta - a.venta : rkOrden === 'unid' ? b.unid - a.unid : rkOrden === 'pct' ? (pct(b) ?? -1e9) - (pct(a) ?? -1e9) : rkOrden === 'pctAsc' ? (pct(a) ?? 1e9) - (pct(b) ?? 1e9) : rkOrden === 'ganAsc' ? ((b.costo > 0) - (a.costo > 0)) || a.gan - b.gan : b.gan - a.gan);
   let html = cab;
   if(rkTab === 'productos'){
     let L = agrupar(f => f.sku || '(sin SKU)'); L.forEach(g => { const r = buscarProductoPorSku(g.k); g.sub = r ? r.producto.nombre + ' · ' + (r.variante.desc || '') : ''; });
     if(rkBuscar) L = L.filter(g => coincideBusqueda(g.k + ' ' + (g.sub || ''), rkBuscar));
     html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"><input placeholder="🔍 Buscar SKU o producto" value="${escapeAttr(rkBuscar)}" oninput="rkBuscar=this.value;clearTimeout(window.__rkT);window.__rkT=setTimeout(renderRankings,250)" style="flex:1;min-width:180px;padding:8px;border:1px solid var(--line);border-radius:10px;">
-      <select onchange="rkOrden=this.value;renderRankings()" style="padding:8px;border:1px solid var(--line);border-radius:10px;">${[['gan', 'Más ganancia'], ['venta', 'Más facturación'], ['unid', 'Más unidades'], ['pct', 'Mayor % s/costo']].map(([v, t]) => `<option value="${v}" ${rkOrden === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
+      <select onchange="rkOrden=this.value;renderRankings()" style="padding:8px;border:1px solid var(--line);border-radius:10px;">${[['gan', 'Más ganancia en $'], ['pct', 'Más ganancia en % (s/costo)'], ['pctAsc', 'Menos ganancia en % (s/costo)'], ['ganAsc', 'Menos ganancia en $'], ['venta', 'Más facturación'], ['unid', 'Más unidades']].map(([v, t]) => `<option value="${v}" ${rkOrden === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
     html += tabla(ord(L).slice(0, 100), 'Producto', canal === 'ambos' ? [['Canal', g => g.fact && g.ml ? 'Ambos' : g.ml ? 'ML' : 'Facturado']] : null);
   } else if(rkTab === 'origen'){ html += tabla(ord(agrupar(f => origenSku(f.sku))), 'Origen'); }
   else if(rkTab === 'clientes'){ const L = agrupar(f => f.canal === 'ml' ? 'Mercado Libre · ' + f.cli : f.cli); html += tabla(ord(L).slice(0, 100), 'Cliente'); }
@@ -19750,7 +19750,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v290';
+const APP_VERSION = '2026-10-02-v291';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
