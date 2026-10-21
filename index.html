@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v292</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v293</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2347,7 +2347,7 @@ a.grilla-celda{display:block;}
     <div class="form-card" style="max-width:1100px;">
       <h2>Costos de productos</h2>
       <input id="cp-buscar" placeholder="🔍 Buscar en fabrico y reventa: nombre, SKU, medida, tela…" oninput="cpBuscar(this.value)" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid var(--line);border-radius:12px;font-size:1rem;margin:4px 0 8px;">
-      <div style="display:flex;gap:6px;margin:4px 0 12px;flex-wrap:wrap;align-items:center;"><span id="cp-tabs" style="display:flex;gap:6px;"></span><button type="button" class="btn-mini" style="margin-left:auto;" onclick="abrirRevisarHistorial()">🩺 Revisar historial de costos</button><button type="button" class="btn-mini" id="cp-reset" style="display:none;background:var(--gold);" onclick="usarCostosActualesEnTodo()">Usar los costos de hoy en todo el historial (una sola vez)</button></div>
+      <div style="display:flex;gap:6px;margin:4px 0 12px;flex-wrap:wrap;align-items:center;"><span id="cp-tabs" style="display:flex;gap:6px;"></span><button type="button" class="btn-mini" style="margin-left:auto;" onclick="abrirRevisarHistorial()">🩺 Revisar historial de costos</button></div>
       <div id="cp-fab" style="border-left:5px solid #2F7A47;padding-left:10px;margin-bottom:18px;"><div style="font-weight:800;color:#2F7A47;margin:2px 0 6px;">🏭 Lo que fabrico</div><div id="cp-fab-in"></div></div>
       <div id="cp-rev" style="border-left:5px solid #2E5A8C;padding-left:10px;"><div style="font-weight:800;color:#2E5A8C;margin:2px 0 6px;">🛒 Reventa</div><div id="cp-rev-in"></div></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
@@ -2578,8 +2578,8 @@ function precioLineaItem(item){
 let ordenActual = null;
 
 function parsePrice(str){
-  if(!str || str === 'Consultar') return null;
-  return parseFloat(str.replace(/\./g,'').replace(',','.'));
+  if(str == null || str === '' || str === 'Consultar') return null;
+  const n = numAr(str); return isNaN(n) ? null : n; // misma lectura de montos en toda la app
 }
 function formatPrice(n){
   return '$ ' + n.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -6739,7 +6739,8 @@ async function separarColorTelas(){
 const preciosPend = {};
 // numeros escritos a la argentina ("2.500,50") o con punto decimal ("3.25")
 // montos que se escriben a mano: "24591.02", "24591,02" y "24.591,02" valen lo mismo; "24.591" es veinticuatro mil
-const numAr = s=>{let t=String(s==null?'':s).trim().replace(/[$\s]/g,'');if(!t)return NaN;const lp=t.lastIndexOf('.'),lc=t.lastIndexOf(',');
+function numAr(s){ // lectura unica de montos (hoisted: se puede usar desde cualquier parte)
+let t=String(s==null?'':s).trim().replace(/[$\s]/g,'');if(!t)return NaN;const lp=t.lastIndexOf('.'),lc=t.lastIndexOf(',');
   if(lp>=0&&lc>=0){const dec=lp>lc?'.':',',mil=dec==='.'?',':'.';return parseFloat(t.split(mil).join('').replace(dec,'.'));}
   if(lc>=0){return parseFloat(t.slice(0,lc).replace(/,/g,'')+'.'+t.slice(lc+1));}
   if(lp>=0){const p=t.split('.');if(p.length===2&&p[1].length<=2)return parseFloat(t);return parseFloat(t.replace(/\./g,''));}
@@ -7420,7 +7421,7 @@ function celdaPrecioPct(S, costo, pr){
   const SU = String(S).toUpperCase(); if(ppPend[SU] != null) pr = ppPend[SU];
   const k = idPP(S), m = costo > 0 && pr > 0 ? (pr - costo) / costo : null, inp = 'padding:4px 6px;border:1px solid var(--line);border-radius:8px;font-size:.82rem;text-align:right;box-sizing:border-box;';
   return { precio: `<input id="pp-${k}" data-sku="${escapeAttr(SU)}" inputmode="decimal" value="${pr ? formatoPesos(Math.round(pr)) : ''}" placeholder="$" style="${inp}width:100px;${ppPend[SU] != null ? 'border-color:var(--gold);background:#FFF8E6;' : ''}" oninput="ppDesdePrecio('${k}',${costo || 0})">`,
-    pct: `<span style="display:inline-flex;gap:2px;align-items:center;"><input id="pc-${k}" inputmode="decimal" value="${m != null ? Math.round(m * 100) : ''}" ${costo > 0 ? '' : 'disabled'} style="${inp}width:56px;color:${colorPct(m)};font-weight:700;" oninput="ppDesdePct('${k}',${costo || 0})">%</span>` };
+    pct: `<span style="display:inline-flex;gap:2px;align-items:center;"><input id="pc-${k}" inputmode="decimal" value="${m != null ? Math.round(m * 100) : ''}" ${costo > 0 ? '' : 'disabled'} style="${inp}width:56px;color:${colorPct(m)};font-weight:700;" oninput="ppDesdePct('${k}',${costo || 0})">%<span id="pw-${k}" title="Más de 300 % sobre el costo: revise si el costo está bien cargado (por ejemplo, por docena)." style="${m != null && m > 3 ? '' : 'display:none;'}cursor:help;">⚠️</span></span>` };
 }
 function ppMarcar(k){ const e = document.getElementById('pp-' + k); if(!e) return; const n = numAr(e.value), S = e.dataset.sku; if(n > 0) ppPend[S] = n; else delete ppPend[S]; e.style.borderColor = 'var(--gold)'; e.style.background = '#FFF8E6'; pintarBarraGuardarCP(); }
 function ppDesdePct(k, costo){ const p = numAr(document.getElementById('pc-' + k).value), e = document.getElementById('pp-' + k); if(costo > 0 && isFinite(p) && e){ e.value = formatoPesos(Math.ceil(costo * (1 + p / 100) / 10) * 10); ppMarcar(k); } ppColor(k, costo); }
@@ -7442,7 +7443,7 @@ async function guardarTodoCP(){
   } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   try{ renderProductosFabrico(); } catch(e){} try{ if(esDueno()) renderCostosReventa(); } catch(e){} pintarBarraGuardarCP();
 }
-function ppColor(k, costo){ const n = numAr(document.getElementById('pp-' + k).value), e = document.getElementById('pc-' + k); if(e) e.style.color = colorPct(costo > 0 && n > 0 ? (n - costo) / costo : null); }
+function ppColor(k, costo){ const n = numAr(document.getElementById('pp-' + k).value), e = document.getElementById('pc-' + k), m = costo > 0 && n > 0 ? (n - costo) / costo : null; if(e) e.style.color = colorPct(m); const w = document.getElementById('pw-' + k); if(w) w.style.display = m != null && m > 3 ? '' : 'none'; }
 // guarda precios en el catalogo (agrupando por producto)
 async function guardarPreciosSkus(lista){
   const porProd = new Map(); lista.forEach(([S, n]) => { const r = buscarProductoPorSku(S); if(r) (porProd.get(r.producto) || porProd.set(r.producto, []).get(r.producto)).push([String(S).toUpperCase(), n]); });
@@ -7481,12 +7482,12 @@ async function abrirRankings(){
   rnDatos.facturas.forEach(f => { const m = String(f.fecha || '').split('/'); if(m.length !== 3) return; const per = m[2] + '-' + m[1];
     const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0), fx = f.total && n0 > 0 ? f.total / n0 : 1.21, sg = signoFact(f);
     (f.items || []).forEach((it, i) => { const S = skuDeFactura(it.codigo), v = it.neto * fx * sg, c = costoItemFactura(it, f), rev = c != null && renglonRevFactura(f, i, v, c);
-      rkFilas.push({ canal: 'fact', per, fecha: f.fecha, cli: f.cliente || 'Sin nombre', sku: S, desc: it.desc || '', unid: (+it.cant || 0) * divisorVenta(S) * sg, venta: v, costo: rev ? null : c, sinC: c == null, rev }); }); });
+      rkFilas.push({ canal: 'fact', per, fecha: f.fecha, cli: f.cliente || 'Sin nombre', sku: S, desc: it.desc || '', unid: (+it.cant || 0) * divisorVenta(S) * sg, venta: v, costo: c, sinC: c == null, rev }); }); });
   // Mercado Libre: detalle guardado desde Resultados ML (solo ventas)
   sd.docs.forEach(d => { const x = d.data(), L = String(x.csv || '').split('\n'), cab = (L.shift() || '').split(';'), ix = k => cab.indexOf(k);
     L.forEach(l => { const r = l.split(';'); if(r[ix('tipo')] !== 'Venta') return; const venta = +r[ix('precio')] || 0; if(!(venta > 0)) return;
       const costo = r[ix('costo')] === '' ? null : +r[ix('costo')], quedo = +r[ix('le_queda')] || 0, rev = !!r[ix('para_revisar')];
-      rkFilas.push({ canal: 'ml', per: x.periodo, fecha: r[ix('fecha')], op: r[ix('operacion')], cli: x.cuenta, sku: String(r[ix('sku_app')] || r[ix('sku_ml')] || '').toUpperCase(), desc: '', unid: +r[ix('unidades')] || 0, venta, quedo, costo: rev ? null : costo, sinC: costo == null, rev }); }); });
+      rkFilas.push({ canal: 'ml', per: x.periodo, fecha: r[ix('fecha')], op: r[ix('operacion')], cli: x.cuenta, sku: String(r[ix('sku_app')] || r[ix('sku_ml')] || '').toUpperCase(), desc: '', unid: +r[ix('unidades')] || 0, venta, quedo, costo, sinC: costo == null, rev }); }); });
   const pers = [...new Set(rkFilas.map(f => f.per))].sort(), nm = p => new Date(p + '-15').toLocaleDateString('es-AR', { month: 'short', year: 'numeric' });
   ['rk-desde', 'rk-hasta'].forEach((id, k) => { const s = document.getElementById(id); s.innerHTML = pers.map(p => `<option value="${p}">${k ? 'hasta ' : 'desde '}${nm(p)}</option>`).join(''); s.value = k ? pers[pers.length - 1] || '' : pers[Math.max(0, pers.length - 1)] || ''; });
   renderRankings();
@@ -7501,14 +7502,14 @@ function renderRankings(){
   if(!tabs.some(t => t[0] === rkTab)) rkTab = 'productos';
   document.getElementById('rk-tabs').innerHTML = tabs.map(([k, t]) => `<button type="button" onclick="rkTab='${k}';renderRankings()" style="padding:7px 12px;border-radius:999px;border:1px solid ${rkTab === k ? 'var(--purple)' : 'var(--line)'};background:${rkTab === k ? 'var(--purple)' : '#fff'};color:${rkTab === k ? '#fff' : 'var(--purple)'};font-weight:700;cursor:pointer;">${t}</button>`).join('');
   const agrupar = key => { const G = {}; F.forEach(f => { const k = key(f); const g = G[k] = G[k] || { k, venta: 0, unid: 0, costo: 0, gan: 0, vC: 0, sinC: 0, rev: 0, fact: 0, ml: 0 };
-    g.venta += f.venta; g.unid += f.unid; g[f.canal] += f.venta; const gg = gan(f); if(gg != null){ g.gan += gg; g.costo += f.costo; g.vC += f.venta; } else if(f.rev) g.rev++; else g.sinC++; }); return Object.values(G); };
+    g.venta += f.venta; g.unid += f.unid; g[f.canal] += f.venta; const gg = gan(f); if(f.rev) g.rev++; if(gg != null){ g.gan += gg; g.costo += f.costo; g.vC += f.venta; } else g.sinC++; }); return Object.values(G); };
   const pct = g => g.costo > 0 ? Math.round(g.gan / g.costo * 100) : null, fP = x => formatPrice(Math.round(x));
-  const sinCT = F.filter(f => f.sinC && !f.rev).length, revT = F.filter(f => f.rev).length;
-  const aviso = sinCT || revT ? `<p class="note" style="text-align:left;color:#8A6417;">⚠️ ${sinCT ? sinCT + ' ventas sin costo' : ''}${sinCT && revT ? ' y ' : ''}${revT ? revT + ' para revisar' : ''}: no cuentan en la ganancia.</p>` : '';
+  const sinCT = F.filter(f => f.sinC).length, revT = F.filter(f => f.rev).length;
+  const aviso = (sinCT ? `<p class="note" style="text-align:left;color:#8A6417;">⚠️ ${sinCT} ventas sin costo: no cuentan en la ganancia.</p>` : '') + (revT ? `<p class="note" style="text-align:left;color:#8A6417;">⚠️ ${revT} ventas para revisar (incluidas): revise su costo con el botón ✏️ del producto.</p>` : '');
   const tot = agrupar(() => 'total')[0] || { venta: 0, gan: 0, costo: 0, unid: 0 };
   const cab = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px;">${[['Facturación', fP(tot.venta)], ['Unidades', Math.round(tot.unid).toLocaleString('es-AR')], ['Ganancia', fP(tot.gan)], ['% s/costo', pct(tot) != null ? pct(tot) + ' %' : '–']].map(([t, v]) => `<div style="border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:#fff;"><small class="note" style="margin:0;">${t}</small><div style="font-weight:800;font-size:1.05rem;">${v}</div></div>`).join('')}</div>${aviso}`;
   const tabla = (filas, colK, extra) => `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.86rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:6px;">#</td><td style="padding:6px;">${colK}</td>${extra ? extra.map(e => `<td style="padding:6px;text-align:right;">${e[0]}</td>`).join('') : ''}<td style="padding:6px;text-align:right;">Unid.</td><td style="padding:6px;text-align:right;">Facturación</td><td style="padding:6px;text-align:right;">Ganancia</td><td style="padding:6px;text-align:right;">% s/costo</td></tr>
-    ${filas.map((g, i) => { const p = pct(g); return `<tr style="border-top:1px solid var(--line);"><td style="padding:6px;color:#8A8072;">${i + 1}</td><td style="padding:6px;"><b>${escaparHtml(g.k)}</b>${g.sub ? `<div class="note" style="text-align:left;margin:0;">${escaparHtml(g.sub)}</div>` : ''}${g.sinC || g.rev ? `<div style="font-size:.72rem;color:#8A6417;">${g.sinC ? g.sinC + ' sin costo' : ''}${g.sinC && g.rev ? ' · ' : ''}${g.rev ? g.rev + ' para revisar' : ''}</div>` : ''}</td>${extra ? extra.map(e => `<td style="padding:6px;text-align:right;">${e[1](g)}</td>`).join('') : ''}<td style="padding:6px;text-align:right;">${Math.round(g.unid).toLocaleString('es-AR')}</td><td style="padding:6px;text-align:right;">${fP(g.venta)}</td><td style="padding:6px;text-align:right;font-weight:700;color:${g.gan < 0 ? '#A6432F' : '#2F7A47'};">${fP(g.gan)}</td><td style="padding:6px;text-align:right;color:${colorPct(p != null ? p / 100 : null)};">${p != null ? p + ' %' : '–'}</td></tr>`; }).join('')}</table></div>`;
+    ${filas.map((g, i) => { const p = pct(g); return `<tr style="border-top:1px solid var(--line);"><td style="padding:6px;color:#8A8072;">${i + 1}</td><td style="padding:6px;"><b>${escaparHtml(g.k)}</b>${g.sub ? `<div class="note" style="text-align:left;margin:0;">${escaparHtml(g.sub)}</div>` : ''}${g.sinC || g.rev ? `<div style="font-size:.72rem;color:#8A6417;">${g.sinC ? g.sinC + ' sin costo' : ''}${g.sinC && g.rev ? ' · ' : ''}${g.rev ? g.rev + ' para revisar' : ''}${colK === 'Producto' && /^[A-Z0-9]/.test(g.k) ? ` <a href="#" onclick="event.preventDefault();corregirCostoSku('${escapeAttr(g.k)}')">✏️ corregir costo</a>` : ''}</div>` : ''}</td>${extra ? extra.map(e => `<td style="padding:6px;text-align:right;">${e[1](g)}</td>`).join('') : ''}<td style="padding:6px;text-align:right;">${Math.round(g.unid).toLocaleString('es-AR')}</td><td style="padding:6px;text-align:right;">${fP(g.venta)}</td><td style="padding:6px;text-align:right;font-weight:700;color:${g.gan < 0 ? '#A6432F' : '#2F7A47'};">${fP(g.gan)}</td><td style="padding:6px;text-align:right;color:${colorPct(p != null ? p / 100 : null)};">${p != null ? p + ' %' : '–'}</td></tr>`; }).join('')}</table></div>`;
   const ord = L => L.sort((a, b) => rkOrden === 'venta' ? b.venta - a.venta : rkOrden === 'unid' ? b.unid - a.unid : rkOrden === 'pct' ? (pct(b) ?? -1e9) - (pct(a) ?? -1e9) : rkOrden === 'pctAsc' ? (pct(a) ?? 1e9) - (pct(b) ?? 1e9) : rkOrden === 'ganAsc' ? ((b.costo > 0) - (a.costo > 0)) || a.gan - b.gan : b.gan - a.gan);
   let html = cab;
   if(rkTab === 'productos'){
@@ -7565,7 +7566,7 @@ function calcResultadoMes(mes, cta){
   rnDatos.facturas.forEach(f => { const m = String(f.fecha || '').split('/'); if(m.length !== 3 || m[2] + '-' + m[1] !== mes) return; R.nFact++;
     const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0), fx = f.total && n0 > 0 ? f.total / n0 : 1.21, sg = signoFact(f); // con IVA (incluye el descuento general)
     f.items.forEach((it, i) => { const v = it.neto * fx * sg; R.vF += v; const c = costoItemFactura(it, f);
-      if(c == null){ R.sinCF++; R.vtaSinCF += v; } else if(renglonRevFactura(f, i, v, c)){ R.revF++; R.vtaSinCF += v; } else R.cF += c; }); });
+      if(c == null){ R.sinCF++; R.vtaSinCF += v; } else { if(renglonRevFactura(f, i, v, c)) R.revF++; R.cF += c; } }); });
   Object.values(rnDatos.ml).forEach(x => { if(x.periodo !== mes || (cta && x.cuenta !== cta)) return; R.hayML = true;
     R.vML += x.vendido; R.envML += x.envios; R.cML += x.costo; R.cargosML += x.cargosML; R.sinCML += x.sinCosto; R.revML += x.revisar;
     Object.entries(x.desglose || {}).forEach(([k, v]) => R.desglose[k] = (R.desglose[k] || 0) + v); });
@@ -7591,7 +7592,8 @@ function renderResultadoNegocio(){
   const desg = Object.entries(A.desglose).filter(([, v]) => Math.abs(v) >= 1).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}: ${formatPrice(v)}`).join(' · ');
   const avisos = [
     !A.hayML ? `No hay datos de Mercado Libre de este mes: abra <a href="#" onclick="event.preventDefault();abrirResultadosML()">Resultados ML</a> con el mes cargado para actualizarlos.` : '',
-    A.revF || A.sinCF ? `Facturas: ${A.revF ? A.revF + ' renglones para revisar' : ''}${A.revF && A.sinCF ? ' y ' : ''}${A.sinCF ? A.sinCF + ' sin costo' : ''} (${formatPrice(A.vtaSinCF)} de ventas sin su costo): el resultado queda más alto hasta corregirlos.` : '',
+    A.sinCF ? `Facturas: ${A.sinCF} renglones sin costo (${formatPrice(A.vtaSinCF)} de ventas sin su costo): el resultado queda más alto hasta cargarlo.` : '',
+    A.revF ? `Facturas: ${A.revF} renglones para revisar (ya incluidos en el resultado): revise su costo en <a href="#" onclick="event.preventDefault();abrirFacturas()">Ventas facturadas</a>.` : '',
     A.gSinTipo ? `Gastos: ${A.gSinTipo} sin tipo (fijo o variable); se toman como fijos. Márquelos en <a href="#" onclick="event.preventDefault();abrirGastos()">Gastos comerciales</a>.` : '',
     A.sinCML || A.revML ? `Mercado Libre: ${A.sinCML ? A.sinCML + ' ventas sin costo' : ''}${A.sinCML && A.revML ? ' y ' : ''}${A.revML ? A.revML + ' para revisar' : ''}.` : ''
   ].filter(Boolean);
@@ -7698,6 +7700,7 @@ function precioBajoCostoOk(S, precio, prod){
 async function pfUnidad(sku, v, sel){
   if(v === '__otra'){ const n = prompt('¿Cuántas unidades trae lo que vende? (número)', ''); const k = parseInt(n, 10); if(!(k >= 1)){ renderProductosFabrico(); return; } v = k === 1 ? '' : k + ' unidades'; }
   const key = 'sku:' + String(sku).toUpperCase();
+  await convertirCostoUnidad([{ S: sku, antes: unidadVentaSku(sku), despues: v || '' }]);
   unidadesVenta[key] = v || 'unidad'; // propia de este SKU (aunque el producto tenga otra)
   try{ await db.collection('config').doc('unidades').set({ u: unidadesVenta }); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   renderProductosFabrico(); try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){} registrarHistorialCostos().catch(() => {});
@@ -8032,7 +8035,7 @@ async function guardarAviosAC(){
     if(!a.nombre) return;
     const reg = aviosDatos.lista[a.nombre] || { unidad: 'unidad', precio: 0 };
     if(a._unidad) reg.unidad = a._unidad;
-    if(a._precio !== undefined) reg.precio = parseFloat(String(a._precio).replace(/\./g, '').replace(',', '.')) || 0;
+    if(a._precio !== undefined) reg.precio = numAr(a._precio) || 0;
     aviosDatos.lista[a.nombre] = reg;
     limpios.push({ nombre: a.nombre, cantidad: +a.cantidad || 0 });
   });
@@ -8968,7 +8971,7 @@ async function renderProductosAC(){
           ${r ? '' : `<button type="button" class="btn-mini" onclick="abrirPublicar('${escapeAttr(s)}')">📸 Publicar</button>`}
           <button type="button" class="btn-mini" title="Editar todo el SKU" onclick="editarSkuCompleto('${escapeAttr(s)}')">✏️</button>
           <button type="button" class="btn-mini" title="Quitar de este artículo" onclick="quitarProductoAC('${escapeAttr(s)}')">🗑️</button>
-        </div></div>${x ? `<div style="grid-column:1/-1;border-top:1px dashed var(--line);padding-top:6px;">${htmlPrecioML(x.total)}</div>` : ''}</div>`;
+        </div></div></div>`;
   };
   cont.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px;">
       <b style="color:var(--purple);">🏷️ SKU de este artículo</b><span class="note" style="margin:0;">uno por cada tela</span></div>
@@ -9040,7 +9043,7 @@ async function guardarSkuCompleto(S){
         await db.collection('config').doc('telas').set(JSON.parse(JSON.stringify(telasDatos))); } } }
     // 3. venta: descripcion, precio y unidad
     const r = buscarProductoPorSku(S), uvN = val('es-uv') || '';
-    if(unidadVentaSku(S) !== uvN){ unidadesVenta['sku:' + S] = uvN || 'unidad'; await db.collection('config').doc('unidades').set({ u: unidadesVenta }); }
+    if(unidadVentaSku(S) !== uvN){ await convertirCostoUnidad([{ S, antes: unidadVentaSku(S), despues: uvN }]); unidadesVenta['sku:' + S] = uvN || 'unidad'; await db.collection('config').doc('unidades').set({ u: unidadesVenta }); }
     if(r){ const d = val('es-desc'), pr = numAr(val('es-precio'));
       if(pr > 0 && !precioBajoCostoOk(S, pr, null)) return;
       if((d != null && d !== (r.variante.desc || '')) || (pr > 0 && Math.abs(pr - parsePrice(r.variante.precio)) > 0.01)){
@@ -10639,7 +10642,10 @@ async function prepararDatosML(){
   if(costosReventa === null) await cargarCostosReventa();
   if(kitsDatos === null) await cargarKits();
   try{ await registrarHistorialCostos(); } catch(e){ console.error('historial de costos', e); }
-  try{ if(tablaConsumo === null) await cargarTablaConsumo(); if(fabricacion === null) await cargarFabricacion(); await idbGuardar('nombres_sku', mapaNombresSku()); } catch(e){}
+  try{ if(tablaConsumo === null) await cargarTablaConsumo(); if(fabricacion === null) await cargarFabricacion(); await idbGuardar('nombres_sku', mapaNombresSku());
+    // unidad de venta de cada SKU (docena = 12) para que Resultados ML pida y muestre los costos en la misma unidad
+    { const uv = {}; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => { const S = String(v.sku).toUpperCase(); uv[S] = cantUnidadVenta(unidadVentaSku(S)); })));
+      Object.keys(unidadesVenta || {}).forEach(k => { if(k.startsWith('sku:')){ const S = k.slice(4); uv[S] = cantUnidadVenta(unidadVentaSku(S)); } }); await idbGuardar('unidad_venta_sku', uv); } } catch(e){}
   try{ const tipo = {}; const fab = new Set(skusQueFabrico());
     CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => { const S = String(v.sku).toUpperCase(); tipo[S] = 'rev'; })));
     fab.forEach(S => { if(articuloDeSku(S) || (fabricacion.vinculos[S] && fabricacion.vinculos[S].calidad)) tipo[S] = 'fab'; });
@@ -10710,7 +10716,7 @@ function renderCostosReventa(){
           ${kitsDatos && kitsDatos[s] ? '<span></span>' : `<input type="checkbox" ${crSel.has(s) ? 'checked' : ''} onchange="crSel[this.checked ? 'add' : 'delete']('${escapeAttr(s)}');renderCrMasivo()" style="width:16px;height:16px;">`}<b>${escaparHtml(s)}</b><span style="color:#6B6258;">${escaparHtml(v.desc || '')}</span><span style="text-align:right;">${ppR.precio}</span>
           ${kitsDatos && kitsDatos[s] ? `<div style="text-align:right;"><b>${costoUnidadSku(s) != null ? formatPrice(costoUnidadSku(s) * cantUnidadVenta(unidadVentaSku(s))) : '—'}</b><small style="display:block;font-size:0.66rem;color:#6B4FA0;">🧩 ${escaparHtml(kitsDatos[s])}</small></div>` : `<div style="position:relative;"><input inputmode="decimal" value="${escapeAttr(crValor(s))}" placeholder="costo" oninput="crCambiar(${i}, this.value)" style="padding:7px;border:1px solid ${codTela(s) ? '#B9D3EE' : 'var(--line)'};border-radius:8px;text-align:right;width:100%;box-sizing:border-box;${codTela(s) ? 'background:#F2F7FD;' : ''}" title="${codTela(s) ? 'Costo por metro de la pantalla Telas (se cambia en los dos lados)' : ''}">${codTela(s) ? '<small style="display:block;text-align:right;font-size:0.66rem;color:#2E5A8C;margin-top:2px;">🧵 de Telas · por metro</small>' : ''}</div>`}
           <span style="text-align:right;">${ppR.pct}</span>
-          <div style="grid-column:3/-1;text-align:right;">${htmlPrecioML(kitsDatos && kitsDatos[s] ? costoUnidadSku(s) : (c > 0 ? c / cantUnidadVenta(unidadVentaSku(s)) : 0))}</div></div>`; }).join('')}</div>`;
+</div>`; }).join('')}</div>`;
   }).join('');
   document.getElementById('cr-lista').innerHTML = html ? `<div id="cr-masivo"></div><div style="display:grid;grid-template-columns:22px 90px minmax(0,1fr) 140px 120px 80px;gap:6px;font-size:0.72rem;color:#8A8072;padding:0 10px 4px;align-items:center;"><input type="checkbox" title="Seleccionar todos los visibles" onchange="(window.__crVis||[]).forEach(s => crSel[this.checked ? 'add' : 'delete'](s));renderCostosReventa()" style="width:16px;height:16px;"><span>SKU</span><span>Descripción</span><span style="text-align:right;">Precio de venta</span><span style="text-align:right;">Costo de compra $</span><span style="text-align:right;">% s/costo</span></div>` + html : '<p class="empty-msg">No hay productos con ese filtro.</p>';
   renderCrMasivo();
@@ -10734,16 +10740,31 @@ async function crMasivo(acc){
   if(acc === 'costo'){ const v = numAr(document.getElementById('crm-costo').value); if(!(v > 0)){ alert('Escriba el costo.'); return; } skus.forEach(s => crPend[s] = String(v)); }
   else if(acc === 'pct'){ const p = numAr(document.getElementById('crm-pct').value); if(!p){ alert('Escriba el porcentaje.'); return; } let sin = 0; skus.forEach(s => { const c = numAr(crValor(s)); if(c > 0) crPend[s] = String(Math.round(c * (1 + p / 100) * 100) / 100); else sin++; }); if(sin) alert(sin + ' SKU no tenían costo y no se modificaron.'); }
   else if(acc === 'borrar'){ if(!confirm(`¿Borrar el costo de ${skus.length} SKU? (se guarda con 💾 Guardar)`)) return; skus.forEach(s => crPend[s] = ''); }
-  else if(acc === 'uv'){ const u = document.getElementById('crm-uv').value; if(!u){ alert('Elija la unidad.'); return; } skus.forEach(s => unidadesVenta['sku:' + s] = u); try{ await db.collection('config').doc('unidades').set({ u: unidadesVenta }); } catch(e){ alert('No se pudo guardar: ' + e.message); return; } registrarHistorialCostos().catch(() => {}); }
+  else if(acc === 'uv'){ const u = document.getElementById('crm-uv').value; if(!u){ alert('Elija la unidad.'); return; } await convertirCostoUnidad(skus.map(s => ({ S: s, antes: unidadVentaSku(s), despues: u === 'unidad' ? '' : u }))); skus.forEach(s => unidadesVenta['sku:' + s] = u); try{ await db.collection('config').doc('unidades').set({ u: unidadesVenta }); } catch(e){ alert('No se pudo guardar: ' + e.message); return; } registrarHistorialCostos().catch(() => {}); }
   renderCostosReventa(); crMostrarGuardar();
 }
+// al cambiar "se vende por", el costo de compra guardado (por unidad de venta) puede quedar en la unidad vieja: se pregunta, no se decide solo
+async function convertirCostoUnidad(items){
+  const L = items.map(x => ({ ...x, c: (costosReventa || {})[String(x.S).toUpperCase()], a: cantUnidadVenta(x.antes || ''), d: cantUnidadVenta(x.despues || '') })).filter(x => x.c > 0 && x.a !== x.d && x.a > 0 && x.d > 0);
+  if(!L.length) return;
+  const nom = u => u ? u : 'unidad';
+  const det = L.slice(0, 10).map(x => `${x.S}: $ ${formatoPesos(x.c)} por ${nom(x.antes)} → $ ${formatoPesos(Math.round(x.c * x.d / x.a * 100) / 100)} por ${nom(x.despues)}`).join('\n') + (L.length > 10 ? '\n…' : '');
+  if(!confirm(`Cambió la unidad de venta. El costo de compra guardado estaba en la unidad anterior:\n\n${det}\n\nAceptar = convertir el costo a la unidad nueva (como arriba)\nCancelar = dejarlo igual (el costo guardado ya era el de la unidad nueva)`)) return;
+  L.forEach(x => { costosReventa[String(x.S).toUpperCase()] = Math.round(x.c * x.d / x.a * 100) / 100; });
+  try{ await db.collection('config').doc('costos_reventa').set({ c: costosReventa, actualizado: new Date().toISOString() }); } catch(e){ alert('No se pudo convertir el costo: ' + e.message); }
+}
 async function crUnidad(ek, u){
+  { let prod = null; CATALOGO.forEach(c => (c.productos || []).forEach(p => { if(p._editKey === ek) prod = p; }));
+    if(prod) await convertirCostoUnidad(prod.variantes.map(v => String(v.sku).toUpperCase()).filter(S => unidadesVenta['sku:' + S] === undefined).map(S => ({ S, antes: unidadesVenta[ek] || '', despues: u || '' }))); }
   if(u) unidadesVenta[ek] = u; else delete unidadesVenta[ek];
   try{ await db.collection('config').doc('unidades').set({ u: unidadesVenta }); renderCostosReventa(); try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){} registrarHistorialCostos().catch(() => {}); }
   catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 function crMostrarGuardar(){ try{ pintarBarraGuardarCP(); } catch(e){} const n = Object.keys(crPend).length, b = document.getElementById('cr-guardar'); b.style.display = n && !(typeof cpMovido !== 'undefined' && cpMovido) ? 'block' : 'none'; b.querySelector('button').textContent = `💾 Guardar (${n} SKU)`; }
-function crCambiar(i, v){ crPend[window.__crSkus[i]] = v; crMostrarGuardar(); }
+function crCambiar(i, v){ const S = window.__crSkus[i]; crPend[S] = v; crMostrarGuardar();
+  // recalcula el % de esa fila con el costo nuevo (no toca el precio)
+  const k = idPP(S), c = numAr(v), e = document.getElementById('pc-' + k), pp = document.getElementById('pp-' + k);
+  if(e && pp){ const pr = numAr(pp.value); e.disabled = !(c > 0); e.value = c > 0 && pr > 0 ? Math.round((pr - c) / c * 100) : ''; pp.setAttribute('oninput', `ppDesdePrecio('${k}',${c > 0 ? c : 0})`); e.setAttribute('oninput', `ppDesdePct('${k}',${c > 0 ? c : 0})`); ppColor(k, c > 0 ? c : 0); } }
 function crTodo(pi, v){
   const q = normBusqueda(document.getElementById('cr-buscar').value), cat = document.getElementById('cr-cat').value;
   const prods = productosReventaConCosto().filter(x => (!cat || x.cat === cat) && (!q || coincideBusqueda(x.p.nombre + ' ' + x.p.variantes.map(w => w.sku).join(' '), q)));
@@ -11170,8 +11191,12 @@ let fcModoIva = (() => { try{ return localStorage.getItem('fc.modoIva2') || 'con
 function cambiarModoIvaFact(v){ fcModoIva = v; try{ localStorage.setItem('fc.modoIva2', v); } catch(e){} renderFacturasNuevas(); renderFacturas(); }
 // factor que lleva cada renglon al precio realmente cobrado (con la bonificacion general ya aplicada), con o sin IVA
 function factorIvaFactura(fa){ const n = (fa.items || []).reduce((a, x) => a + (x.neto || 0), 0); const f = fa.total && n > 0 ? fa.total / n : 1.21; return fcModoIva === 'con' ? f : f / 1.21; }
-// renglon con ganancia absurda (pierde mas del 50 % o gana mas del 200 % sobre el costo): no se cuenta hasta confirmarlo
-function renglonRevFactura(fa, i, v, c){ return c > 0 && ((v - c) / c < -0.5 || (v - c) / c > 2) && !(fa.confirmados || []).includes(i); }
+// umbral unico de la app: una venta que pierde mas del 30 % o gana mas del 200 % sobre el costo se MARCA para revisar (igual se suma)
+const UMBRAL_REVISAR = { pierde: -0.3, gana: 2 };
+function esDudosa(v, c){ return c > 0 && ((v - c) / c < UMBRAL_REVISAR.pierde || (v - c) / c > UMBRAL_REVISAR.gana); }
+function renglonRevFactura(fa, i, v, c){ return esDudosa(v, c) && !(fa.confirmados || []).includes(i); }
+// abre Costos de productos con ese SKU buscado, para corregir su costo
+function corregirCostoSku(S){ abrirCostosProductos('todos').then(() => { const b = document.getElementById('cp-buscar'); if(b){ b.value = S; cpBuscar(S); } }); }
 async function confirmarRenglonFactura(id, i, nueva){
   const fa = nueva ? facturasNuevas[id] : (facturas || []).find(f => (f._id || String(f.numero).replace(/\//g, '-')) === id); if(!fa) return;
   fa.confirmados = [...new Set([...(fa.confirmados || []), i])];
@@ -11182,14 +11207,14 @@ function tablaFactura(fa, editable, refId){
   const fx = factorIvaFactura(fa);
   let tN = 0, tC = 0, tV = 0, conC = true, nRev = 0;
   const filas = fa.items.map((it, i) => { const c = costoItemFactura(it, fa); const v = it.neto * fx * signoFact(fa); tN += v; const rev = renglonRevFactura(fa, i, v, c); if(rev) nRev++;
-    if(c == null) conC = false; else if(!rev){ tC += c; tV += v; } const g = c != null ? v - c : null;
+    if(c == null) conC = false; else { tC += c; tV += v; } const g = c != null ? v - c : null; // las dudosas tambien suman
     const s = skuDeFactura(it.codigo);
-    return `<tr style="border-top:1px solid var(--line);${it.ok === false ? 'background:#FDEBE7;' : rev ? 'background:#FFF8E6;' : ''}"><td style="padding:6px;">${it.ok === false ? '⚠️ ' : ''}<b>${escaparHtml(it.codigo)}</b>${s !== it.codigo ? ` <span class="note">→ ${escaparHtml(s)}</span>` : ''}<div class="note" style="text-align:left;margin:0;">${escaparHtml(it.desc)}</div>${rev ? `<div style="font-size:.78rem;color:#8A6417;margin-top:2px;">⚠️ Para revisar: ganancia fuera de lo normal; no se cuenta hasta confirmarla. ${refId != null ? `<button type="button" class="btn-mini" style="padding:2px 8px;" onclick="confirmarRenglonFactura(${typeof refId === 'number' ? refId : `'${refId}'`}, ${i}, ${typeof refId === 'number'})">✓ Está bien</button>` : ''}</div>` : ''}</td>
+    return `<tr style="border-top:1px solid var(--line);${it.ok === false ? 'background:#FDEBE7;' : rev ? 'background:#FFF8E6;' : ''}"><td style="padding:6px;">${it.ok === false ? '⚠️ ' : ''}<b>${escaparHtml(it.codigo)}</b>${s !== it.codigo ? ` <span class="note">→ ${escaparHtml(s)}</span>` : ''}<div class="note" style="text-align:left;margin:0;">${escaparHtml(it.desc)}</div>${rev ? `<div style="font-size:.78rem;color:#8A6417;margin-top:2px;">⚠️ Para revisar: ganancia fuera de lo normal (¿costo o unidad mal cargados?). <button type="button" class="btn-mini" style="padding:2px 8px;" onclick="corregirCostoSku('${escapeAttr(s)}')">✏️ Corregir costo</button> ${refId != null ? `<button type="button" class="btn-mini" style="padding:2px 8px;" onclick="confirmarRenglonFactura(${typeof refId === 'number' ? refId : `'${refId}'`}, ${i}, ${typeof refId === 'number'})">✓ Está bien</button>` : ''}</div>` : ''}</td>
       <td style="padding:6px;text-align:right;">${it.cant.toLocaleString('es-AR')}${divisorVenta(s) > 1 ? `<div class="note" style="margin:0;">${({ 12: 'docenas', 6: 'medias doc.', 2: 'pares' })[divisorVenta(s)]}</div>` : ''}</td><td style="padding:6px;text-align:right;">${formatPrice(v / (it.cant || 1))}</td>
       <td style="padding:6px;text-align:right;">${c != null ? formatPrice(Math.abs(c) / (it.cant || 1)) : (editable ? `<input placeholder="código en la app" style="width:120px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;font-size:.8rem;text-transform:uppercase;" onchange="equivFactura('${escapeAttr(it.codigo)}', this.value)">` : '<span class="note">sin costo</span>')}</td>
       <td style="padding:6px;text-align:right;font-weight:700;color:${g == null ? '#A89E90' : g < 0 ? '#A6432F' : '#2F7A47'};">${g != null ? formatPrice(g) + `<div class="note" style="margin:0;">${c > 0 ? Math.round(g / c * 100) + ' % s/costo' : ''}</div>` : '–'}</td></tr>`; }).join('');
   const G = tV - tC;
-  return `${nRev ? `<p style="margin:4px 0;font-size:.82rem;color:#8A6417;">⚠️ ${nRev} ${nRev === 1 ? 'renglón para revisar' : 'renglones para revisar'}: no se cuentan en la ganancia hasta confirmarlos. Si el costo está mal, corríjalo en Costos de productos → 🩺 Revisar historial de costos.</p>` : ''}<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><tr style="color:#8A8072;font-size:.72rem;text-transform:uppercase;"><td style="padding:6px;">Producto</td><td style="padding:6px;text-align:right;">Cant.</td><td style="padding:6px;text-align:right;">Precio ${fcModoIva === 'con' ? 'c/IVA' : 's/IVA'}<div style="text-transform:none;font-size:.68rem;">con descuentos</div></td><td style="padding:6px;text-align:right;">Costo c/u<div style="text-transform:none;font-size:.68rem;">con IVA</div></td><td style="padding:6px;text-align:right;">Ganancia</td></tr>${filas}
+  return `${nRev ? `<p style="margin:4px 0;font-size:.82rem;color:#8A6417;">⚠️ ${nRev} ${nRev === 1 ? 'renglón para revisar' : 'renglones para revisar'}: se suman igual, pero conviene revisar su costo (botón ✏️ en cada renglón).</p>` : ''}<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><tr style="color:#8A8072;font-size:.72rem;text-transform:uppercase;"><td style="padding:6px;">Producto</td><td style="padding:6px;text-align:right;">Cant.</td><td style="padding:6px;text-align:right;">Precio ${fcModoIva === 'con' ? 'c/IVA' : 's/IVA'}<div style="text-transform:none;font-size:.68rem;">con descuentos</div></td><td style="padding:6px;text-align:right;">Costo c/u<div style="text-transform:none;font-size:.68rem;">con IVA</div></td><td style="padding:6px;text-align:right;">Ganancia</td></tr>${filas}
     <tr style="border-top:2px solid var(--purple);font-weight:800;"><td style="padding:6px;">Total ${fcModoIva === 'con' ? '(con IVA)' : '(sin IVA)'}</td><td></td><td style="padding:6px;text-align:right;">${formatPrice(tN)}</td><td style="padding:6px;text-align:right;">${tC ? formatPrice(tC) : '–'}</td><td style="padding:6px;text-align:right;color:${G < 0 ? '#A6432F' : '#2F7A47'};">${tC ? formatPrice(G) + (conC ? '' : ' *') : '–'}<div class="note" style="margin:0;">${tC > 0 ? Math.round(G / tC * 100) + ' % s/costo' : ''}</div></td></tr>
     <tr style="color:#6B6258;"><td style="padding:4px 6px;" colspan="5">${(()=>{ const bruto = fa.items.reduce((s, x) => s + x.neto, 0) * 1.21, desc = bruto - (fcModoIva === 'con' ? tN : tN * 1.21); return desc > 1 ? `Descuento general de la factura: ${formatPrice(desc)} (${Math.round(desc / bruto * 100)} %, ya repartido en cada renglón) · ` : ''; })()}${(()=>{ const T = fcModoIva === 'con' ? tN : tN * 1.21; return `Total de la factura ${formatPrice(T)}${/^B$/i.test(fa.tipo || '') ? ' (factura B: IVA incluido, aprox. ' + formatPrice(T - T / 1.21) + ')' : ' · IVA ' + formatPrice(T - T / 1.21)}`; })()} · <i>ganancia calculada ${fcModoIva === 'con' ? 'con IVA' : 'sin IVA'}</i></td></tr></table></div>${conC ? '' : '<p class="note" style="text-align:left;">* Algún producto no tiene costo: emparejalo con su código de la app.</p>'}`;
 }
@@ -11283,12 +11308,12 @@ async function borrarFactura(id){ if(!confirm('¿Quitar esta factura de la app? 
 function renderFacturas(){
   const mes = document.getElementById('fc-mes').value;
   const L = (facturas || []).filter(f => !mes || (f.fecha || '').split('/').reverse().slice(0, 2).join('-') === mes).sort((a, b) => String(b.fecha).split('/').reverse().join('').localeCompare(String(a.fecha).split('/').reverse().join('')));
-  let N = 0, C = 0, T = 0, TV = 0, nRevT = 0; L.forEach(f => { const fx = factorIvaFactura(f), sg = signoFact(f); f.items.forEach((it, i) => { const c = costoItemFactura(it, f), v = it.neto * fx * sg; N += it.neto * sg; T += v; if(c != null){ if(renglonRevFactura(f, i, v, c)) nRevT++; else { C += c; TV += v; } } }); });
+  let N = 0, C = 0, T = 0, TV = 0, nRevT = 0; L.forEach(f => { const fx = factorIvaFactura(f), sg = signoFact(f); f.items.forEach((it, i) => { const c = costoItemFactura(it, f), v = it.neto * fx * sg; N += it.neto * sg; T += v; if(c != null){ if(renglonRevFactura(f, i, v, c)) nRevT++; C += c; TV += v; } }); });
   const GAN = TV - C;
   document.getElementById('fc-resumen').innerHTML = L.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px;">
     <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;"><small class="note">Facturado ${fcModoIva === 'con' ? '(con IVA)' : '(sin IVA)'}</small><div style="font-weight:800;font-size:1.2rem;">${formatPrice(T)}</div><small class="note">${fcModoIva === 'con' ? 'sin IVA ' + formatPrice(T / 1.21) : 'con IVA ' + formatPrice(T * 1.21)}</small></div>
     <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;"><small class="note">Costo de los productos</small><div style="font-weight:800;font-size:1.2rem;color:#D97A3A;">${formatPrice(C)}</div><small class="note">sin impuestos ni costos de logística</small></div>
-    <div style="background:${GAN < 0 ? '#FDEBE7' : '#EEF6F0'};border-radius:12px;padding:10px;"><small class="note">Ganancia ${fcModoIva === 'con' ? '(con IVA)' : '(sin IVA)'}</small><div style="font-weight:800;font-size:1.2rem;color:${GAN < 0 ? '#A6432F' : '#2F7A47'};">${formatPrice(GAN)}</div><small class="note">${C > 0 ? Math.round(GAN / C * 100) + ' % sobre el costo' : ''}${nRevT ? ` · ⚠️ ${nRevT} renglones para revisar no se cuentan` : ''}</small></div></div>` : '';
+    <div style="background:${GAN < 0 ? '#FDEBE7' : '#EEF6F0'};border-radius:12px;padding:10px;"><small class="note">Ganancia ${fcModoIva === 'con' ? '(con IVA)' : '(sin IVA)'}</small><div style="font-weight:800;font-size:1.2rem;color:${GAN < 0 ? '#A6432F' : '#2F7A47'};">${formatPrice(GAN)}</div><small class="note">${C > 0 ? Math.round(GAN / C * 100) + ' % sobre el costo' : ''}${nRevT ? ` · ⚠️ ${nRevT} renglones para revisar (incluidos)` : ''}</small></div></div>` : '';
   setTimeout(() => { const bar = document.getElementById('fc-barra'); if(bar) bar.style.display = L.length ? 'flex' : 'none'; actualizarSelFact(); }, 0);
   document.getElementById('fc-lista').innerHTML = L.length ? L.map(f => `<details style="border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:6px;background:#fff;"><summary style="cursor:pointer;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><input type="checkbox" class="fc-sel" value="${escapeAttr(f._id || String(f.numero).replace(/\//g, '-'))}" onclick="event.stopPropagation();" onchange="actualizarSelFact()" style="width:18px;height:18px;"><b style="flex:1;">▸ ${f.esNC ? '<span style="color:#A6432F;">NC</span> ' : ''}${escaparHtml(f.tipo || '')} ${escaparHtml(f.numero)} · ${escaparHtml(f.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(f.cliente || '')}</span><span style="text-align:right;"><b style="font-size:.9rem;">${formatPrice(f.total || (f.neto || 0) * 1.21)}</b><small class="note" style="display:block;margin:0;">sin IVA ${formatPrice((f.total || (f.neto || 0) * 1.21) / 1.21)}</small></span><button type="button" class="btn-mini" title="Quitar de la app" onclick="event.preventDefault();event.stopPropagation();borrarFactura('${escapeAttr(f._id || f.numero)}')">🗑️</button></summary>${tablaFactura(f, true, (f._id || String(f.numero).replace(/\//g, '-')))}</details>`).join('') : '<p class="empty-msg">Todavía no guardaste facturas.</p>';
 }
@@ -11421,7 +11446,7 @@ let ccFilas = [];
 async function abrirRevisarCostos(){
   let pres = []; try{ const s = await db.collection('presupuestos').get(); pres = s.docs.map(d => d.data()).filter(p => !p.pedido); } catch(e){}
   ccFilas = ccPend.map(c => { const r = buscarProductoPorSku(c.sku); if(!r) return null; const pr = parsePrice(r.variante.precio); if(!(pr > 0)) return null;
-    const pctAntes = (pr - c.antes) / c.antes, sug = Math.ceil(c.ahora * (1 + pctAntes) / 10) * 10, np = pres.filter(p => (p.items || []).some(it => String(it.sku || '').toUpperCase() === c.sku)).length;
+    const pctAntes = (pr - c.antes) / c.antes, sug = pr, /* sin propuesta: se muestra el precio actual */ np = pres.filter(p => (p.items || []).some(it => String(it.sku || '').toUpperCase() === c.sku)).length;
     return { ...c, r, pr, sug, pctAntes, np, u: unidadVentaSku(c.sku) || 'unidad' }; }).filter(Boolean);
   const t = document.getElementById('pub-titulo'); if(t) t.textContent = '💲 Revisar cambios de costo';
   renderRevisarCostos(); document.getElementById('pub-modal').style.display = 'block';
@@ -11429,7 +11454,7 @@ async function abrirRevisarCostos(){
 function renderRevisarCostos(){
   const mg = (pr, c) => c > 0 ? Math.round((pr - c) / c * 100) + ' %' : '—';
   document.getElementById('pub-cont').innerHTML = !ccFilas.length ? '<p class="note">No hay cambios de costo pendientes.</p>' : `
-    <p class="note" style="text-align:left;margin:0 0 8px;">Costos por unidad de venta. A la derecha, el % sobre el costo que tenía: cámbielo o escriba el precio directamente.</p>
+    <p class="note" style="text-align:left;margin:0 0 8px;">Costos por unidad de venta. A la derecha, el precio actual y su % con el costo nuevo: si quiere cambiarlo, escriba el precio o el %.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
       <label style="display:flex;gap:6px;align-items:center;font-size:.85rem;"><input type="checkbox" id="cc-todos" checked onchange="document.querySelectorAll('.cc-sel').forEach(x => x.checked = this.checked)"> Todos</label>
       <select id="cc-red" style="padding:6px;border:1px solid var(--line);border-radius:8px;font-size:.85rem;"><option value="10">Redondear a $ 10</option><option value="100">a $ 100</option><option value="1000">a $ 1.000</option></select><button type="button" class="btn-mini" onclick="ccRedondear()">Redondear seleccionados</button></div>
@@ -11438,10 +11463,10 @@ function renderRevisarCostos(){
         <input type="checkbox" class="cc-sel" data-i="${i}" checked>
         <span><b>${escaparHtml(f.sku)}</b> <span class="note" style="margin:0;">${escaparHtml(f.r.producto.nombre)} · ${escaparHtml(f.r.variante.desc || '')} · por ${escaparHtml(f.u)}</span><br>
           costo ${formatPrice(f.antes)} → <b>${formatPrice(f.ahora)}</b> (${f.ahora > f.antes ? '+' : ''}${Math.round((f.ahora / f.antes - 1) * 100)} %) · precio ${formatPrice(f.pr)} · sobre el costo ${mg(f.pr, f.antes)} → <b style="color:${colorPct((f.pr - f.ahora) / f.ahora)};">${mg(f.pr, f.ahora)}</b></span>
-        <span style="display:flex;flex-direction:column;gap:4px;"><span style="display:flex;gap:3px;align-items:center;"><input class="cc-pct" data-i="${i}" inputmode="decimal" value="${Math.round(f.pctAntes * 100)}" oninput="ccDesdePct(${i}, this.value)" style="width:60px;padding:6px;border:1px solid var(--line);border-radius:8px;text-align:right;">% s/costo</span>
+        <span style="display:flex;flex-direction:column;gap:4px;"><span style="display:flex;gap:3px;align-items:center;"><input class="cc-pct" data-i="${i}" inputmode="decimal" value="${Math.round((f.pr - f.ahora) / f.ahora * 100)}" oninput="ccDesdePct(${i}, this.value)" style="width:60px;padding:6px;border:1px solid var(--line);border-radius:8px;text-align:right;">% s/costo</span>
           <input class="cc-pr" data-i="${i}" inputmode="decimal" value="${f.sug}" oninput="ccMargen(${i}, this.value)" style="width:100%;box-sizing:border-box;padding:6px;border:1px solid var(--line);border-radius:8px;text-align:right;"></span></div>
       ${f.np ? `<div class="note" style="text-align:left;margin:3px 0 0 30px;color:#8A6417;">Está en ${f.np} presupuesto${f.np === 1 ? '' : 's'} abierto${f.np === 1 ? '' : 's'}: <a href="#" onclick="event.preventDefault();cerrarPublicar();abrirPresupuestos();">revisar</a></div>` : ''}
-      <div style="margin:2px 0 0 30px;">${(() => { try{ return htmlPrecioML(f.ahora / (cantUnidadVenta(f.u === 'unidad' ? '' : f.u) || 1)); } catch(e){ return ''; } })()}</div></div>`).join('')}</div>
+</div>`).join('')}</div>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;"><button class="btn btn-gold" style="flex:1;" onclick="ccAplicar()">Aplicar al catálogo los seleccionados</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="ccDejar()">Dejar como está</button></div>`;
 }
 function ccMargen(i, v){ const f = ccFilas[i], n = numAr(v), e = document.querySelector(`.cc-pct[data-i="${i}"]`); if(e && n > 0) e.value = Math.round((n - f.ahora) / f.ahora * 100); }
@@ -13498,7 +13523,7 @@ async function analizarPedidoIA(){
     let subtotalTotal = 0;
     itemsResueltos.forEach(it => {
       if(it.match){
-        const precioNum = parseFloat(it.match.variante.precio.replace(/\./g,'').replace(',','.')) || 0;
+        const precioNum = numAr(it.match.variante.precio) || 0;
         const subtotal = precioNum * it.cantidad;
         subtotalTotal += subtotal;
         html += `<div style="padding:10px 12px;border-bottom:1px solid var(--line);font-size:0.85rem;">
@@ -13792,7 +13817,7 @@ async function guardarEdicionHistorial(numero){
       const desc = row.querySelector('.ni-desc').value.trim();
       const cantidad = Math.max(0, parseInt(row.querySelector('.ni-cant').value, 10) || 0);
       const precioTexto = row.querySelector('.ni-precio').value.trim();
-      const precio = parseFloat(precioTexto.replace(/\./g,'').replace(',','.')) || 0;
+      const precio = numAr(precioTexto) || 0;
       const descuentoItemPct = Math.min(100, Math.max(0, parseFloat(row.querySelector('.ni-desc-item').value) || 0));
       if(!sku && !desc && !precioTexto && cantidad <= 1) return; // fila vacia, ni la menciono
       if(cantidad > 0 && (sku || desc) && precio > 0){
@@ -14190,7 +14215,7 @@ async function guardarPedidoManual(){
   const bultos = Math.max(1, parseInt(document.getElementById('m-bultos').value, 10) || 1);
   const detalle = document.getElementById('m-detalle').value.trim();
   const totalTexto = document.getElementById('m-total').value.trim();
-  const total = parseFloat(totalTexto.replace(/\./g,'').replace(',','.')) || 0;
+  const total = numAr(totalTexto) || 0;
 
   if(!numero || !nombre || !apellido || !total){
     document.getElementById('m-error').style.display = 'block';
@@ -14734,7 +14759,7 @@ async function guardarZonasFlex(){
   const zonas = configZonasFlex.zonas.map((z,i) => ({
     id: z.id, nombre: z.nombre,
     bonificacion: parseFloat(document.getElementById('zf-bonif-'+i).value) || z.bonificacion,
-    pago: parseFloat(document.getElementById('zf-pago-'+i).value) || 0,
+    pago: numAr(document.getElementById('zf-pago-'+i).value) || 0,
   }));
   configZonasFlex = { zonas };
   try{
@@ -14818,7 +14843,7 @@ function parsearFacturaML(texto){
     const m = linea.match(patronLinea);
     if(m){
       const concepto = m[1].trim();
-      const monto = parseFloat(m[2].replace(/\./g,'').replace(',','.'));
+      const monto = numAr(m[2]);
       const esBonif = /BONIFICA/i.test(concepto) && !/ANULACI[OÓ]N/i.test(concepto);
       items.push({ concepto, monto: monto * (esBonif ? 1 : -1) });
     }
@@ -14832,7 +14857,7 @@ function parsearFacturaML(texto){
     const m = linea.match(patronLinea);
     if(m){
       const concepto = m[1].trim();
-      const monto = parseFloat(m[2].replace(/\./g,'').replace(',','.'));
+      const monto = numAr(m[2]);
       items.push({ concepto, monto: monto * signoDoc });
     }
   });
@@ -15220,7 +15245,7 @@ async function guardarGastoPeriodicoML(){
   const cuenta = document.getElementById('full-cuenta').value;
   const mes = document.getElementById('full-mes').value;
   const concepto = document.getElementById('full-concepto').value;
-  const monto = parseFloat(document.getElementById('full-monto').value) || 0;
+  const monto = numAr(document.getElementById('full-monto').value) || 0;
   if(!mes){ alert('Falta el mes.'); return; }
   if(monto <= 0){ alert('Falta el monto.'); return; }
   try{
@@ -15638,7 +15663,7 @@ function recalcularFilaCostos(id, sinGuardar){
   const tr = document.getElementById('cc-fila-' + id);
   if(!tr) return;
   const consumo = parseFloat(tr.querySelector('.cc-consumo').value) || 0;
-  const costoTela = parseFloat(tr.querySelector('.cc-costotela').value) || 0;
+  const costoTela = numAr(tr.querySelector('.cc-costotela').value) || 0;
   const confeccion = parseFloat(tr.querySelector('.cc-confeccion').value) || 0;
   const insumos = parseFloat(tr.querySelector('.cc-insumos').value) || 0;
 
@@ -15667,9 +15692,9 @@ async function guardarFilaCostos(id){
     articulo: tr.querySelector('.cc-articulo').value.trim(),
     tela: tr.querySelector('.cc-tela').value.trim(),
     consumo: parseFloat(tr.querySelector('.cc-consumo').value) || 0,
-    costoTela: parseFloat(tr.querySelector('.cc-costotela').value) || 0,
-    costoConfeccion: parseFloat(tr.querySelector('.cc-confeccion').value) || 0,
-    costoInsumos: parseFloat(tr.querySelector('.cc-insumos').value) || 0,
+    costoTela: numAr(tr.querySelector('.cc-costotela').value) || 0,
+    costoConfeccion: numAr(tr.querySelector('.cc-confeccion').value) || 0,
+    costoInsumos: numAr(tr.querySelector('.cc-insumos').value) || 0,
     creado: new Date().toISOString(),
   };
   try{
@@ -15952,13 +15977,7 @@ function normalizarPrecioAArgentino(valorCelda){
   } else {
     const texto = String(valorCelda || '').trim();
     if(!texto) return '';
-    if(/,\d{1,2}$/.test(texto)){
-      // termina en coma + 1 o 2 digitos: formato argentino (ej "11.168,80")
-      numero = parseFloat(texto.replace(/\./g,'').replace(',','.'));
-    } else {
-      // formato con punto decimal (ej "11168.8", tal como lo entrega Excel para celdas numericas)
-      numero = parseFloat(texto.replace(/,/g,''));
-    }
+    numero = numAr(texto); // "24.591" = 24591; "11.168,80" = 11168,80; "11168.8" = 11168,8
   }
   if(isNaN(numero)) return '';
   return numero.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -16511,7 +16530,7 @@ function agregarVarianteNP(){
     <input type="text" placeholder="SKU" class="npv-sku">
     <input type="text" placeholder="Descripción (ej: 1 Plaza)" class="npv-desc">
     <input type="text" placeholder="Precio de venta" class="npv-precio">
-    ${conCosto ? '<div><input type="text" placeholder="Costo (privado)" class="npv-costo" title="Costo de compra: no se muestra en el catálogo, queda en Costos de reventa" style="background:#FFF8E6;border-color:#EBD9A8;width:100%;box-sizing:border-box;" oninput="this.nextElementSibling.innerHTML = htmlPrecioML(numAr(this.value))"><div></div></div>' : ''}
+    ${conCosto ? '<div><input type="text" placeholder="Costo por unidad de venta (privado)" class="npv-costo" title="Costo de compra: no se muestra en el catálogo, queda en Costos de reventa" style="background:#FFF8E6;border-color:#EBD9A8;width:100%;box-sizing:border-box;"></div>' : ''}
     <button type="button" class="btn-mini" onclick="document.getElementById('${id}').remove();">✕</button>
   `;
   cont.appendChild(row);
@@ -19768,7 +19787,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v292';
+const APP_VERSION = '2026-10-02-v293';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
