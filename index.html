@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v293</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v294</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2370,7 +2370,7 @@ a.grilla-celda{display:block;}
     <div class="form-card" style="max-width:1000px;">
       <h2>Rankings de ventas</h2>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
-        <select id="rk-canal" onchange="renderRankings()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"><option value="ambos">Ambos canales</option><option value="fact">Facturadas (Tango/TFactura)</option><option value="ml">Mercado Libre</option></select>
+        <select id="rk-canal" onchange="renderRankings()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"><option value="ambos">Ambos canales</option><option value="fact">Facturadas (Tango/TFactura)</option><option value="ml" style="background:#FFE600;color:#2D3277;">Mercado Libre</option></select>
         <select id="rk-desde" onchange="renderRankings()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"></select>
         <select id="rk-hasta" onchange="renderRankings()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"></select>
       </div>
@@ -5907,7 +5907,7 @@ function abrirGrupoInicio(k){
   grupoInicioAbierto = k;
   const tl = document.getElementById('ini-t-' + k); if(tl) tl.classList.add('sel');
   const cont = document.getElementById('ini-sub-' + g.lado);
-  const boton = ([t, f]) => { if(!puede(permisoDeGrupo(k)) || !puede(permisoDeAccion(f))) return ''; window.__iniItems = window.__iniItems || []; window.__iniItems.push([t, f]); return `<button type="button" onclick="usarItemInicio(${window.__iniItems.length - 1})">${t}</button>`; };
+  const boton = ([t, f]) => { if(!puede(permisoDeGrupo(k)) || !puede(permisoDeAccion(f))) return ''; window.__iniItems = window.__iniItems || []; window.__iniItems.push([t, f]); return `<button type="button" onclick="usarItemInicio(${window.__iniItems.length - 1})"${/ResultadosML|CalculadoraML|VentasML/.test(f) ? ' style="background:#FFE600;color:#2D3277;font-weight:700;border-color:#E6CF00;"' : ''}>${t}</button>`; }; // Mercado Libre: siempre amarillo
   cont.innerHTML = `<p style="margin:0 0 10px;font-weight:700;color:var(--purple);">${g.titulo}</p>` + (g.columnas
     ? `<div class="ini-cols" style="grid-template-columns:repeat(${g.columnas.filter(col => col.some(([, f]) => puede(permisoDeGrupo(k)) && puede(permisoDeAccion(f)))).length || 1},minmax(0,1fr));">${g.columnas.map((col, ci) => { const cc = g.colorColumnas && g.colorColumnas[ci];
         if(!col.some(([, f]) => puede(permisoDeGrupo(k)) && puede(permisoDeAccion(f)))) return '';
@@ -7492,9 +7492,12 @@ async function abrirRankings(){
   ['rk-desde', 'rk-hasta'].forEach((id, k) => { const s = document.getElementById(id); s.innerHTML = pers.map(p => `<option value="${p}">${k ? 'hasta ' : 'desde '}${nm(p)}</option>`).join(''); s.value = k ? pers[pers.length - 1] || '' : pers[Math.max(0, pers.length - 1)] || ''; });
   renderRankings();
 }
+const ML_AMARILLO = 'background:#FFE600;color:#2D3277;';
+const chipML = t => `<span style="${ML_AMARILLO}border-radius:999px;padding:1px 8px;font-size:.75rem;font-weight:700;white-space:nowrap;">${t}</span>`;
+function pintarSelectCanal(){ const s = document.getElementById('rk-canal'); if(!s) return; const ml = s.value === 'ml'; s.style.background = ml ? '#FFE600' : ''; s.style.color = ml ? '#2D3277' : ''; s.style.fontWeight = ml ? '700' : ''; }
 function origenSku(S){ try{ if(skusQueFabrico().map(x => String(x).toUpperCase()).includes(S)) return 'Fabricado'; } catch(e){} return (costosReventa || {})[S] ? 'Reventa' : 'Sin dato'; }
 function renderRankings(){
-  const canal = document.getElementById('rk-canal').value, d = document.getElementById('rk-desde').value, ha = document.getElementById('rk-hasta').value;
+  const canal = document.getElementById('rk-canal').value, d = document.getElementById('rk-desde').value, ha = document.getElementById('rk-hasta').value; pintarSelectCanal();
   const F = rkFilas.filter(f => (canal === 'ambos' || f.canal === canal) && (!d || f.per >= d) && (!ha || f.per <= ha));
   // ganancia: facturas = venta - costo; ML = le queda - costo
   const gan = f => f.costo == null ? null : (f.canal === 'ml' ? f.quedo : f.venta) - f.costo;
@@ -7509,7 +7512,7 @@ function renderRankings(){
   const tot = agrupar(() => 'total')[0] || { venta: 0, gan: 0, costo: 0, unid: 0 };
   const cab = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px;">${[['Facturación', fP(tot.venta)], ['Unidades', Math.round(tot.unid).toLocaleString('es-AR')], ['Ganancia', fP(tot.gan)], ['% s/costo', pct(tot) != null ? pct(tot) + ' %' : '–']].map(([t, v]) => `<div style="border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:#fff;"><small class="note" style="margin:0;">${t}</small><div style="font-weight:800;font-size:1.05rem;">${v}</div></div>`).join('')}</div>${aviso}`;
   const tabla = (filas, colK, extra) => `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.86rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:6px;">#</td><td style="padding:6px;">${colK}</td>${extra ? extra.map(e => `<td style="padding:6px;text-align:right;">${e[0]}</td>`).join('') : ''}<td style="padding:6px;text-align:right;">Unid.</td><td style="padding:6px;text-align:right;">Facturación</td><td style="padding:6px;text-align:right;">Ganancia</td><td style="padding:6px;text-align:right;">% s/costo</td></tr>
-    ${filas.map((g, i) => { const p = pct(g); return `<tr style="border-top:1px solid var(--line);"><td style="padding:6px;color:#8A8072;">${i + 1}</td><td style="padding:6px;"><b>${escaparHtml(g.k)}</b>${g.sub ? `<div class="note" style="text-align:left;margin:0;">${escaparHtml(g.sub)}</div>` : ''}${g.sinC || g.rev ? `<div style="font-size:.72rem;color:#8A6417;">${g.sinC ? g.sinC + ' sin costo' : ''}${g.sinC && g.rev ? ' · ' : ''}${g.rev ? g.rev + ' para revisar' : ''}${colK === 'Producto' && /^[A-Z0-9]/.test(g.k) ? ` <a href="#" onclick="event.preventDefault();corregirCostoSku('${escapeAttr(g.k)}')">✏️ corregir costo</a>` : ''}</div>` : ''}</td>${extra ? extra.map(e => `<td style="padding:6px;text-align:right;">${e[1](g)}</td>`).join('') : ''}<td style="padding:6px;text-align:right;">${Math.round(g.unid).toLocaleString('es-AR')}</td><td style="padding:6px;text-align:right;">${fP(g.venta)}</td><td style="padding:6px;text-align:right;font-weight:700;color:${g.gan < 0 ? '#A6432F' : '#2F7A47'};">${fP(g.gan)}</td><td style="padding:6px;text-align:right;color:${colorPct(p != null ? p / 100 : null)};">${p != null ? p + ' %' : '–'}</td></tr>`; }).join('')}</table></div>`;
+    ${filas.map((g, i) => { const p = pct(g); return `<tr style="border-top:1px solid var(--line);"><td style="padding:6px;color:#8A8072;">${i + 1}</td><td style="padding:6px;"><b>${escaparHtml(g.k)}</b>${g.sub || g.subML ? `<div class="note" style="text-align:left;margin:0;">${escaparHtml(g.sub || '')}${g.subML || ''}</div>` : ''}${g.sinC || g.rev ? `<div style="font-size:.72rem;color:#8A6417;">${g.sinC ? g.sinC + ' sin costo' : ''}${g.sinC && g.rev ? ' · ' : ''}${g.rev ? g.rev + ' para revisar' : ''}${colK === 'Producto' && /^[A-Z0-9]/.test(g.k) ? ` <a href="#" onclick="event.preventDefault();corregirCostoSku('${escapeAttr(g.k)}')">✏️ corregir costo</a>` : ''}</div>` : ''}</td>${extra ? extra.map(e => `<td style="padding:6px;text-align:right;">${e[1](g)}</td>`).join('') : ''}<td style="padding:6px;text-align:right;">${Math.round(g.unid).toLocaleString('es-AR')}</td><td style="padding:6px;text-align:right;">${fP(g.venta)}</td><td style="padding:6px;text-align:right;font-weight:700;color:${g.gan < 0 ? '#A6432F' : '#2F7A47'};">${fP(g.gan)}</td><td style="padding:6px;text-align:right;color:${colorPct(p != null ? p / 100 : null)};">${p != null ? p + ' %' : '–'}</td></tr>`; }).join('')}</table></div>`;
   const ord = L => L.sort((a, b) => rkOrden === 'venta' ? b.venta - a.venta : rkOrden === 'unid' ? b.unid - a.unid : rkOrden === 'pct' ? (pct(b) ?? -1e9) - (pct(a) ?? -1e9) : rkOrden === 'pctAsc' ? (pct(a) ?? 1e9) - (pct(b) ?? 1e9) : rkOrden === 'ganAsc' ? ((b.costo > 0) - (a.costo > 0)) || a.gan - b.gan : b.gan - a.gan);
   let html = cab;
   if(rkTab === 'productos'){
@@ -7517,10 +7520,10 @@ function renderRankings(){
     if(rkBuscar) L = L.filter(g => coincideBusqueda(g.k + ' ' + (g.sub || ''), rkBuscar));
     html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"><input placeholder="🔍 Buscar SKU o producto" value="${escapeAttr(rkBuscar)}" oninput="rkBuscar=this.value;clearTimeout(window.__rkT);window.__rkT=setTimeout(renderRankings,250)" style="flex:1;min-width:180px;padding:8px;border:1px solid var(--line);border-radius:10px;">
       <select onchange="rkOrden=this.value;renderRankings()" style="padding:8px;border:1px solid var(--line);border-radius:10px;">${[['gan', 'Más ganancia en $'], ['pct', 'Más ganancia en % (s/costo)'], ['pctAsc', 'Menos ganancia en % (s/costo)'], ['ganAsc', 'Menos ganancia en $'], ['venta', 'Más facturación'], ['unid', 'Más unidades']].map(([v, t]) => `<option value="${v}" ${rkOrden === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
-    html += tabla(ord(L).slice(0, 100), 'Producto', canal === 'ambos' ? [['Canal', g => g.fact && g.ml ? 'Ambos' : g.ml ? 'ML' : 'Facturado']] : null);
+    html += tabla(ord(L).slice(0, 100), 'Producto', canal === 'ambos' ? [['Canal', g => g.fact && g.ml ? 'Ambos' : g.ml ? chipML('ML') : 'Facturado']] : null);
   } else if(rkTab === 'origen'){ html += tabla(ord(agrupar(f => origenSku(f.sku))), 'Origen'); }
-  else if(rkTab === 'clientes'){ const L = agrupar(f => f.canal === 'ml' ? 'Mercado Libre · ' + f.cli : f.cli); html += tabla(ord(L).slice(0, 100), 'Cliente'); }
-  else if(rkTab === 'meses'){ const L = agrupar(f => f.per).sort((a, b) => a.k.localeCompare(b.k)); L.forEach(g => { g.sub = canal === 'ambos' ? `Facturado ${fP(g.fact)} · ML ${fP(g.ml)}` : ''; g.k = new Date(g.k + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }); }); html += tabla(L, 'Mes'); }
+  else if(rkTab === 'clientes'){ const L = agrupar(f => f.canal === 'ml' ? 'Mercado Libre · ' + f.cli : f.cli); html += tabla(ord(L).slice(0, 100), 'Cliente').replace(/<b>Mercado Libre · ([^<]+)<\/b>/g, (m, c) => chipML('Mercado Libre · ' + c)); }
+  else if(rkTab === 'meses'){ const L = agrupar(f => f.per).sort((a, b) => a.k.localeCompare(b.k)); L.forEach(g => { g.sub = canal === 'ambos' ? `Facturado ${fP(g.fact)} · ` : ''; g.subML = canal === 'ambos' ? chipML('ML ' + fP(g.ml)) : ''; g.k = new Date(g.k + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }); }); html += tabla(L, 'Mes'); }
   else if(rkTab === 'dias'){
     // cuantas veces aparece cada dia en el periodo (hasta hoy si el periodo llega al mes actual)
     const ini = new Date(d + '-01T12:00:00'), [hy, hm] = (ha || d).split('-').map(Number), fin0 = new Date(hy, hm, 0, 12), hoy = new Date(); const fin = fin0 > hoy ? hoy : fin0;
@@ -7538,9 +7541,9 @@ function renderRankings(){
           <td style="padding:6px;text-align:right;color:#8A8072;">${Math.round(g.venta / tv * 100)} %</td></tr>`; }).join('')}</table></div>`; };
     const ml = F.filter(f => f.canal === 'ml'), fa = F.filter(f => f.canal === 'fact');
     html += `<p class="note" style="text-align:left;">Mercado Libre: fecha de la venta. Facturadas: fecha de la factura. "Promedio por día" = facturación ÷ cantidad de ese día en el período.</p>`
-      + (ml.length ? bloque('🟡 Mercado Libre', ml) : '') + (fa.length ? bloque('🧾 Facturadas', fa) : '') + (!ml.length && !fa.length ? '<p class="empty-msg">Sin ventas en el período.</p>' : ''); }
+      + (ml.length ? bloque('Mercado Libre', ml).replace('<div style="font-weight:800;color:var(--purple);margin:10px 0 4px;">Mercado Libre</div>', `<div style="margin:10px 0 4px;">${chipML('Mercado Libre')}</div>`) : '') + (fa.length ? bloque('🧾 Facturadas', fa) : '') + (!ml.length && !fa.length ? '<p class="empty-msg">Sin ventas en el período.</p>' : ''); }
   else if(rkTab === 'canales'){ const L = agrupar(f => f.sku || '(sin SKU)').filter(g => g.fact && g.ml); L.forEach(g => { const r = buscarProductoPorSku(g.k); g.sub = r ? r.producto.nombre : ''; });
-    html += `<p class="note" style="text-align:left;">SKU que se venden en los dos canales: qué parte de la facturación es mayorista (facturado) y cuál de Mercado Libre.</p>` + tabla(ord(L).slice(0, 100), 'Producto', [['Facturado', g => Math.round(g.fact / g.venta * 100) + ' %'], ['ML', g => Math.round(g.ml / g.venta * 100) + ' %']]); }
+    html += `<p class="note" style="text-align:left;">SKU que se venden en los dos canales: qué parte de la facturación es mayorista (facturado) y cuál de Mercado Libre.</p>` + tabla(ord(L).slice(0, 100), 'Producto', [['Facturado', g => Math.round(g.fact / g.venta * 100) + ' %'], ['ML', g => chipML(Math.round(g.ml / g.venta * 100) + ' %')]]); }
   document.getElementById('rk-body').innerHTML = html;
 }
 // ===== Resultado del negocio: facturas + Mercado Libre + gastos, con IVA, mes por mes =====
@@ -7602,12 +7605,12 @@ function renderResultadoNegocio(){
     <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.92rem;">
       <tr style="color:#8A8072;font-size:.72rem;text-transform:uppercase;"><td style="padding:6px;">Concepto</td><td style="padding:6px;text-align:right;">$ (con IVA)</td><td style="padding:6px;text-align:right;">% de lo vendido</td>${B ? `<td style="padding:6px;text-align:right;">Mes anterior</td>` : ''}</tr>
       ${fila('Ventas facturadas', A.vF, B && B.vF, { sub: `${A.nFact} comprobantes · Tango/TFactura, sin Mercado Libre` })}
-      ${fila('Ventas Mercado Libre', A.vML + A.envML, B && (B.vML + B.envML), { sub: `ventas ${formatPrice(A.vML)} + envíos cobrados ${formatPrice(A.envML)}${cta ? ' · cuenta ' + cta : ''}` })}
+      ${fila(chipML('Ventas Mercado Libre'), A.vML + A.envML, B && (B.vML + B.envML), { sub: `ventas ${formatPrice(A.vML)} + envíos cobrados ${formatPrice(A.envML)}${cta ? ' · cuenta ' + cta : ''}` })}
       ${fila('Total vendido', A.total, B && B.total, { tot: true })}
       ${fila('Costo de mercadería (facturas)', A.cF, B && B.cF, { neg: true })}
-      ${fila('Costo de mercadería (Mercado Libre)', A.cML, B && B.cML, { neg: true })}
+      ${fila(chipML('Costo de mercadería (Mercado Libre)'), A.cML, B && B.cML, { neg: true })}
       ${fila('Margen bruto', A.bruto, B && B.bruto, { tot: true })}
-      ${fila('Cargos de Mercado Libre', A.cargosML, B && B.cargosML, { neg: true, sub: desg })}
+      ${fila(chipML('Cargos de Mercado Libre'), A.cargosML, B && B.cargosML, { neg: true, sub: desg })}
       ${A.periodicos || (B && B.periodicos) ? fila('Otros gastos de Mercado Libre (cargados a mano)', A.periodicos, B && B.periodicos, { neg: true }) : ''}
       ${fila('Gastos variables', A.gVar, B && B.gVar, { neg: true, sub: 'fletes, comisiones, embalaje… (suben o bajan con la venta)' })}
       ${fila('Contribución', A.contrib, B && B.contrib, { tot: true, sub: 'lo que queda para pagar los gastos fijos' })}
@@ -19787,7 +19790,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v293';
+const APP_VERSION = '2026-10-02-v294';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
