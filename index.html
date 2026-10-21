@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v285</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v286</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2333,7 +2333,7 @@ a.grilla-celda{display:block;}
           <div id="da-msgs" style="min-height:300px;max-height:60vh;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:10px;background:#FAF8F5;"></div>
           <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;" id="da-canales"></div>
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;"><input id="da-sku" list="da-skus" placeholder="🔍 Agregar producto (SKU o nombre)" style="flex:1;min-width:200px;padding:9px;border:1px solid var(--line);border-radius:10px;" oninput="if(window.__daOpts&&window.__daOpts.has(this.value))agregarProductoDA();"><datalist id="da-skus"></datalist>
-            <label class="btn-mini" style="cursor:pointer;">📎 Adjuntar<input type="file" accept="image/*,application/pdf,.pdf,.txt,.csv,text/plain,text/csv" multiple style="display:none;" onchange="adjuntarImagenDA(this)"></label></div>
+            <label class="btn-mini" style="cursor:pointer;">📎 Adjuntar<input type="file" accept="image/*,application/pdf,.pdf,.txt,.csv,text/plain,text/csv,.xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple style="display:none;" onchange="adjuntarImagenDA(this)"></label></div>
           <div id="da-adjuntos" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;"></div>
           <textarea id="da-texto" rows="3" placeholder="Escriba el pedido. Ej: 3 fotos para Mercado Libre de este producto" style="width:100%;box-sizing:border-box;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:10px;font:inherit;"></textarea>
           <button class="btn btn-gold" style="width:100%;margin-top:6px;" id="da-enviar" onclick="enviarDA()">Enviar</button>
@@ -11933,7 +11933,11 @@ async function adjuntarImagenDA(inp){
       if(/^image\//.test(f.type)) daImgs.push(await comprimirImagenAFotoBase64(f));
       else if(f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) daDocs.push({ tipo: 'pdf', nombre: f.name, data: String(await leerArchivoDA(f)).split(',')[1] });
       else if(/^text\//.test(f.type) || /\.(txt|csv)$/i.test(f.name)) daDocs.push({ tipo: 'texto', nombre: f.name, data: String(await leerArchivoDA(f, true)).slice(0, 200000) });
-      else alert(`"${f.name}": tipo de archivo no admitido. Use imágenes, PDF, TXT o CSV.`);
+      else if(/\.(xlsx|xls)$/i.test(f.name)){ // Excel: cada hoja se envia como CSV
+        const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: true });
+        const txt = wb.SheetNames.map(n => `Hoja "${n}":\n` + XLSX.utils.sheet_to_csv(wb.Sheets[n], { FS: ';', blankrows: false })).join('\n\n');
+        daDocs.push({ tipo: 'texto', nombre: f.name, data: txt.slice(0, 200000) + (txt.length > 200000 ? '\n(… el archivo es más largo y se recortó)' : '') }); }
+      else alert(`"${f.name}": tipo de archivo no admitido. Use imágenes, PDF, Excel, TXT o CSV.`);
     } catch(e){ alert(`No se pudo leer "${f.name}".`); }
   }
   inp.value = ''; renderAdjuntosDA();
@@ -19656,7 +19660,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v285';
+const APP_VERSION = '2026-10-02-v286';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
