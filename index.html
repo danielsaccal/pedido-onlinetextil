@@ -619,7 +619,7 @@ a.grilla-celda{display:block;}
     <div class="ini-grid ini-ext"><div class="ini-tile" id="ini-t-c" onclick="abrirGrupoInicio('c')"><div class="ini-ic">📣</div><b>Difusión</b><span>Compartir catálogo, enviar a clientes, redes, promociones, videos</span></div></div>
     <div class="ini-sub" id="ini-sub-ext" style="display:none;"></div>
     <p class="ini-sec">ADMINISTRACIÓN INTERNA</p>
-    <div class="ini-grid"><div class="ini-tile" id="ini-t-d" onclick="abrirGrupoInicio('d')"><div class="ini-ic">🧾</div><b>Ventas</b><span>Armar pedidos, clientes, gastos y resultados ML</span></div><div class="ini-tile" id="ini-t-f" onclick="abrirGrupoInicio('f')"><div class="ini-ic">🏷️</div><b>Catálogo</b><span>Altas, edición, fotos, precios, aumentos</span></div><div class="ini-tile" id="ini-t-g" onclick="abrirGrupoInicio('g')"><div class="ini-ic">✂️</div><b>Producción</b><span>Telas, cortes, órdenes, talleres, stock</span></div></div>
+    <div class="ini-grid"><div class="ini-tile" id="ini-t-d" onclick="abrirGrupoInicio('d')"><div class="ini-ic">🧾</div><b>Ventas</b><span>Armar pedidos, clientes, gastos y resultados ML</span></div><div class="ini-tile" id="ini-t-f" onclick="abrirGrupoInicio('f')"><div class="ini-ic">🏷️</div><b>Catálogo</b><span>Altas, edición, fotos, precios, aumentos</span></div><div class="ini-tile" id="ini-t-g" onclick="abrirGrupoInicio('g')"><div class="ini-ic">✂️</div><b>Producción</b><span>Telas, cortes, órdenes, talleres, stock</span></div><div class="ini-tile" id="ini-t-k" onclick="abrirGrupoInicio('k')"><div class="ini-ic">🤖</div><b>Agentes IA</b><span>Director de arte, auditor contable</span></div></div>
     <div class="ini-sub" id="ini-sub-int" style="display:none;"></div>
   </div>
 
@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v284</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v285</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5873,6 +5873,9 @@ const GRUPOS_INICIO = {
     [['👥 Usuarios', 'abrirUsuarios()'], ['💾 Copia de seguridad', 'abrirCopiaSeguridad()'], ['🔔 Avisos push', 'abrirConfigPush()']],
     [['📝 Listas y opciones', 'abrirListas()'], ['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['📖 Palabras de la app', 'abrirGlosario()']],
     [['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']]
+  ] },
+  k: { lado: 'int', titulo: 'Agentes IA', titulosColumnas: ['1 · Agentes'], columnas: [
+    [['🎨 Director de arte', 'abrirDirectorArte()'], ['🧾 Auditor contable', 'abrirAuditor()']],
   ] },
 };
 let grupoInicioAbierto = null;
@@ -11456,7 +11459,7 @@ function puede(perm){
 function permisoDeGrupo(k){ return { a: 'pedidos', c: 'difusion', g: 'produccion' }[k] || null; }
 function aplicarPermisosInicio(){
   if(rolActual === 'dueño') return;
-  ['a', 'c', 'd', 'f', 'g'].forEach(k => { const g = GRUPOS_INICIO[k], t = document.getElementById('ini-t-' + k); if(!g || !t) return;
+  ['a', 'c', 'd', 'f', 'g', 'k'].forEach(k => { const g = GRUPOS_INICIO[k], t = document.getElementById('ini-t-' + k); if(!g || !t) return;
     const items = g.columnas ? g.columnas.flat() : (g.items || []);
     const alguno = puede(permisoDeGrupo(k)) && items.some(([, f]) => puede(permisoDeAccion(f)));
     t.style.display = alguno ? '' : 'none'; });
@@ -19653,7 +19656,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v284';
+const APP_VERSION = '2026-10-02-v285';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
