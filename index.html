@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v283</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v284</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -11871,9 +11871,38 @@ function renderMsgsDA(){
   box.scrollTop = box.scrollHeight;
 }
 // cada bloque ESPECIFICACION con botones para copiar el bloque o solo la indicacion en ingles
+// ===== Respuestas de los agentes: tablas dibujadas, negritas, listas y grafico de barras con la columna $ =====
+function mdADA(t){
+  const lineas = String(t || '').split('\n'), out = []; let i = 0;
+  const inl = s => escaparHtml(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
+  const monto = s => { const m = String(s).replace(/\(est\.\)/i, '').match(/-?\$?\s*-?[\d.]+(?:,\d+)?/); if(!m) return null; const n = numAr(m[0].replace(/[$\s]/g, '')); return isFinite(n) ? n : null; };
+  while(i < lineas.length){
+    const l = lineas[i];
+    if(/^\s*\|/.test(l)){
+      const filas = []; while(i < lineas.length && /^\s*\|/.test(lineas[i])){ filas.push(lineas[i]); i++; }
+      const celdas = filas.map(f => f.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim())).filter(c => !c.every(x => /^:?-{2,}:?$/.test(x) || x === ''));
+      if(!celdas.length) continue;
+      const cab = celdas[0], cuerpo = celdas.slice(1);
+      out.push(`<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.85rem;margin:6px 0;"><tr>${cab.map(c => `<th style="text-align:left;padding:5px 6px;border-bottom:2px solid var(--purple);color:var(--purple);">${inl(c)}</th>`).join('')}</tr>${cuerpo.map(r => `<tr>${r.map(c => `<td style="padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:top;">${inl(c)}</td>`).join('')}</tr>`).join('')}</table></div>`);
+      // grafico: barras con la columna de montos ($)
+      const jm = cab.findIndex(c => /\$|monto|impacto/i.test(c));
+      if(jm >= 0 && cuerpo.length >= 2){
+        const ds = cuerpo.map(r => ({ v: monto(r[jm]), lab: (r.find((c, k) => k !== jm && c && !/^[🔴🟡🟢⚪]$/u.test(c)) || '').slice(0, 40), col: /🔴/u.test(r.join('')) ? '#A6432F' : /🟡/u.test(r.join('')) ? '#D9A300' : '#2F7A47' })).filter(d => d.v != null && d.v !== 0);
+        const mx = Math.max(...ds.map(d => Math.abs(d.v)), 1);
+        if(ds.length >= 2) out.push(`<div style="margin:4px 0 8px;">${ds.map(d => `<div style="display:grid;grid-template-columns:minmax(0,40%) 1fr auto;gap:6px;align-items:center;font-size:.78rem;margin:3px 0;"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escaparHtml(d.lab)}</span><span style="background:#F2F2F2;border-radius:6px;height:12px;overflow:hidden;"><span style="display:block;height:100%;width:${Math.max(3, Math.abs(d.v) / mx * 100)}%;background:${d.col};"></span></span><b>${formatPrice(d.v)}</b></div>`).join('')}</div>`);
+      }
+      continue;
+    }
+    if(/^\s*#{1,4}\s/.test(l)){ out.push(`<div style="font-weight:800;color:var(--purple);margin:8px 0 4px;">${inl(l.replace(/^\s*#+\s*/, ''))}</div>`); i++; continue; }
+    if(/^\s*[-*•]\s+/.test(l)){ const it = []; while(i < lineas.length && /^\s*[-*•]\s+/.test(lineas[i])){ it.push(lineas[i].replace(/^\s*[-*•]\s+/, '')); i++; } out.push(`<ul style="margin:4px 0 4px 18px;padding:0;">${it.map(x => `<li>${inl(x)}</li>`).join('')}</ul>`); continue; }
+    if(!l.trim()){ out.push('<div style="height:6px;"></div>'); i++; continue; }
+    out.push(`<div>${inl(l)}</div>`); i++;
+  }
+  return out.join('');
+}
 function htmlRespuestaDA(t, i){
   const partes = String(t || '').split(/(?=ESPECIFICACI[ÓO]N)/);
-  return partes.map((p, k) => { if(!/^ESPECIFICACI/.test(p)) return `<div style="white-space:pre-wrap;">${escaparHtml(p)}</div>`;
+  return partes.map((p, k) => { if(!/^ESPECIFICACI/.test(p)) return mdADA(p);
     const m = p.match(/Indicaci[óo]n para el generador[^:]*:\s*([\s\S]*?)(?=\n-\s|\n\n|$)/i), ev = p.match(/Evitar[^:]*:\s*([\s\S]*?)(?=\n-\s|\n\n|$)/i);
     const prompt = m ? m[1].trim() + (ev ? '\n\nAvoid: ' + ev[1].trim() : '') : '';
     window.__daCopias = window.__daCopias || {}; window.__daCopias[`${i}-${k}`] = { b: p.trim(), p: prompt };
@@ -19624,7 +19653,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v283';
+const APP_VERSION = '2026-10-02-v284';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
