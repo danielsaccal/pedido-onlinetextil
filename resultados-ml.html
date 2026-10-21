@@ -843,7 +843,7 @@ $('file').addEventListener('change',async ev=>{
     try{ await cargarPeriodos([d.periodo, mesAnt(d.periodo)]); }catch(e){}
     // control: ¿el reporte es de la cuenta elegida? Si ese mes ya estaba y no coincide ninguna operacion, o si coincide con la otra cuenta, avisa
     {const ops=new Set(rows.map(o=>String(o.op)).filter(Boolean));
-     const coincide=c=>{const e=DATA.find(x=>x.cuenta===c&&x.periodo===d.periodo);if(!e)return null;const n=e.rows.filter(o=>ops.has(String(o.op))).length;return n/Math.max(1,Math.min(e.rows.length,ops.size));};
+     const coincide=c=>{const e=DATA.find(x=>x.cuenta===c&&x.periodo===d.periodo&&x.rows&&x.rows.length);if(!e)return null; /* un mes guardado vacio (sin operaciones) no cuenta: se reemplaza */const n=e.rows.filter(o=>ops.has(String(o.op))).length;return n/Math.max(1,Math.min(e.rows.length,ops.size));};
      const otra=['Alberto','Rita'].find(c=>c!==cuenta), cEsta=coincide(cuenta), cOtra=coincide(otra);
      if((cOtra!=null&&cOtra>0.5)||(cEsta!=null&&cEsta<0.1)){
        const msg=cOtra!=null&&cOtra>0.5?`Este reporte de ${mesTxt(d.periodo)} parece ser de ${otra} (sus operaciones coinciden con el mes de ${otra} que ya está guardado).`:`Ya hay un ${mesTxt(d.periodo)} guardado de ${cuenta} y ninguna operación coincide con este reporte: puede ser de ${otra}.`;
