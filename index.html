@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v308</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v309</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5924,7 +5924,7 @@ const GRUPOS_INICIO = {
   ] },
   art: { lado: 'int', titulo: '📦 Artículos', titulosColumnas: ['Catálogo', 'Precios', 'Costos', 'Stock', 'Producción'], colorColumnas: { 2: '#2F7A47' }, columnas: [
     [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['🗂️ Ordenar categorías', 'abrirCategorias()'], ['📷 Fotos de productos', 'abrirActualizarFoto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['🌐 Links de la web', 'abrirLinksWeb()']],
-    [['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']],
+    [['🏷️ Lista de precios', 'abrirListaPrecios()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']],
     [['💲 Costos de productos (fabrico y reventa)', 'abrirCostosProductos()'], ['💰 Costos de confección', 'abrirConfeccion()']],
     [['📊 Stock y prioridades', 'abrirStock()'], ['📦 Faltantes de stock', 'abrirFaltantes()']],
     [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['📋 Nueva orden de trabajo', 'abrirAsistenteOT()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['🚚 Ingreso a los talleres', 'abrirEnviosTela()'], ['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🏭 Productos en producción', 'abrirEnProduccion()'], ['📥 Entregas del taller', 'abrirIngresoTaller()'], ['📦 Historial de órdenes', 'abrirHistorialOT()'], ['🗂️ Historial de entregas', 'abrirHistorialEntregas()'], ['🔎 ¿Cuándo hice este SKU?', 'abrirHistorialSku()']],
@@ -7545,6 +7545,20 @@ async function aplicarPctMasivo(skus, pct){
   if(!confirm(`¿Poner el precio de ${lista.length} SKU con ${pct} % sobre su costo?\n\n` + lista.slice(0, 15).map(([S, n]) => `${S}: ${formatPrice(n)}`).join('\n') + (lista.length > 15 ? '\n…' : '') + (sinCosto.length ? `\n\nSin costo (no se tocan): ${sinCosto.join(', ')}` : '') + (sinPub.length ? `\nSin publicar (no se tocan): ${sinPub.join(', ')}` : ''))) return;
   try{ const ok = await guardarPreciosSkus(lista); alert(`Listo: ${ok} precios actualizados.`); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   try{ renderProductosFabrico(); } catch(e){} try{ if(esDueno()) renderCostosReventa(); } catch(e){}
+}
+// ===== Lista de precios: SKU o nombre -> precio de lista, costo por unidad de venta y % sobre el costo =====
+async function abrirListaPrecios(){
+  try{ await prepararCostosFacturas(); } catch(e){}
+  pvModal('🏷️ Lista de precios', `<input id="lp-q" placeholder="🔍 SKU o nombre del producto" oninput="clearTimeout(window.__lpT);window.__lpT=setTimeout(renderListaPrecios,200)" style="padding:10px;border:1px solid var(--line);border-radius:10px;width:100%;box-sizing:border-box;font-size:1rem;"><div id="lp-res" style="margin-top:10px;max-height:60vh;overflow:auto;"></div>`);
+  setTimeout(() => { const e = document.getElementById('lp-q'); if(e) e.focus(); }, 50);
+}
+function renderListaPrecios(){
+  const q = (document.getElementById('lp-q').value || '').trim(), box = document.getElementById('lp-res'); if(!q){ box.innerHTML = ''; return; }
+  const L = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => { const S = String(v.sku).toUpperCase(); if(S === q.toUpperCase() || coincideBusqueda(S + ' ' + p.nombre + ' ' + (v.desc || ''), q)) L.push({ S, p, v }); })));
+  L.sort((a, b) => (a.S === q.toUpperCase() ? -1 : 0) - (b.S === q.toUpperCase() ? -1 : 0));
+  box.innerHTML = L.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:6px;">SKU</td><td style="padding:6px;">Se vende por</td><td style="padding:6px;text-align:right;">Precio de lista</td>${esDueno() ? '<td style="padding:6px;text-align:right;">Costo</td><td style="padding:6px;text-align:right;">% s/costo</td>' : ''}</tr>
+    ${L.slice(0, 40).map(({ S, p, v }) => { const pr = parsePrice(v.precio); let cu = null; try{ cu = costoUnidadSku(S); } catch(e){} const c = cu > 0 ? cu * divisorVenta(S) : null, m = c > 0 && pr > 0 ? (pr - c) / c : null;
+      return `<tr style="border-top:1px solid var(--line);"><td style="padding:7px 6px;"><b>${escaparHtml(S)}</b><div class="note" style="text-align:left;margin:0;">${escaparHtml(p.nombre)} · ${escaparHtml(v.desc || '')}</div></td><td style="padding:7px 6px;">${escaparHtml(unidadVentaSku(S) || 'unidad')}</td><td style="padding:7px 6px;text-align:right;font-weight:800;">${pr ? formatPrice(pr) : '—'}</td>${esDueno() ? `<td style="padding:7px 6px;text-align:right;">${c != null ? formatPrice(c) : '—'}</td><td style="padding:7px 6px;text-align:right;font-weight:700;color:${colorPct(m)};">${m != null ? Math.round(m * 100) + ' %' : '—'}</td>` : ''}</tr>`; }).join('')}</table></div>${L.length > 40 ? `<p class="note">Y ${L.length - 40} más: escriba más para achicar la búsqueda.</p>` : ''}` : '<p class="empty-msg">No encontré ese SKU o producto.</p>';
 }
 // ===== Posicion de IVA a una fecha (mes calendario), por razon social y total. Todo al 21 %. =====
 // Debito: Propia = ventas facturadas; Alberto y Rita = ventas de ML (precio con IVA / 1,21 x 0,21), del detalle venta por venta.
@@ -20568,7 +20582,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v308';
+const APP_VERSION = '2026-10-02-v309';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
