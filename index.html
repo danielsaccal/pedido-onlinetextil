@@ -1637,7 +1637,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v311</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v312</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -7747,7 +7747,7 @@ function renderTesoreria(){
         <small class="note" style="margin:0;display:block;">${x.cargado ? `Real ${formatPrice(x.real)} el ${new Date(x.fechaReal).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}${x.movs.length ? ` · ${x.movs.length} movimientos después` : ''}` : 'Sin saldo cargado'}</small>
         <div style="display:flex;gap:6px;margin-top:6px;"><button type="button" class="btn-mini" onclick="tsSaldoReal('${x.k}')">Saldo real</button>${x.movs.length ? `<button type="button" class="btn-mini" onclick="tsVerMovs('${x.k}')">Ver</button>` : ''}</div></div>`).join('')}
       <div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff;"><div style="font-weight:700;">🧾 Cheques en cartera</div><div style="font-weight:800;font-size:1.25rem;margin:4px 0;">${formatPrice(ch)}</div><small class="note" style="margin:0;">De Cuentas corrientes</small></div></div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;"><button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="tsFormCaja()">🧾 Caja del día</button><button type="button" class="btn-mini" onclick="tsFormTransf()">⇄ Transferencia entre cuentas</button><button type="button" class="btn-mini" onclick="tsFormOtro()">± Otro movimiento</button></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;"><button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="tsFormCaja()">🧾 Caja del día</button><button type="button" class="btn-mini" onclick="tsFormTransf()">⇄ Transferencia entre cuentas</button><button type="button" class="btn-mini" onclick="tsFormOtro()">± Otro movimiento</button><label class="btn-mini" style="cursor:pointer;">📥 Importar extracto Santander<input type="file" accept=".xlsx,.xls,.csv,.pdf,application/pdf" style="display:none;" onchange="tsImportarSantander(this)"></label><button type="button" class="btn-mini" onclick="tsVerExtractos()">🧾 Impuestos y movimientos del banco</button></div>
     <div id="ts-det" style="margin-top:12px;"></div>
     <p class="note" style="text-align:left;margin-top:10px;">El saldo de cada cuenta = el último saldo real que usted cargó + lo registrado en la app después (caja del día, cobros, órdenes de pago, gastos y transferencias). Los gastos pagados con transferencia o débito se toman de Santander. Al cargar un saldo real nuevo, la app le muestra la diferencia con lo que calculaba.</p>`;
 }
@@ -7789,6 +7789,70 @@ function tsFormOtro(){ pvModal('± Otro movimiento', `<div style="display:grid;g
     <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="tsGuardarOtro()">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`); }
 async function tsGuardarOtro(){ const c = document.getElementById('ot-c').value, i = numAr(document.getElementById('ot-i').value), d = document.getElementById('ot-d').value.trim(); if(!i){ alert('Escriba el importe.'); return; }
   if(await tsGuardarMovs([{ cuenta: c, importe: i, fecha: ccHoy(), tipo: 'otro', detalle: d }], 'Movimiento de dinero')){ cerrarPublicar(); await tsCargar(); renderTesoreria(); } }
+// ===== Extracto de Santander (Excel, CSV o PDF): se guarda cada movimiento una sola vez, se separan los impuestos y se cruza con lo registrado =====
+function tsClasificar(t){ const s = normBusqueda(t);
+  if(/sircreb/.test(s)) return ['impuesto', 'SIRCREB'];
+  if(/iibb|ingresos brutos/.test(s)) return ['impuesto', 'IIBB (adelantos y percepciones)'];
+  if(/25413|deb.*cred|imp\.? ?(al )?deb|imp\.? ?(al )?cred|impuesto (al )?cheque/.test(s)) return ['impuesto', 'Impuesto a débitos y créditos'];
+  if(/percep.*iva|iva percep|iva rg|i\.v\.a/.test(s)) return ['impuesto', 'Percepción de IVA'];
+  if(/comisi|mantenimiento|cargo|seguro|iva .*comis/.test(s)) return ['comision', 'Comisiones y cargos del banco'];
+  if(/transf.*recib|credito|acreditac|deposito/.test(s)) return ['ingreso', 'Ingreso'];
+  if(/transf.*realiz|debito|pago|compra|extraccion/.test(s)) return ['egreso', 'Egreso'];
+  return ['otro', 'Otro']; }
+const tsProvincia = t => { const m = normBusqueda(t).match(/iibb\s+([a-z ]+?)(?:\s+letra|\s+\d|$|\/)/); return m ? m[1].trim().replace(/\b\w/g, x => x.toUpperCase()) : ''; };
+async function tsLeerSantander(file){
+  const fISO = v => { if(v instanceof Date) return v.toISOString().slice(0, 10); const m = String(v || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); if(!m) return ''; const y = m[3].length === 2 ? '20' + m[3] : m[3]; return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; };
+  const L = [];
+  if(/\.pdf$/i.test(file.name)){
+    const lin = await lineasPDF(file); let fecha = '', ult = null;
+    lin.forEach(l0 => { const l = String(l0).trim(); const m = l.match(/^(?:(\d{2}\/\d{2}\/\d{2,4})\s+)?(?:(\d{3,})\s+)?(.+?)\s+(-?\s?\$\s?-?[\d.]+,\d{2})\s+(-?\s?\$\s?-?[\d.]+,\d{2})$/);
+      if(m){ if(m[1]) fecha = fISO(m[1]); ult = { fecha, comp: m[2] || '', concepto: m[3].trim(), detalle: '', importe: numAr(m[4].replace(/\s/g, '').replace('$', '')), saldo: numAr(m[5].replace(/\s/g, '').replace('$', '')) }; L.push(ult); }
+      else if(ult && l && !/^(fecha|comprobante|movimiento|saldo)/i.test(l) && l.length < 120) ult.detalle = (ult.detalle ? ult.detalle + ' ' : '') + l; });
+  } else {
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true }), ws = wb.Sheets[wb.SheetNames[0]], R = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    const hi = R.findIndex(r => r.some(c => /movimiento|concepto|descripci/i.test(String(c))) && r.some(c => /saldo/i.test(String(c)))); if(hi < 0) throw new Error('No reconozco el formato: falta la fila de títulos (Fecha, Movimiento, Saldo).');
+    const H = R[hi].map(c => normBusqueda(String(c))), ix = re => H.findIndex(x => re.test(x));
+    const cF = ix(/^fecha/), cC = ix(/comprobante/), cM = ix(/movimiento|concepto|descripci/), cS = ix(/saldo/), cImp = H.map((x, i) => /(caja de ahorro|cuenta corriente|importe|monto|debito|credito)/.test(x) && i !== cS ? i : -1).filter(i => i >= 0);
+    let fecha = '';
+    R.slice(hi + 1).forEach(r => { const f = fISO(r[cF]); if(f) fecha = f; const mov = String(r[cM] || '').trim(); if(!mov) return;
+      let imp = 0; cImp.forEach(i => { const v = typeof r[i] === 'number' ? r[i] : numAr(String(r[i]).replace(/\$/g, '').replace(/\s/g, '')); if(isFinite(v) && v) imp += /debito/.test(H[i]) ? -Math.abs(v) : v; });
+      const lineas = mov.split(/\n/); L.push({ fecha, comp: String(r[cC] || '').trim(), concepto: lineas[0].trim(), detalle: lineas.slice(1).join(' ').trim(), importe: Math.round(imp * 100) / 100, saldo: typeof r[cS] === 'number' ? r[cS] : numAr(String(r[cS]).replace(/\$/g, '').replace(/\s/g, '')) }); });
+  }
+  return L.filter(x => x.fecha && x.importe);
+}
+async function tsImportarSantander(inp){
+  const f = inp.files[0]; inp.value = ''; if(!f) return;
+  procesando('Leyendo el extracto…');
+  let L; try{ L = await tsLeerSantander(f); } catch(e){ procesando.error(e.message); alert('No se pudo leer: ' + e.message); return; }
+  if(!L.length){ procesando.fin(); alert('No encontré movimientos en el archivo.'); return; }
+  const id = x => ('st-' + x.fecha + '-' + (x.comp || '') + '-' + Math.round(x.importe * 100) + '-' + normBusqueda(x.concepto).replace(/[^a-z0-9]/g, '').slice(0, 30));
+  const ex = await db.collection('teso_extractos').get(), ya = new Set(ex.docs.map(d => d.id));
+  const nuevos = L.filter(x => !ya.has(id(x)));
+  try{ for(let i = 0; i < nuevos.length; i += 400){ const b = db.batch(); nuevos.slice(i, i + 400).forEach(x => { const [cat, tipo] = tsClasificar(x.concepto + ' ' + x.detalle); b.set(db.collection('teso_extractos').doc(id(x)), { ...x, cuenta: 'santander', cat, tipo, provincia: cat === 'impuesto' ? tsProvincia(x.concepto + ' ' + x.detalle) : '', importado: new Date().toISOString(), archivo: f.name }); }); await b.commit(); } }
+  catch(e){ procesando.error(e.message); alert('No se pudo guardar: ' + e.message); return; }
+  procesando.listo('✓ Extracto importado');
+  const ultimo = L.slice().sort((a, b) => a.fecha.localeCompare(b.fecha)).pop();
+  await ccLog('Extracto Santander', `${f.name}: ${nuevos.length} movimientos nuevos de ${L.length}`);
+  if(ultimo && isFinite(ultimo.saldo) && confirm(`Se importaron ${nuevos.length} movimientos nuevos (${L.length - nuevos.length} ya estaban).\n\nEl saldo final del extracto es ${formatPrice(ultimo.saldo)} (${ultimo.fecha.split('-').reverse().join('/')}).\n¿Usarlo como saldo real de Santander?`)){
+    const saldos = { ...tsCfg.saldos, santander: { real: ultimo.saldo, fecha: new Date().toISOString() } }; try{ await db.collection('config').doc('tesoreria').set({ ...tsCfg, saldos }); tsCfg.saldos = saldos; } catch(e){} }
+  await tsCargar(); renderTesoreria(); tsVerExtractos();
+}
+async function tsVerExtractos(){
+  const s = await db.collection('teso_extractos').get(); const E = s.docs.map(d => ({ _id: d.id, ...d.data() }));
+  const meses = [...new Set(E.map(x => x.fecha.slice(0, 7)))].sort().reverse(); const mes = window.__tsMesExt && meses.includes(window.__tsMesExt) ? window.__tsMesExt : meses[0];
+  const box = document.getElementById('ts-det'); if(!mes){ box.innerHTML = '<p class="note">Todavía no importó extractos.</p>'; return; }
+  const M = E.filter(x => x.fecha.slice(0, 7) === mes), sum = f => M.filter(f).reduce((a, x) => a + x.importe, 0);
+  const imp = {}; M.filter(x => x.cat === 'impuesto' || x.cat === 'comision').forEach(x => { const k = x.tipo + (x.provincia ? ' · ' + x.provincia : ''); imp[k] = (imp[k] || 0) + x.importe; });
+  // cruce: cada ingreso o egreso del banco contra lo registrado en la app (mismo importe, +/- 3 dias)
+  const reg = tsMovs.filter(x => x.cuenta === 'santander');
+  const usados = new Set(); const sinReg = M.filter(x => x.cat === 'ingreso' || x.cat === 'egreso').filter(x => { const t = new Date(x.fecha + 'T12:00:00'); const i = reg.findIndex((r, k) => !usados.has(k) && Math.abs(r.importe - x.importe) < 1 && Math.abs(new Date(String(r.fecha || r.creado).slice(0, 10) + 'T12:00:00') - t) <= 3 * 864e5); if(i >= 0){ usados.add(i); return false; } return true; });
+  box.innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;"><b style="color:var(--purple);">🏦 Santander · movimientos del banco</b><select onchange="window.__tsMesExt=this.value;tsVerExtractos()" style="padding:6px;border:1px solid var(--line);border-radius:8px;">${meses.map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${new Date(m + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</option>`).join('')}</select></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-bottom:10px;">${[['Ingresos', sum(x => x.importe > 0)], ['Egresos', sum(x => x.importe < 0)], ['Impuestos', sum(x => x.cat === 'impuesto')], ['Comisiones', sum(x => x.cat === 'comision')]].map(([t, v]) => `<div style="border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:#fff;"><small class="note" style="margin:0;">${t}</small><div style="font-weight:800;color:${v < 0 ? '#A6432F' : '#2F7A47'};">${formatPrice(v)}</div></div>`).join('')}</div>
+    <b style="font-size:.85rem;">Impuestos y cargos del banco</b><div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.85rem;margin-bottom:10px;">${Object.entries(imp).sort((a, b) => a[1] - b[1]).map(([k, v]) => `<tr style="border-top:1px solid var(--line);"><td style="padding:5px;">${escaparHtml(k)}</td><td style="padding:5px;text-align:right;font-weight:700;color:#A6432F;">${formatPrice(v)}</td></tr>`).join('') || '<tr><td class="note">Sin impuestos en el mes.</td></tr>'}</table></div>
+    <b style="font-size:.85rem;">Movimientos del banco que no están registrados en la app (${sinReg.length})</b>
+    <p class="note" style="text-align:left;margin:2px 0 6px;">Se cruzan por importe y fecha (± 3 días) con los cobros, pagos, gastos y caja del día cargados en Santander.</p>
+    <div class="tw" style="max-height:40vh;overflow:auto;"><table style="width:100%;border-collapse:collapse;font-size:.84rem;">${sinReg.sort((a, b) => a.fecha.localeCompare(b.fecha)).map(x => `<tr style="border-top:1px solid var(--line);"><td style="padding:5px;white-space:nowrap;">${x.fecha.split('-').reverse().join('/')}</td><td style="padding:5px;"><b>${escaparHtml(x.concepto)}</b> <span class="meta">${escaparHtml(x.detalle || '')}</span></td><td style="padding:5px;text-align:right;font-weight:700;color:${x.importe < 0 ? '#A6432F' : '#2F7A47'};">${formatPrice(x.importe)}</td></tr>`).join('') || '<tr><td class="note">✓ Todo registrado.</td></tr>'}</table></div>`;
+}
 async function pintarAvisoTeso(){
   const box = document.getElementById('avisoTeso'); if(!box) return; if(!esDueno()){ box.style.display = 'none'; return; }
   try{ await tsCargar(); } catch(e){ return; }
@@ -20688,7 +20752,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v311';
+const APP_VERSION = '2026-10-02-v312';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
@@ -20746,7 +20810,7 @@ window.addEventListener('load', () => {
     ['abrirFacturas', 'Cargando facturas…'], ['leerFacturasPDF', 'Leyendo facturas…'], ['guardarFactura', 'Guardando la factura…'], ['borrarFacturasSel', 'Borrando facturas…'],
     ['importarLinksWeb', 'Leyendo el archivo de Tienda Nube…'], ['analizarPedidoIA', 'La IA está armando el pedido…'],
     ['generarFlyersNuevoIngreso', 'Generando las piezas…'], ['abrirResultadosML', 'Preparando Resultados ML…'], ['descargarCopia', 'Preparando la copia…'],
-    ['abrirFaltantes', 'Cargando faltantes…'], ['abrirIVA', 'Calculando el IVA…'], ['abrirTesoreria', 'Cargando saldos…'], ['abrirCompras', 'Cargando proveedores…'], ['pvGuardarPago', 'Guardando la orden de pago…'], ['pvGuardarCompra', 'Guardando…'], ['abrirCtaCte', 'Cargando cuentas corrientes…'], ['ccGuardarCobro', 'Guardando…'], ['abrirRankings', 'Armando los rankings…'], ['abrirResultadoNegocio', 'Calculando el resultado…'], ['guardarTodoCP', 'Guardando…'],  ['abrirRevisarHistorial', 'Revisando el historial…'], ['corregirHistorialSel', 'Corrigiendo…'], ['abrirRevisarCostos', 'Cargando…'], ['ccAplicar', 'Actualizando precios…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
+    ['abrirFaltantes', 'Cargando faltantes…'], ['tsVerExtractos', 'Cargando movimientos del banco…'], ['abrirIVA', 'Calculando el IVA…'], ['abrirTesoreria', 'Cargando saldos…'], ['abrirCompras', 'Cargando proveedores…'], ['pvGuardarPago', 'Guardando la orden de pago…'], ['pvGuardarCompra', 'Guardando…'], ['abrirCtaCte', 'Cargando cuentas corrientes…'], ['ccGuardarCobro', 'Guardando…'], ['abrirRankings', 'Armando los rankings…'], ['abrirResultadoNegocio', 'Calculando el resultado…'], ['guardarTodoCP', 'Guardando…'],  ['abrirRevisarHistorial', 'Revisando el historial…'], ['corregirHistorialSel', 'Corrigiendo…'], ['abrirRevisarCostos', 'Cargando…'], ['ccAplicar', 'Actualizando precios…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
   ];
   setTimeout(() => W.forEach(([n, t]) => conProcesando(n, t)), 0);
 });
