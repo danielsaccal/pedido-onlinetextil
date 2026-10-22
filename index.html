@@ -568,6 +568,7 @@ a.grilla-celda{display:block;}
     <div id="avisoCopia" style="display:none;"></div>
     <div id="avisoCostos" style="display:none;"></div>
     <div id="avisoCtaCte" style="display:none;"></div>
+    <div id="avisoCompras" style="display:none;"></div>
     <style>
       .ini-sec{font-size:0.78rem;font-weight:700;letter-spacing:.06em;color:#8A8072;margin:18px 0 10px;}
       .ini-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
@@ -1599,7 +1600,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v296</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v297</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2387,6 +2388,16 @@ a.grilla-celda{display:block;}
       <div id="cc-tot"></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;" id="cc-tabs"></div>
       <div id="cc-body"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-compras">
+    <div class="form-card" style="max-width:1000px;">
+      <h2>Proveedores y pagos</h2>
+      <div id="pv-tot"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;" id="pv-tabs"></div>
+      <div id="pv-body"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
   </div>
@@ -5875,7 +5886,7 @@ const GRUPOS_INICIO = {
     [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['🧾 Presupuestos', 'abrirPresupuestos()'], ['📄 Pedido desde una foto', "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)"], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()'], ['📋 Historial de pedidos', 'abrirHistorial()']],
     [['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']],
     [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']],
-    [['💳 Cuentas corrientes', 'abrirCtaCte()'], ['🧾 Ventas facturadas', 'abrirFacturas()'], ['💸 Gastos comerciales', 'abrirGastos()'], ['🧮 Simulador de costos ML', 'abrirCalculadoraML()'], ['🧾 Auditor (IA)', 'abrirAuditor()']],
+    [['💳 Cuentas corrientes', 'abrirCtaCte()'], ['🏭 Proveedores y pagos', 'abrirCompras()'], ['🧾 Ventas facturadas', 'abrirFacturas()'], ['💸 Gastos comerciales', 'abrirGastos()'], ['🧮 Simulador de costos ML', 'abrirCalculadoraML()'], ['🧾 Auditor (IA)', 'abrirAuditor()']],
     [['📊 Resultado del negocio', 'abrirResultadoNegocio()'], ['🏆 Rankings de ventas', 'abrirRankings()'], ['📈 Resultados Mercado Libre', 'abrirResultadosML()']]
   ] },
   f: { lado: 'int', titulo: 'Catálogo', titulosColumnas: ['1 · Productos', '2 · Fotos y textos', '3 · Precios'], columnas: [
@@ -7467,6 +7478,225 @@ async function aplicarPctMasivo(skus, pct){
   if(!confirm(`¿Poner el precio de ${lista.length} SKU con ${pct} % sobre su costo?\n\n` + lista.slice(0, 15).map(([S, n]) => `${S}: ${formatPrice(n)}`).join('\n') + (lista.length > 15 ? '\n…' : '') + (sinCosto.length ? `\n\nSin costo (no se tocan): ${sinCosto.join(', ')}` : '') + (sinPub.length ? `\nSin publicar (no se tocan): ${sinPub.join(', ')}` : ''))) return;
   try{ const ok = await guardarPreciosSkus(lista); alert(`Listo: ${ok} precios actualizados.`); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   try{ renderProductosFabrico(); } catch(e){} try{ if(esDueno()) renderCostosReventa(); } catch(e){}
+}
+// ===== Compras, proveedores y pagos =====
+// proveedores, compras (facturas, NC, liquidaciones de taller), pagos (ordenes de pago). Moneda del proveedor: ARS o USD.
+const PV_RAZONES = [['propia', 'Propia'], ['alberto', 'Alberto'], ['rita', 'Rita']];
+const PV_RUBROS = ['Telas', 'Mercadería de reventa', 'Insumos', 'Servicios', 'Taller'];
+const PV_MEDIOS = ['Transferencia Santander', 'Transferencia Mercado Pago 1', 'Transferencia Mercado Pago 2', 'Transferencia financiera', 'Efectivo', 'Cheque de terceros', 'Otro'];
+let pvProv = [], pvCompras = [], pvPagos = [], pvTab = 'proveedores', pvSel = null, pvBuscar = '';
+const pvMon = p => (p && p.moneda === 'USD') ? 'USD' : 'ARS';
+const fmtMon = (n, m) => m === 'USD' ? 'US$ ' + (Math.round(n * 100) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : formatPrice(n);
+async function abrirCompras(){
+  mostrarPaso('step-compras'); document.getElementById('pv-body').innerHTML = '<p class="empty-msg">Cargando…</p>';
+  const [a, b2, c] = await Promise.all([db.collection('proveedores').get(), db.collection('compras').get(), db.collection('pagos').get()]);
+  pvProv = a.docs.map(d => ({ _id: d.id, ...d.data() })).sort((x, y) => String(x.nombre).localeCompare(String(y.nombre)));
+  pvCompras = b2.docs.map(d => ({ _id: d.id, ...d.data() })); pvPagos = c.docs.map(d => ({ _id: d.id, ...d.data() }));
+  renderCompras();
+}
+function pvCalcular(){
+  const R = {}; pvProv.forEach(p => R[p._id] = { p, facts: [], pagos: [], saldo: 0, vence7: 0, vencido: 0 });
+  pvCompras.forEach(c => { const r = R[c.proveedorId]; if(r) r.facts.push({ ...c, pendiente: c.nc ? 0 : c.importe }); });
+  pvPagos.forEach(x => { const r = R[x.proveedorId]; if(r) r.pagos.push(x); });
+  const hoy = new Date();
+  Object.values(R).forEach(r => { r.facts.sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+    const debe = r.facts.reduce((a, f) => a + (f.nc ? -f.importe : f.importe), 0), haber = r.pagos.reduce((a, x) => a + (+x.aplicadoMon || 0), 0);
+    r.saldo = Math.round((debe - haber) * 100) / 100;
+    let disp = haber + r.facts.filter(f => f.nc).reduce((a, f) => a + f.importe, 0);
+    r.facts.filter(f => !f.nc).forEach(f => { const ap = Math.min(disp, f.importe); f.pendiente = Math.round((f.importe - ap) * 100) / 100; disp -= ap;
+      if(f.pendiente > 0.5){ const vto = new Date(String(f.vence || f.fecha) + 'T12:00:00'); const d = Math.floor((vto - hoy) / 864e5); f.diasVto = d; if(d < 0) r.vencido += f.pendiente; else if(d <= 7) r.vence7 += f.pendiente; } }); });
+  return R;
+}
+function renderCompras(){
+  const R = pvCalcular(), L = Object.values(R);
+  const tot = m => L.filter(r => pvMon(r.p) === m).reduce((a, r) => a + Math.max(0, r.saldo), 0), tv = m => L.filter(r => pvMon(r.p) === m).reduce((a, r) => a + r.vencido + r.vence7, 0);
+  const caja = (t, v, col) => `<div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff;"><small class="note" style="margin:0;">${t}</small><div style="font-weight:800;font-size:1.2rem;color:${col || 'inherit'};">${v}</div></div>`;
+  document.getElementById('pv-tot').innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">${caja('A pagar', formatPrice(tot('ARS')) + (tot('USD') > 0 ? `<div style="font-size:.85rem;">+ ${fmtMon(tot('USD'), 'USD')}</div>` : ''))}${caja('Vencido o vence en 7 días', formatPrice(tv('ARS')) + (tv('USD') > 0 ? `<div style="font-size:.85rem;">+ ${fmtMon(tv('USD'), 'USD')}</div>` : ''), tv('ARS') > 0 ? '#A6432F' : '')}</div>`;
+  const tabs = [['proveedores', '🏭 Proveedores'], ['pagos', '🧾 Órdenes de pago'], ['talleres', '✂️ Liquidar talleres']];
+  document.getElementById('pv-tabs').innerHTML = tabs.map(([k, t]) => `<button type="button" onclick="pvTab='${k}';pvSel=null;renderCompras()" style="padding:7px 12px;border-radius:999px;border:1px solid ${pvTab === k ? 'var(--purple)' : 'var(--line)'};background:${pvTab === k ? 'var(--purple)' : '#fff'};color:${pvTab === k ? '#fff' : 'var(--purple)'};font-weight:700;cursor:pointer;">${t}</button>`).join('');
+  const box = document.getElementById('pv-body');
+  if(pvTab === 'pagos'){ const P = pvPagos.slice().sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)) || (b.numero || 0) - (a.numero || 0));
+    box.innerHTML = P.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.86rem;">${P.map(x => { const pr = pvProv.find(p => p._id === x.proveedorId) || {}; return `<tr style="border-top:1px solid var(--line);"><td style="padding:6px;">OP ${String(x.numero || '').padStart(5, '0')}</td><td style="padding:6px;">${String(x.fecha).split('-').reverse().join('/')}</td><td style="padding:6px;"><b>${escaparHtml(pr.nombre || '?')}</b></td><td style="padding:6px;" class="meta">${escaparHtml((x.medios || []).map(m => m.medio).join(', '))}</td><td style="padding:6px;text-align:right;">${formatPrice(x.totalARS || 0)}</td><td style="padding:6px;"><button type="button" class="btn-mini" onclick="pvImprimirOP('${x._id}')">🖨️</button></td></tr>`; }).join('')}</table></div>` : '<p class="empty-msg">Todavía no hay órdenes de pago.</p>'; return; }
+  if(pvTab === 'talleres'){ return pvRenderTalleres(); }
+  if(pvSel){ return pvRenderProveedor(R[pvSel]); }
+  let F = L.sort((a, b) => b.saldo - a.saldo || String(a.p.nombre).localeCompare(String(b.p.nombre))); if(pvBuscar) F = F.filter(r => coincideBusqueda(r.p.nombre + ' ' + (r.p.rubro || '') + ' ' + (r.p.cuit || ''), pvBuscar));
+  box.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"><input placeholder="🔍 Buscar proveedor" value="${escapeAttr(pvBuscar)}" oninput="pvBuscar=this.value;clearTimeout(window.__pvT);window.__pvT=setTimeout(renderCompras,250)" style="flex:1;min-width:180px;padding:9px;border:1px solid var(--line);border-radius:10px;"><button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="pvFormProveedor()">➕ Proveedor</button></div>
+    ${F.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:6px;">Proveedor</td><td style="padding:6px;">Rubro</td><td style="padding:6px;text-align:right;">Saldo</td><td style="padding:6px;text-align:right;">Vencido</td><td style="padding:6px;text-align:right;">Vence en 7 días</td></tr>
+      ${F.map(r => `<tr style="border-top:1px solid var(--line);cursor:pointer;" onclick="pvSel='${r.p._id}';renderCompras()"><td style="padding:7px 6px;"><b>${escaparHtml(r.p.nombre)}</b>${pvMon(r.p) === 'USD' ? ' <span class="meta">USD</span>' : ''}</td><td style="padding:7px 6px;" class="meta">${escaparHtml(r.p.rubro || '')}</td><td style="padding:7px 6px;text-align:right;font-weight:800;">${fmtMon(r.saldo, pvMon(r.p))}</td><td style="padding:7px 6px;text-align:right;color:${r.vencido > 0 ? '#A6432F' : '#8A8072'};">${r.vencido > 0 ? fmtMon(r.vencido, pvMon(r.p)) : '–'}</td><td style="padding:7px 6px;text-align:right;color:#8A6417;">${r.vence7 > 0 ? fmtMon(r.vence7, pvMon(r.p)) : '–'}</td></tr>`).join('')}</table></div>` : '<p class="empty-msg">Cargue su primer proveedor con ➕ Proveedor.</p>'}`;
+}
+function pvRenderProveedor(r){
+  const p = r.p, m = pvMon(p), box = document.getElementById('pv-body');
+  const filas = [...r.facts.map(f => ({ fecha: f.fecha, t: f.nc ? 'Nota de crédito' : f.liquidacion ? 'Liquidación taller' : 'Factura', det: `${f.tipo || ''} ${f.numero || ''} · ${(PV_RAZONES.find(x => x[0] === f.razon) || [, ''])[1]}${f.detalle ? ' · ' + f.detalle : ''}`, debe: f.nc ? 0 : f.importe, haber: f.nc ? f.importe : 0, f })),
+    ...r.pagos.map(x => ({ fecha: x.fecha, t: 'Pago OP ' + String(x.numero || '').padStart(5, '0'), det: (x.medios || []).map(y => y.medio).join(', ') + (x.tc ? ` · TC ${x.tc}` : ''), debe: 0, haber: +x.aplicadoMon || 0, x }))].sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+  let s = 0; filas.forEach(f => { s += f.debe - f.haber; f.saldo = s; });
+  const pend = r.facts.filter(f => !f.nc && f.pendiente > 0.5);
+  box.innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;"><a href="#" onclick="event.preventDefault();pvSel=null;renderCompras()">← Todos</a><b style="font-size:1.1rem;margin-left:8px;">${escaparHtml(p.nombre)}</b><span class="meta">${escaparHtml(p.rubro || '')}${p.cuit ? ' · CUIT ' + escaparHtml(p.cuit) : ''}${p.plazo ? ' · ' + p.plazo + ' días' : ''}</span><span style="margin-left:auto;font-weight:800;font-size:1.15rem;">Saldo ${fmtMon(r.saldo, m)}</span></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"><button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="pvFormPago('${p._id}')">💸 Orden de pago</button><button type="button" class="btn-mini" onclick="pvFormCompra('${p._id}')">➕ Factura de compra</button><button type="button" class="btn-mini" onclick="pvFormCompra('${p._id}', true)">Nota de crédito</button><button type="button" class="btn-mini" onclick="pvFormProveedor('${p._id}')">✏️ Datos del proveedor</button></div>
+    ${pend.length ? `<b style="color:var(--purple);">Facturas pendientes</b>${pend.map(f => `<div style="display:flex;gap:8px;flex-wrap:wrap;padding:5px 0;border-top:1px solid var(--line);font-size:.86rem;"><span>${String(f.fecha).split('-').reverse().join('/')}</span><span>${escaparHtml((f.tipo || '') + ' ' + (f.numero || ''))}</span>${f.diasVto < 0 ? `<span style="color:#A6432F;font-weight:700;">vencida hace ${-f.diasVto} días</span>` : `<span class="meta">vence en ${f.diasVto} días</span>`}<span style="margin-left:auto;">pendiente <b>${fmtMon(f.pendiente, m)}</b> de ${fmtMon(f.importe, m)}</span></div>`).join('')}` : ''}
+    <div style="font-weight:700;color:var(--purple);margin:12px 0 6px;">Movimientos</div>
+    <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.85rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:5px;">Fecha</td><td style="padding:5px;">Concepto</td><td style="padding:5px;text-align:right;">Debe</td><td style="padding:5px;text-align:right;">Haber</td><td style="padding:5px;text-align:right;">Saldo</td><td></td></tr>
+      ${filas.map(f => `<tr style="border-top:1px solid var(--line);"><td style="padding:5px;white-space:nowrap;">${String(f.fecha).split('-').reverse().join('/')}</td><td style="padding:5px;"><b>${f.t}</b> <span class="meta">${escaparHtml(f.det || '')}</span></td><td style="padding:5px;text-align:right;">${f.debe ? fmtMon(f.debe, m) : ''}</td><td style="padding:5px;text-align:right;color:#2F7A47;">${f.haber ? fmtMon(f.haber, m) : ''}</td><td style="padding:5px;text-align:right;font-weight:700;">${fmtMon(f.saldo, m)}</td><td style="padding:5px;white-space:nowrap;">${f.x ? `<a href="#" title="Imprimir" onclick="event.preventDefault();pvImprimirOP('${f.x._id}')">🖨️</a> ` : ''}<a href="#" title="Borrar" onclick="event.preventDefault();pvBorrar('${f.f ? 'compras' : 'pagos'}','${(f.f || f.x)._id}')">🗑️</a></td></tr>`).join('') || '<tr><td colspan="6" class="note">Sin movimientos.</td></tr>'}</table></div>`;
+}
+const pvInp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
+function pvModal(titulo, html){ const t = document.getElementById('pub-titulo'); if(t) t.textContent = titulo; document.getElementById('pub-cont').innerHTML = html; document.getElementById('pub-modal').style.display = 'block'; }
+function pvFormProveedor(id){
+  const p = pvProv.find(x => x._id === id) || {};
+  pvModal(id ? '✏️ Proveedor' : '➕ Proveedor nuevo', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <label style="grid-column:1/-1;">Razón social o nombre<input id="pf-n" value="${escapeAttr(p.nombre || '')}" style="${pvInp}"></label>
+    <label>CUIT<input id="pf-c" value="${escapeAttr(p.cuit || '')}" style="${pvInp}"></label><label>Teléfono<input id="pf-t" value="${escapeAttr(p.tel || '')}" style="${pvInp}"></label>
+    <label>Rubro<select id="pf-r" style="${pvInp}">${PV_RUBROS.map(r => `<option ${p.rubro === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
+    <label>Moneda<select id="pf-m" style="${pvInp}"><option value="ARS" ${pvMon(p) === 'ARS' ? 'selected' : ''}>Pesos</option><option value="USD" ${pvMon(p) === 'USD' ? 'selected' : ''}>Dólares</option></select></label>
+    <label>Plazo de pago (días)<input id="pf-p" inputmode="numeric" value="${p.plazo != null ? p.plazo : 30}" style="${pvInp}"></label><label>Descuento habitual (%)<input id="pf-d" inputmode="decimal" value="${p.desc || ''}" style="${pvInp}"></label>
+    <label style="grid-column:1/-1;">Datos bancarios (CBU / alias)<input id="pf-b" value="${escapeAttr(p.banco || '')}" style="${pvInp}"></label></div>
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="pvGuardarProveedor('${id || ''}')">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
+}
+async function pvGuardarProveedor(id){
+  const g = x => document.getElementById(x).value.trim(), d = { nombre: g('pf-n'), cuit: g('pf-c'), tel: g('pf-t'), rubro: g('pf-r'), moneda: g('pf-m'), plazo: Math.round(numAr(g('pf-p')) || 0), desc: numAr(g('pf-d')) || 0, banco: g('pf-b') };
+  if(!d.nombre){ alert('Escriba el nombre.'); return; }
+  if(!id && pvProv.some(p => ccClave(p.nombre) === ccClave(d.nombre))){ alert('Ya existe un proveedor con ese nombre.'); return; }
+  try{ if(id){ await db.collection('proveedores').doc(id).set(d, { merge: true }); Object.assign(pvProv.find(x => x._id === id), d); } else { const r = await db.collection('proveedores').add({ ...d, creado: new Date().toISOString() }); pvProv.push({ _id: r.id, ...d }); id = r.id; } }
+  catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  await ccLog('Proveedor', d.nombre); cerrarPublicar(); pvSel = id; renderCompras();
+}
+function pvFormCompra(pid, nc){
+  const p = pvProv.find(x => x._id === pid), m = pvMon(p), hoy = ccHoy();
+  pvModal((nc ? 'Nota de crédito de ' : 'Factura de compra de ') + p.nombre, `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <label style="grid-column:1/-1;font-size:.85rem;">📄 Leer del PDF de la factura (opcional)<input type="file" id="cf-pdf" accept="application/pdf" onchange="pvLeerPDF(this)" style="${pvInp}"></label>
+    <label>A nombre de<select id="cf-rz" style="${pvInp}">${PV_RAZONES.map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select></label>
+    <label>Tipo<select id="cf-t" style="${pvInp}">${['A', 'B', 'C', 'X'].map(x => `<option>${x}</option>`).join('')}</select></label>
+    <label>Número (punto de venta - número)<input id="cf-n" placeholder="00001-00001234" style="${pvInp}"></label><label>Fecha<input type="date" id="cf-f" value="${hoy}" style="${pvInp}"></label>
+    <label>Total ${m === 'USD' ? '(US$)' : '($)'}<input id="cf-i" inputmode="decimal" style="${pvInp}"></label><label>IVA incluido (para el IVA)<input id="cf-iva" inputmode="decimal" placeholder="opcional" style="${pvInp}"></label>
+    <label>Vence<input type="date" id="cf-v" value="${new Date(Date.now() + (p.plazo || 0) * 864e5).toISOString().slice(0, 10)}" style="${pvInp}"></label><label>Detalle<input id="cf-d" placeholder="opcional" style="${pvInp}"></label>
+    <label style="grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:.88rem;"><input type="checkbox" id="cf-g" ${p.rubro === 'Servicios' ? 'checked' : ''} style="width:18px;height:18px;"> Es un gasto (luz, alquiler, servicios…): que figure también en Gastos comerciales</label>
+    <label id="cf-gt-l" style="grid-column:1/-1;">Tipo de gasto<select id="cf-gt" style="${pvInp}"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></label></div>
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="pvGuardarCompra('${pid}', ${nc ? 'true' : 'false'})">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
+}
+// lee numero, fecha, total e IVA de una factura electronica (formato AFIP)
+async function pvLeerPDF(inp){
+  const f = inp.files[0]; if(!f) return;
+  try{ const L = await lineasPDF(f), t = L.join(' ');
+    const pv = (t.match(/Punto de Venta:?\s*(\d{1,5})/i) || [])[1], nro = (t.match(/Comp\.?\s*Nro:?\s*(\d{1,8})/i) || [])[1];
+    const fe = (t.match(/Fecha de Emisi[oó]n:?\s*(\d{2}\/\d{2}\/\d{4})/i) || [])[1], tot = (t.match(/Importe Total:?\s*\$?\s*([\d.,]+)/i) || [])[1];
+    const iva = [...t.matchAll(/IVA\s*\d+(?:[.,]\d+)?\s*%:?\s*\$?\s*([\d.,]+)/gi)].reduce((a, m) => a + (numAr(m[1]) || 0), 0), let_ = (t.match(/\b(FACTURA|NOTA DE CR[EÉ]DITO)\s*([ABC])\b/i) || t.match(/\bCOD\.?\s*0?(\d{2})/i) || []);
+    if(pv && nro) document.getElementById('cf-n').value = pv.padStart(5, '0') + '-' + nro.padStart(8, '0');
+    if(fe) document.getElementById('cf-f').value = ccFechaISO(fe);
+    if(tot) document.getElementById('cf-i').value = formatoPesos(Math.round(numAr(tot) * 100) / 100);
+    if(iva > 0) document.getElementById('cf-iva').value = formatoPesos(Math.round(iva * 100) / 100);
+    if(let_[2]) document.getElementById('cf-t').value = let_[2].toUpperCase();
+    if(!(pv && nro && tot)) alert('Leí parte de los datos. Complete lo que falta a mano.');
+  } catch(e){ alert('No pude leer el PDF: complete a mano.'); }
+}
+async function pvGuardarCompra(pid, nc){
+  const g = x => document.getElementById(x).value.trim(), p = pvProv.find(x => x._id === pid);
+  const d = { proveedorId: pid, razon: g('cf-rz'), tipo: g('cf-t'), numero: g('cf-n'), fecha: g('cf-f'), vence: g('cf-v') || g('cf-f'), importe: numAr(g('cf-i')), iva: numAr(g('cf-iva')) || 0, moneda: pvMon(p), detalle: g('cf-d'), nc: !!nc, creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
+  if(!(d.importe > 0) || !d.fecha){ alert('Complete fecha y total.'); return; }
+  const clave = x => { const m = String(x.numero || '').match(/(\d+)\D+(\d+)/); return `${x.proveedorId}|${x.nc ? 'NC' : 'FC'}|${x.tipo}|${m ? (+m[1]) + '-' + (+m[2]) : String(x.numero || '').replace(/\D/g, '').replace(/^0+/, '')}`; }; // mismo punto de venta y numero
+  if(d.numero && pvCompras.some(x => clave(x) === clave(d))){ alert('Ya está cargado un comprobante de este proveedor con el mismo tipo y número. No se guardó.'); return; }
+  const esGasto = document.getElementById('cf-g').checked && !nc;
+  try{ const r = await db.collection('compras').add(d); pvCompras.push({ _id: r.id, ...d });
+    if(esGasto){ const gr = await db.collection('gastos').add({ fecha: d.fecha, monto: d.moneda === 'USD' ? 0 : d.importe, concepto: p.nombre + (d.detalle ? ' · ' + d.detalle : ''), quien: 'Proveedor', medio: 'Cuenta corriente', nota: `Factura ${d.tipo} ${d.numero}`, tipo: g('cf-gt'), origen: 'compra', compraId: r.id, creado: new Date().toISOString() }); await db.collection('compras').doc(r.id).set({ gastoId: gr.id }, { merge: true }); pvCompras[pvCompras.length - 1].gastoId = gr.id; } }
+  catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  await ccLog(nc ? 'NC de compra' : 'Factura de compra', `${p.nombre} · ${d.tipo} ${d.numero} · ${fmtMon(d.importe, d.moneda)}`); cerrarPublicar(); pvSel = pid; renderCompras(); pintarAvisoCompras();
+}
+async function pvFormPago(pid){
+  const p = pvProv.find(x => x._id === pid), m = pvMon(p), r = pvCalcular()[pid];
+  let cheques = []; try{ const s = await db.collection('cc_movimientos').get(); cheques = s.docs.map(d => ({ _id: d.id, ...d.data() })).filter(x => x.cheque && (x.cheque.estado || 'cartera') === 'cartera'); } catch(e){}
+  window.__pvCheques = cheques;
+  pvModal('💸 Orden de pago · ' + p.nombre, `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <label>Fecha<input type="date" id="op-f" value="${ccHoy()}" style="${pvInp}"></label>${m === 'USD' ? `<label>Tipo de cambio ($ por US$)<input id="op-tc" inputmode="decimal" style="${pvInp}" oninput="pvTotOP()"></label>` : '<span></span>'}
+    <div style="grid-column:1/-1;"><b style="font-size:.88rem;">Medios de pago</b><div id="op-medios"></div><button type="button" class="btn-mini" onclick="pvAgregarMedio()">➕ Otro medio</button></div>
+    <details style="grid-column:1/-1;"><summary style="cursor:pointer;font-size:.88rem;">Retenciones que usted le practica (opcional)</summary><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px;">${[['iibb', 'IIBB'], ['gan', 'Ganancias'], ['otras', 'Otras']].map(([k, t]) => `<label style="font-size:.8rem;">${t}<input id="op-r-${k}" inputmode="decimal" oninput="pvTotOP()" style="${pvInp}"></label>`).join('')}</div></details>
+    <label style="grid-column:1/-1;">Comprobante de transferencia (foto o PDF, opcional)<input type="file" id="op-cp" accept="image/*,application/pdf" style="${pvInp}"></label>
+    <label style="grid-column:1/-1;">Detalle<input id="op-d" placeholder="opcional" style="${pvInp}"></label></div>
+    <p id="op-tot" style="font-weight:700;margin:8px 0;"></p><p class="note" style="text-align:left;">Saldo del proveedor: <b>${fmtMon(r.saldo, m)}</b>. Se aplica a las facturas más viejas.</p>
+    <div style="display:flex;gap:8px;"><button class="btn btn-gold" style="flex:1;" onclick="pvGuardarPago('${pid}')">Guardar y ver la orden de pago</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
+  pvAgregarMedio();
+}
+function pvAgregarMedio(){
+  const box = document.getElementById('op-medios'), i = box.children.length, ch = window.__pvCheques || [];
+  const d = document.createElement('div'); d.className = 'op-m'; d.style.cssText = 'display:grid;grid-template-columns:1.4fr 1fr;gap:6px;margin:6px 0;';
+  d.innerHTML = `<select class="op-mm" onchange="const c=this.parentNode.querySelector('.op-ch');c.style.display=this.value==='Cheque de terceros'?'block':'none';pvTotOP()" style="${pvInp}">${PV_MEDIOS.map(x => `<option>${x}</option>`).join('')}</select><input class="op-mi" inputmode="decimal" placeholder="Importe $" oninput="pvTotOP()" style="${pvInp}">
+    <select class="op-ch" onchange="const x=(window.__pvCheques||[]).find(c=>c._id===this.value);if(x){this.parentNode.querySelector('.op-mi').value=formatoPesos(x.importe);pvTotOP();}" style="${pvInp}grid-column:1/-1;display:none;"><option value="">Elegir cheque de la cartera…</option>${ch.map(c => `<option value="${c._id}">${c.cheque.electronico ? 'E-cheq' : 'Cheque'} ${escaparHtml(c.cheque.banco || '')} N.º ${escaparHtml(c.cheque.numero || '')} · ${formatPrice(c.importe)} · cobro ${String(c.cheque.fechaCobro || '').split('-').reverse().join('/')}</option>`).join('')}</select>`;
+  box.appendChild(d);
+}
+function pvLeerOP(){
+  const medios = [...document.querySelectorAll('.op-m')].map(d => ({ medio: d.querySelector('.op-mm').value, importe: numAr(d.querySelector('.op-mi').value) || 0, chequeId: d.querySelector('.op-mm').value === 'Cheque de terceros' ? d.querySelector('.op-ch').value : '' })).filter(x => x.importe > 0);
+  const ret = {}; ['iibb', 'gan', 'otras'].forEach(k => { const v = numAr(document.getElementById('op-r-' + k).value); if(v > 0) ret[k] = v; });
+  const tc = document.getElementById('op-tc') ? numAr(document.getElementById('op-tc').value) : null;
+  const totalARS = medios.reduce((a, x) => a + x.importe, 0), retT = Object.values(ret).reduce((a, x) => a + x, 0);
+  return { medios, ret, tc, totalARS, retT };
+}
+function pvTotOP(){ const o = pvLeerOP(), e = document.getElementById('op-tot'); if(!e) return; e.textContent = `Total pagado: ${formatPrice(o.totalARS)}${o.retT ? ` + retenciones ${formatPrice(o.retT)}` : ''}${o.tc ? ` = US$ ${((o.totalARS + o.retT) / o.tc).toLocaleString('es-AR', { maximumFractionDigits: 2 })}` : ''}`; }
+const pvArchivoB64 = f => new Promise((res, rej) => { if(/^image\//.test(f.type)) return comprimirImagenAFotoBase64(f).then(res, rej); if(f.size > 700000) return rej(new Error('el PDF pesa más de 700 KB: adjunte una foto o captura')); const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(f); });
+async function pvGuardarPago(pid){
+  const p = pvProv.find(x => x._id === pid), m = pvMon(p), o = pvLeerOP();
+  if(!o.medios.length){ alert('Cargue al menos un medio de pago con su importe.'); return; }
+  if(m === 'USD' && !(o.tc > 0)){ alert('Escriba el tipo de cambio.'); return; }
+  if(o.medios.some(x => x.medio === 'Cheque de terceros' && !x.chequeId)){ alert('Elija el cheque de la cartera.'); return; }
+  let comp = null; const fi = document.getElementById('op-cp').files[0]; if(fi){ try{ comp = await pvArchivoB64(fi); } catch(e){ alert('Comprobante: ' + e.message); return; } }
+  const aplicadoMon = m === 'USD' ? Math.round((o.totalARS + o.retT) / o.tc * 100) / 100 : o.totalARS + o.retT;
+  let numero = 1;
+  try{ const ref = db.collection('config').doc('op_num'); const d = await ref.get(); numero = ((d.exists && d.data().n) || 0) + 1; await ref.set({ n: numero });
+    const pago = { proveedorId: pid, fecha: document.getElementById('op-f').value || ccHoy(), numero, medios: o.medios, retenciones: o.ret, tc: o.tc || null, totalARS: o.totalARS, aplicadoMon, moneda: m, detalle: document.getElementById('op-d').value.trim(), creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
+    const r = await db.collection('pagos').add(comp ? { ...pago, comprobante: comp } : pago); pvPagos.push({ _id: r.id, ...pago, comprobante: comp });
+    for(const x of o.medios.filter(x => x.chequeId)){ const c = (window.__pvCheques || []).find(y => y._id === x.chequeId); if(c) await db.collection('cc_movimientos').doc(c._id).set({ cheque: { ...c.cheque, estado: 'entregado', entregadoA: p.nombre, op: numero } }, { merge: true }); }
+    await ccLog('Orden de pago', `OP ${numero} · ${p.nombre} · ${formatPrice(o.totalARS)}`);
+    cerrarPublicar(); pvSel = pid; renderCompras(); pintarAvisoCompras(); pvImprimirOP(r.id);
+  } catch(e){ alert('No se pudo guardar: ' + e.message); }
+}
+function pvImprimirOP(id){
+  const x = pvPagos.find(y => y._id === id); if(!x) return; const p = pvProv.find(y => y._id === x.proveedorId) || {};
+  const efectivo = (x.medios || []).some(m => /Efectivo|Cheque/.test(m.medio)) || !x.comprobante;
+  const w = window.open('', '_blank'); if(!w){ alert('Permita ventanas emergentes para imprimir.'); return; }
+  w.document.write(`<html><head><title>Orden de pago ${String(x.numero).padStart(5, '0')}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#222}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}td,th{padding:6px;border-bottom:1px solid #ddd;text-align:left}.r{text-align:right}h1{font-size:20px;margin:0}.firma{margin-top:60px;display:flex;gap:40px}.firma div{flex:1;border-top:1px solid #444;padding-top:6px;font-size:12px;text-align:center}img{max-width:100%;margin-top:14px;border:1px solid #ddd}</style></head><body>
+    <h1>OnLineTextil · Orden de pago N.º ${String(x.numero).padStart(5, '0')}</h1><p>Fecha: ${String(x.fecha).split('-').reverse().join('/')}<br>Proveedor: <b>${escaparHtml(p.nombre || '')}</b>${p.cuit ? ' · CUIT ' + escaparHtml(p.cuit) : ''}</p>
+    <table><tr><th>Medio</th><th class="r">Importe</th></tr>${(x.medios || []).map(m => `<tr><td>${escaparHtml(m.medio)}</td><td class="r">${formatPrice(m.importe)}</td></tr>`).join('')}
+    ${Object.entries(x.retenciones || {}).map(([k, v]) => `<tr><td>Retención ${k.toUpperCase()}</td><td class="r">${formatPrice(v)}</td></tr>`).join('')}
+    <tr><td><b>Total</b></td><td class="r"><b>${formatPrice((x.totalARS || 0) + Object.values(x.retenciones || {}).reduce((a, v) => a + v, 0))}</b>${x.tc ? `<br>US$ ${x.aplicadoMon} (TC ${x.tc})` : ''}</td></tr></table>
+    ${x.detalle ? `<p>${escaparHtml(x.detalle)}</p>` : ''}
+    ${x.comprobante && /^data:image/.test(x.comprobante) ? `<p><b>Comprobante de transferencia:</b></p><img src="${x.comprobante}">` : x.comprobante ? '<p>Comprobante adjunto (PDF) guardado en el sistema.</p>' : ''}
+    ${efectivo ? '<div class="firma"><div>Recibí conforme · Firma</div><div>Aclaración y DNI</div></div>' : ''}<script>setTimeout(()=>print(),400)<\/script></body></html>`); w.document.close();
+}
+async function pvBorrar(col, id){
+  const x = (col === 'compras' ? pvCompras : pvPagos).find(y => y._id === id); if(!x) return;
+  if(!confirm(`¿Borrar ${col === 'compras' ? 'esta factura' : 'esta orden de pago'}?${col === 'pagos' && (x.medios || []).some(m => m.chequeId) ? '\nLos cheques entregados vuelven a la cartera.' : ''}`)) return;
+  try{ await db.collection(col).doc(id).delete();
+    if(col === 'compras' && x.gastoId) await db.collection('gastos').doc(x.gastoId).delete();
+    if(col === 'pagos') for(const m of (x.medios || []).filter(m => m.chequeId)){ const d = await db.collection('cc_movimientos').doc(m.chequeId).get(); if(d.exists) await db.collection('cc_movimientos').doc(m.chequeId).set({ cheque: { ...d.data().cheque, estado: 'cartera', entregadoA: '', op: null } }, { merge: true }); } }
+  catch(e){ alert('No se pudo borrar: ' + e.message); return; }
+  if(col === 'compras') pvCompras = pvCompras.filter(y => y._id !== id); else pvPagos = pvPagos.filter(y => y._id !== id);
+  await ccLog('Borrado (' + col + ')', id); renderCompras(); pintarAvisoCompras();
+}
+// talleres: lo entregado (prendas buenas) x costo de confeccion del articulo, todavia sin liquidar
+async function pvRenderTalleres(){
+  const box = document.getElementById('pv-body'); box.innerHTML = '<p class="empty-msg">Cargando entregas…</p>';
+  try{ if(tablaConsumo === null) await cargarTablaConsumo(); } catch(e){}
+  const s = await db.collection('ingresos_taller').get(); const ing = s.docs.map(d => ({ _id: d.id, ...d.data() })).filter(x => !x.liquidacion);
+  const G = {}; ing.forEach(x => { const g = G[x.taller] = G[x.taller] || { taller: x.taller, ids: [], prendas: 0, importe: 0, sinPrecio: new Set() };
+    g.ids.push(x._id); (x.detalle || []).forEach(dd => { const pr = ((tablaConsumo && tablaConsumo.empaque && tablaConsumo.empaque[dd.articulo]) || {}).confeccion || 0; g.prendas += dd.buenas || 0; g.importe += (dd.buenas || 0) * pr; if(!pr && dd.buenas) g.sinPrecio.add(dd.articulo); }); });
+  const L = Object.values(G).filter(g => g.prendas > 0);
+  box.innerHTML = `<p class="note" style="text-align:left;">Entregas del taller todavía sin liquidar: prendas buenas × costo de confección del artículo. Al liquidar, se carga como deuda con el taller.</p>` + (L.length ? L.map(g => { const pr = pvProv.find(p => ccClave(p.nombre) === ccClave(g.taller));
+    return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line);padding:8px 0;"><b>${escaparHtml(g.taller)}</b><span class="meta">${g.ids.length} entregas · ${g.prendas.toLocaleString('es-AR')} prendas${g.sinPrecio.size ? ` · <span style="color:#A6432F;">sin costo de confección: ${escaparHtml([...g.sinPrecio].join(', '))}</span>` : ''}</span><span style="margin-left:auto;font-weight:800;">${formatPrice(g.importe)}</span>
+      <button type="button" class="btn-mini" onclick='pvLiquidar(${JSON.stringify(g.taller)}, ${JSON.stringify(g.ids)}, ${Math.round(g.importe * 100) / 100}, ${g.prendas})'>${pr ? 'Liquidar' : 'Crear proveedor y liquidar'}</button></div>`; }).join('') : '<p class="empty-msg">No hay entregas pendientes de liquidar.</p>');
+}
+async function pvLiquidar(taller, ids, importe, prendas){
+  if(!(importe > 0)){ alert('El importe da cero: cargue el costo de confección de los artículos.'); return; }
+  const v = prompt(`Liquidación de ${taller}: ${prendas} prendas. Importe a pagar:`, formatoPesos(importe)); if(v == null) return; const imp = numAr(v); if(!(imp > 0)) return;
+  try{ let pr = pvProv.find(p => ccClave(p.nombre) === ccClave(taller));
+    if(!pr){ const d = { nombre: taller, rubro: 'Taller', moneda: 'ARS', plazo: 0, creado: new Date().toISOString() }; const r = await db.collection('proveedores').add(d); pr = { _id: r.id, ...d }; pvProv.push(pr); }
+    const c = { proveedorId: pr._id, razon: 'propia', tipo: 'X', numero: 'LIQ-' + Date.now().toString().slice(-6), fecha: ccHoy(), vence: ccHoy(), importe: imp, iva: 0, moneda: 'ARS', detalle: `${prendas} prendas entregadas`, liquidacion: ids, nc: false, creado: new Date().toISOString() };
+    const r = await db.collection('compras').add(c); pvCompras.push({ _id: r.id, ...c });
+    const b = db.batch(); ids.forEach(id => b.set(db.collection('ingresos_taller').doc(id), { liquidacion: r.id }, { merge: true })); await b.commit();
+    await ccLog('Liquidación de taller', `${taller} · ${prendas} prendas · ${formatPrice(imp)}`); pvTab = 'proveedores'; pvSel = pr._id; renderCompras(); pintarAvisoCompras();
+  } catch(e){ alert('No se pudo liquidar: ' + e.message); }
+}
+async function pintarAvisoCompras(){
+  const box = document.getElementById('avisoCompras'); if(!box) return; if(!puede('compras')){ box.style.display = 'none'; return; }
+  try{ if(!pvProv.length){ const [a, b2, c] = await Promise.all([db.collection('proveedores').get(), db.collection('compras').get(), db.collection('pagos').get()]); pvProv = a.docs.map(d => ({ _id: d.id, ...d.data() })); pvCompras = b2.docs.map(d => ({ _id: d.id, ...d.data() })); pvPagos = c.docs.map(d => ({ _id: d.id, ...d.data() })); } } catch(e){ return; }
+  const L = Object.values(pvCalcular()).filter(r => pvMon(r.p) === 'ARS'), tot = L.reduce((a, r) => a + Math.max(0, r.saldo), 0), v7 = L.reduce((a, r) => a + r.vencido + r.vence7, 0);
+  if(tot < 1){ box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:.92rem;"><span style="flex:1;">🏭 A pagar <b>${formatPrice(tot)}</b>${v7 > 0 ? ` · vencido o vence esta semana <b style="color:#A6432F;">${formatPrice(v7)}</b>` : ''}</span><button type="button" class="btn-mini" onclick="abrirCompras()">Ver</button></div>`;
 }
 // ===== Cuentas corrientes y cobranzas (solo la razon social del duenio; nada de Mercado Libre) =====
 // facturas: salen de Ventas facturadas (desde la fecha de inicio); cobros, senias y ajustes: coleccion cc_movimientos; cambios: cc_log
@@ -10679,6 +10909,7 @@ auth.onAuthStateChanged(async u => {
     setTimeout(() => { try{ pintarAvisoCopia(); } catch(e){} }, 300);
     setTimeout(() => { detectarCambiosCosto().catch(() => {}); }, 1500);
     setTimeout(() => { pintarAvisoCtaCte().catch(() => {}); }, 2200);
+    setTimeout(() => { pintarAvisoCompras().catch(() => {}); }, 2600);
     if(ES_PESTANA_AGENTE) setTimeout(async () => { try{ const q = new URLSearchParams(location.search), paq = (q.get('paq') || '').split(',').filter(Boolean);
       document.title = (ES_PESTANA_AGENTE === 'auditor' ? 'Auditor' : 'Director de arte') + ' · OnLineTextil';
       if(q.get('mes')) window.__audMes = q.get('mes');
@@ -11145,6 +11376,7 @@ function editarGasto(id){
   document.getElementById('gs-form').scrollIntoView({ behavior: 'smooth' });
 }
 async function borrarGasto(id){
+  { const g0 = (gastos || []).find(x => x._id === arguments[0]); if(g0 && g0.origen === 'compra'){ alert('Este gasto viene de una factura de compra: bórrela desde Proveedores y pagos, y se borra también acá.'); return; } }
   if(!confirm('¿Borrar este gasto?')) return;
   try{ await db.collection('gastos').doc(id).delete(); gastos = gastos.filter(g => g._id !== id); renderGastos(); } catch(e){ alert('No se pudo borrar: ' + e.message); }
 }
@@ -11182,7 +11414,7 @@ function renderGastos(){
       ${L.some(g => !g.tipo && !g.enML) ? `<span style="font-size:.8rem;color:#A6432F;margin-left:auto;">⚠️ ${L.filter(g => !g.tipo && !g.enML).length} sin tipo</span>` : ''}</div>` : '') + (L.length ? L.map(g => `<div style="display:grid;grid-template-columns:22px 86px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:12px;margin-bottom:6px;background:#fff;">
       <input type="checkbox" ${gsSel.has(g._id) ? 'checked' : ''} onchange="gsSel[this.checked ? 'add' : 'delete']('${g._id}');renderGastos()">
       <span style="font-size:.82rem;color:#6B6258;">${new Date(g.fecha + 'T12:00:00').toLocaleDateString('es-AR')}</span>
-      <div><b>${escaparHtml(g.concepto || '')}</b> <span class="meta">· ${escaparHtml(g.quien || '')}</span>${g.enML ? ' <span style="font-size:.7rem;background:#EEE8F7;color:#5b2a86;border-radius:999px;padding:1px 7px;">ya en Resultados ML</span>' : g.tipo ? ` <span style="font-size:.7rem;background:${g.tipo === 'fijo' ? '#EAF1FA' : '#FFF4D6'};color:${g.tipo === 'fijo' ? '#2E5A8C' : '#8A6417'};border-radius:999px;padding:1px 7px;">${g.tipo}</span>` : ' <span style="font-size:.7rem;background:#FDEBE7;color:#A6432F;border-radius:999px;padding:1px 7px;">sin tipo</span>'}<div style="font-size:.78rem;color:#8A8072;">${escaparHtml(g.medio || '')}${g.nota ? ' · ' + escaparHtml(g.nota) : ''}</div></div>
+      <div><b>${escaparHtml(g.concepto || '')}</b> <span class="meta">· ${escaparHtml(g.quien || '')}</span>${g.origen === 'compra' ? ' <span style="font-size:.7rem;background:#EAF1FA;color:#2E5A8C;border-radius:999px;padding:1px 7px;">factura de compra</span>' : ''}${g.enML ? ' <span style="font-size:.7rem;background:#EEE8F7;color:#5b2a86;border-radius:999px;padding:1px 7px;">ya en Resultados ML</span>' : g.tipo ? ` <span style="font-size:.7rem;background:${g.tipo === 'fijo' ? '#EAF1FA' : '#FFF4D6'};color:${g.tipo === 'fijo' ? '#2E5A8C' : '#8A6417'};border-radius:999px;padding:1px 7px;">${g.tipo}</span>` : ' <span style="font-size:.7rem;background:#FDEBE7;color:#A6432F;border-radius:999px;padding:1px 7px;">sin tipo</span>'}<div style="font-size:.78rem;color:#8A8072;">${escaparHtml(g.medio || '')}${g.nota ? ' · ' + escaparHtml(g.nota) : ''}</div></div>
       <div style="text-align:right;white-space:nowrap;"><b>${formatPrice(+g.monto || 0)}</b><div style="display:flex;gap:4px;justify-content:flex-end;margin-top:4px;">${g.comprobante ? `<button type="button" class="btn-mini" onclick="verComprobante('${g._id}')" title="Ver comprobante">📎</button>` : ''}<button type="button" class="btn-mini" onclick="editarGasto('${g._id}')">✏️</button><button type="button" class="btn-mini" onclick="borrarGasto('${g._id}')">🗑️</button></div></div></div>`).join('') : '<p class="empty-msg">No hay gastos con este filtro.</p>');
 }
 
@@ -11434,6 +11666,7 @@ async function facturasDesdeExcel(file){
   const G = new Map();
   filas.forEach(r => {
     if(!col(r, 'NumeroComprobante') && !col(r, 'NumeroFactura')) return; // filas vacias o de totales
+    if(/compra/i.test(String(col(r, 'TipoOperacion')))) return; // las compras van a Proveedores
     if(!col(r, 'SKU') && !col(r, 'Producto') && !n(col(r, 'PrecioTotalRenglon'))) return;
     const nro = String(col(r, 'NumeroComprobante') || (String(col(r, 'PuntoVenta')).padStart(5, '0') + '-' + String(col(r, 'NumeroFactura')).padStart(8, '0'))).trim(); if(!nro) return;
     const tipoC = String(col(r, 'TipoComprobante')), esNC = /cr[eé]dito/i.test(tipoC);
@@ -11693,6 +11926,7 @@ const PERMISOS = [
   ['gastos', '💸 Gastos comerciales'],
   ['facturas', '🧾 Ventas facturadas'],
   ['ctacte', '💳 Cuentas corrientes y cobranzas (registrar cobros, ver saldos de clientes)'],
+  ['compras', '🧾 Compras, proveedores y pagos (cargar facturas, órdenes de pago, ver saldos de proveedores)'],
   ['costos', '💲 Costos (reventa, confección, calculadora)'],
   ['resultadosML', '📈 Resultados de Mercado Libre'],
   ['config', '⚙️ Configuración (listas, datos bancarios, avisos)']
@@ -11712,6 +11946,7 @@ function permisoDeAccion(f){
   if(/abrirFaltantes/.test(s)) return 'produccion';
   if(/abrirResultadoNegocio|abrirAuditor|abrirRankings/.test(s)) return 'gastos';
   if(/abrirCtaCte/.test(s)) return 'ctacte';
+  if(/abrirCompras/.test(s)) return 'compras';
   if(/abrirDirectorArte/.test(s)) return 'difusion';
   if(/abrirPresupuestos/.test(s)) return 'ventas';
   if(/abrirClientes/.test(s)) return 'clientes';
@@ -19939,7 +20174,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v296';
+const APP_VERSION = '2026-10-02-v297';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
@@ -19997,7 +20232,7 @@ window.addEventListener('load', () => {
     ['abrirFacturas', 'Cargando facturas…'], ['leerFacturasPDF', 'Leyendo facturas…'], ['guardarFactura', 'Guardando la factura…'], ['borrarFacturasSel', 'Borrando facturas…'],
     ['importarLinksWeb', 'Leyendo el archivo de Tienda Nube…'], ['analizarPedidoIA', 'La IA está armando el pedido…'],
     ['generarFlyersNuevoIngreso', 'Generando las piezas…'], ['abrirResultadosML', 'Preparando Resultados ML…'], ['descargarCopia', 'Preparando la copia…'],
-    ['abrirFaltantes', 'Cargando faltantes…'], ['abrirCtaCte', 'Cargando cuentas corrientes…'], ['ccGuardarCobro', 'Guardando…'], ['abrirRankings', 'Armando los rankings…'], ['abrirResultadoNegocio', 'Calculando el resultado…'], ['guardarTodoCP', 'Guardando…'],  ['abrirRevisarHistorial', 'Revisando el historial…'], ['corregirHistorialSel', 'Corrigiendo…'], ['abrirRevisarCostos', 'Cargando…'], ['ccAplicar', 'Actualizando precios…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
+    ['abrirFaltantes', 'Cargando faltantes…'], ['abrirCompras', 'Cargando proveedores…'], ['pvGuardarPago', 'Guardando la orden de pago…'], ['pvGuardarCompra', 'Guardando…'], ['abrirCtaCte', 'Cargando cuentas corrientes…'], ['ccGuardarCobro', 'Guardando…'], ['abrirRankings', 'Armando los rankings…'], ['abrirResultadoNegocio', 'Calculando el resultado…'], ['guardarTodoCP', 'Guardando…'],  ['abrirRevisarHistorial', 'Revisando el historial…'], ['corregirHistorialSel', 'Corrigiendo…'], ['abrirRevisarCostos', 'Cargando…'], ['ccAplicar', 'Actualizando precios…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
   ];
   setTimeout(() => W.forEach(([n, t]) => conProcesando(n, t)), 0);
 });
