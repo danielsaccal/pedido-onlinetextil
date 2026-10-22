@@ -1649,7 +1649,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v317</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v318</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5990,8 +5990,10 @@ const GRUPOS_INICIO = {
     [['💸 Gastos y caja chica', 'abrirGastos()']],
     [['🧾 Cheques en cartera', "abrirCtaCte('cheques')"]],
   ] },
-  imp: { lado: 'int', titulo: '🧮 Impuestos', titulosColumnas: ['IVA'], columnas: [
-    [['🧮 Posición de IVA', 'abrirIVA()']],
+  imp: { lado: 'int', titulo: '🧮 Impuestos', titulosColumnas: ['IVA', 'Retenciones', 'Cierre'], columnas: [
+    [['🧮 Posición de IVA', 'abrirIVA()'], ['📒 Libro IVA Ventas y Compras', 'abrirLibroIVA()']],
+    [['🧾 Retenciones y percepciones sufridas', 'abrirRetenciones()']],
+    [['🔒 Cierre de mes', 'abrirCierreMes()']],
   ] },
   est: { lado: 'int', titulo: '📊 Informes', titulosColumnas: ['Resultados', 'Mercado Libre', 'Auditoría'], columnas: [
     [['📊 Resultado del negocio', 'abrirResultadoNegocio()'], ['🏆 Rankings de ventas', 'abrirRankings()']],
@@ -7745,6 +7747,71 @@ function renderListaPrecios(){
     ${L.slice(0, 40).map(({ S, p, v }) => { const pr = parsePrice(v.precio); let cu = null; try{ cu = costoUnidadSku(S); } catch(e){} const c = cu > 0 ? cu * divisorVenta(S) : null, m = c > 0 && pr > 0 ? (pr - c) / c : null;
       return `<tr style="border-top:1px solid var(--line);"><td style="padding:7px 6px;"><b>${escaparHtml(S)}</b><div class="note" style="text-align:left;margin:0;">${escaparHtml(p.nombre)} · ${escaparHtml(v.desc || '')}</div></td><td style="padding:7px 6px;">${escaparHtml(unidadVentaSku(S) || 'unidad')}</td><td style="padding:7px 6px;text-align:right;font-weight:800;">${pr ? formatPrice(pr) : '—'}</td>${esDueno() ? `<td style="padding:7px 6px;text-align:right;">${c != null ? formatPrice(c) : '—'}</td><td style="padding:7px 6px;text-align:right;font-weight:700;color:${colorPct(m)};">${m != null ? Math.round(m * 100) + ' %' : '—'}</td>` : ''}</tr>`; }).join('')}</table></div>${L.length > 40 ? `<p class="note">Y ${L.length - 40} más: escriba más para achicar la búsqueda.</p>` : ''}` : '<p class="empty-msg">No encontré ese SKU o producto.</p>';
 }
+// ===== Cierre de mes: un mes cerrado no admite cambios en comprobantes, cobros, pagos, gastos ni caja (solo el duenio lo reabre) =====
+let cierres = null;
+async function cargarCierres(){ if(cierres) return cierres; try{ const d = await db.collection('config').doc('cierres').get(); cierres = d.exists ? (d.data().m || {}) : {}; } catch(e){ cierres = {}; } return cierres; }
+const mesDe = f => { const s = String(f || ''); const m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? `${m[3]}-${m[2].padStart(2, '0')}` : s.slice(0, 7); };
+async function mesBloqueado(fecha){ await cargarCierres(); const m = mesDe(fecha); if(cierres[m] && cierres[m].cerrado){ alert(`El mes ${m.split('-').reverse().join('/')} está cerrado: no se puede modificar.\nPara cambiarlo, el dueño debe reabrirlo en Impuestos → Cierre de mes.`); return true; } return false; }
+async function abrirCierreMes(){
+  if(!esDueno()){ alert('Solo el dueño puede cerrar o reabrir meses.'); return; }
+  cierres = null; await cargarCierres();
+  const meses = []; const d = new Date(); d.setDate(1); for(let i = 0; i < 12; i++){ meses.push(d.toISOString().slice(0, 7)); d.setMonth(d.getMonth() - 1); }
+  pvModal('🔒 Cierre de mes', `<p class="note" style="text-align:left;">Cierre un mes cuando ya lo presentó al contador: nadie podrá cargar, modificar ni borrar comprobantes, cobros, pagos, gastos ni caja de ese mes.</p>
+    ${meses.map(m => { const c = cierres[m]; return `<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--line);"><span style="flex:1;">${new Date(m + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</span>${c && c.cerrado ? `<span class="meta">🔒 cerrado el ${new Date(c.fecha).toLocaleDateString('es-AR')}</span><button type="button" class="btn-mini" onclick="cambiarCierre('${m}', false)">Reabrir</button>` : `<button type="button" class="btn-mini" onclick="cambiarCierre('${m}', true)">Cerrar mes</button>`}</div>`; }).join('')}`);
+}
+async function cambiarCierre(m, cerrar){
+  if(!confirm(cerrar ? `¿Cerrar ${m.split('-').reverse().join('/')}? No se podrá modificar nada de ese mes.` : `¿Reabrir ${m.split('-').reverse().join('/')}? Se podrá volver a modificar.`)) return;
+  const n = { ...cierres, [m]: { cerrado: cerrar, fecha: new Date().toISOString(), por: (firebase.auth().currentUser || {}).email || '' } };
+  try{ await db.collection('config').doc('cierres').set({ m: n }); cierres = n; } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  await ccLog(cerrar ? 'Mes cerrado' : 'Mes reabierto', m); abrirCierreMes();
+}
+// ===== Libro IVA Ventas y Compras (Excel) por mes y razon social =====
+async function abrirLibroIVA(){
+  if(!esDueno()){ alert('Solo el dueño puede descargar el libro IVA.'); return; }
+  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1);
+  pvModal('📒 Libro IVA Ventas y Compras', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><label>Mes<input type="month" id="li-m" value="${d.toISOString().slice(0, 7)}" style="padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;"></label><span></span>
+    <div style="grid-column:1/-1;"><b style="font-size:.85rem;">Razón social</b>${selectorRZ('li-rz', 'propia')}</div></div>
+    <button class="btn btn-gold" style="width:100%;margin-top:10px;" onclick="descargarLibroIVA()">📥 Descargar Excel</button>
+    <p class="note" style="text-align:left;">Hojas: Ventas, Compras y Resumen. Las ventas de Alberto y Rita salen de sus facturas cargadas; si no hay, del reporte de Mercado Libre (sin detalle por comprador).</p>`);
+}
+async function descargarLibroIVA(){
+  const mes = document.getElementById('li-m').value, rz = document.getElementById('li-rz').value; if(!mes) return;
+  procesando('Armando el libro IVA…');
+  try{
+    const [vf, cp, pr, cl] = await Promise.all([db.collection('ventas_facturadas').get(), db.collection('compras').get(), db.collection('proveedores').get(), db.collection('clientes').get()]);
+    const prov = {}; pr.docs.forEach(x => prov[x.id] = x.data());
+    const cuitCli = n => { const k = ccClave(n); const c = cl.docs.map(x => x.data()).find(x => [ccClave(x.razonSocial || ''), ccClave(`${x.apellido || ''} ${x.nombre || ''}`), ccClave(`${x.nombre || ''} ${x.apellido || ''}`)].includes(k)); return c ? c.cuit || '' : ''; };
+    const r2 = x => Math.round(x * 100) / 100;
+    const V = vf.docs.map(x => x.data()).filter(f => (f.razon || 'propia') === rz && mesDe(f.fecha) === mes).sort((a, b) => ccFechaISO(a.fecha).localeCompare(ccFechaISO(b.fecha))).map(f => { const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0), tot = f.total || n0 * 1.21, sg = f.esNC ? -1 : 1, m = String(f.numero || '').match(/(\d+)\D+(\d+)/);
+      return { Fecha: f.fecha, Comprobante: (f.esNC ? 'NC' : f.esND ? 'ND' : 'FC') + ' ' + (f.tipo || ''), 'Punto de venta': m ? m[1] : '', Número: m ? m[2] : f.numero, Cliente: f.cliente || '', CUIT: cuitCli(f.cliente), 'Neto gravado 21%': r2(sg * n0), 'IVA 21%': r2(sg * (tot - n0)), Total: r2(sg * tot) }; });
+    const C = cp.docs.map(x => x.data()).filter(c => (c.razon || 'propia') === rz && String(c.fecha).slice(0, 7) === mes && !c.liquidacion && c.moneda !== 'USD').sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))).map(c => { const sg = c.nc ? -1 : 1, iva = +c.iva || 0, piva = +c.percIva || 0, piibb = +c.percIibb || 0, neto = (+c.importe || 0) - iva - piva - piibb, m = String(c.numero || '').match(/(\d+)\D+(\d+)/), p = prov[c.proveedorId] || {};
+      return { Fecha: String(c.fecha).split('-').reverse().join('/'), Comprobante: (c.nc ? 'NC' : c.nd ? 'ND' : 'FC') + ' ' + (c.tipo || ''), 'Punto de venta': m ? m[1] : '', Número: m ? m[2] : c.numero, Proveedor: p.nombre || '', CUIT: p.cuit || '', 'Neto gravado': r2(sg * neto), IVA: r2(sg * iva), 'Percepción IVA': r2(sg * piva), 'Percepción IIBB': r2(sg * piibb), 'Provincia IIBB': c.provIibb || '', Total: r2(sg * (+c.importe || 0)) }; });
+    const s = (L, k) => r2(L.reduce((a, x) => a + (x[k] || 0), 0));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(V.length ? V : [{ Fecha: 'Sin facturas de venta cargadas en este mes' }]), 'Ventas');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(C.length ? C : [{ Fecha: 'Sin comprobantes de compra en este mes' }]), 'Compras');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ Concepto: 'Ventas: neto gravado', Importe: s(V, 'Neto gravado 21%') }, { Concepto: 'Débito fiscal (IVA ventas)', Importe: s(V, 'IVA 21%') }, { Concepto: 'Compras: neto gravado', Importe: s(C, 'Neto gravado') }, { Concepto: 'Crédito fiscal (IVA compras)', Importe: s(C, 'IVA') }, { Concepto: 'Percepciones de IVA sufridas', Importe: s(C, 'Percepción IVA') }, { Concepto: 'Saldo (débito − crédito − percepciones)', Importe: r2(s(V, 'IVA 21%') - s(C, 'IVA') - s(C, 'Percepción IVA')) }]), 'Resumen');
+    XLSX.writeFile(wb, `libro-iva-${rz}-${mes}.xlsx`);
+    procesando.listo('✓ Libro IVA descargado');
+  } catch(e){ procesando.error(e.message); alert('No se pudo armar: ' + e.message); }
+}
+// ===== Retenciones y percepciones sufridas (recibos, compras y banco), por mes =====
+async function abrirRetenciones(){
+  if(!esDueno()){ alert('Solo el dueño.'); return; }
+  const d = new Date(); pvModal('🧾 Retenciones y percepciones sufridas', `<label>Mes <input type="month" id="rt-m" value="${d.toISOString().slice(0, 7)}" onchange="renderRetenciones()" style="padding:6px;border:1px solid var(--line);border-radius:8px;"></label><div id="rt-res" style="margin-top:10px;max-height:60vh;overflow:auto;"></div>`);
+  renderRetenciones();
+}
+async function renderRetenciones(){
+  const mes = document.getElementById('rt-m').value, box = document.getElementById('rt-res'); box.innerHTML = '<p class="note">Cargando…</p>';
+  const [mv, cp, ex] = await Promise.all([db.collection('cc_movimientos').get(), db.collection('compras').get(), db.collection('teso_extractos').get().catch(() => ({ docs: [] }))]);
+  const F = [];
+  mv.docs.map(x => x.data()).filter(m => (m.tipo === 'cobro' || m.tipo === 'sena') && String(m.fecha).slice(0, 7) === mes).forEach(m => Object.entries(m.retenciones || {}).forEach(([k, v]) => { if(+v) F.push({ origen: 'Recibo de ' + (m.nombre || m.cliente), tipo: { iva: 'Retención IVA', iibb: 'Retención IIBB', gan: 'Retención Ganancias', otras: 'Otras retenciones' }[k] || k, prov: k === 'iibb' ? (m.retProv || '') : '', cert: (m.retCert || {})[k] || '', imp: +v, rz: 'propia' }); }));
+  cp.docs.map(x => x.data()).filter(c => String(c.fecha).slice(0, 7) === mes).forEach(c => { const sg = c.nc ? -1 : 1; if(+c.percIva) F.push({ origen: 'Compra ' + (c.tipo || '') + ' ' + (c.numero || ''), tipo: 'Percepción IVA', prov: '', cert: '', imp: sg * c.percIva, rz: c.razon }); if(+c.percIibb) F.push({ origen: 'Compra ' + (c.tipo || '') + ' ' + (c.numero || ''), tipo: 'Percepción IIBB', prov: c.provIibb || '', cert: '', imp: sg * c.percIibb, rz: c.razon }); });
+  ex.docs.map(x => x.data()).filter(x => x.cat === 'impuesto' && String(x.fecha).slice(0, 7) === mes).forEach(x => F.push({ origen: 'Banco Santander', tipo: x.tipo, prov: x.provincia || '', cert: '', imp: -x.importe, rz: 'propia' }));
+  const G = {}; F.forEach(f => { const k = f.tipo + (f.prov ? ' · ' + f.prov : ''); G[k] = (G[k] || 0) + f.imp; });
+  box.innerHTML = F.length ? `<b style="font-size:.85rem;">Por tipo</b><div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.86rem;margin-bottom:10px;">${Object.entries(G).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr style="border-top:1px solid var(--line);"><td style="padding:5px;">${escaparHtml(k)}</td><td style="padding:5px;text-align:right;font-weight:700;">${formatPrice(v)}</td></tr>`).join('')}<tr style="border-top:2px solid var(--purple);"><td style="padding:5px;"><b>Total</b></td><td style="padding:5px;text-align:right;"><b>${formatPrice(Object.values(G).reduce((a, x) => a + x, 0))}</b></td></tr></table></div>
+    <details><summary style="cursor:pointer;font-size:.85rem;">Detalle (${F.length})</summary><div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.82rem;">${F.map(f => `<tr style="border-top:1px solid var(--line);"><td style="padding:4px;">${chipRZ(f.rz)}</td><td style="padding:4px;">${escaparHtml(f.origen)}</td><td style="padding:4px;">${escaparHtml(f.tipo)}${f.prov ? ' · ' + escaparHtml(f.prov) : ''}${f.cert ? ' <span class="meta">cert. ' + escaparHtml(f.cert) + '</span>' : ''}</td><td style="padding:4px;text-align:right;">${formatPrice(f.imp)}</td></tr>`).join('')}</table></div></details>` : '<p class="note">Sin retenciones ni percepciones en este mes.</p>';
+}
 // ===== Posicion de IVA a una fecha (mes calendario), por razon social y total. Todo al 21 %. =====
 // Debito: Propia = ventas facturadas; Alberto y Rita = ventas de ML (precio con IVA / 1,21 x 0,21), del detalle venta por venta.
 // Credito: facturas de compra de cada razon social + cargos que factura ML (comision, cargo fijo, cuotas, envios, Full, publicidad), estimados del resumen mensual.
@@ -7849,7 +7916,7 @@ function tsFormCaja(){ pvModal('🧾 Caja del día · local', `<div style="displ
     <label>Débito (Payway → Santander)<input id="cj-d" inputmode="decimal" placeholder="$" style="${tsInp}"></label><label>Detalle<input id="cj-x" placeholder="opcional" style="${tsInp}"></label></div>
     <p class="note" style="text-align:left;">Solo ventas de contado del local. Los cobros de cuenta corriente se registran en Cuentas corrientes.</p>
     <div style="display:flex;gap:8px;"><button class="btn btn-gold" style="flex:1;" onclick="tsGuardarCaja()">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`); }
-async function tsGuardarMovs(L, logAcc){ dashCache = null;
+async function tsGuardarMovs(L, logAcc){ dashCache = null; for(const x of L){ if(await mesBloqueado(x.fecha || ccHoy())) return false; }
   const ahora = new Date().toISOString(), us = (firebase.auth().currentUser || {}).email || '';
   try{ const b = db.batch(); L.forEach(x => b.set(db.collection('teso_movs').doc(), { ...x, creado: ahora, usuario: us })); await b.commit(); } catch(e){ alert('No se pudo guardar: ' + e.message); return false; }
   await ccLog(logAcc, L.map(x => `${x.cuenta} ${formatPrice(x.importe)}`).join(' · ')); return true;
@@ -8041,7 +8108,7 @@ function pvFormCompra(pid, nc){
     <div style="grid-column:1/-1;"><b style="font-size:.85rem;">A nombre de (razón social)</b>${selectorRZ('cf-rz', 'propia')}</div>
     <label>Tipo<select id="cf-t" style="${pvInp}">${['A', 'B', 'C', 'X'].map(x => `<option>${x}</option>`).join('')}</select></label>
     <label>Número (punto de venta - número)<input id="cf-n" placeholder="00001-00001234" style="${pvInp}"></label><label>Fecha<input type="date" id="cf-f" value="${hoy}" style="${pvInp}"></label>
-    <label>Total ${m === 'USD' ? '(US$)' : '($)'}<input id="cf-i" inputmode="decimal" style="${pvInp}"></label><label>IVA de la factura<input id="cf-iva" inputmode="decimal" placeholder="opcional" style="${pvInp}"></label><label>Percepción de IVA<input id="cf-piva" inputmode="decimal" placeholder="opcional" style="${pvInp}"></label><span></span>
+    <label>Total ${m === 'USD' ? '(US$)' : '($)'}<input id="cf-i" inputmode="decimal" style="${pvInp}"></label><label>IVA de la factura<input id="cf-iva" inputmode="decimal" placeholder="opcional" style="${pvInp}"></label><label>Percepción de IVA<input id="cf-piva" inputmode="decimal" placeholder="opcional" style="${pvInp}"></label><label>Percepción de IIBB<input id="cf-piibb" inputmode="decimal" placeholder="opcional" style="${pvInp}"></label><label>Provincia (IIBB)<input id="cf-pprov" placeholder="ej.: CABA" style="${pvInp}"></label><span></span>
     <label>Vence<input type="date" id="cf-v" value="${new Date(Date.now() + (p.plazo || 0) * 864e5).toISOString().slice(0, 10)}" style="${pvInp}"></label><label>Detalle<input id="cf-d" placeholder="opcional" style="${pvInp}"></label>
     <label style="grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:.88rem;"><input type="checkbox" id="cf-g" ${p.rubro === 'Servicios' ? 'checked' : ''} style="width:18px;height:18px;"> Es un gasto (luz, alquiler, servicios…): que figure también en Gastos comerciales</label>
     <label id="cf-gt-l" style="grid-column:1/-1;">Tipo de gasto<select id="cf-gt" style="${pvInp}"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></label></div>
@@ -8062,9 +8129,9 @@ async function pvLeerPDF(inp){
     if(!(pv && nro && tot)) alert('Leí parte de los datos. Complete lo que falta a mano.');
   } catch(e){ alert('No pude leer el PDF: complete a mano.'); }
 }
-async function pvGuardarCompra(pid, nc){ dashCache = null; const esND = nc === 'nd'; if(esND) nc = false;
+async function pvGuardarCompra(pid, nc){ dashCache = null; if(await mesBloqueado(document.getElementById('cf-f').value)) return; const esND = nc === 'nd'; if(esND) nc = false;
   const g = x => document.getElementById(x).value.trim(), p = pvProv.find(x => x._id === pid);
-  const d = { proveedorId: pid, razon: g('cf-rz'), tipo: g('cf-t'), numero: g('cf-n'), fecha: g('cf-f'), vence: g('cf-v') || g('cf-f'), importe: numAr(g('cf-i')), iva: numAr(g('cf-iva')) || 0, percIva: numAr(g('cf-piva')) || 0, moneda: pvMon(p), detalle: g('cf-d'), nc: !!nc, nd: esND, creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
+  const d = { proveedorId: pid, razon: g('cf-rz'), tipo: g('cf-t'), numero: g('cf-n'), fecha: g('cf-f'), vence: g('cf-v') || g('cf-f'), importe: numAr(g('cf-i')), iva: numAr(g('cf-iva')) || 0, percIva: numAr(g('cf-piva')) || 0, percIibb: numAr(g('cf-piibb')) || 0, provIibb: g('cf-pprov'), moneda: pvMon(p), detalle: g('cf-d'), nc: !!nc, nd: esND, creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
   if(!(d.importe > 0) || !d.fecha){ alert('Complete fecha y total.'); return; }
   const clave = x => { const m = String(x.numero || '').match(/(\d+)\D+(\d+)/); return `${x.proveedorId}|${x.nc ? 'NC' : x.nd ? 'ND' : 'FC'}|${x.tipo}|${m ? (+m[1]) + '-' + (+m[2]) : String(x.numero || '').replace(/\D/g, '').replace(/^0+/, '')}`; }; // mismo punto de venta y numero
   if(d.numero && pvCompras.some(x => clave(x) === clave(d))){ alert('Ya está cargado un comprobante de este proveedor con el mismo tipo y número. No se guardó.'); return; }
@@ -8104,7 +8171,7 @@ function pvLeerOP(){
 }
 function pvTotOP(){ const o = pvLeerOP(), e = document.getElementById('op-tot'); if(!e) return; e.textContent = `Total pagado: ${formatPrice(o.totalARS)}${o.retT ? ` + retenciones ${formatPrice(o.retT)}` : ''}${o.tc ? ` = US$ ${((o.totalARS + o.retT) / o.tc).toLocaleString('es-AR', { maximumFractionDigits: 2 })}` : ''}`; }
 const pvArchivoB64 = f => new Promise((res, rej) => { if(/^image\//.test(f.type)) return comprimirImagenAFotoBase64(f).then(res, rej); if(f.size > 700000) return rej(new Error('el PDF pesa más de 700 KB: adjunte una foto o captura')); const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(f); });
-async function pvGuardarPago(pid){ dashCache = null;
+async function pvGuardarPago(pid){ dashCache = null; if(await mesBloqueado(document.getElementById('op-f').value || ccHoy())) return;
   const p = pvProv.find(x => x._id === pid), m = pvMon(p), o = pvLeerOP();
   if(!o.medios.length){ alert('Cargue al menos un medio de pago con su importe.'); return; }
   if(m === 'USD' && !(o.tc > 0)){ alert('Escriba el tipo de cambio.'); return; }
@@ -8134,7 +8201,7 @@ function pvImprimirOP(id){
     ${efectivo ? '<div class="firma"><div>Recibí conforme · Firma</div><div>Aclaración y DNI</div></div>' : ''}<script>setTimeout(()=>print(),400)<\/script></body></html>`); w.document.close();
 }
 async function pvBorrar(col, id){
-  const x = (col === 'compras' ? pvCompras : pvPagos).find(y => y._id === id); if(!x) return;
+  const x = (col === 'compras' ? pvCompras : pvPagos).find(y => y._id === id); if(!x) return; if(await mesBloqueado(x.fecha)) return;
   if(!confirm(`¿Borrar ${col === 'compras' ? 'esta factura' : 'esta orden de pago'}?${col === 'pagos' && (x.medios || []).some(m => m.chequeId) ? '\nLos cheques entregados vuelven a la cartera.' : ''}`)) return;
   try{ await db.collection(col).doc(id).delete();
     if(col === 'compras' && x.gastoId) await db.collection('gastos').doc(x.gastoId).delete();
@@ -8304,7 +8371,7 @@ function ccFormCobro(k, tipo){
       <label>Fecha<input type="date" id="cb-f" value="${ccHoy()}" style="${inp}"></label><label>Importe recibido<input id="cb-i" inputmode="decimal" placeholder="$" style="${inp}"></label>
       <label style="grid-column:1/-1;">Medio<select id="cb-m" onchange="document.getElementById('cb-ch').style.display=/Cheque|E-cheq/.test(this.value)?'grid':'none'" style="${inp}">${['Efectivo', 'Transferencia a Santander', 'Transferencia a Mercado Pago', 'Cheque', 'E-cheq', 'Otro'].map(x => `<option>${x}</option>`).join('')}</select></label>
       <div id="cb-ch" style="display:none;grid-column:1/-1;grid-template-columns:1fr 1fr;gap:8px;"><label>Banco<input id="cb-cb" style="${inp}"></label><label>N.º de cheque<input id="cb-cn" style="${inp}"></label><label>Fecha de cobro<input type="date" id="cb-cf" style="${inp}"></label><label>Librador<input id="cb-cl" style="${inp}"></label></div>
-      <details style="grid-column:1/-1;"><summary style="cursor:pointer;font-size:.88rem;">Retenciones que le hizo el cliente (opcional)</summary><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px;">${[['iva', 'IVA'], ['iibb', 'IIBB'], ['gan', 'Ganancias'], ['otras', 'Otras']].map(([k2, t2]) => `<label style="font-size:.8rem;">${t2}<input id="cb-r-${k2}" inputmode="decimal" style="${inp}"></label>`).join('')}</div></details>
+      <details style="grid-column:1/-1;"><summary style="cursor:pointer;font-size:.88rem;">Retenciones que le hizo el cliente (opcional)</summary><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px;">${[['iva', 'IVA'], ['iibb', 'IIBB'], ['gan', 'Ganancias'], ['otras', 'Otras']].map(([k2, t2]) => `<label style="font-size:.8rem;">${t2}<input id="cb-r-${k2}" inputmode="decimal" placeholder="$" style="${inp}"><input id="cb-c-${k2}" placeholder="N.º certificado" style="${inp}margin-top:4px;font-size:.78rem;"></label>`).join('')}<label style="font-size:.8rem;grid-column:1/-1;">Provincia de la retención de IIBB<input id="cb-rprov" placeholder="ej.: Buenos Aires" style="${inp}"></label></div></details>
       <label style="grid-column:1/-1;">Detalle (opcional)<input id="cb-d" placeholder="Recibo N.º, observación…" style="${inp}"></label></div>
     <p class="note" style="text-align:left;">Se aplica a las facturas más viejas. Saldo actual: <b>${formatPrice(c.saldo || 0)}</b>.</p>
     <div style="display:flex;gap:8px;"><button class="btn btn-gold" style="flex:1;" onclick="ccGuardarCobro('${escapeAttr(k)}','${tipo}')">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`;
@@ -8313,19 +8380,19 @@ function ccFormCobro(k, tipo){
 async function ccGuardarCobro(k, tipo){
   const g = id => document.getElementById(id).value.trim(), imp = numAr(g('cb-i'));
   if(!(imp > 0)){ alert('Escriba el importe.'); return; }
-  const medio = g('cb-m'), ret = {}; ['iva', 'iibb', 'gan', 'otras'].forEach(r => { const v = numAr(g('cb-r-' + r)); if(v > 0) ret[r] = v; });
-  const mov = { cliente: k, nombre: (ccCalcular()[k] || {}).nombre || (document.getElementById('rc-c') || {}).value || window.__ccNombreNuevo || k, tipo, fecha: g('cb-f') || ccHoy(), importe: imp, medio, retenciones: ret, detalle: g('cb-d') };
+  const medio = g('cb-m'), ret = {}, retCert = {}; ['iva', 'iibb', 'gan', 'otras'].forEach(r => { const v = numAr(g('cb-r-' + r)); if(v > 0){ ret[r] = v; if(g('cb-c-' + r)) retCert[r] = g('cb-c-' + r); } });
+  const mov = { cliente: k, nombre: (ccCalcular()[k] || {}).nombre || (document.getElementById('rc-c') || {}).value || window.__ccNombreNuevo || k, tipo, fecha: g('cb-f') || ccHoy(), importe: imp, medio, retenciones: ret, retCert, retProv: g('cb-rprov'), detalle: g('cb-d') };
   if(/Cheque|E-cheq/.test(medio)){ if(!g('cb-cn')){ alert('Escriba el número de cheque.'); return; } mov.cheque = { electronico: medio === 'E-cheq', banco: g('cb-cb'), numero: g('cb-cn'), fechaCobro: g('cb-cf') || '', librador: g('cb-cl'), estado: 'cartera' }; }
   cerrarPublicar(); await ccGuardarMov(mov); if(ccTab === 'recibos'){ ccCli = null; renderCtaCte(); }
 }
-async function ccGuardarMov(mov){ dashCache = null;
+async function ccGuardarMov(mov){ dashCache = null; if(await mesBloqueado(mov.fecha)) return;
   mov.creado = new Date().toISOString(); mov.creadoPor = (firebase.auth().currentUser || {}).email || '';
   try{ const r = await db.collection('cc_movimientos').add(mov); ccMovs.push({ _id: r.id, ...mov }); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   await ccLog({ cobro: 'Cobro', sena: 'Seña', ajuste: 'Ajuste', inicial: 'Saldo inicial' }[mov.tipo] || mov.tipo, `${mov.nombre} · ${formatPrice(mov.importe)}${mov.medio ? ' · ' + mov.medio : ''}`);
   ccCli = mov.cliente; renderCtaCte(); pintarAvisoCtaCte();
 }
 async function ccBorrarMov(id){
-  const m = ccMovs.find(x => x._id === id); if(!m || !confirm(`¿Borrar este movimiento (${m.tipo}, ${formatPrice(m.importe)})?`)) return;
+  const m = ccMovs.find(x => x._id === id); if(m && await mesBloqueado(m.fecha)) return; if(!m || !confirm(`¿Borrar este movimiento (${m.tipo}, ${formatPrice(m.importe)})?`)) return;
   try{ await db.collection('cc_movimientos').doc(id).delete(); } catch(e){ alert('No se pudo borrar: ' + e.message); return; }
   ccMovs = ccMovs.filter(x => x._id !== id); await ccLog('Borrado', `${m.nombre} · ${m.tipo} · ${formatPrice(m.importe)}`); renderCtaCte(); pintarAvisoCtaCte();
 }
@@ -11483,6 +11550,7 @@ auth.onAuthStateChanged(async u => {
     setTimeout(() => { pintarAvisoCompras().catch(() => {}); }, 2600);
     setTimeout(() => { pintarAvisoTeso().catch(() => {}); }, 3000);
     setTimeout(() => { pintarDash().catch(() => {}); }, 1200);
+    setTimeout(() => { copiaAutomatica().catch(() => {}); }, 9000);
     if(ES_PESTANA_AGENTE) setTimeout(async () => { try{ const q = new URLSearchParams(location.search), paq = (q.get('paq') || '').split(',').filter(Boolean);
       document.title = (ES_PESTANA_AGENTE === 'auditor' ? 'Auditor' : 'Director de arte') + ' · OnLineTextil';
       if(q.get('mes')) window.__audMes = q.get('mes');
@@ -11926,6 +11994,7 @@ function leerComprobante(file){
   return new Promise((res, rej) => { if(file.size > 700000){ rej(new Error('El PDF es muy grande (máximo 700 KB). Sacale una foto o comprimilo.')); return; } const r = new FileReader(); r.onload = () => res({ tipo: 'pdf', data: r.result, nombre: file.name }); r.onerror = rej; r.readAsDataURL(file); });
 }
 async function guardarGasto(){
+  if(await mesBloqueado(document.getElementById('gs-fecha').value)) return;
   const g = { fecha: document.getElementById('gs-fecha').value, monto: numAr(document.getElementById('gs-monto').value), concepto: document.getElementById('gs-concepto').value.trim(), medio: document.getElementById('gs-medio').value.trim(), quien: document.getElementById('gs-quien').value.trim(), nota: document.getElementById('gs-nota').value.trim(), enML: document.getElementById('gs-enml').checked, tipo: document.getElementById('gs-tipo').value };
   if(!g.fecha || !(g.monto > 0) || !g.concepto){ alert('Completá fecha, monto y concepto.'); return; }
   if(!g.tipo && !g.enML){ alert('Elegí el tipo de gasto: fijo o variable.'); return; }
@@ -11949,6 +12018,7 @@ function editarGasto(id){
   document.getElementById('gs-form').scrollIntoView({ behavior: 'smooth' });
 }
 async function borrarGasto(id){
+  { const g1 = (gastos || []).find(x => x._id === id); if(g1 && await mesBloqueado(g1.fecha)) return; }
   { const g0 = (gastos || []).find(x => x._id === arguments[0]); if(g0 && g0.origen === 'compra'){ alert('Este gasto viene de una factura de compra: bórrela desde Proveedores y pagos, y se borra también acá.'); return; } }
   if(!confirm('¿Borrar este gasto?')) return;
   try{ await db.collection('gastos').doc(id).delete(); gastos = gastos.filter(g => g._id !== id); renderGastos(); } catch(e){ alert('No se pudo borrar: ' + e.message); }
@@ -12314,6 +12384,7 @@ function claveComprobante(f){ const m = String(f.numero || '').match(/(\d+)\D+(\
   return `${f.razon || 'propia'}-${f.esNC ? 'NC' : f.esND ? 'ND' : 'FC'}-${String(f.tipo || '').toUpperCase()}-${pv}-${nro}`; }
 async function guardarFactura(i, reemplazar){
   const fa = facturasNuevas[i]; if(!fa) return;
+  if(await mesBloqueado(fa.fecha)) return;
   const k = claveComprobante(fa), previas = (facturas || []).filter(x => claveComprobante(x) === k);
   if(fa.repetidaEnLote && !reemplazar){ alert('Este mismo comprobante aparece dos veces en los archivos que subió. Guarde solo uno.'); return; }
   if(previas.length && !reemplazar){ alert(`Ya hay un comprobante guardado con el mismo punto de venta y número (${fa.tipo || ''} ${fa.numero}). No se guardó. Si quiere reemplazarlo, use "Reemplazar la guardada".`); return; }
@@ -12337,6 +12408,7 @@ function actualizarSelFact(){
 }
 async function borrarFacturasSel(){
   const ids = [...document.querySelectorAll('.fc-sel:checked')].map(c => c.value); if(!ids.length) return;
+  for(const f of (facturas || []).filter(f => ids.includes(f._id || String(f.numero).replace(/\//g, '-')))){ if(await mesBloqueado(f.fecha)) return; }
   if(!confirm(`¿Quitar ${ids.length} ${ids.length === 1 ? 'factura' : 'facturas'} de la app? (en TFactura no se toca)`)) return;
   try{ for(let i = 0; i < ids.length; i += 400){ const b = db.batch(); ids.slice(i, i + 400).forEach(id => b.delete(db.collection('ventas_facturadas').doc(id))); await b.commit(); } }
   catch(e){ alert('No se pudieron borrar: ' + e.message); return; }
@@ -12346,7 +12418,7 @@ async function borrarFacturasSel(){
   facturasNuevas.forEach(fa => { if(!fa.error) fa.yaEsta = (facturas || []).some(x => claveComprobante(x) === claveComprobante(fa)); });
   document.getElementById('fc-todas').checked = false; renderFacturasNuevas(); renderFacturas(); actualizarSelFact();
 }
-async function borrarFactura(id){ if(!confirm('¿Quitar esta factura de la app? (en TFactura no se toca)')) return;
+async function borrarFactura(id){ { const f0 = (facturas || []).find(f => (f._id || String(f.numero).replace(/\//g, '-')) === id); if(f0 && await mesBloqueado(f0.fecha)) return; } if(!confirm('¿Quitar esta factura de la app? (en TFactura no se toca)')) return;
   try{ await db.collection('ventas_facturadas').doc(id).delete(); } catch(e){ alert('No se pudo borrar: ' + e.message); return; }
   { const f0 = facturas.find(f => (f._id || String(f.numero).replace(/\//g, '-')) === id); if(f0 && f0.stockAplicado){ try{ await stockPorFactura(f0, -1, 'factura quitada ' + f0.numero); } catch(e){} } }
   facturas = facturas.filter(f => (f._id || String(f.numero).replace(/\//g, '-')) !== id);
@@ -12578,7 +12650,7 @@ function permisoDeAccion(f){
   if(/abrirResultadoNegocio|abrirAuditor|abrirRankings/.test(s)) return 'gastos';
   if(/abrirCtaCte/.test(s)) return 'ctacte';
   if(/abrirCompras/.test(s)) return 'compras';
-  if(/abrirTesoreria|abrirIVA/.test(s)) return 'tesoreria'; // solo el duenio (no figura en los permisos de colaboradores)
+  if(/abrirTesoreria|abrirIVA|abrirLibroIVA|abrirRetenciones|abrirCierreMes/.test(s)) return 'tesoreria'; // solo el duenio (no figura en los permisos de colaboradores)
   if(/abrirDirectorArte/.test(s)) return 'difusion';
   if(/abrirPresupuestos/.test(s)) return 'ventas';
   if(/abrirClientes/.test(s)) return 'clientes';
@@ -12611,7 +12683,8 @@ async function guardarPermiso(mail, perm, val){
 // ===== Copia de seguridad: descarga toda la base a la computadora (.zip) =====
 const COLECCIONES_COPIA = ['config', 'productos_nuevos', 'productos_editados', 'productos_eliminados', 'historial_precios', 'clientes', 'pedidos',
   'ordenes_trabajo', 'envios_tela', 'ingresos_taller', 'stock_movs', 'historial_costos', 'calculadora_costos', 'gastos', 'gastos_periodicos_ml',
-  'ventas_facturadas', 'movimientos_ml', 'usuarios', 'mlMeses', 'fotos'];
+  'ventas_facturadas', 'movimientos_ml', 'usuarios', 'mlMeses', 'fotos',
+  'cc_movimientos', 'cc_log', 'proveedores', 'compras', 'pagos', 'teso_movs', 'teso_extractos', 'ml_detalle', 'ml_stock_aplicado', 'presupuestos', 'agente_chats'];
 function cargarJSZip(){
   if(window.JSZip) return Promise.resolve();
   return new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload = res; s.onerror = () => rej(new Error('No se pudo cargar el compresor')); document.head.appendChild(s); });
@@ -12624,12 +12697,22 @@ function abrirCopiaSeguridad(){
   document.getElementById('pub-cont').innerHTML = `<p class="note" style="text-align:left;">Descarga <b>toda la información de la app</b> a esta computadora, en un archivo .zip: productos y precios, clientes, pedidos, órdenes y entregas, stock, telas y costos, gastos, facturas, usuarios y Resultados ML. No cambia nada en la app.</p>
     <p class="note" style="text-align:left;">${d == null ? 'Todavía no se descargó ninguna copia desde este dispositivo.' : d === 0 ? 'Última copia descargada: hoy.' : `Última copia descargada: hace ${d} ${d === 1 ? 'día' : 'días'}.`}</p>
     <label style="display:flex;gap:8px;align-items:center;margin:8px 0;"><input type="checkbox" id="cs-fotos" checked style="width:18px;height:18px;"> Incluir fotos <span class="note" style="margin:0;">(sin fotos el archivo es mucho más liviano)</span></label>
+    <label style="display:block;margin:8px 0;font-size:.9rem;">Copia automática en esta computadora <select id="cs-auto" onchange="try{localStorage.setItem('ot_copiaAuto', this.value);}catch(e){}" style="padding:6px;border:1px solid var(--line);border-radius:8px;"><option value="diaria">Diaria</option><option value="semanal">Semanal</option><option value="no">Desactivada</option></select></label>
+    <p class="note" style="text-align:left;margin:0 0 6px;">Se descarga sola (sin fotos) a la carpeta Descargas la primera vez que abre la app en el día o en la semana.</p>
     <div id="cs-res"></div>
     <button class="btn btn-gold" style="width:100%;margin-top:8px;" onclick="descargarCopia(document.getElementById('cs-fotos').checked)">💾 Descargar copia</button>`;
   document.getElementById('pub-modal').style.display = 'block';
+  try{ document.getElementById('cs-auto').value = localStorage.getItem('ot_copiaAuto') || 'diaria'; } catch(e){}
+}
+// copia automatica: solo el duenio, en computadora, segun la frecuencia elegida
+async function copiaAutomatica(){
+  if(!esDueno() || window.innerWidth < 900) return;
+  let modo = 'diaria'; try{ modo = localStorage.getItem('ot_copiaAuto') || 'diaria'; } catch(e){}
+  if(modo === 'no') return; const d = diasDesdeCopia(); if(d != null && d < (modo === 'semanal' ? 7 : 1)) return;
+  try{ await descargarCopia(false); } catch(e){ console.error('copia automática', e); }
 }
 async function descargarCopia(conFotos){
-  const res = document.getElementById('cs-res');
+  const res = document.getElementById('cs-res') || document.createElement('div');
   try{
     await cargarJSZip();
     const zip = new JSZip(), resumen = {}, fecha = new Date();
@@ -20844,7 +20927,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v317';
+const APP_VERSION = '2026-10-02-v318';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
