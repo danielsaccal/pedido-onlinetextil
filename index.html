@@ -1600,7 +1600,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v297</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v298</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1811,6 +1811,7 @@ a.grilla-celda{display:block;}
           <div class="field" style="margin:0;"><label>Código de tela</label><input type="text" id="et-sku" placeholder="HON315B" list="lista-telas" style="text-transform:uppercase;"></div>
           <div class="field" style="margin:0;"><label>Metros</label><input type="number" id="et-metros" min="0" step="0.01" placeholder="640"></div>
           <div class="field" style="margin:0;"><label>Comprobante</label><input type="text" id="et-comprobante" placeholder="R-7343"></div>
+          <label style="grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:.85rem;"><input type="checkbox" id="et-deposito" checked style="width:18px;height:18px;"> Sale de mi depósito (descontar del stock de telas). Destildar si la manda el proveedor directo al taller.</label>
           <div class="field" style="margin:0;"><label>Fecha</label><input type="date" id="et-fecha"></div>
           <div class="field" style="margin:0;"><label>📷 Foto del remito</label><input type="file" id="et-foto" accept="image/*"></div>
         </div>
@@ -2060,7 +2061,12 @@ a.grilla-celda{display:block;}
     </style>
     <div class="form-card" style="max-width:920px;">
       <h2>Stock y prioridades</h2>
-      <p class="note" style="text-align:left;margin-bottom:10px;">Los SKU que fabricás, de lo más urgente a lo menos. Las entregas del taller suman al stock solas.</p>
+      <div id="sk-inicio"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;" id="sk-tabs"></div>
+      <div id="sk-otra" style="display:none;"></div>
+      <div id="sk-prod">
+      <p class="note" style="text-align:left;margin-bottom:10px;">Lo que fabrica y lo que revende, de lo más urgente a lo menos. Suman solas las entregas del taller; restan solas las ventas facturadas y las de Mercado Libre (al cargar el reporte).</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"><button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="skFormMov()">➕ Movimiento</button><span class="note" style="margin:auto 0;">ingreso de mercadería · envío a Full · segunda calidad · salida o ajuste</span></div>
       <input type="text" id="sk-buscar" placeholder="🔍 Buscar SKU o producto" oninput="renderStock()" style="width:100%;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:12px;box-sizing:border-box;">
       <div class="sk-kpis" id="sk-kpis"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
@@ -2068,6 +2074,7 @@ a.grilla-celda{display:block;}
       </div>
       <div id="sk-lista"><p class="empty-msg">Cargando...</p></div>
       <div class="sk-guardar" id="sk-guardar"><button type="button" onclick="guardarStock()">💾 Guardar stock</button></div>
+      </div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
   </div>
@@ -5994,7 +6001,7 @@ async function guardarEnvioTela(){
   const d = {
     taller: document.getElementById('et-taller').value,
     skuTela: document.getElementById('et-sku').value.trim().toUpperCase(),
-    metros: parseFloat(document.getElementById('et-metros').value),
+    metros: numAr(document.getElementById('et-metros').value),
     comprobante: document.getElementById('et-comprobante').value.trim(),
     fecha: document.getElementById('et-fecha').value || new Date().toISOString().slice(0, 10),
     creado: new Date().toISOString(),
@@ -6003,8 +6010,10 @@ async function guardarEnvioTela(){
   const ft = document.getElementById('et-foto').files[0];
   if(ft){ try{ d.remitoFoto = await fotoRemito(ft); } catch(e){ err.textContent = 'No se pudo leer la foto.'; err.style.display = 'block'; return; } }
   try{
+    const dep = document.getElementById('et-deposito'); d.desdeDeposito = !dep || dep.checked;
     const ref = await db.collection('envios_tela').add(d);
     enviosTela.unshift({ _id: ref.id, ...d });
+    if(d.desdeDeposito){ try{ if(stockDatos === null) await cargarStock(); stockDatos.telas = stockDatos.telas || {}; const k = d.skuTela; stockDatos.telas[k] = { metros: Math.round(((+((stockDatos.telas[k] || {}).metros) || 0) - d.metros) * 100) / 100 }; await db.collection('config').doc('stock').set(JSON.parse(JSON.stringify(stockDatos))); db.collection('stock_movs').add({ tela: k, cantidad: -d.metros, tipo: 'envío al taller', ref: d.taller, usuario: (firebase.auth().currentUser || {}).email || '', fecha: new Date().toISOString() }).catch(() => {}); } catch(e){ alert('El envío se guardó, pero no se pudo descontar el stock de tela: ' + e.message); } }
     ['et-sku', 'et-metros', 'et-comprobante', 'et-foto'].forEach(id => document.getElementById(id).value = '');
     renderEnviosTela();
   } catch(e){ err.textContent = 'No se pudo guardar: ' + e.message; err.style.display = 'block'; }
@@ -8506,16 +8515,40 @@ async function cargarStock(){
   try{ const d = await db.collection('config').doc('stock').get(); stockDatos = d.exists ? d.data() : {}; } catch(e){ stockDatos = stockDatos || {}; }
   stockDatos.skus = stockDatos.skus || {};
 }
-async function moverStock(sku, cantidad, tipo, ref){
+async function moverStock(sku, cantidad, tipo, ref, ubic){
   if(!sku || !cantidad) return;
   if(stockDatos === null) await cargarStock();
-  const S = String(sku).toUpperCase();
+  const S = String(sku).toUpperCase(), u = ubic === 'full' ? 'full' : 'stock';
   const x = stockDatos.skus[S] || { stock: 0, minimo: 0 };
-  x.stock = Math.round(((+x.stock || 0) + cantidad) * 100) / 100;
+  x[u] = Math.round(((+x[u] || 0) + cantidad) * 100) / 100;
   stockDatos.skus[S] = x;
   await db.collection('config').doc('stock').set(JSON.parse(JSON.stringify(stockDatos)));
-  db.collection('stock_movs').add({ sku: S, cantidad, tipo, ref: ref || '', fecha: new Date().toISOString() }).catch(() => {});
+  db.collection('stock_movs').add({ sku: S, cantidad, tipo, ref: ref || '', ubic: u, usuario: (firebase.auth().currentUser || {}).email || '', fecha: new Date().toISOString() }).catch(() => {});
 }
+// varios movimientos juntos (una sola escritura)
+async function moverStockVarios(movs, tipo, ref){
+  if(stockDatos === null) await cargarStock();
+  const ok = movs.filter(m => m.sku && m.cantidad); if(!ok.length) return 0;
+  ok.forEach(m => { const S = String(m.sku).toUpperCase(), u = m.ubic === 'full' ? 'full' : 'stock'; const x = stockDatos.skus[S] || { stock: 0, minimo: 0 }; x[u] = Math.round(((+x[u] || 0) + m.cantidad) * 100) / 100; stockDatos.skus[S] = x; });
+  await db.collection('config').doc('stock').set(JSON.parse(JSON.stringify(stockDatos)));
+  const us = (firebase.auth().currentUser || {}).email || '', f = new Date().toISOString();
+  ok.forEach(m => db.collection('stock_movs').add({ sku: String(m.sku).toUpperCase(), cantidad: m.cantidad, tipo: m.tipo || tipo, ref: m.ref || ref || '', ubic: m.ubic === 'full' ? 'full' : 'stock', usuario: us, fecha: f }).catch(() => {}));
+  return ok.length;
+}
+// SKU que se controlan: los que fabrica + los de reventa con costo + los que ya tienen stock
+function skuControlado(S){ S = String(S).toUpperCase(); return !!(buscarProductoPorSku(S) || (stockDatos && stockDatos.skus && stockDatos.skus[S])); }
+// ventas facturadas: restan stock (en piezas) si la factura es posterior al inicio del control
+async function stockPorFactura(fa, signo, ref){
+  if(stockDatos === null) await cargarStock();
+  const ini = stockDatos.inicio; if(!ini) return false;
+  const m = String(fa.fecha || '').split('/'), f = m.length === 3 ? `${m[2]}-${m[1]}-${m[0]}` : '';
+  if(!f || f < ini) return false;
+  const sg = fa.esNC ? (fa.devolvieron !== false ? 1 : 0) : -1; if(!sg) return false;
+  const movs = (fa.items || []).map(it => { const S = skuDeFactura(it.codigo); return skuControlado(S) ? { sku: S, cantidad: sg * signo * (+it.cant || 0) * divisorVenta(S), ref: ref } : null; }).filter(Boolean);
+  await moverStockVarios(movs, fa.esNC ? 'nota de crédito' : 'venta facturada', ref);
+  return movs.length > 0;
+}
+function skusDeStock(){ const s = new Set(skusQueFabrico()); Object.keys(costosReventa || {}).forEach(k => { if(buscarProductoPorSku(k)) s.add(String(k).toUpperCase()); }); return [...s]; }
 function skusQueFabrico(){
   const s = new Set();
   Object.keys((fabricacion && fabricacion.vinculos) || {}).forEach(k => { const v = fabricacion.vinculos[k]; if(v && (v.articulo || v.calidad)) s.add(k); });
@@ -8528,7 +8561,7 @@ function enProduccionSku(sku){
   return (historialOT || []).filter(o => !o.cerrada).reduce((s, o) => s + (o.renglones || []).filter(r => String(r.sku || '').toUpperCase() === S).reduce((a, r) => a + pendienteRenglon(r), 0), 0);
 }
 function filasStock(){
-  return skusQueFabrico().map(sku => {
+  return skusDeStock().map(sku => {
     const x = (stockDatos.skus[sku]) || {};
     const p = stockPend[sku] || {};
     const stock = p.stock !== undefined ? numAr(p.stock) || 0 : (+x.stock || 0);
@@ -8542,11 +8575,14 @@ function filasStock(){
     else if(minimo > 0 && disp < minimo && prod <= 0){ nivel = 1; est = 'Debajo del mínimo, sin orden de producción'; }
     else if(minimo > 0 && stock < minimo){ nivel = 2; est = 'Debajo del mínimo, ya en producción'; }
     else { nivel = 3; est = minimo > 0 ? 'OK' : 'OK (sin mínimo cargado)'; }
-    return { sku, stock, minimo, prod, disp, nivel, est, nombre: r ? (r.variante && r.variante.desc ? String(r.variante.desc).split(' — ')[0] + ' · ' + r.producto.nombre : r.producto.nombre) : (art ? (art.startsWith('ficha:') ? art.slice(6) : art) : ''), articulo: art, sugerido: Math.max(0, Math.ceil((minimo > 0 ? minimo * 2 : 0) - disp)) };
+    const full = +x.full || 0;
+    return { sku, stock, full, minimo, prod, disp, nivel, est, nombre: r ? (r.variante && r.variante.desc ? String(r.variante.desc).split(' — ')[0] + ' · ' + r.producto.nombre : r.producto.nombre) : (art ? (art.startsWith('ficha:') ? art.slice(6) : art) : ''), articulo: art, sugerido: Math.max(0, Math.ceil((minimo > 0 ? minimo * 2 : 0) - disp)) };
   }).sort((a, b) => a.nivel - b.nivel || (a.minimo ? a.disp / a.minimo : 9) - (b.minimo ? b.disp / b.minimo : 9) || a.sku.localeCompare(b.sku));
 }
+let skTab = 'productos';
 async function abrirStock(){
   mostrarPaso('step-stock');
+  try{ if(!costosReventa || !Object.keys(costosReventa).length){ const d = await db.collection('config').doc('costos_reventa').get(); costosReventa = d.exists ? (d.data().c || {}) : {}; } } catch(e){}
   document.getElementById('sk-lista').innerHTML = '<p class="empty-msg">Cargando...</p>';
   if(tablaConsumo === null) await cargarTablaConsumo();
   if(fabricacion === null) await cargarFabricacion();
@@ -8554,7 +8590,57 @@ async function abrirStock(){
   if(fichasArticulos === null) await cargarFichasArticulos();
   await cargarStock();
   historialOT = null; await cargarHistorialOT();
-  renderStock();
+  pintarStockTabs(); renderStock();
+}
+function pintarStockTabs(){
+  const ini = stockDatos.inicio;
+  const neg = Object.entries(stockDatos.skus || {}).filter(([, x]) => (+x.stock || 0) < 0 || (+x.full || 0) < 0).length;
+  document.getElementById('sk-inicio').innerHTML = !ini ? `<div style="background:#FFF8E6;border:1px solid #EBD9A8;border-radius:12px;padding:10px;margin-bottom:10px;font-size:.9rem;">Para que las ventas descuenten stock solas, elija desde qué fecha arranca el control (el día que cuente la mercadería): <input type="date" id="sk-ini" style="padding:6px;border:1px solid var(--line);border-radius:8px;"> <button type="button" class="btn-mini" onclick="skGuardarInicio()">Empezar</button></div>`
+    : `<p class="note" style="text-align:left;margin:0 0 8px;">Control de stock desde el ${ini.split('-').reverse().join('/')}.${neg ? ` <b style="color:#A6432F;">⚠️ ${neg} SKU con stock negativo: revise (suele ser una venta sin su ingreso o un conteo pendiente).</b>` : ''}</p>`;
+  document.getElementById('sk-tabs').innerHTML = [['productos', '📦 Productos'], ['telas', '🧵 Telas (metros)'], ['movs', '🕒 Movimientos']].map(([k, t]) => `<button type="button" onclick="skTab='${k}';pintarStockTabs();skRenderTab()" style="padding:7px 12px;border-radius:999px;border:1px solid ${skTab === k ? 'var(--purple)' : 'var(--line)'};background:${skTab === k ? 'var(--purple)' : '#fff'};color:${skTab === k ? '#fff' : 'var(--purple)'};font-weight:700;cursor:pointer;">${t}</button>`).join('');
+  document.getElementById('sk-prod').style.display = skTab === 'productos' ? '' : 'none'; document.getElementById('sk-otra').style.display = skTab === 'productos' ? 'none' : '';
+}
+async function skGuardarInicio(){ const v = document.getElementById('sk-ini').value; if(!v){ alert('Elija la fecha.'); return; } stockDatos.inicio = v; try{ await db.collection('config').doc('stock').set(JSON.parse(JSON.stringify(stockDatos))); } catch(e){ delete stockDatos.inicio; alert('No se pudo guardar: ' + e.message); return; } pintarStockTabs(); alert('Listo. Cargue el stock contado de cada SKU (columna Stock) y toque Guardar.'); }
+async function skRenderTab(){
+  const box = document.getElementById('sk-otra'); if(skTab === 'productos'){ renderStock(); return; }
+  if(skTab === 'movs'){ box.innerHTML = '<p class="empty-msg">Cargando…</p>'; const s = await db.collection('stock_movs').get(); const L = s.docs.map(d => d.data()).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))).slice(0, 300);
+    box.innerHTML = L.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.84rem;">${L.map(m => `<tr style="border-top:1px solid var(--line);"><td style="padding:5px;white-space:nowrap;">${new Date(m.fecha).toLocaleString('es-AR')}</td><td style="padding:5px;"><b>${escaparHtml(m.sku || m.tela || '')}</b>${m.ubic === 'full' ? ' ' + chipML('Full') : ''}</td><td style="padding:5px;text-align:right;font-weight:700;color:${m.cantidad < 0 ? '#A6432F' : '#2F7A47'};">${m.cantidad > 0 ? '+' : ''}${m.cantidad}${m.tela ? ' m' : ''}</td><td style="padding:5px;">${escaparHtml(m.tipo || '')} <span class="meta">${escaparHtml(m.ref || '')}</span></td><td style="padding:5px;" class="meta">${escaparHtml(m.usuario || '')}</td></tr>`).join('')}</table></div>` : '<p class="empty-msg">Sin movimientos.</p>'; return; }
+  if(skTab === 'telas'){ const T = Object.entries((telasDatos && telasDatos.telas) || {}).sort((a, b) => a[0].localeCompare(b[0])); stockDatos.telas = stockDatos.telas || {};
+    box.innerHTML = `<p class="note" style="text-align:left;">Metros en el depósito. Bajan solos al enviar tela al taller desde el depósito; los ingresos y ajustes se cargan acá.</p>
+      <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.86rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:5px;">Tela</td><td style="padding:5px;text-align:right;">Metros</td><td></td></tr>
+      ${T.map(([k, t]) => { const mts = +((stockDatos.telas[k] || {}).metros) || 0; return `<tr style="border-top:1px solid var(--line);"><td style="padding:6px;"><b>${escaparHtml(k)}</b> <span class="meta">${escaparHtml([t.nombre, t.color, t.ancho ? t.ancho + ' cm' : ''].filter(Boolean).join(' · '))}</span></td><td style="padding:6px;text-align:right;font-weight:800;color:${mts < 0 ? '#A6432F' : 'inherit'};">${mts.toLocaleString('es-AR')}</td><td style="padding:6px;white-space:nowrap;"><button type="button" class="btn-mini" onclick="skMovTela('${escapeAttr(k)}','ingreso')">➕ Ingreso</button> <button type="button" class="btn-mini" onclick="skMovTela('${escapeAttr(k)}','ajuste')">Ajustar</button></td></tr>`; }).join('') || '<tr><td class="note">No hay telas cargadas.</td></tr>'}</table></div>`; }
+}
+async function skMovTela(k, tipo){
+  stockDatos.telas = stockDatos.telas || {}; const act = +((stockDatos.telas[k] || {}).metros) || 0;
+  const v = prompt(tipo === 'ingreso' ? `Metros que ingresan de ${k}:` : `Metros contados de ${k} (hoy hay ${act}):`, ''); if(v == null) return; const n = numAr(v); if(!isFinite(n) || (tipo === 'ingreso' && !(n > 0))){ alert('Cantidad inválida.'); return; }
+  const delta = tipo === 'ingreso' ? n : n - act; const prev = stockDatos.telas[k];
+  stockDatos.telas[k] = { metros: Math.round((act + delta) * 100) / 100 };
+  try{ await db.collection('config').doc('stock').set(JSON.parse(JSON.stringify(stockDatos))); } catch(e){ if(prev === undefined) delete stockDatos.telas[k]; else stockDatos.telas[k] = prev; alert('No se pudo guardar: ' + e.message); return; }
+  db.collection('stock_movs').add({ tela: k, cantidad: delta, tipo: tipo === 'ingreso' ? 'ingreso de tela' : 'ajuste de tela (conteo)', usuario: (firebase.auth().currentUser || {}).email || '', fecha: new Date().toISOString() }).catch(() => {});
+  skRenderTab();
+}
+// movimiento manual de productos
+function skFormMov(){
+  const inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
+  const t = document.getElementById('pub-titulo'); if(t) t.textContent = '➕ Movimiento de stock';
+  document.getElementById('pub-cont').innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <label style="grid-column:1/-1;">Tipo<select id="sm-t" style="${inp}"><option value="ingreso">Ingreso de mercadería (compra o devolución)</option><option value="full">Envío a Full</option><option value="fullml">Ajustar Full según Mercado Libre</option><option value="segunda">Pasar a segunda calidad (SKU -2DA)</option><option value="salida">Salida (rotura, regalo, muestra…)</option></select></label>
+    <label>SKU<input id="sm-s" list="sm-skus" style="${inp}text-transform:uppercase;"></label><label>Cantidad (unidades sueltas)<input id="sm-c" inputmode="decimal" style="${inp}"></label>
+    <label style="grid-column:1/-1;">Detalle<input id="sm-d" placeholder="opcional" style="${inp}"></label></div><datalist id="sm-skus">${skusDeStock().map(s => `<option value="${s}">`).join('')}</datalist>
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="skGuardarMov()">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`;
+  document.getElementById('pub-modal').style.display = 'block';
+}
+async function skGuardarMov(){
+  const t = document.getElementById('sm-t').value, S = document.getElementById('sm-s').value.trim().toUpperCase(), n = numAr(document.getElementById('sm-c').value), d = document.getElementById('sm-d').value.trim();
+  if(!S || !(n >= 0) || (t !== 'fullml' && !(n > 0))){ alert('Complete SKU y cantidad.'); return; }
+  const x = (stockDatos.skus || {})[S] || {}; let movs = [];
+  if(t === 'ingreso') movs = [{ sku: S, cantidad: n, tipo: 'ingreso de mercadería', ref: d }];
+  else if(t === 'full') movs = [{ sku: S, cantidad: -n, tipo: 'envío a Full', ref: d }, { sku: S, cantidad: n, ubic: 'full', tipo: 'envío a Full', ref: d }];
+  else if(t === 'fullml'){ const dif = n - (+x.full || 0); if(!dif){ alert('Coincide con lo que tiene la app: no hay diferencia.'); return; } if(!confirm(`Full de ${S}: la app tiene ${+x.full || 0} y Mercado Libre dice ${n}. ¿Ajustar ${dif > 0 ? '+' : ''}${dif}?`)) return; movs = [{ sku: S, cantidad: dif, ubic: 'full', tipo: 'ajuste Full (según ML)', ref: d }]; }
+  else if(t === 'segunda') movs = [{ sku: S, cantidad: -n, tipo: 'pasa a segunda calidad', ref: d }, { sku: S + '-2DA', cantidad: n, tipo: 'segunda calidad', ref: S }];
+  else movs = [{ sku: S, cantidad: -n, tipo: 'salida', ref: d }];
+  try{ await moverStockVarios(movs); } catch(e){ alert('No se pudo guardar: ' + e.message); await cargarStock(); return; }
+  cerrarPublicar(); pintarStockTabs(); renderStock();
 }
 const NIVELES_STOCK = [['#C9563F', '🔴 Hacer ya'], ['#D98A2B', '🟠 Debajo del mínimo'], ['#D9B53B', '🟡 En producción'], ['#3D9A5B', '🟢 OK']];
 function renderStock(){
@@ -8571,6 +8657,7 @@ function renderStock(){
         <div class="sk-est" style="color:${NIVELES_STOCK[f.nivel][0]};">${f.est}${f.sugerido && f.nivel < 2 ? ` · sugerido: hacer ${f.sugerido}` : ''}</div></div>
       <div class="sk-nums">
         <label>Stock<input type="text" inputmode="decimal" value="${escapeAttr(stockPend[f.sku] && stockPend[f.sku].stock !== undefined ? stockPend[f.sku].stock : f.stock)}" oninput="cambiarStockLista('${escapeAttr(f.sku)}', 'stock', this.value)"></label>
+        <label>Full<span class="ro" style="color:#2D3277;background:#FFE600;border-radius:8px;">${f.full}</span></label>
         <label>En producción<span class="ro">${f.prod}</span></label>
         <label>Mínimo<input type="text" inputmode="decimal" value="${escapeAttr(stockPend[f.sku] && stockPend[f.sku].minimo !== undefined ? stockPend[f.sku].minimo : (f.minimo || ''))}" placeholder="—" oninput="cambiarStockLista('${escapeAttr(f.sku)}', 'minimo', this.value)"></label>
       </div>
@@ -11692,13 +11779,15 @@ async function guardarFactura(i, reemplazar){
   if(previas.length && !reemplazar){ alert(`Ya hay un comprobante guardado con el mismo punto de venta y número (${fa.tipo || ''} ${fa.numero}). No se guardó. Si quiere reemplazarlo, use "Reemplazar la guardada".`); return; }
   if(previas.length && reemplazar){
     if(!confirm(`¿Reemplazar el comprobante ${fa.tipo || ''} ${fa.numero} ya guardado (${previas[0].fecha || ''}${previas[0].cliente ? ' · ' + previas[0].cliente : ''}) por este? El anterior se borra.`)) return;
-    try{ for(const x of previas){ await db.collection('ventas_facturadas').doc(x._id || String(x.numero).replace(/\//g, '-')).delete(); } } catch(e){ alert('No se pudo reemplazar: ' + e.message); return; }
+    try{ for(const x of previas){ await db.collection('ventas_facturadas').doc(x._id || String(x.numero).replace(/\//g, '-')).delete(); if(x.stockAplicado){ try{ await stockPorFactura(x, -1, 'factura reemplazada ' + x.numero); } catch(e){} } } } catch(e){ alert('No se pudo reemplazar: ' + e.message); return; }
     facturas = (facturas || []).filter(x => claveComprobante(x) !== k);
   }
   const items = fa.items.map(it => { const c = costoItemFactura(it, fa); return { ...it, sku: skuDeFactura(it.codigo), costo: c, gan: c != null ? it.neto * signoFact(fa) - c : null }; });
   const doc = { confirmados: fa.confirmados || [], esNC: !!fa.esNC, devolvieron: fa.devolvieron !== false, numero: fa.numero, tipo: fa.tipo, fecha: fa.fecha, cliente: fa.cliente, total: fa.total, items, neto: items.reduce((a, x) => a + x.neto, 0), costo: items.reduce((a, x) => a + (x.costo || 0), 0), archivo: fa.archivo, guardado: new Date().toISOString() };
   const idDoc = (String(fa.numero).replace(/\//g, '-') || String(Date.now())) + (fa.esNC ? '-NC' : '');
-  try{ await db.collection('ventas_facturadas').doc(idDoc).set(doc); fa.yaEsta = true; fa.repetidaEnLote = false; (facturas = facturas || []).push({ ...doc, _id: idDoc }); renderFacturasNuevas(); renderFacturas(); }
+  try{ await db.collection('ventas_facturadas').doc(idDoc).set(doc); fa.yaEsta = true; fa.repetidaEnLote = false; (facturas = facturas || []).push({ ...doc, _id: idDoc });
+    try{ if(await stockPorFactura(doc, 1, `${doc.tipo || ''} ${doc.numero}`)){ await db.collection('ventas_facturadas').doc(idDoc).set({ stockAplicado: true }, { merge: true }); facturas[facturas.length - 1].stockAplicado = true; } } catch(e){ alert('La factura se guardó, pero no se pudo descontar el stock: ' + e.message); }
+    renderFacturasNuevas(); renderFacturas(); }
   catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 function actualizarSelFact(){
@@ -11712,12 +11801,14 @@ async function borrarFacturasSel(){
   try{ for(let i = 0; i < ids.length; i += 400){ const b = db.batch(); ids.slice(i, i + 400).forEach(id => b.delete(db.collection('ventas_facturadas').doc(id))); await b.commit(); } }
   catch(e){ alert('No se pudieron borrar: ' + e.message); return; }
   const s = new Set(ids);
+  for(const f of facturas.filter(f => s.has(f._id || String(f.numero).replace(/\//g, '-')) && f.stockAplicado)){ try{ await stockPorFactura(f, -1, 'factura quitada ' + f.numero); } catch(e){} } // el stock vuelve
   facturas = facturas.filter(f => !s.has(f._id || String(f.numero).replace(/\//g, '-')));
   facturasNuevas.forEach(fa => { if(!fa.error) fa.yaEsta = (facturas || []).some(x => claveComprobante(x) === claveComprobante(fa)); });
   document.getElementById('fc-todas').checked = false; renderFacturasNuevas(); renderFacturas(); actualizarSelFact();
 }
 async function borrarFactura(id){ if(!confirm('¿Quitar esta factura de la app? (en TFactura no se toca)')) return;
   try{ await db.collection('ventas_facturadas').doc(id).delete(); } catch(e){ alert('No se pudo borrar: ' + e.message); return; }
+  { const f0 = facturas.find(f => (f._id || String(f.numero).replace(/\//g, '-')) === id); if(f0 && f0.stockAplicado){ try{ await stockPorFactura(f0, -1, 'factura quitada ' + f0.numero); } catch(e){} } }
   facturas = facturas.filter(f => (f._id || String(f.numero).replace(/\//g, '-')) !== id);
   facturasNuevas.forEach(fa => { if(!fa.error) fa.yaEsta = (facturas || []).some(x => claveComprobante(x) === claveComprobante(fa)); });
   renderFacturasNuevas(); renderFacturas(); }
@@ -20174,7 +20265,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v297';
+const APP_VERSION = '2026-10-02-v298';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
