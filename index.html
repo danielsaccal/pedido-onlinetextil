@@ -444,13 +444,13 @@ body.con-sb #sb{display:block;}
 @media(min-width:901px){ body.con-sb{padding-left:240px;} body.con-sb #sb-toggle{display:none;} }
 @media(max-width:900px){ body.con-sb #sb{transform:translateX(-100%);transition:transform .2s;box-shadow:4px 0 20px rgba(0,0,0,.2);} body.con-sb.sb-abierta #sb{transform:none;} }
 #sb .sb-logo{font-family:Georgia,serif;font-weight:700;color:#3D2B4E;font-size:1.2rem;padding:8px 18px 12px;}
-#sb a{display:flex;gap:10px;align-items:center;padding:9px 18px;color:#3D2B4E;text-decoration:none;font-size:.93rem;border-left:4px solid transparent;cursor:pointer;}
+#sb a{display:flex;gap:10px;align-items:center;padding:10px 18px;color:#3D2B4E;text-decoration:none;font-size:1.02rem;font-weight:600;border-left:4px solid transparent;cursor:pointer;}
 #sb a:hover{background:#FAF7F2;}
 #sb a.on{background:#F2EEF7;border-left-color:#F4C430;font-weight:700;}
-#sb .sb-sub{padding:2px 0 8px 46px;}
-#sb .sb-sub div{font-size:.84rem;color:#6B6258;padding:5px 8px 5px 0;cursor:pointer;line-height:1.25;}
+#sb .sb-sub{padding:4px 10px 10px 30px;}
+#sb .sb-sub div{font-size:.86rem;color:#4A4038;padding:5px 8px 5px 10px;cursor:pointer;line-height:1.25;}
 #sb .sb-sub div:hover{color:#3D2B4E;}
-#sb .sb-sub b{display:block;font-size:.66rem;letter-spacing:.08em;color:#A89E90;text-transform:uppercase;margin:6px 0 2px;}
+#sb .sb-sub b{display:block;font-size:.74rem;letter-spacing:.06em;color:#fff;background:#3D2B4E;text-transform:uppercase;margin:8px 0 3px;padding:4px 10px;border-radius:6px;}
 #sb .sb-sub div.ml{background:#FFE600;color:#2D3277;font-weight:700;border-radius:6px;padding:4px 8px;margin:2px 8px 2px 0;}
 #sb hr{border:none;border-top:1px solid #EEE;margin:10px 16px;}
 #sb-toggle{display:none;}
@@ -1637,7 +1637,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v310</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v311</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -20688,7 +20688,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v310';
+const APP_VERSION = '2026-10-02-v311';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
