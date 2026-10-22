@@ -755,6 +755,7 @@ async function saveEntry(d){
   }catch(e){showErr('Se ve en pantalla, pero no se pudo guardar en la base: '+e.message);return false;}
 }
 async function borrarMes(idViejo){const d=DATA.find(x=>x.id===idViejo)||(()=>{const [c,p]=String(idViejo).split('|');return c&&p?{cuenta:c,periodo:p}:{};})();
+  if(d.cuenta&&d.periodo) await aplicarStockML(d.cuenta,d.periodo,true); // el stock descontado por ese mes vuelve
   MESES_META=MESES_META.filter(x=>x.cuenta+'|'+x.periodo!==idViejo);const id=d.cuenta?idMes(d):idViejo;await borrarBloques(id);await db.collection('mlMeses').doc(id).delete();}
 function normEntry(d){
   d.rows.forEach(o=>{
@@ -867,6 +868,7 @@ $('file').addEventListener('change',async ev=>{
     alertOk(mesTxt(d.periodo)+' de '+cuenta+': '+rows.length.toLocaleString('es-AR')+' operaciones leídas. Guardando en la base… no cierres la página.');
     procesando.texto('Guardando '+mesTxt(d.periodo)+' de '+cuenta+' · '+rows.length.toLocaleString('es-AR')+' operaciones…');
     const ok=await saveEntry(d);
+    if(ok) aplicarStockML(d.cuenta,d.periodo);
     if(ok){ MESES_META=MESES_META.filter(x=>!(x.cuenta===d.cuenta&&x.periodo===d.periodo)); MESES_META.push({ref:db.collection('mlMeses').doc(idMes(d)),cuenta:d.cuenta,periodo:d.periodo,file:d.file,n:d.rows.length});
       SEL_MESES=[...new Set([...(periodosACargar().sel), d.periodo])]; try{localStorage.setItem('ml.selMeses',JSON.stringify(SEL_MESES));}catch(e){} try{pintarBarraMeses(); render();}catch(e){} }
     if(ok) alertOk('✓ '+mesTxt(d.periodo)+' de '+cuenta+(existed?' reemplazado con el reporte nuevo.':' guardado.')+' ('+rows.length.toLocaleString('es-AR')+' operaciones)');
@@ -1587,6 +1589,23 @@ async function corregirDudosos(skus){
     procesando.listo('✓ '+cambios.length+' registros corregidos');
   }catch(e){procesando.error(e.message);alert('No se pudo corregir: '+e.message);return;}
   render(); if(window.__pantallaML==='diag')renderDiagnostico();
+}
+// ===== Stock: las ventas del reporte descuentan stock (Full si salio de Full; si no, local y deposito) desde la fecha de inicio del control =====
+// se guarda lo ya aplicado por cuenta y mes (ml_stock_aplicado): si se vuelve a cargar el reporte, solo se aplica la diferencia
+async function aplicarStockML(cuenta, periodo, quitar){
+  try{
+    const sref=db.collection('config').doc('stock'), sd=await sref.get(), st=sd.exists?sd.data():{}; if(!st.inicio) return;
+    st.skus=st.skus||{}; const aref=db.collection('ml_stock_aplicado').doc(cuenta+'_'+periodo), ad=await aref.get(), prev=ad.exists?(ad.data().m||{}):{};
+    const iso=f=>{const m=String(f||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);return m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:'';};
+    const now={};
+    if(!quitar) allRows().filter(o=>o.cuenta===cuenta&&o.periodo===periodo&&o.tipo==='Venta'&&o.pcd>0&&!o.excl&&o.skuBase&&iso(o.fecha)>=st.inicio).forEach(o=>{
+      const S=String(o.skuBase).toUpperCase(); if(!NAMES[S]&&!st.skus[S]) return; const k=S+'|'+(/full/i.test(o.log||'')?'full':'stock'); now[k]=(now[k]||0)-(+o.unid||0); });
+    const claves=new Set([...Object.keys(prev),...Object.keys(now)]), movs=[];
+    claves.forEach(k=>{ const d=(now[k]||0)-(prev[k]||0); if(!d) return; const [S,u]=k.split('|'); const x=st.skus[S]||{stock:0,minimo:0}; x[u]=Math.round(((+x[u]||0)+d)*100)/100; st.skus[S]=x; movs.push({S,u,d}); });
+    if(!movs.length) return;
+    await sref.set(st); if(quitar) await aref.delete(); else await aref.set({m:now,actualizado:new Date().toISOString()});
+    const f=new Date().toISOString(); movs.forEach(m=>db.collection('stock_movs').add({sku:m.S,cantidad:m.d,ubic:m.u,tipo:quitar?'mes de ML quitado':'venta Mercado Libre',ref:cuenta+' '+periodo,fecha:f}).catch(()=>{}));
+  }catch(e){ console.error(e); showErr('⚠️ No se pudo actualizar el stock con este reporte: '+(e.message||e)+'. Vuelva a cargarlo para reintentar.'); }
 }
 // ===== Resumen mensual por cuenta para la pantalla "Resultado del negocio" de la app (config/ml_resumen_mensual) =====
 let __resGuardado = '';
