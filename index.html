@@ -436,10 +436,48 @@ a.grilla-celda{display:block;}
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
+
+<style>
+/* ===== Barra lateral (menu) + inicio con vista general ===== */
+#sb{position:fixed;top:0;left:0;bottom:0;width:240px;background:#fff;border-right:1px solid #E6E0D6;overflow-y:auto;z-index:150;display:none;padding:10px 0 30px;box-sizing:border-box;}
+body.con-sb #sb{display:block;}
+@media(min-width:901px){ body.con-sb{padding-left:240px;} body.con-sb #sb-toggle{display:none;} }
+@media(max-width:900px){ body.con-sb #sb{transform:translateX(-100%);transition:transform .2s;box-shadow:4px 0 20px rgba(0,0,0,.2);} body.con-sb.sb-abierta #sb{transform:none;} }
+#sb .sb-logo{font-family:Georgia,serif;font-weight:700;color:#3D2B4E;font-size:1.2rem;padding:8px 18px 12px;}
+#sb a{display:flex;gap:10px;align-items:center;padding:9px 18px;color:#3D2B4E;text-decoration:none;font-size:.93rem;border-left:4px solid transparent;cursor:pointer;}
+#sb a:hover{background:#FAF7F2;}
+#sb a.on{background:#F2EEF7;border-left-color:#F4C430;font-weight:700;}
+#sb .sb-sub{padding:2px 0 8px 46px;}
+#sb .sb-sub div{font-size:.84rem;color:#6B6258;padding:5px 8px 5px 0;cursor:pointer;line-height:1.25;}
+#sb .sb-sub div:hover{color:#3D2B4E;}
+#sb .sb-sub b{display:block;font-size:.66rem;letter-spacing:.08em;color:#A89E90;text-transform:uppercase;margin:6px 0 2px;}
+#sb .sb-sub div.ml{background:#FFE600;color:#2D3277;font-weight:700;border-radius:6px;padding:4px 8px;margin:2px 8px 2px 0;}
+#sb hr{border:none;border-top:1px solid #EEE;margin:10px 16px;}
+#sb-toggle{display:none;}
+@media(max-width:900px){ body.con-sb #sb-toggle{display:inline-block;} }
+body.con-sb #avisoCtaCte, body.con-sb #avisoCompras, body.con-sb #avisoTeso{display:none !important;} /* ya estan en los numeros del dia */
+#sb-velo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:140;}
+@media(max-width:900px){ body.sb-abierta #sb-velo{display:block;} }
+body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-sb #step-inicio .ini-sec{display:none !important;}
+#dash .d-acc{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 14px;}
+#dash .d-acc button{background:#fff;border:1px solid #E6E0D6;border-radius:999px;padding:8px 14px;font:inherit;font-size:.88rem;cursor:pointer;color:#3D2B4E;}
+#dash .d-acc button.g{background:#F4C430;border-color:#F4C430;font-weight:700;}
+#dash .d-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:12px;}
+#dash .d-card{background:#fff;border:1px solid #E6E0D6;border-radius:14px;padding:12px 14px;cursor:pointer;}
+#dash .d-card small{color:#8A8072;font-size:.8rem;}
+#dash .d-card div{font-weight:800;font-size:1.25rem;margin-top:4px;}
+#dash .d-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px;}
+@media(max-width:700px){ #dash .d-row{grid-template-columns:1fr;} }
+#dash .d-box{background:#fff;border:1px solid #E6E0D6;border-radius:14px;padding:14px;}
+#dash .d-box h3{margin:0 0 8px;font-size:.75rem;letter-spacing:.08em;color:#8A8072;text-transform:uppercase;}
+#dash .d-li{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid #F0ECE5;font-size:.9rem;cursor:pointer;}
+</style>
+<nav id="sb"></nav><div id="sb-velo" onclick="document.body.classList.remove('sb-abierta')"></div>
 <header class="top">
   <h1>OnLineTextil</h1>
   <p>Pedido mayorista · onlinetextil.com.ar</p>
   <div class="menu-herramientas">
+    <button class="menu-toggle" id="sb-toggle" onclick="document.body.classList.toggle('sb-abierta')" style="margin-right:6px;">☰ Menú</button>
     <button class="menu-toggle" id="btn-atras" onclick="irAtras()" style="display:none;margin-right:6px;">← Volver</button>
     <button class="menu-toggle" onclick="abrirBuscador()" title="Buscar en toda la app" style="margin-right:6px;">🔍</button>
     <button class="menu-toggle" onclick="irInicio()">🏠 Inicio</button>
@@ -565,6 +603,7 @@ a.grilla-celda{display:block;}
 
   <!-- STEP: INICIO (iconos) -->
   <div class="step" id="step-inicio">
+    <div id="dash"></div>
     <div id="avisoCopia" style="display:none;"></div>
     <div id="avisoCostos" style="display:none;"></div>
     <div id="avisoCtaCte" style="display:none;"></div>
@@ -1598,7 +1637,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v309</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v310</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5980,11 +6019,76 @@ const GRUPOS_INICIO = {
     [['🎨 Director de arte', 'abrirDirectorArte()'], ['🧾 Auditor contable', 'abrirAuditor()']],
   ] },
 };
+// ===== Barra lateral: las mismas opciones del inicio, con sus permisos =====
+const SB_ORDEN = [['ped', '🛒', 'Pedidos'], ['comp', '🧾', 'Comprobantes'], ['cli', '👥', 'Clientes'], ['art', '📦', 'Artículos'], ['prov', '🏭', 'Proveedores'], ['teso', '💰', 'Fondos'], ['imp', '🧮', 'Impuestos'], ['est', '📊', 'Informes'], ['c', '📣', 'Difusión y creatividad']];
+let sbAbierto = null;
+function sbItems(k){ const g = GRUPOS_INICIO[k]; if(!g) return []; const tit = g.titulosColumnas || []; const out = [];
+  (g.columnas || []).forEach((col, i) => { const vis = col.filter(([, f]) => puede(permisoGrupoItem(k, f)) && puede(permisoDeAccion(f))); if(vis.length) out.push({ titulo: tit[i] || '', items: vis }); }); return out; }
+function pintarBarraLateral(){
+  const sb = document.getElementById('sb'); if(!sb) return;
+  if(!rolActual){ document.body.classList.remove('con-sb'); return; }
+  document.body.classList.add('con-sb');
+  window.__sbItems = [];
+  const reg = it => { window.__sbItems.push(it); return window.__sbItems.length - 1; };
+  const grupo = (k, ic, t) => { const cols = sbItems(k); if(!cols.length) return '';
+    return `<a class="${sbAbierto === k ? 'on' : ''}" onclick="sbAbierto=sbAbierto==='${k}'?null:'${k}';pintarBarraLateral()">${ic} ${t}</a>${sbAbierto === k ? `<div class="sb-sub">${cols.map(c => (cols.length > 1 && c.titulo ? `<b>${escaparHtml(c.titulo.replace(/^\d+ · /, ''))}</b>` : '') + c.items.map(([tt, f]) => `<div class="${/ResultadosML|CalculadoraML|VentasML/.test(f) ? 'ml' : ''}" onclick="sbUsar(${reg([tt, f])})">${escaparHtml(tt.replace(/^\S+\s/, ''))}</div>`).join('')).join('')}</div>` : ''}`; };
+  const agentes = [['🎨', 'Director de arte', 'abrirDirectorArte()'], ['🧾', 'Auditor contable', 'abrirAuditor()']].filter(([, , f]) => puede(permisoDeAccion(f)));
+  sb.innerHTML = `<div class="sb-logo">OnLineTextil</div>
+    <a onclick="sbAbierto=null;irInicio();pintarBarraLateral();document.body.classList.remove('sb-abierta')">🏠 Inicio</a>
+    ${SB_ORDEN.map(([k, ic, t]) => grupo(k, ic, t)).join('')}<hr>
+    ${agentes.length ? `<a class="${sbAbierto === 'ag' ? 'on' : ''}" onclick="sbAbierto=sbAbierto==='ag'?null:'ag';pintarBarraLateral()">🤖 Agentes IA</a>${sbAbierto === 'ag' ? `<div class="sb-sub">${agentes.map(([ic, t, f]) => `<div onclick="sbUsar(${reg([t, f])})">${ic} ${t}</div>`).join('')}</div>` : ''}` : ''}
+    ${grupo('i', '⚙️', 'Configuración')}`;
+}
+function sbUsar(i){ const it = (window.__sbItems || [])[i]; if(!it) return; document.body.classList.remove('sb-abierta'); window.__iniItems = window.__iniItems || []; window.__iniItems.push(it); usarItemInicio(window.__iniItems.length - 1); }
+// ===== Inicio: vista general (accesos rapidos, numeros del dia, para atender hoy, ventas por canal) =====
+async function pintarDash(){
+  const box = document.getElementById('dash'); if(!box || !rolActual) return;
+  const acc = [['➕ Pedido', 'irACatalogoDesdeInicio()', 'g'], ['➕ Presupuesto', 'abrirPresupuestos().then(() => nuevoPresupuesto())'], ['➕ Recibo', "abrirCtaCte('recibos').then(() => ccElegirCliente())"], ['➕ Factura de compra', "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'f'))"], ['➕ Orden de pago', "abrirCompras('pagos').then(() => pvElegirProveedor('pago'))"], ['🧾 Caja del día', 'abrirTesoreria().then(() => tsFormCaja())']].filter(([, f]) => puede(permisoDeAccion(f)));
+  window.__dashItems = acc.map(([t, f]) => [t, f]);
+  const hora = new Date().getHours(), saludo = hora < 12 ? 'Buenos días' : hora < 20 ? 'Buenas tardes' : 'Buenas noches';
+  const nombre = ((firebase.auth().currentUser || {}).displayName || '').split(' ')[0];
+  box.innerHTML = `<h2 style="font-family:Georgia,serif;color:var(--purple);margin:6px 0 8px;">${saludo}${nombre ? ', ' + escaparHtml(nombre) : ''}</h2>
+    <div class="d-acc">${acc.map(([t, , c], i) => `<button type="button" class="${c || ''}" onclick="dashUsar(${i})">${t}</button>`).join('')}</div>
+    ${esDueno() ? '<div class="d-cards" id="dash-cards"><div class="d-card"><small>Cargando…</small><div>…</div></div></div>' : ''}
+    <div class="d-row"><div class="d-box"><h3>Para atender hoy</h3><div id="dash-hoy"><p class="note" style="text-align:left;margin:0;">Revisando…</p></div></div>
+      ${esDueno() ? '<div class="d-box"><h3>Ventas del mes por canal</h3><div id="dash-canal">…</div></div>' : ''}</div>`;
+  const hoy = [];
+  try{
+    const mes = new Date().toISOString().slice(0, 7);
+    const [rs, vf] = await Promise.all([db.collection('config').doc('ml_resumen_mensual').get().catch(() => null), esDueno() ? db.collection('ventas_facturadas').get().catch(() => null) : null]);
+    const res = rs && rs.exists ? (rs.data().m || {}) : {};
+    if(esDueno()){
+      let disp = null, cobrar = null, venc = null, pagar = null, p7 = null;
+      try{ await tsCargar(); const S = TS_CUENTAS.map(([k]) => tsSaldo(k)); if(S.some(x => x.cargado)) disp = S.reduce((a, x) => a + (x.cargado ? x.saldo : 0), 0) + (window.__tsCheques || 0); } catch(e){}
+      try{ if(!ccFacts.length) await abrirCtaCteDatos(); const C = Object.values(ccCalcular()); cobrar = C.reduce((a, c) => a + Math.max(0, c.saldo), 0); venc = C.reduce((a, c) => a + c.vencido, 0); } catch(e){}
+      try{ if(!pvProv.length){ const [a, b2, c] = await Promise.all([db.collection('proveedores').get(), db.collection('compras').get(), db.collection('pagos').get()]); pvProv = a.docs.map(d => ({ _id: d.id, ...d.data() })); pvCompras = b2.docs.map(d => ({ _id: d.id, ...d.data() })); pvPagos = c.docs.map(d => ({ _id: d.id, ...d.data() })); }
+        const L = Object.values(pvCalcular()).filter(r => pvMon(r.p) === 'ARS'); pagar = L.reduce((a, r) => a + Math.max(0, r.saldo), 0); p7 = L.reduce((a, r) => a + r.vencido + r.vence7, 0); } catch(e){}
+      let vPropia = 0; if(vf) vf.docs.forEach(d => { const f = d.data(); if(f.razon && f.razon !== 'propia') return; if(ccFechaISO(f.fecha).slice(0, 7) !== mes) return; vPropia += (f.esNC ? -1 : 1) * (+f.total || 0); });
+      const ml = k => Object.values(res).filter(x => x.periodo === mes && String(x.cuenta).toLowerCase() === k).reduce((a, x) => a + (x.vendido || 0) + (x.envios || 0), 0);
+      const vA = ml('alberto'), vR = ml('rita'), tot = vPropia + vA + vR, M = x => x >= 1e6 ? '$ ' + (x / 1e6).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' M' : formatPrice(x);
+      const card = (t, v, extra, f) => `<div class="d-card" onclick="${f}"><small>${t}</small><div>${v}${extra ? ` <span style="color:#A6432F;font-size:.85rem;">· ${extra}</span>` : ''}</div></div>`;
+      const dc = document.getElementById('dash-cards'); if(dc) dc.innerHTML = card('Disponible', disp != null ? formatPrice(disp) : '—', '', 'abrirTesoreria()') + card('A cobrar · vencido', cobrar != null ? formatPrice(cobrar) : '—', venc > 0 ? formatPrice(venc) : '', 'abrirCtaCte()') + card('A pagar · vence esta semana', pagar != null ? formatPrice(pagar) : '—', p7 > 0 ? formatPrice(p7) : '', 'abrirCompras()') + card('Vendido este mes', M(tot), '', 'abrirResultadoNegocio()');
+      const cn = document.getElementById('dash-canal'); if(cn) cn.innerHTML = [[chipRZ('propia') + ' facturado', vPropia], [chipRZ('alberto') + ' Mercado Libre', vA], [chipRZ('rita') + ' Mercado Libre', vR]].map(([t, v]) => `<div class="d-li" style="cursor:default;"><span>${t}</span><b>${M(v)}</b></div>`).join('') + (!vA && !vR ? '<p class="note" style="text-align:left;margin:6px 0 0;">Para ver Mercado Libre, abra Resultados ML con el mes cargado.</p>' : '');
+      const rev = Object.values(res).filter(x => x.periodo === mes).reduce((a, x) => a + (x.revisar || 0), 0);
+      if(rev) hoy.push([`⚠️ ${rev} ventas para revisar en Mercado Libre`, 'abrirResultadosML()', true]);
+      if(venc > 0) hoy.push([`💳 Cobros vencidos por ${formatPrice(venc)}`, 'abrirCtaCte()']);
+      if(p7 > 0) hoy.push([`🏭 Pagos vencidos o de esta semana por ${formatPrice(p7)}`, 'abrirCompras()']);
+    }
+    if(typeof ccPend !== 'undefined' && ccPend.length && esDueno()) hoy.push([`💲 ${ccPend.length} SKU cambiaron de costo`, 'abrirRevisarCostos()']);
+    try{ if(stockDatos === null) await cargarStock(); const bajo = Object.values(stockDatos.skus || {}).filter(x => (+x.minimo || 0) > 0 && (+x.stock || 0) < +x.minimo).length, neg = Object.values(stockDatos.skus || {}).filter(x => (+x.stock || 0) < 0 || (+x.full || 0) < 0).length;
+      if(bajo) hoy.push([`📦 ${bajo} SKU debajo del stock mínimo`, 'abrirStock()']); if(neg) hoy.push([`⚠️ ${neg} SKU con stock negativo`, 'abrirStock()']); } catch(e){}
+  } catch(e){ console.error(e); }
+  window.__dashHoy = hoy;
+  const dh = document.getElementById('dash-hoy'); if(dh) dh.innerHTML = hoy.length ? hoy.map(([t, , ml], i) => `<div class="d-li" onclick="dashHoy(${i})"><span>${t}</span><b ${ml ? 'style="background:#FFE600;color:#2D3277;padding:0 8px;border-radius:6px;"' : ''}>Ver</b></div>`).join('') : '<p class="note" style="text-align:left;margin:0;">✓ Nada pendiente.</p>';
+}
+function dashUsar(i){ const it = (window.__dashItems || [])[i]; if(!it) return; window.__iniItems = window.__iniItems || []; window.__iniItems.push(it); usarItemInicio(window.__iniItems.length - 1); }
+function dashHoy(i){ const it = (window.__dashHoy || [])[i]; if(!it) return; window.__iniItems = window.__iniItems || []; window.__iniItems.push([it[0], it[1]]); usarItemInicio(window.__iniItems.length - 1); }
 let grupoInicioAbierto = null;
 function irInicio(){
   const menu = document.querySelector('.menu-dropdown');
   if(menu) menu.classList.remove('open');
   mostrarPaso('step-inicio');
+  try{ pintarDash(); } catch(e){}
 }
 function abrirGrupoInicio(k){
   const g = GRUPOS_INICIO[k];
@@ -11233,6 +11337,7 @@ auth.onAuthStateChanged(async u => {
     setTimeout(() => { pintarAvisoCtaCte().catch(() => {}); }, 2200);
     setTimeout(() => { pintarAvisoCompras().catch(() => {}); }, 2600);
     setTimeout(() => { pintarAvisoTeso().catch(() => {}); }, 3000);
+    setTimeout(() => { pintarDash().catch(() => {}); }, 1200);
     if(ES_PESTANA_AGENTE) setTimeout(async () => { try{ const q = new URLSearchParams(location.search), paq = (q.get('paq') || '').split(',').filter(Boolean);
       document.title = (ES_PESTANA_AGENTE === 'auditor' ? 'Auditor' : 'Director de arte') + ' · OnLineTextil';
       if(q.get('mes')) window.__audMes = q.get('mes');
@@ -12345,6 +12450,7 @@ function puede(perm){
 function permisoDeGrupo(k){ return { a: 'pedidos', c: 'difusion', g: 'produccion' }[k] || null; }
 function permisoGrupoItem(k, f){ if(k !== 'art') return permisoDeGrupo(k); for(const o of ['f', 'g']){ const g = GRUPOS_INICIO[o]; if(g && (g.columnas || []).flat().some(([, ff]) => ff === f)) return permisoDeGrupo(o); } return null; }
 function aplicarPermisosInicio(){
+  try{ pintarBarraLateral(); } catch(e){ console.error(e); }
   if(rolActual === 'dueño') return;
   ['a', 'c', 'd', 'f', 'g', 'k', 'ped', 'comp', 'cli', 'art', 'prov', 'teso', 'imp', 'est'].forEach(k => { const g = GRUPOS_INICIO[k], t = document.getElementById('ini-t-' + k); if(!g || !t) return;
     const items = g.columnas ? g.columnas.flat() : (g.items || []);
@@ -20582,7 +20688,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v309';
+const APP_VERSION = '2026-10-02-v310';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
