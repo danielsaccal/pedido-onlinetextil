@@ -567,6 +567,7 @@ a.grilla-celda{display:block;}
   <div class="step" id="step-inicio">
     <div id="avisoCopia" style="display:none;"></div>
     <div id="avisoCostos" style="display:none;"></div>
+    <div id="avisoCtaCte" style="display:none;"></div>
     <style>
       .ini-sec{font-size:0.78rem;font-weight:700;letter-spacing:.06em;color:#8A8072;margin:18px 0 10px;}
       .ini-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
@@ -1598,7 +1599,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v295</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v296</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2376,6 +2377,16 @@ a.grilla-celda{display:block;}
       </div>
       <div id="rk-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
       <div id="rk-body"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-ctacte">
+    <div class="form-card" style="max-width:1000px;">
+      <h2>Cuentas corrientes</h2>
+      <div id="cc-tot"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;" id="cc-tabs"></div>
+      <div id="cc-body"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
   </div>
@@ -5864,7 +5875,7 @@ const GRUPOS_INICIO = {
     [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['🧾 Presupuestos', 'abrirPresupuestos()'], ['📄 Pedido desde una foto', "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)"], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()'], ['📋 Historial de pedidos', 'abrirHistorial()']],
     [['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']],
     [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']],
-    [['🧾 Ventas facturadas', 'abrirFacturas()'], ['💸 Gastos comerciales', 'abrirGastos()'], ['🧮 Simulador de costos ML', 'abrirCalculadoraML()'], ['🧾 Auditor (IA)', 'abrirAuditor()']],
+    [['💳 Cuentas corrientes', 'abrirCtaCte()'], ['🧾 Ventas facturadas', 'abrirFacturas()'], ['💸 Gastos comerciales', 'abrirGastos()'], ['🧮 Simulador de costos ML', 'abrirCalculadoraML()'], ['🧾 Auditor (IA)', 'abrirAuditor()']],
     [['📊 Resultado del negocio', 'abrirResultadoNegocio()'], ['🏆 Rankings de ventas', 'abrirRankings()'], ['📈 Resultados Mercado Libre', 'abrirResultadosML()']]
   ] },
   f: { lado: 'int', titulo: 'Catálogo', titulosColumnas: ['1 · Productos', '2 · Fotos y textos', '3 · Precios'], columnas: [
@@ -7456,6 +7467,182 @@ async function aplicarPctMasivo(skus, pct){
   if(!confirm(`¿Poner el precio de ${lista.length} SKU con ${pct} % sobre su costo?\n\n` + lista.slice(0, 15).map(([S, n]) => `${S}: ${formatPrice(n)}`).join('\n') + (lista.length > 15 ? '\n…' : '') + (sinCosto.length ? `\n\nSin costo (no se tocan): ${sinCosto.join(', ')}` : '') + (sinPub.length ? `\nSin publicar (no se tocan): ${sinPub.join(', ')}` : ''))) return;
   try{ const ok = await guardarPreciosSkus(lista); alert(`Listo: ${ok} precios actualizados.`); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   try{ renderProductosFabrico(); } catch(e){} try{ if(esDueno()) renderCostosReventa(); } catch(e){}
+}
+// ===== Cuentas corrientes y cobranzas (solo la razon social del duenio; nada de Mercado Libre) =====
+// facturas: salen de Ventas facturadas (desde la fecha de inicio); cobros, senias y ajustes: coleccion cc_movimientos; cambios: cc_log
+let ccCfg = { inicio: '', plazo: 30 }, ccMovs = [], ccFacts = [], ccClientesDB = [], ccTab = 'clientes', ccCli = null, ccBuscar = '';
+const ccClave = n => normBusqueda(n || '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+const ccFechaISO = f => { const m = String(f || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : String(f || '').slice(0, 10); };
+const ccHoy = () => new Date().toISOString().slice(0, 10);
+async function ccLog(accion, detalle){ try{ await db.collection('cc_log').add({ fecha: new Date().toISOString(), usuario: (firebase.auth().currentUser || {}).email || '', accion, detalle }); } catch(e){} }
+async function abrirCtaCte(){
+  mostrarPaso('step-ctacte'); document.getElementById('cc-body').innerHTML = '<p class="empty-msg">Cargando…</p>';
+  try{ await prepararCostosFacturas(); } catch(e){}
+  const [cf, sf, sm, sc] = await Promise.all([db.collection('config').doc('ctacte').get(), db.collection('ventas_facturadas').get(), db.collection('cc_movimientos').get(), db.collection('clientes').get().catch(() => ({ docs: [] }))]);
+  ccCfg = { inicio: '', plazo: 30, contado: {}, ...(cf.exists ? cf.data() : {}) };
+  ccMovs = sm.docs.map(d => ({ _id: d.id, ...d.data() }));
+  ccClientesDB = sc.docs.map(d => d.data());
+  ccFacts = sf.docs.map(d => ({ _id: d.id, ...d.data() })).map(f => { const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0); const tot = Math.round((f.total || n0 * 1.21) * 100) / 100;
+    return { id: f._id, numero: (f.esNC ? 'NC ' : '') + (f.tipo || '') + ' ' + f.numero, fecha: ccFechaISO(f.fecha), cliente: f.cliente || 'Sin nombre', importe: f.esNC ? -tot : tot, esNC: !!f.esNC }; })
+    .filter(f => !ccCfg.inicio || f.fecha >= ccCfg.inicio);
+  if(!ccCfg.inicio){ ccTab = 'config'; }
+  renderCtaCte();
+}
+// saldo y estado de cada factura, aplicando los cobros (primero a lo que se indico, el resto a las facturas mas viejas)
+function ccCalcular(){
+  const C = {};
+  const cli = k => C[k] = C[k] || { k, nombre: k, facts: [], movs: [], saldo: 0 };
+  ccFacts.forEach(f => { if(/consumidor final/i.test(f.cliente)) return; /* mostrador: siempre contado */ const c = cli(ccClave(f.cliente)); c.nombre = f.cliente; if(ccCfg.contado && ccCfg.contado[f.id]) return; c.facts.push({ ...f, pendiente: f.importe }); });
+  ccMovs.forEach(m => { const c = cli(m.cliente); if(m.nombre) c.nombre = m.nombre; c.movs.push(m); });
+  Object.values(C).forEach(c => {
+    c.facts.sort((a, b) => a.fecha.localeCompare(b.fecha));
+    const debe = c.facts.reduce((a, f) => a + f.importe, 0) + c.movs.filter(m => m.tipo === 'ajuste' || m.tipo === 'inicial').reduce((a, m) => a + m.importe, 0);
+    const haber = c.movs.filter(m => m.tipo === 'cobro' || m.tipo === 'sena').reduce((a, m) => a + m.importe + Object.values(m.retenciones || {}).reduce((x, y) => x + (+y || 0), 0), 0);
+    c.saldo = Math.round((debe - haber) * 100) / 100;
+    // aplicacion: NC y cobros contra facturas, de la mas vieja a la mas nueva
+    let disp = haber + c.facts.filter(f => f.importe < 0).reduce((a, f) => a - f.importe, 0);
+    c.facts.filter(f => f.importe > 0).forEach(f => { const ap = Math.min(disp, f.importe); f.pendiente = Math.round((f.importe - ap) * 100) / 100; disp -= ap; });
+    const hoy = new Date();
+    c.vencido = 0; c.buckets = [0, 0, 0, 0];
+    c.facts.filter(f => f.pendiente > 0.5).forEach(f => { const dias = Math.floor((hoy - new Date(f.fecha + 'T12:00:00')) / 864e5), plazo = +((ccCfg.plazos || {})[c.k] || ccCfg.plazo || 30);
+      f.dias = dias; f.vencida = dias > plazo; if(f.vencida) c.vencido += f.pendiente; c.buckets[dias <= 30 ? 0 : dias <= 60 ? 1 : dias <= 90 ? 2 : 3] += f.pendiente; });
+    const db0 = ccClientesDB.find(x => { const a = ccClave(`${x.apellido || ''} ${x.nombre || ''}`), b = ccClave(`${x.nombre || ''} ${x.apellido || ''}`); return a === c.k || b === c.k; });
+    c.tel = db0 ? db0.telefono : '';
+  });
+  return C;
+}
+function renderCtaCte(){
+  const C = ccCalcular(), L = Object.values(C).filter(c => Math.abs(c.saldo) > 0.5 || c.movs.length);
+  const tot = L.reduce((a, c) => a + Math.max(0, c.saldo), 0), venc = L.reduce((a, c) => a + c.vencido, 0);
+  const cheques = ccMovs.filter(m => m.cheque && (m.cheque.estado || 'cartera') === 'cartera'), totCh = cheques.reduce((a, m) => a + m.importe, 0);
+  const caja = (t, v, col) => `<div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff;"><small class="note" style="margin:0;">${t}</small><div style="font-weight:800;font-size:1.25rem;color:${col || 'inherit'};">${v}</div></div>`;
+  document.getElementById('cc-tot').innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">${caja('A cobrar', formatPrice(tot))}${caja('Vencido', formatPrice(venc), venc > 0 ? '#A6432F' : '')}${caja('Cheques en cartera', formatPrice(totCh) + ` <small class="note">(${cheques.length})</small>`)}</div>`;
+  const tabs = [['clientes', '👥 Clientes'], ['cheques', '🧾 Cheques'], ['log', '🕒 Registro de cambios'], ['config', '⚙️ Ajustes']];
+  document.getElementById('cc-tabs').innerHTML = tabs.map(([k, t]) => `<button type="button" onclick="ccTab='${k}';ccCli=null;renderCtaCte()" style="padding:7px 12px;border-radius:999px;border:1px solid ${ccTab === k ? 'var(--purple)' : 'var(--line)'};background:${ccTab === k ? 'var(--purple)' : '#fff'};color:${ccTab === k ? '#fff' : 'var(--purple)'};font-weight:700;cursor:pointer;">${t}</button>`).join('');
+  const box = document.getElementById('cc-body');
+  if(ccTab === 'config'){
+    box.innerHTML = `<div style="max-width:520px;">${!ccCfg.inicio ? '<p style="background:#FFF8E6;border:1px solid #EBD9A8;border-radius:12px;padding:10px;">Para empezar, elija desde qué fecha se toman las facturas como cuenta corriente. Las anteriores no se cuentan; si un cliente ya debía algo, cárguelo como <b>saldo inicial</b>.</p>' : ''}
+      <div class="field"><label>Facturas desde</label><input type="date" id="cc-ini" value="${ccCfg.inicio || ''}"></div>
+      <div class="field"><label>Plazo habitual (días, para marcar lo vencido)</label><input id="cc-plazo" inputmode="numeric" value="${ccCfg.plazo || 30}"></div>
+      <button class="btn btn-gold" style="width:auto;padding:10px 18px;" onclick="ccGuardarCfg()">Guardar</button></div>`; return; }
+  if(ccTab === 'log'){ box.innerHTML = '<p class="empty-msg">Cargando…</p>'; db.collection('cc_log').get().then(s => { const L2 = s.docs.map(d => d.data()).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))).slice(0, 200);
+      box.innerHTML = L2.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.84rem;">${L2.map(x => `<tr style="border-top:1px solid var(--line);"><td style="padding:5px;white-space:nowrap;">${new Date(x.fecha).toLocaleString('es-AR')}</td><td style="padding:5px;">${escaparHtml(x.usuario || '')}</td><td style="padding:5px;"><b>${escaparHtml(x.accion)}</b> ${escaparHtml(x.detalle || '')}</td></tr>`).join('')}</table></div>` : '<p class="empty-msg">Sin cambios registrados.</p>'; }); return; }
+  if(ccTab === 'cheques'){
+    const ch = ccMovs.filter(m => m.cheque).sort((a, b) => String(a.cheque.fechaCobro || '').localeCompare(String(b.cheque.fechaCobro || '')));
+    box.innerHTML = ch.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.85rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:5px;">Cobro</td><td style="padding:5px;">Cliente</td><td style="padding:5px;">Cheque</td><td style="padding:5px;text-align:right;">Importe</td><td style="padding:5px;">Estado</td></tr>
+      ${ch.map(m => `<tr style="border-top:1px solid var(--line);"><td style="padding:5px;white-space:nowrap;">${(m.cheque.fechaCobro || '').split('-').reverse().join('/')}</td><td style="padding:5px;">${escaparHtml(m.nombre || m.cliente)}</td><td style="padding:5px;">${m.cheque.electronico ? 'E-cheq' : 'Físico'} · ${escaparHtml(m.cheque.banco || '')} N.º ${escaparHtml(m.cheque.numero || '')}${m.cheque.librador ? ' · ' + escaparHtml(m.cheque.librador) : ''}</td><td style="padding:5px;text-align:right;">${formatPrice(m.importe)}</td>
+        <td style="padding:5px;"><select onchange="ccEstadoCheque('${m._id}', this.value)" style="padding:4px;border:1px solid var(--line);border-radius:8px;">${[['cartera', 'En cartera'], ['depositado', 'Depositado'], ['entregado', 'Entregado a proveedor'], ['rechazado', 'Rechazado']].map(([v, t]) => `<option value="${v}" ${(m.cheque.estado || 'cartera') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></td></tr>`).join('')}</table></div>` : '<p class="empty-msg">No hay cheques registrados.</p>'; return; }
+  if(ccCli){ return renderCtaCteCliente(C[ccCli] || { k: ccCli, nombre: ccCli, facts: [], movs: [], saldo: 0, buckets: [0, 0, 0, 0], vencido: 0 }); }
+  let F = L.sort((a, b) => b.saldo - a.saldo); if(ccBuscar) F = F.filter(c => coincideBusqueda(c.nombre, ccBuscar));
+  box.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"><input placeholder="🔍 Buscar cliente" value="${escapeAttr(ccBuscar)}" oninput="ccBuscar=this.value;clearTimeout(window.__ccT);window.__ccT=setTimeout(renderCtaCte,250)" style="flex:1;min-width:180px;padding:9px;border:1px solid var(--line);border-radius:10px;"><button type="button" class="btn-mini" onclick="ccNuevoCliente()">➕ Saldo inicial de un cliente</button></div>
+    ${F.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:6px;">Cliente</td><td style="padding:6px;text-align:right;">Saldo</td><td style="padding:6px;text-align:right;">Vencido</td><td style="padding:6px;text-align:right;">0-30</td><td style="padding:6px;text-align:right;">31-60</td><td style="padding:6px;text-align:right;">61-90</td><td style="padding:6px;text-align:right;">+90</td></tr>
+      ${F.map(c => `<tr style="border-top:1px solid var(--line);cursor:pointer;" onclick="ccCli='${escapeAttr(c.k)}';renderCtaCte()"><td style="padding:7px 6px;"><b>${escaparHtml(c.nombre)}</b></td><td style="padding:7px 6px;text-align:right;font-weight:800;color:${c.saldo > 0 ? 'inherit' : '#2F7A47'};">${formatPrice(c.saldo)}</td><td style="padding:7px 6px;text-align:right;color:${c.vencido > 0 ? '#A6432F' : '#8A8072'};">${c.vencido > 0 ? formatPrice(c.vencido) : '–'}</td>${c.buckets.map(x => `<td style="padding:7px 6px;text-align:right;color:#6B6258;">${x > 0.5 ? fP0(x) : '–'}</td>`).join('')}</tr>`).join('')}</table></div>` : '<p class="empty-msg">No hay saldos pendientes.</p>'}`;
+}
+const fP0 = x => '$ ' + formatoPesos(Math.round(x));
+function renderCtaCteCliente(c){
+  const box = document.getElementById('cc-body');
+  const filas = [...c.facts.map(f => ({ fecha: f.fecha, t: f.esNC ? 'Nota de crédito' : 'Factura', det: f.numero, debe: f.importe > 0 ? f.importe : 0, haber: f.importe < 0 ? -f.importe : 0, f })),
+    ...c.movs.map(m => { const ret = Object.values(m.retenciones || {}).reduce((x, y) => x + (+y || 0), 0); const neg = m.tipo === 'cobro' || m.tipo === 'sena';
+      return { fecha: m.fecha, t: { cobro: 'Cobro', sena: 'Seña', ajuste: 'Ajuste', inicial: 'Saldo inicial' }[m.tipo] || m.tipo, det: [m.medio, m.cheque ? `${m.cheque.electronico ? 'E-cheq' : 'Cheque'} ${m.cheque.banco || ''} N.º ${m.cheque.numero || ''}` : '', ret ? 'retenciones ' + formatPrice(ret) : '', m.detalle].filter(Boolean).join(' · '), debe: neg ? 0 : Math.max(0, m.importe), haber: neg ? m.importe + ret : Math.max(0, -m.importe), m }; })]
+    .sort((a, b) => a.fecha.localeCompare(b.fecha));
+  let s = 0; filas.forEach(r => { s += r.debe - r.haber; r.saldo = s; });
+  const pend = c.facts.filter(f => f.pendiente > 0.5);
+  box.innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;"><a href="#" onclick="event.preventDefault();ccCli=null;renderCtaCte()">← Todos los clientes</a><b style="font-size:1.1rem;margin-left:8px;">${escaparHtml(c.nombre)}</b>
+      <span style="margin-left:auto;font-weight:800;font-size:1.15rem;">Saldo ${formatPrice(c.saldo)}</span></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"><button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="ccFormCobro('${escapeAttr(c.k)}','cobro')">💵 Registrar cobro</button><button type="button" class="btn-mini" onclick="ccFormCobro('${escapeAttr(c.k)}','sena')">Seña</button><button type="button" class="btn-mini" onclick="ccFormAjuste('${escapeAttr(c.k)}')">Ajuste / saldo inicial</button><button type="button" class="btn-mini" onclick="ccResumenPDF('${escapeAttr(c.k)}')">🖨️ Resumen de cuenta</button><button type="button" class="btn-mini" onclick="ccWhatsapp('${escapeAttr(c.k)}')">💬 WhatsApp</button></div>
+    ${pend.length ? `<div style="display:flex;gap:8px;align-items:center;margin:6px 0;"><b style="color:var(--purple);">Facturas pendientes</b>${pend.length > 1 ? `<a href="#" style="margin-left:auto;font-size:.82rem;" onclick="event.preventDefault();ccMarcarContado(${escapeAttr(JSON.stringify(pend.map(f => f.id)))})">todas fueron de contado</a>` : ''}</div>${pend.map(f => `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:5px 0;border-top:1px solid var(--line);font-size:.86rem;"><span>${f.fecha.split('-').reverse().join('/')}</span><span>${escaparHtml(f.numero)}</span><span class="meta">${f.dias} días</span>${f.vencida ? '<span style="color:#A6432F;font-weight:700;">vencida</span>' : ''}<span style="margin-left:auto;">pendiente <b>${formatPrice(f.pendiente)}</b> de ${formatPrice(f.importe)}</span><a href="#" title="Fue cobrada en el momento: no va a cuenta corriente" onclick="event.preventDefault();ccMarcarContado('${f.id}')">fue de contado</a></div>`).join('')}` : ''}
+    <div style="font-weight:700;color:var(--purple);margin:12px 0 6px;">Movimientos</div>
+    <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.85rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:5px;">Fecha</td><td style="padding:5px;">Concepto</td><td style="padding:5px;text-align:right;">Debe</td><td style="padding:5px;text-align:right;">Haber</td><td style="padding:5px;text-align:right;">Saldo</td><td></td></tr>
+      ${filas.map(r => `<tr style="border-top:1px solid var(--line);"><td style="padding:5px;white-space:nowrap;">${r.fecha.split('-').reverse().join('/')}</td><td style="padding:5px;"><b>${r.t}</b> <span class="meta">${escaparHtml(r.det || '')}</span></td><td style="padding:5px;text-align:right;">${r.debe ? formatPrice(r.debe) : ''}</td><td style="padding:5px;text-align:right;color:#2F7A47;">${r.haber ? formatPrice(r.haber) : ''}</td><td style="padding:5px;text-align:right;font-weight:700;">${formatPrice(r.saldo)}</td><td style="padding:5px;">${r.m ? `<a href="#" title="Borrar" onclick="event.preventDefault();ccBorrarMov('${r.m._id}')">🗑️</a>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="note">Sin movimientos.</td></tr>'}</table></div>`;
+}
+async function ccGuardarCfg(){
+  const ini = document.getElementById('cc-ini').value, pl = Math.max(1, Math.round(numAr(document.getElementById('cc-plazo').value) || 30));
+  if(!ini){ alert('Elija la fecha de inicio.'); return; }
+  try{ await db.collection('config').doc('ctacte').set({ ...ccCfg, inicio: ini, plazo: pl }); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  await ccLog('Ajustes', `inicio ${ini} · plazo ${pl} días`); ccTab = 'clientes'; abrirCtaCte();
+}
+async function ccMarcarContado(id){
+  const ids = Array.isArray(id) ? id : [id];
+  if(!confirm(ids.length > 1 ? `¿Las ${ids.length} facturas pendientes se cobraron en el momento (contado)? Dejan de figurar en la cuenta corriente.` : '¿Esta factura se cobró en el momento (contado)? Deja de figurar en la cuenta corriente.')) return;
+  const ct = { ...(ccCfg.contado || {}) }; ids.forEach(x => ct[x] = true);
+  try{ await db.collection('config').doc('ctacte').set({ ...ccCfg, contado: ct }); ccCfg.contado = ct; } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  await ccLog('Factura de contado', ids.join(', ')); renderCtaCte(); pintarAvisoCtaCte();
+}
+function ccNuevoCliente(){ const n = prompt('Nombre del cliente (como figura en las facturas):', ''); if(!n) return; ccFormAjuste(ccClave(n), n, true); }
+function ccFormAjuste(k, nombre, inicial){
+  const v = prompt(`${inicial ? 'Saldo inicial' : 'Ajuste'} de ${nombre || k}:\n(positivo = el cliente debe más · negativo = debe menos)`, ''); if(v == null) return; const n = numAr(v); if(!n){ alert('Importe inválido.'); return; }
+  const det = inicial ? '' : (prompt('Motivo del ajuste:', '') || '');
+  ccGuardarMov({ cliente: k, nombre: nombre || (ccCalcular()[k] || {}).nombre || k, tipo: inicial ? 'inicial' : 'ajuste', fecha: inicial && ccCfg.inicio ? ccCfg.inicio : ccHoy(), importe: n, detalle: det });
+}
+function ccFormCobro(k, tipo){
+  const c = ccCalcular()[k] || { nombre: k };
+  const inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
+  const t = document.getElementById('pub-titulo'); if(t) t.textContent = (tipo === 'sena' ? '💵 Seña de ' : '💵 Cobro de ') + c.nombre;
+  document.getElementById('pub-cont').innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <label>Fecha<input type="date" id="cb-f" value="${ccHoy()}" style="${inp}"></label><label>Importe recibido<input id="cb-i" inputmode="decimal" placeholder="$" style="${inp}"></label>
+      <label style="grid-column:1/-1;">Medio<select id="cb-m" onchange="document.getElementById('cb-ch').style.display=/Cheque|E-cheq/.test(this.value)?'grid':'none'" style="${inp}">${['Efectivo', 'Transferencia a Santander', 'Transferencia a Mercado Pago', 'Cheque', 'E-cheq', 'Otro'].map(x => `<option>${x}</option>`).join('')}</select></label>
+      <div id="cb-ch" style="display:none;grid-column:1/-1;grid-template-columns:1fr 1fr;gap:8px;"><label>Banco<input id="cb-cb" style="${inp}"></label><label>N.º de cheque<input id="cb-cn" style="${inp}"></label><label>Fecha de cobro<input type="date" id="cb-cf" style="${inp}"></label><label>Librador<input id="cb-cl" style="${inp}"></label></div>
+      <details style="grid-column:1/-1;"><summary style="cursor:pointer;font-size:.88rem;">Retenciones que le hizo el cliente (opcional)</summary><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px;">${[['iva', 'IVA'], ['iibb', 'IIBB'], ['gan', 'Ganancias'], ['otras', 'Otras']].map(([k2, t2]) => `<label style="font-size:.8rem;">${t2}<input id="cb-r-${k2}" inputmode="decimal" style="${inp}"></label>`).join('')}</div></details>
+      <label style="grid-column:1/-1;">Detalle (opcional)<input id="cb-d" placeholder="Recibo N.º, observación…" style="${inp}"></label></div>
+    <p class="note" style="text-align:left;">Se aplica a las facturas más viejas. Saldo actual: <b>${formatPrice(c.saldo || 0)}</b>.</p>
+    <div style="display:flex;gap:8px;"><button class="btn btn-gold" style="flex:1;" onclick="ccGuardarCobro('${escapeAttr(k)}','${tipo}')">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`;
+  document.getElementById('pub-modal').style.display = 'block';
+}
+async function ccGuardarCobro(k, tipo){
+  const g = id => document.getElementById(id).value.trim(), imp = numAr(g('cb-i'));
+  if(!(imp > 0)){ alert('Escriba el importe.'); return; }
+  const medio = g('cb-m'), ret = {}; ['iva', 'iibb', 'gan', 'otras'].forEach(r => { const v = numAr(g('cb-r-' + r)); if(v > 0) ret[r] = v; });
+  const mov = { cliente: k, nombre: (ccCalcular()[k] || {}).nombre || k, tipo, fecha: g('cb-f') || ccHoy(), importe: imp, medio, retenciones: ret, detalle: g('cb-d') };
+  if(/Cheque|E-cheq/.test(medio)){ if(!g('cb-cn')){ alert('Escriba el número de cheque.'); return; } mov.cheque = { electronico: medio === 'E-cheq', banco: g('cb-cb'), numero: g('cb-cn'), fechaCobro: g('cb-cf') || '', librador: g('cb-cl'), estado: 'cartera' }; }
+  cerrarPublicar(); await ccGuardarMov(mov);
+}
+async function ccGuardarMov(mov){
+  mov.creado = new Date().toISOString(); mov.creadoPor = (firebase.auth().currentUser || {}).email || '';
+  try{ const r = await db.collection('cc_movimientos').add(mov); ccMovs.push({ _id: r.id, ...mov }); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  await ccLog({ cobro: 'Cobro', sena: 'Seña', ajuste: 'Ajuste', inicial: 'Saldo inicial' }[mov.tipo] || mov.tipo, `${mov.nombre} · ${formatPrice(mov.importe)}${mov.medio ? ' · ' + mov.medio : ''}`);
+  ccCli = mov.cliente; renderCtaCte(); pintarAvisoCtaCte();
+}
+async function ccBorrarMov(id){
+  const m = ccMovs.find(x => x._id === id); if(!m || !confirm(`¿Borrar este movimiento (${m.tipo}, ${formatPrice(m.importe)})?`)) return;
+  try{ await db.collection('cc_movimientos').doc(id).delete(); } catch(e){ alert('No se pudo borrar: ' + e.message); return; }
+  ccMovs = ccMovs.filter(x => x._id !== id); await ccLog('Borrado', `${m.nombre} · ${m.tipo} · ${formatPrice(m.importe)}`); renderCtaCte(); pintarAvisoCtaCte();
+}
+async function ccEstadoCheque(id, est){
+  const m = ccMovs.find(x => x._id === id); if(!m) return; let extra = {};
+  if(est === 'entregado'){ const a = prompt('¿A qué proveedor lo entregó?', m.cheque.entregadoA || ''); if(a == null){ renderCtaCte(); return; } extra.entregadoA = a; }
+  const ch = { ...m.cheque, estado: est, ...extra };
+  try{ await db.collection('cc_movimientos').doc(id).set({ cheque: ch }, { merge: true }); m.cheque = ch; } catch(e){ alert('No se pudo guardar: ' + e.message); renderCtaCte(); return; }
+  await ccLog('Cheque', `N.º ${ch.numero} → ${est}${extra.entregadoA ? ' (' + extra.entregadoA + ')' : ''}`); renderCtaCte();
+}
+function ccResumenPDF(k){
+  const c = ccCalcular()[k]; if(!c) return; const pend = c.facts.filter(f => f.pendiente > 0.5);
+  const w = window.open('', '_blank'); if(!w){ alert('Permita ventanas emergentes para imprimir.'); return; }
+  w.document.write(`<html><head><title>Resumen de cuenta · ${escaparHtml(c.nombre)}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#222}table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px;border-bottom:1px solid #ddd;text-align:left}td.r,th.r{text-align:right}h1{font-size:20px;margin:0}</style></head><body>
+    <h1>OnLineTextil · Resumen de cuenta</h1><p>Cliente: <b>${escaparHtml(c.nombre)}</b> · Fecha: ${new Date().toLocaleDateString('es-AR')}</p>
+    <table><tr><th>Fecha</th><th>Comprobante</th><th class="r">Importe</th><th class="r">Pendiente</th></tr>${pend.map(f => `<tr><td>${f.fecha.split('-').reverse().join('/')}</td><td>${escaparHtml(f.numero)}</td><td class="r">${formatPrice(f.importe)}</td><td class="r">${formatPrice(f.pendiente)}</td></tr>`).join('')}
+    <tr><td colspan="3"><b>Saldo a la fecha</b></td><td class="r"><b>${formatPrice(c.saldo)}</b></td></tr></table><script>setTimeout(()=>print(),300)<\/script></body></html>`); w.document.close();
+}
+function ccWhatsapp(k){
+  const c = ccCalcular()[k]; if(!c) return; const pend = c.facts.filter(f => f.pendiente > 0.5);
+  const txt = `Hola, ${c.nombre}. Le enviamos el estado de su cuenta en OnLineTextil al ${new Date().toLocaleDateString('es-AR')}:\n` + pend.map(f => `• ${f.numero} del ${f.fecha.split('-').reverse().join('/')}: ${formatPrice(f.pendiente)}`).join('\n') + `\nSaldo: ${formatPrice(c.saldo)}.\nMuchas gracias.`;
+  const tel = String(c.tel || '').replace(/\D/g, '');
+  window.open(tel ? `https://wa.me/${tel.startsWith('54') ? tel : '54' + tel}?text=${encodeURIComponent(txt)}` : `https://wa.me/?text=${encodeURIComponent(txt)}`, '_blank');
+}
+// aviso en el inicio: a cobrar y vencido (solo con permiso de cuentas corrientes)
+async function pintarAvisoCtaCte(){
+  const box = document.getElementById('avisoCtaCte'); if(!box) return;
+  if(!puede('ctacte')){ box.style.display = 'none'; return; }
+  try{ if(!ccFacts.length && !ccMovs.length){ const cf = await db.collection('config').doc('ctacte').get(); if(!cf.exists || !cf.data().inicio){ box.style.display = 'none'; return; } }
+    if(!ccFacts.length) await abrirCtaCteDatos(); } catch(e){ return; }
+  const C = Object.values(ccCalcular()), tot = C.reduce((a, c) => a + Math.max(0, c.saldo), 0), venc = C.reduce((a, c) => a + c.vencido, 0);
+  if(tot < 1){ box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:.92rem;"><span style="flex:1;">💳 A cobrar <b>${formatPrice(tot)}</b>${venc > 0 ? ` · vencido <b style="color:#A6432F;">${formatPrice(venc)}</b>` : ''}</span><button type="button" class="btn-mini" onclick="abrirCtaCte()">Ver</button></div>`;
+}
+async function abrirCtaCteDatos(){
+  const [cf, sf, sm] = await Promise.all([db.collection('config').doc('ctacte').get(), db.collection('ventas_facturadas').get(), db.collection('cc_movimientos').get()]);
+  ccCfg = { inicio: '', plazo: 30, contado: {}, ...(cf.exists ? cf.data() : {}) }; ccMovs = sm.docs.map(d => ({ _id: d.id, ...d.data() }));
+  ccFacts = sf.docs.map(d => ({ _id: d.id, ...d.data() })).map(f => { const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0); const tot = Math.round((f.total || n0 * 1.21) * 100) / 100; return { id: f._id, numero: (f.esNC ? 'NC ' : '') + (f.tipo || '') + ' ' + f.numero, fecha: ccFechaISO(f.fecha), cliente: f.cliente || 'Sin nombre', importe: f.esNC ? -tot : tot, esNC: !!f.esNC }; }).filter(f => !ccCfg.inicio || f.fecha >= ccCfg.inicio);
 }
 // ===== Rankings de ventas: facturadas, Mercado Libre o ambos (con IVA) =====
 let rkFilas = [], rkTab = 'productos', rkOrden = 'gan', rkBuscar = '';
@@ -10491,6 +10678,7 @@ auth.onAuthStateChanged(async u => {
     setTimeout(aplicarPermisosInicio, 0);
     setTimeout(() => { try{ pintarAvisoCopia(); } catch(e){} }, 300);
     setTimeout(() => { detectarCambiosCosto().catch(() => {}); }, 1500);
+    setTimeout(() => { pintarAvisoCtaCte().catch(() => {}); }, 2200);
     if(ES_PESTANA_AGENTE) setTimeout(async () => { try{ const q = new URLSearchParams(location.search), paq = (q.get('paq') || '').split(',').filter(Boolean);
       document.title = (ES_PESTANA_AGENTE === 'auditor' ? 'Auditor' : 'Director de arte') + ' · OnLineTextil';
       if(q.get('mes')) window.__audMes = q.get('mes');
@@ -11504,6 +11692,7 @@ const PERMISOS = [
   ['produccion', '✂️ Producción (telas, cortes, órdenes, talleres, stock)'],
   ['gastos', '💸 Gastos comerciales'],
   ['facturas', '🧾 Ventas facturadas'],
+  ['ctacte', '💳 Cuentas corrientes y cobranzas (registrar cobros, ver saldos de clientes)'],
   ['costos', '💲 Costos (reventa, confección, calculadora)'],
   ['resultadosML', '📈 Resultados de Mercado Libre'],
   ['config', '⚙️ Configuración (listas, datos bancarios, avisos)']
@@ -11522,6 +11711,7 @@ function permisoDeAccion(f){
   if(/abrirPedidoIA|abrirHistorial\(|abrirPendientesEntrega/.test(s)) return 'ventas';
   if(/abrirFaltantes/.test(s)) return 'produccion';
   if(/abrirResultadoNegocio|abrirAuditor|abrirRankings/.test(s)) return 'gastos';
+  if(/abrirCtaCte/.test(s)) return 'ctacte';
   if(/abrirDirectorArte/.test(s)) return 'difusion';
   if(/abrirPresupuestos/.test(s)) return 'ventas';
   if(/abrirClientes/.test(s)) return 'clientes';
@@ -19749,7 +19939,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v295';
+const APP_VERSION = '2026-10-02-v296';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
@@ -19807,7 +19997,7 @@ window.addEventListener('load', () => {
     ['abrirFacturas', 'Cargando facturas…'], ['leerFacturasPDF', 'Leyendo facturas…'], ['guardarFactura', 'Guardando la factura…'], ['borrarFacturasSel', 'Borrando facturas…'],
     ['importarLinksWeb', 'Leyendo el archivo de Tienda Nube…'], ['analizarPedidoIA', 'La IA está armando el pedido…'],
     ['generarFlyersNuevoIngreso', 'Generando las piezas…'], ['abrirResultadosML', 'Preparando Resultados ML…'], ['descargarCopia', 'Preparando la copia…'],
-    ['abrirFaltantes', 'Cargando faltantes…'], ['abrirRankings', 'Armando los rankings…'], ['abrirResultadoNegocio', 'Calculando el resultado…'], ['guardarTodoCP', 'Guardando…'],  ['abrirRevisarHistorial', 'Revisando el historial…'], ['corregirHistorialSel', 'Corrigiendo…'], ['abrirRevisarCostos', 'Cargando…'], ['ccAplicar', 'Actualizando precios…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
+    ['abrirFaltantes', 'Cargando faltantes…'], ['abrirCtaCte', 'Cargando cuentas corrientes…'], ['ccGuardarCobro', 'Guardando…'], ['abrirRankings', 'Armando los rankings…'], ['abrirResultadoNegocio', 'Calculando el resultado…'], ['guardarTodoCP', 'Guardando…'],  ['abrirRevisarHistorial', 'Revisando el historial…'], ['corregirHistorialSel', 'Corrigiendo…'], ['abrirRevisarCostos', 'Cargando…'], ['ccAplicar', 'Actualizando precios…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
   ];
   setTimeout(() => W.forEach(([n, t]) => conProcesando(n, t)), 0);
 });
