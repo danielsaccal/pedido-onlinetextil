@@ -1601,7 +1601,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v300</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v301</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2414,6 +2414,15 @@ a.grilla-celda{display:block;}
     <div class="form-card" style="max-width:1000px;">
       <h2>Dinero disponible</h2>
       <div id="ts-body"></div>
+      <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
+    </div>
+  </div>
+
+  <div class="step" id="step-iva">
+    <div class="form-card" style="max-width:980px;">
+      <h2>Posición de IVA</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;"><label style="font-size:.9rem;">A la fecha <input type="date" id="iv-f" onchange="renderIVA()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"></label><span class="note" style="margin:0;">Mes calendario, del 1 a la fecha elegida. Todo al 21 %.</span></div>
+      <div id="iv-body"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
   </div>
@@ -5903,7 +5912,7 @@ const GRUPOS_INICIO = {
     [['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']],
     [['👥 Clientes', 'abrirClientes()'], ['😴 Clientes inactivos', 'abrirClientesInactivos()']],
     [['💰 Dinero disponible', 'abrirTesoreria()'], ['💳 Cuentas corrientes', 'abrirCtaCte()'], ['🏭 Proveedores y pagos', 'abrirCompras()'], ['🧾 Ventas facturadas', 'abrirFacturas()'], ['💸 Gastos comerciales', 'abrirGastos()'], ['🧾 Auditor (IA)', 'abrirAuditor()']],
-    [['📊 Resultado del negocio', 'abrirResultadoNegocio()'], ['🏆 Rankings de ventas', 'abrirRankings()'], ['📈 Resultados Mercado Libre', 'abrirResultadosML()']]
+    [['📊 Resultado del negocio', 'abrirResultadoNegocio()'], ['🧮 Posición de IVA', 'abrirIVA()'], ['🏆 Rankings de ventas', 'abrirRankings()'], ['📈 Resultados Mercado Libre', 'abrirResultadosML()']]
   ] },
   f: { lado: 'int', titulo: 'Catálogo', titulosColumnas: ['1 · Productos', '2 · Fotos y textos', '3 · Precios'], columnas: [
     [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['🗂️ Ordenar categorías', 'abrirCategorias()']],
@@ -7497,6 +7506,58 @@ async function aplicarPctMasivo(skus, pct){
   try{ const ok = await guardarPreciosSkus(lista); alert(`Listo: ${ok} precios actualizados.`); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   try{ renderProductosFabrico(); } catch(e){} try{ if(esDueno()) renderCostosReventa(); } catch(e){}
 }
+// ===== Posicion de IVA a una fecha (mes calendario), por razon social y total. Todo al 21 %. =====
+// Debito: Propia = ventas facturadas; Alberto y Rita = ventas de ML (precio con IVA / 1,21 x 0,21), del detalle venta por venta.
+// Credito: facturas de compra de cada razon social + cargos que factura ML (comision, cargo fijo, cuotas, envios, Full, publicidad), estimados del resumen mensual.
+const IV_RZ = [['propia', 'Propia'], ['alberto', 'Alberto'], ['rita', 'Rita']];
+let ivDatos = null;
+async function abrirIVA(){
+  if(!esDueno()){ alert('Solo el dueño puede ver la posición de IVA.'); return; }
+  mostrarPaso('step-iva'); const f = document.getElementById('iv-f'); if(!f.value) f.value = ccHoy();
+  document.getElementById('iv-body').innerHTML = '<p class="empty-msg">Cargando…</p>';
+  const [vf, cp, md, rs, cf] = await Promise.all([db.collection('ventas_facturadas').get(), db.collection('compras').get(), db.collection('ml_detalle').get().catch(() => ({ docs: [] })), db.collection('config').doc('ml_resumen_mensual').get(), db.collection('config').doc('iva').get()]);
+  ivDatos = { fact: vf.docs.map(d => d.data()), compras: cp.docs.map(d => d.data()), det: md.docs.map(d => d.data()), res: rs.exists ? (rs.data().m || {}) : {}, cfg: cf.exists ? cf.data() : {} };
+  renderIVA();
+}
+function calcIVA(fecha){
+  const mes = fecha.slice(0, 7), R = {}; IV_RZ.forEach(([k]) => R[k] = { deb: 0, cred: 0, credML: 0, perc: 0, ant: +(((ivDatos.cfg[mes] || {})[k]) || 0), vtas: 0, nComp: 0, mlEst: false });
+  const enRango = iso => iso && iso.slice(0, 7) === mes && iso <= fecha;
+  // propia: ventas facturadas
+  ivDatos.fact.forEach(f => { const iso = ccFechaISO(f.fecha); if(!enRango(iso)) return; const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0), tot = f.total || n0 * 1.21, iva = tot - n0, sg = f.esNC ? -1 : 1; R.propia.deb += sg * iva; R.propia.vtas += sg * tot; });
+  // Alberto y Rita: ventas de ML del detalle (hasta la fecha)
+  ivDatos.det.filter(d => d.periodo === mes).forEach(d => { const k = String(d.cuenta || '').toLowerCase(); if(!R[k]) return; const L = String(d.csv || '').split('\n'), cab = (L.shift() || '').split(';'), ix = c => cab.indexOf(c);
+    L.forEach(l => { const r = l.split(';'); const iso = ccFechaISO(r[ix('fecha')]); if(!enRango(iso)) return; if(r[ix('tipo')] !== 'Venta' || /cancel/i.test(r[ix('estado')] || '')) return; const v = +r[ix('precio')] || 0; if(!v) return; R[k].vtas += v; R[k].deb += v / 1.21 * 0.21; }); });
+  // credito: facturas de compra
+  ivDatos.compras.forEach(c => { if(!enRango(c.fecha) || !R[c.razon] || c.moneda === 'USD') return; const sg = c.nc ? -1 : 1; R[c.razon].cred += sg * (+c.iva || 0); R[c.razon].perc += sg * (+c.percIva || 0); R[c.razon].nComp++; });
+  // credito: cargos que factura ML (estimado: proporcional a las ventas hasta la fecha)
+  const FACTURA_ML = /comisi|cargo fijo|cuotas|env[ií]os|full|publicidad/i, NO = /impuesto|retenc|cadete|cancelac|otros/i;
+  ['alberto', 'rita'].forEach(k => { const x = Object.values(ivDatos.res).find(y => y.periodo === mes && String(y.cuenta).toLowerCase() === k); if(!x) return;
+    const cargos = Object.entries(x.desglose || {}).filter(([c]) => FACTURA_ML.test(c) && !NO.test(c)).reduce((a, [, v]) => a + (+v || 0), 0);
+    const prop = x.vendido > 0 ? Math.min(1, R[k].vtas / x.vendido) : 0; R[k].credML = cargos * prop / 1.21 * 0.21; R[k].mlEst = true; });
+  IV_RZ.forEach(([k]) => { const r = R[k]; r.saldo = r.deb - r.cred - r.credML - r.perc - r.ant; });
+  return R;
+}
+function renderIVA(){
+  const fecha = document.getElementById('iv-f').value || ccHoy(), mes = fecha.slice(0, 7), R = calcIVA(fecha);
+  const T = k => IV_RZ.reduce((a, [z]) => a + R[z][k], 0), fP = x => formatPrice(Math.round(x));
+  const fila = (t, k, neg, sub) => `<tr style="border-top:1px solid var(--line);"><td style="padding:7px 6px;">${t}${sub ? `<div class="note" style="text-align:left;margin:0;">${sub}</div>` : ''}</td>${IV_RZ.map(([z]) => `<td style="padding:7px 6px;text-align:right;${neg ? 'color:#2F7A47;' : ''}">${neg && R[z][k] ? '− ' : ''}${fP(R[z][k])}</td>`).join('')}<td style="padding:7px 6px;text-align:right;font-weight:700;${neg ? 'color:#2F7A47;' : ''}">${neg && T(k) ? '− ' : ''}${fP(T(k))}</td></tr>`;
+  const sinML = ['alberto', 'rita'].filter(k => !ivDatos.det.some(d => d.periodo === mes && String(d.cuenta).toLowerCase() === k));
+  document.getElementById('iv-body').innerHTML = `${sinML.length ? `<p style="background:#FFF8E6;border:1px solid #EBD9A8;border-radius:12px;padding:8px 12px;font-size:.88rem;">⚠️ Falta el reporte de Mercado Libre de este mes de: <b>${sinML.map(k => k[0].toUpperCase() + k.slice(1)).join(' y ')}</b>. Ábralo en Resultados ML para que se tome.</p>` : ''}
+    <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.9rem;"><tr style="color:#8A8072;font-size:.72rem;text-transform:uppercase;"><td style="padding:6px;">${new Date(mes + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })} · al ${fecha.split('-').reverse().join('/')}</td>${IV_RZ.map(([, t]) => `<td style="padding:6px;text-align:right;">${t}</td>`).join('')}<td style="padding:6px;text-align:right;">Total</td></tr>
+      ${fila('Ventas con IVA', 'vtas', false, 'Propia: ventas facturadas · Alberto y Rita: Mercado Libre')}
+      ${fila('<b>Débito fiscal</b>', 'deb')}
+      ${fila('Crédito fiscal (facturas de compra)', 'cred', true)}
+      ${fila('Crédito fiscal (cargos de Mercado Libre)', 'credML', true, 'estimado: comisiones, cargo fijo, cuotas, envíos, Full y publicidad; confirmar con la factura mensual de ML')}
+      ${fila('Percepciones de IVA', 'perc', true)}
+      <tr style="border-top:1px solid var(--line);"><td style="padding:7px 6px;">Saldo a favor del mes anterior</td>${IV_RZ.map(([z]) => `<td style="padding:7px 6px;text-align:right;"><input inputmode="decimal" value="${R[z].ant ? formatoPesos(Math.round(R[z].ant)) : ''}" placeholder="$ 0" onchange="ivGuardarAnt('${mes}','${z}',this.value)" style="width:110px;padding:5px;border:1px solid var(--line);border-radius:8px;text-align:right;"></td>`).join('')}<td style="padding:7px 6px;text-align:right;color:#2F7A47;">${T('ant') ? '− ' : ''}${fP(T('ant'))}</td></tr>
+      <tr style="border-top:2px solid var(--purple);font-weight:800;"><td style="padding:8px 6px;">A pagar (+) / a favor (−)</td>${IV_RZ.map(([z]) => `<td style="padding:8px 6px;text-align:right;color:${R[z].saldo > 0 ? '#A6432F' : '#2F7A47'};">${fP(R[z].saldo)}</td>`).join('')}<td style="padding:8px 6px;text-align:right;">${fP(T('saldo'))}</td></tr></table></div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;"><button type="button" class="btn-mini" onclick="ivImprimir()">🖨️ Para el contador (imprimir o PDF)</button></div>
+    <p class="note" style="text-align:left;margin-top:8px;">Cálculo de gestión para controlar: la posición oficial la determina su contador.</p>`;
+}
+async function ivGuardarAnt(mes, z, v){ const n = numAr(v) || 0; const c = { ...(ivDatos.cfg || {}) }; c[mes] = { ...(c[mes] || {}), [z]: n };
+  try{ await db.collection('config').doc('iva').set(c); ivDatos.cfg = c; } catch(e){ alert('No se pudo guardar: ' + e.message); return; } renderIVA(); }
+function ivImprimir(){ const w = window.open('', '_blank'); if(!w){ alert('Permita ventanas emergentes para imprimir.'); return; }
+  w.document.write(`<html><head><title>Posición de IVA</title><style>body{font-family:Arial,sans-serif;padding:24px}table{width:100%;border-collapse:collapse;font-size:13px}td{padding:6px;border-bottom:1px solid #ddd}input{border:none;text-align:right;font:inherit}.note{font-size:11px;color:#666}</style></head><body><h2>Posición de IVA</h2>${document.getElementById('iv-body').innerHTML.replace(/<button[\s\S]*?<\/button>/g, '')}<script>setTimeout(()=>print(),300)<\/script></body></html>`); w.document.close(); }
 // ===== Dinero disponible: saldo real cargado por el duenio + lo que la app registra despues (caja diaria, cobros, pagos, gastos, transferencias) =====
 const TS_CUENTAS = [['santander', '🏦 Santander', ''], ['mp_alberto', '💙 Mercado Pago Alberto', ''], ['mp_rita', '💙 Mercado Pago Rita', ''], ['efectivo', '💵 Efectivo', '']];
 let tsCfg = { saldos: {} }, tsMovs = [], tsTab = 'cuentas';
@@ -7663,7 +7724,7 @@ function pvFormCompra(pid, nc){
     <label>A nombre de<select id="cf-rz" style="${pvInp}">${PV_RAZONES.map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select></label>
     <label>Tipo<select id="cf-t" style="${pvInp}">${['A', 'B', 'C', 'X'].map(x => `<option>${x}</option>`).join('')}</select></label>
     <label>Número (punto de venta - número)<input id="cf-n" placeholder="00001-00001234" style="${pvInp}"></label><label>Fecha<input type="date" id="cf-f" value="${hoy}" style="${pvInp}"></label>
-    <label>Total ${m === 'USD' ? '(US$)' : '($)'}<input id="cf-i" inputmode="decimal" style="${pvInp}"></label><label>IVA incluido (para el IVA)<input id="cf-iva" inputmode="decimal" placeholder="opcional" style="${pvInp}"></label>
+    <label>Total ${m === 'USD' ? '(US$)' : '($)'}<input id="cf-i" inputmode="decimal" style="${pvInp}"></label><label>IVA de la factura<input id="cf-iva" inputmode="decimal" placeholder="opcional" style="${pvInp}"></label><label>Percepción de IVA<input id="cf-piva" inputmode="decimal" placeholder="opcional" style="${pvInp}"></label><span></span>
     <label>Vence<input type="date" id="cf-v" value="${new Date(Date.now() + (p.plazo || 0) * 864e5).toISOString().slice(0, 10)}" style="${pvInp}"></label><label>Detalle<input id="cf-d" placeholder="opcional" style="${pvInp}"></label>
     <label style="grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:.88rem;"><input type="checkbox" id="cf-g" ${p.rubro === 'Servicios' ? 'checked' : ''} style="width:18px;height:18px;"> Es un gasto (luz, alquiler, servicios…): que figure también en Gastos comerciales</label>
     <label id="cf-gt-l" style="grid-column:1/-1;">Tipo de gasto<select id="cf-gt" style="${pvInp}"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></label></div>
@@ -7686,7 +7747,7 @@ async function pvLeerPDF(inp){
 }
 async function pvGuardarCompra(pid, nc){
   const g = x => document.getElementById(x).value.trim(), p = pvProv.find(x => x._id === pid);
-  const d = { proveedorId: pid, razon: g('cf-rz'), tipo: g('cf-t'), numero: g('cf-n'), fecha: g('cf-f'), vence: g('cf-v') || g('cf-f'), importe: numAr(g('cf-i')), iva: numAr(g('cf-iva')) || 0, moneda: pvMon(p), detalle: g('cf-d'), nc: !!nc, creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
+  const d = { proveedorId: pid, razon: g('cf-rz'), tipo: g('cf-t'), numero: g('cf-n'), fecha: g('cf-f'), vence: g('cf-v') || g('cf-f'), importe: numAr(g('cf-i')), iva: numAr(g('cf-iva')) || 0, percIva: numAr(g('cf-piva')) || 0, moneda: pvMon(p), detalle: g('cf-d'), nc: !!nc, creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
   if(!(d.importe > 0) || !d.fecha){ alert('Complete fecha y total.'); return; }
   const clave = x => { const m = String(x.numero || '').match(/(\d+)\D+(\d+)/); return `${x.proveedorId}|${x.nc ? 'NC' : 'FC'}|${x.tipo}|${m ? (+m[1]) + '-' + (+m[2]) : String(x.numero || '').replace(/\D/g, '').replace(/^0+/, '')}`; }; // mismo punto de venta y numero
   if(d.numero && pvCompras.some(x => clave(x) === clave(d))){ alert('Ya está cargado un comprobante de este proveedor con el mismo tipo y número. No se guardó.'); return; }
@@ -12128,7 +12189,7 @@ function permisoDeAccion(f){
   if(/abrirResultadoNegocio|abrirAuditor|abrirRankings/.test(s)) return 'gastos';
   if(/abrirCtaCte/.test(s)) return 'ctacte';
   if(/abrirCompras/.test(s)) return 'compras';
-  if(/abrirTesoreria/.test(s)) return 'tesoreria'; // solo el duenio (no figura en los permisos de colaboradores)
+  if(/abrirTesoreria|abrirIVA/.test(s)) return 'tesoreria'; // solo el duenio (no figura en los permisos de colaboradores)
   if(/abrirDirectorArte/.test(s)) return 'difusion';
   if(/abrirPresupuestos/.test(s)) return 'ventas';
   if(/abrirClientes/.test(s)) return 'clientes';
@@ -20356,7 +20417,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v300';
+const APP_VERSION = '2026-10-02-v301';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
@@ -20414,7 +20475,7 @@ window.addEventListener('load', () => {
     ['abrirFacturas', 'Cargando facturas…'], ['leerFacturasPDF', 'Leyendo facturas…'], ['guardarFactura', 'Guardando la factura…'], ['borrarFacturasSel', 'Borrando facturas…'],
     ['importarLinksWeb', 'Leyendo el archivo de Tienda Nube…'], ['analizarPedidoIA', 'La IA está armando el pedido…'],
     ['generarFlyersNuevoIngreso', 'Generando las piezas…'], ['abrirResultadosML', 'Preparando Resultados ML…'], ['descargarCopia', 'Preparando la copia…'],
-    ['abrirFaltantes', 'Cargando faltantes…'], ['abrirTesoreria', 'Cargando saldos…'], ['abrirCompras', 'Cargando proveedores…'], ['pvGuardarPago', 'Guardando la orden de pago…'], ['pvGuardarCompra', 'Guardando…'], ['abrirCtaCte', 'Cargando cuentas corrientes…'], ['ccGuardarCobro', 'Guardando…'], ['abrirRankings', 'Armando los rankings…'], ['abrirResultadoNegocio', 'Calculando el resultado…'], ['guardarTodoCP', 'Guardando…'],  ['abrirRevisarHistorial', 'Revisando el historial…'], ['corregirHistorialSel', 'Corrigiendo…'], ['abrirRevisarCostos', 'Cargando…'], ['ccAplicar', 'Actualizando precios…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
+    ['abrirFaltantes', 'Cargando faltantes…'], ['abrirIVA', 'Calculando el IVA…'], ['abrirTesoreria', 'Cargando saldos…'], ['abrirCompras', 'Cargando proveedores…'], ['pvGuardarPago', 'Guardando la orden de pago…'], ['pvGuardarCompra', 'Guardando…'], ['abrirCtaCte', 'Cargando cuentas corrientes…'], ['ccGuardarCobro', 'Guardando…'], ['abrirRankings', 'Armando los rankings…'], ['abrirResultadoNegocio', 'Calculando el resultado…'], ['guardarTodoCP', 'Guardando…'],  ['abrirRevisarHistorial', 'Revisando el historial…'], ['corregirHistorialSel', 'Corrigiendo…'], ['abrirRevisarCostos', 'Cargando…'], ['ccAplicar', 'Actualizando precios…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
   ];
   setTimeout(() => W.forEach(([n, t]) => conProcesando(n, t)), 0);
 });
