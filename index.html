@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v305</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v306</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2242,6 +2242,7 @@ a.grilla-celda{display:block;}
       <p class="note" style="text-align:left;">Subí las facturas de TFactura (PDF). La app lee cada renglón, lo cruza con el costo de cada producto <b>vigente el día de la factura</b> y te muestra la ganancia. El precio de cada producto ya tiene aplicados los <b>descuentos y bonificaciones</b> de la factura.</p>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;"><b style="font-size:.88rem;">Calcular la ganancia:</b>
         <select id="fc-modo" onchange="cambiarModoIvaFact(this.value)" style="padding:7px;border:1px solid var(--line);border-radius:10px;"><option value="con">con IVA (los costos están con IVA)</option><option value="sin">sin IVA</option></select></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;"><button type="button" class="btn-mini" onclick="fvManual('f')">➕ Factura</button><button type="button" class="btn-mini" onclick="fvManual('nc')">➕ Nota de crédito</button><button type="button" class="btn-mini" onclick="fvManual('nd')">➕ Nota de débito</button><span class="note" style="margin:auto 0;">carga a mano · o suba el PDF o Excel de TFactura:</span></div>
       <div style="margin:10px 0 4px;"><b style="font-size:.88rem;">Razón social de las facturas que va a subir</b><div id="fc-rz-sel"></div></div>
       <label class="btn btn-gold" style="display:block;text-align:center;cursor:pointer;margin:10px 0;">📄 Subir facturas (PDF o Excel de TFactura)<input type="file" id="fc-file" accept="application/pdf,.pdf,.xlsx,.xls,.csv" multiple style="display:none;" onchange="leerFacturasPDF(this)"></label>
       <div id="fc-nuevas"></div>
@@ -5912,13 +5913,13 @@ const GRUPOS_INICIO = {
   ] },
   comp: { lado: 'int', titulo: '🧾 Comprobantes', titulosColumnas: ['Presupuestos', 'Ventas', 'Cobros', 'Compras', 'Pagos'], columnas: [
     [['🧾 Presupuestos', 'abrirPresupuestos()']],
-    [['🧾 Facturas, NC y ND de venta', 'abrirFacturas()']],
+    [['➕ Factura de venta', "abrirFacturas().then(() => fvManual('f'))"], ['➕ Nota de crédito de venta', "abrirFacturas().then(() => fvManual('nc'))"], ['➕ Nota de débito de venta', "abrirFacturas().then(() => fvManual('nd'))"], ['📋 Ver comprobantes de venta', 'abrirFacturas()']],
     [['➕ Recibo nuevo', "abrirCtaCte('recibos').then(() => ccElegirCliente())"], ['📋 Recibos', "abrirCtaCte('recibos')"]],
-    [['➕ Comprobante de compra', "abrirCompras('proveedores').then(() => pvElegirProveedor('compra'))"], ['📋 Comprobantes de compra', "abrirCompras('compras')"]],
+    [['➕ Factura de compra', "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'f'))"], ['➕ Nota de crédito de compra', "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nc'))"], ['➕ Nota de débito de compra', "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nd'))"], ['📋 Ver comprobantes de compra', "abrirCompras('compras')"]],
     [['➕ Orden de pago nueva', "abrirCompras('pagos').then(() => pvElegirProveedor('pago'))"], ['📋 Órdenes de pago', "abrirCompras('pagos')"]],
   ] },
   cli: { lado: 'int', titulo: '👥 Clientes', titulosColumnas: ['Fichas', 'Cuentas corrientes'], columnas: [
-    [['👥 Clientes', 'abrirClientes()']],
+    [['➕ Cliente nuevo', 'abrirClientes(); setTimeout(() => cliForm(), 300)'], ['👥 Clientes', 'abrirClientes()']],
     [['💳 Cuentas corrientes', 'abrirCtaCte()']],
   ] },
   art: { lado: 'int', titulo: '📦 Artículos', titulosColumnas: ['Catálogo', 'Precios', 'Costos', 'Stock', 'Producción', 'Consultas'], colorColumnas: { 2: '#2F7A47' }, columnas: [
@@ -5930,7 +5931,7 @@ const GRUPOS_INICIO = {
     [['📦 Historial de órdenes', 'abrirHistorialOT()'], ['🗂️ Historial de entregas', 'abrirHistorialEntregas()'], ['🔎 ¿Cuándo hice este SKU?', 'abrirHistorialSku()']],
   ] },
   prov: { lado: 'int', titulo: '🏭 Proveedores', titulosColumnas: ['Fichas y cuentas corrientes', 'Talleres'], columnas: [
-    [['🏭 Proveedores y cuentas corrientes', 'abrirCompras()']],
+    [['➕ Proveedor nuevo', "abrirCompras('proveedores').then(() => pvFormProveedor())"], ['🏭 Proveedores y cuentas corrientes', 'abrirCompras()']],
     [['✂️ Liquidar talleres', "abrirCompras('talleres')"]],
   ] },
   teso: { lado: 'int', titulo: '💰 Fondos', titulosColumnas: ['Saldos', 'Caja', 'Gastos', 'Cheques'], columnas: [
@@ -7744,10 +7745,10 @@ function pvRenderProveedor(r){
       ${filas.map(f => `<tr style="border-top:1px solid var(--line);"><td style="padding:5px;white-space:nowrap;">${String(f.fecha).split('-').reverse().join('/')}</td><td style="padding:5px;">${f.rz ? chipRZ(f.rz) + ' ' : ''}<b>${f.t}</b> <span class="meta">${escaparHtml(f.det || '')}</span></td><td style="padding:5px;text-align:right;">${f.debe ? fmtMon(f.debe, m) : ''}</td><td style="padding:5px;text-align:right;color:#2F7A47;">${f.haber ? fmtMon(f.haber, m) : ''}</td><td style="padding:5px;text-align:right;font-weight:700;">${fmtMon(f.saldo, m)}</td><td style="padding:5px;white-space:nowrap;">${f.x ? `<a href="#" title="Imprimir" onclick="event.preventDefault();pvImprimirOP('${f.x._id}')">🖨️</a> ` : ''}<a href="#" title="Borrar" onclick="event.preventDefault();pvBorrar('${f.f ? 'compras' : 'pagos'}','${(f.f || f.x)._id}')">🗑️</a></td></tr>`).join('') || '<tr><td colspan="6" class="note">Sin movimientos.</td></tr>'}</table></div>`;
 }
 const pvInp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
-function pvElegirProveedor(para){
+function pvElegirProveedor(para, tipoIni){
   if(!pvProv.length){ alert('Primero cargue un proveedor con ➕ Proveedor.'); pvTab = 'proveedores'; renderCompras(); return; }
   pvModal(para === 'pago' ? '➕ Orden de pago nueva' : '➕ Comprobante de compra', `<label>Proveedor<select id="ep-p" style="${pvInp}">${pvProv.map(p => `<option value="${p._id}">${escaparHtml(p.nombre)}</option>`).join('')}</select></label>
-    ${para === 'compra' ? `<label style="margin-top:6px;display:block;">Tipo<select id="ep-t" style="${pvInp}"><option value="f">Factura</option><option value="nc">Nota de crédito</option><option value="nd">Nota de débito</option></select></label>` : ''}
+    ${para === 'compra' ? `<label style="margin-top:6px;display:block;">Tipo<select id="ep-t" style="${pvInp}">${[['f', 'Factura'], ['nc', 'Nota de crédito'], ['nd', 'Nota de débito']].map(([v, t]) => `<option value="${v}" ${tipoIni === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>` : ''}
     <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="const id=document.getElementById('ep-p').value, t=(document.getElementById('ep-t')||{}).value; cerrarPublicar(); setTimeout(()=>{ ${para === 'pago' ? 'pvFormPago(id)' : "pvFormCompra(id, t==='nc' ? true : t==='nd' ? 'nd' : false)"} },50);">Seguir</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
 }
 function pvModal(titulo, html){ const t = document.getElementById('pub-titulo'); if(t) t.textContent = titulo; document.getElementById('pub-cont').innerHTML = html; document.getElementById('pub-modal').style.display = 'block'; }
@@ -11990,6 +11991,38 @@ async function facturasDesdeExcel(file){
   L.forEach(fa => { const s = fa.items.reduce((a, x) => a + x.neto, 0), conIva = fa.tipo === 'B' || fa.tipo === 'C' ? s * 1.21 : null; if(!fa.total) fa.total = conIva || s * 1.21; fa.subtotal = s;
     if(conIva != null && Math.abs(conIva - fa.total) > Math.max(2, fa.total * 0.002)){ fa.controlOk = false; fa.mensajeControl = `La suma de los renglones (${formatPrice(conIva)}) no coincide con el total del comprobante (${formatPrice(fa.total)}).`; } });
   return L;
+}
+// ===== Comprobante de venta cargado a mano (factura, NC o ND): pasa por los mismos controles que los subidos =====
+function fvManual(tipo){
+  const inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
+  const nom = { f: 'Factura de venta', nc: 'Nota de crédito de venta', nd: 'Nota de débito de venta' }[tipo];
+  let clientes = []; try{ clientes = (listaClientes || []).map(c => c.razonSocial || `${c.apellido || ''} ${c.nombre || ''}`.trim()).filter(Boolean); } catch(e){}
+  const skus = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => skus.push(v.sku))));
+  pvModal('➕ ' + nom, `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <div style="grid-column:1/-1;"><b style="font-size:.85rem;">Razón social</b>${selectorRZ('fv-rz', (document.getElementById('fc-rz') || {}).value || 'propia')}</div>
+    <label style="grid-column:1/-1;">Cliente<input id="fv-c" list="fv-cl" style="${inp}"></label><datalist id="fv-cl">${[...new Set(clientes)].sort().map(n => `<option value="${escapeAttr(n)}">`).join('')}</datalist>
+    <label>Letra<select id="fv-l" style="${inp}"><option>A</option><option>B</option><option>C</option></select></label><label>Número (punto de venta - número)<input id="fv-n" placeholder="00010-00001234" style="${inp}"></label>
+    <label>Fecha<input type="date" id="fv-f" value="${ccHoy()}" style="${inp}"></label><span></span></div>
+    <b style="display:block;margin:10px 0 4px;font-size:.88rem;">Renglones (importe con IVA)</b><div id="fv-rows"></div><datalist id="fv-skus">${skus.map(s => `<option value="${s}">`).join('')}</datalist>
+    <button type="button" class="btn-mini" onclick="fvFila()">➕ Renglón</button><p id="fv-tot" style="font-weight:800;margin:8px 0;"></p>
+    <div style="display:flex;gap:8px;"><button class="btn btn-gold" style="flex:1;" onclick="fvGuardar('${tipo}')">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
+  fvFila();
+}
+function fvFila(){ const d = document.createElement('div'); d.className = 'fv-r'; d.style.cssText = 'display:grid;grid-template-columns:1.2fr .6fr 1fr;gap:6px;margin-bottom:6px;';
+  d.innerHTML = `<input class="fv-s" list="fv-skus" placeholder="SKU" style="padding:7px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;"><input class="fv-q" inputmode="decimal" placeholder="Cant." style="padding:7px;border:1px solid var(--line);border-radius:8px;"><input class="fv-i" inputmode="decimal" placeholder="Importe $" oninput="fvTot()" style="padding:7px;border:1px solid var(--line);border-radius:8px;">`;
+  document.getElementById('fv-rows').appendChild(d); }
+function fvTot(){ const t = [...document.querySelectorAll('.fv-i')].reduce((a, e) => a + (numAr(e.value) || 0), 0); document.getElementById('fv-tot').textContent = 'Total con IVA: ' + formatPrice(t); }
+async function fvGuardar(tipo){
+  const g = id => (document.getElementById(id).value || '').trim();
+  const items = [...document.querySelectorAll('.fv-r')].map(d => { const s = d.querySelector('.fv-s').value.trim().toUpperCase(), q = numAr(d.querySelector('.fv-q').value) || 0, i = numAr(d.querySelector('.fv-i').value) || 0; const r = s ? buscarProductoPorSku(s) : null;
+    return i > 0 ? { codigo: s || 'VARIOS', desc: r ? r.producto.nombre + ' ' + (r.variante.desc || '') : '', cant: q || 1, neto: Math.round(i / 1.21 * 100) / 100, importe: Math.round(i / 1.21 * 100) / 100, ok: true } : null; }).filter(Boolean);
+  if(!g('fv-c') || !g('fv-n') || !items.length){ alert('Complete cliente, número y al menos un renglón con importe.'); return; }
+  const f = g('fv-f').split('-'), total = items.reduce((a, x) => a + x.neto * 1.21, 0);
+  const fa = { numero: g('fv-n'), tipo: g('fv-l'), fecha: `${f[2]}/${f[1]}/${f[0]}`, cliente: g('fv-c'), total: Math.round(total * 100) / 100, items, esNC: tipo === 'nc', esND: tipo === 'nd', devolvieron: true, controlOk: true, razon: g('fv-rz') || 'propia', manual: true };
+  const k = claveComprobante(fa); fa.yaEsta = (facturas || []).some(x => claveComprobante(x) === k);
+  facturasNuevas.push(fa); const i = facturasNuevas.length - 1; cerrarPublicar(); renderFacturasNuevas();
+  if(fa.yaEsta){ alert('Ya hay un comprobante con el mismo punto de venta y número en esa razón social. No se guardó.'); return; }
+  await guardarFactura(i);
 }
 // mismo comprobante = mismo tipo (factura o nota de credito), letra, punto de venta y numero
 function claveComprobante(f){ const m = String(f.numero || '').match(/(\d+)\D+(\d+)/); const pv = m ? +m[1] : 0, nro = m ? +m[2] : +String(f.numero || '').replace(/\D/g, '') || 0;
@@ -20514,7 +20547,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v305';
+const APP_VERSION = '2026-10-02-v306';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
