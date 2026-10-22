@@ -1598,7 +1598,7 @@ a.grilla-celda{display:block;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v306</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v307</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -7927,7 +7927,7 @@ async function abrirCtaCte(tab){ if(typeof tab === 'string'){ ccTab = tab; ccCli
   ccMovs = sm.docs.map(d => ({ _id: d.id, ...d.data() }));
   ccClientesDB = sc.docs.map(d => d.data());
   ccFacts = sf.docs.map(d => ({ _id: d.id, ...d.data() })).filter(f => !f.razon || f.razon === 'propia').map(f => { const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0); const tot = Math.round((f.total || n0 * 1.21) * 100) / 100;
-    return { id: f._id, numero: (f.esNC ? 'NC ' : f.esND ? 'ND ' : '') + (f.tipo || '') + ' ' + f.numero, fecha: ccFechaISO(f.fecha), cliente: f.cliente || 'Sin nombre', importe: f.esNC ? -tot : tot, esNC: !!f.esNC }; })
+    return { id: f._id, numero: (f.esNC ? 'NC ' : f.esND ? 'ND ' : '') + (f.tipo || '') + ' ' + f.numero + (f.facturaRef ? ' (s/ ' + f.facturaRef.numero + ')' : ''), fecha: ccFechaISO(f.fecha), cliente: f.cliente || 'Sin nombre', importe: f.esNC ? -tot : tot, esNC: !!f.esNC, ref: f.facturaRef ? f.facturaRef.id : null }; })
     .filter(f => !ccCfg.inicio || f.fecha >= ccCfg.inicio);
   if(!ccCfg.inicio){ ccTab = 'config'; }
   renderCtaCte();
@@ -7944,8 +7944,10 @@ function ccCalcular(){
     const haber = c.movs.filter(m => m.tipo === 'cobro' || m.tipo === 'sena').reduce((a, m) => a + m.importe + Object.values(m.retenciones || {}).reduce((x, y) => x + (+y || 0), 0), 0);
     c.saldo = Math.round((debe - haber) * 100) / 100;
     // aplicacion: NC y cobros contra facturas, de la mas vieja a la mas nueva
-    let disp = haber + c.facts.filter(f => f.importe < 0).reduce((a, f) => a - f.importe, 0);
-    c.facts.filter(f => f.importe > 0).forEach(f => { const ap = Math.min(disp, f.importe); f.pendiente = Math.round((f.importe - ap) * 100) / 100; disp -= ap; });
+    // las NC relacionadas se aplican a su factura; el resto (cobros y NC sin relacion) a las facturas mas viejas
+    const pend = {}; c.facts.filter(f => f.importe > 0).forEach(f => pend[f.id] = f.importe);
+    let disp = haber; c.facts.filter(f => f.importe < 0).forEach(nc => { let m = -nc.importe; if(nc.ref && pend[nc.ref] != null){ const a = Math.min(m, pend[nc.ref]); pend[nc.ref] -= a; m -= a; } disp += m; });
+    c.facts.filter(f => f.importe > 0).forEach(f => { const ap = Math.min(disp, pend[f.id]); f.pendiente = Math.round((pend[f.id] - ap) * 100) / 100; disp -= ap; });
     const hoy = new Date();
     c.vencido = 0; c.buckets = [0, 0, 0, 0];
     const dbP = ccClientesDB.find(x => [ccClave(`${x.apellido || ''} ${x.nombre || ''}`), ccClave(`${x.nombre || ''} ${x.apellido || ''}`), ccClave(x.razonSocial || '')].includes(c.k));
@@ -12000,7 +12002,8 @@ function fvManual(tipo){
   const skus = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => skus.push(v.sku))));
   pvModal('➕ ' + nom, `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     <div style="grid-column:1/-1;"><b style="font-size:.85rem;">Razón social</b>${selectorRZ('fv-rz', (document.getElementById('fc-rz') || {}).value || 'propia')}</div>
-    <label style="grid-column:1/-1;">Cliente<input id="fv-c" list="fv-cl" style="${inp}"></label><datalist id="fv-cl">${[...new Set(clientes)].sort().map(n => `<option value="${escapeAttr(n)}">`).join('')}</datalist>
+    <label style="grid-column:1/-1;">Cliente<input id="fv-c" list="fv-cl" onchange="fvFacturasCliente('${tipo}')" style="${inp}"></label>
+    ${tipo !== 'f' ? `<label style="grid-column:1/-1;">Comprobante relacionado${tipo === 'nc' ? ' (obligatorio)' : ' (opcional)'}<select id="fv-ref" onchange="fvTraerRenglones()" style="${inp}"><option value="">Primero elija el cliente…</option></select></label>` : ''}<datalist id="fv-cl">${[...new Set(clientes)].sort().map(n => `<option value="${escapeAttr(n)}">`).join('')}</datalist>
     <label>Letra<select id="fv-l" style="${inp}"><option>A</option><option>B</option><option>C</option></select></label><label>Número (punto de venta - número)<input id="fv-n" placeholder="00010-00001234" style="${inp}"></label>
     <label>Fecha<input type="date" id="fv-f" value="${ccHoy()}" style="${inp}"></label><span></span></div>
     <b style="display:block;margin:10px 0 4px;font-size:.88rem;">Renglones (importe con IVA)</b><div id="fv-rows"></div><datalist id="fv-skus">${skus.map(s => `<option value="${s}">`).join('')}</datalist>
@@ -12008,17 +12011,36 @@ function fvManual(tipo){
     <div style="display:flex;gap:8px;"><button class="btn btn-gold" style="flex:1;" onclick="fvGuardar('${tipo}')">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
   fvFila();
 }
-function fvFila(){ const d = document.createElement('div'); d.className = 'fv-r'; d.style.cssText = 'display:grid;grid-template-columns:1.2fr .6fr 1fr;gap:6px;margin-bottom:6px;';
-  d.innerHTML = `<input class="fv-s" list="fv-skus" placeholder="SKU" style="padding:7px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;"><input class="fv-q" inputmode="decimal" placeholder="Cant." style="padding:7px;border:1px solid var(--line);border-radius:8px;"><input class="fv-i" inputmode="decimal" placeholder="Importe $" oninput="fvTot()" style="padding:7px;border:1px solid var(--line);border-radius:8px;">`;
-  document.getElementById('fv-rows').appendChild(d); }
+function fvFila(x){ x = x || {}; const d = document.createElement('div'); d.className = 'fv-r'; d.style.cssText = 'display:grid;grid-template-columns:1.2fr .6fr 1fr 32px;gap:6px;margin-bottom:6px;'; if(x.unit) d.dataset.unit = x.unit; if(x.max) d.dataset.max = x.max;
+  d.innerHTML = `<input class="fv-s" list="fv-skus" placeholder="SKU" value="${escapeAttr(x.sku || '')}" style="padding:7px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;"><input class="fv-q" inputmode="decimal" placeholder="Cant." value="${x.cant != null ? x.cant : ''}" oninput="fvCant(this)" style="padding:7px;border:1px solid var(--line);border-radius:8px;"><input class="fv-i" inputmode="decimal" placeholder="Importe $" value="${x.imp ? formatoPesos(Math.round(x.imp * 100) / 100) : ''}" oninput="fvTot()" style="padding:7px;border:1px solid var(--line);border-radius:8px;"><button type="button" title="Quitar renglón" onclick="this.parentNode.remove();fvTot()" style="border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;">✕</button>`;
+  document.getElementById('fv-rows').appendChild(d); fvTot(); }
+// al cambiar la cantidad de un renglon traido de la factura, el importe se recalcula con el precio de esa factura
+function fvCant(e){ const d = e.parentNode, u = +d.dataset.unit, q = numAr(e.value) || 0, mx = +d.dataset.max; if(mx && q > mx){ alert('No puede superar lo facturado (' + mx + ').'); e.value = mx; } if(u) d.querySelector('.fv-i').value = formatoPesos(Math.round(u * (numAr(e.value) || 0) * 100) / 100); fvTot(); }
+// facturas del cliente (misma razon social) para relacionar la NC o ND
+function fvFacturasCliente(tipo){
+  const s = document.getElementById('fv-ref'); if(!s) return; const k = ccClave(document.getElementById('fv-c').value), rz = document.getElementById('fv-rz').value || 'propia';
+  const L = (facturas || []).filter(f => !f.esNC && ccClave(f.cliente) === k && (f.razon || 'propia') === rz).sort((a, b) => ccFechaISO(b.fecha).localeCompare(ccFechaISO(a.fecha)));
+  window.__fvFacts = L;
+  s.innerHTML = L.length ? '<option value="">Elegir la factura…</option>' + L.map((f, i) => `<option value="${i}">${f.esND ? 'ND' : 'Factura'} ${escaparHtml((f.tipo || '') + ' ' + f.numero)} · ${escaparHtml(f.fecha)} · ${formatPrice(f.total || 0)}</option>`).join('') : '<option value="">Este cliente no tiene facturas cargadas en esta razón social</option>';
+}
+function fvTraerRenglones(){
+  const i = document.getElementById('fv-ref').value, f = (window.__fvFacts || [])[i]; if(!f) return;
+  const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0), fx = f.total && n0 > 0 ? f.total / n0 : 1.21;
+  document.getElementById('fv-rows').innerHTML = '';
+  (f.items || []).forEach(it => { const imp = (it.neto || 0) * fx, q = +it.cant || 1; fvFila({ sku: skuDeFactura(it.codigo), cant: q, imp, unit: imp / q, max: q }); });
+  document.getElementById('fv-l').value = f.tipo || document.getElementById('fv-l').value;
+}
 function fvTot(){ const t = [...document.querySelectorAll('.fv-i')].reduce((a, e) => a + (numAr(e.value) || 0), 0); document.getElementById('fv-tot').textContent = 'Total con IVA: ' + formatPrice(t); }
 async function fvGuardar(tipo){
   const g = id => (document.getElementById(id).value || '').trim();
   const items = [...document.querySelectorAll('.fv-r')].map(d => { const s = d.querySelector('.fv-s').value.trim().toUpperCase(), q = numAr(d.querySelector('.fv-q').value) || 0, i = numAr(d.querySelector('.fv-i').value) || 0; const r = s ? buscarProductoPorSku(s) : null;
     return i > 0 ? { codigo: s || 'VARIOS', desc: r ? r.producto.nombre + ' ' + (r.variante.desc || '') : '', cant: q || 1, neto: Math.round(i / 1.21 * 100) / 100, importe: Math.round(i / 1.21 * 100) / 100, ok: true } : null; }).filter(Boolean);
   if(!g('fv-c') || !g('fv-n') || !items.length){ alert('Complete cliente, número y al menos un renglón con importe.'); return; }
+  const refSel = document.getElementById('fv-ref'), ref = refSel && refSel.value !== '' ? (window.__fvFacts || [])[refSel.value] : null;
+  if(tipo === 'nc' && !ref){ alert('La nota de crédito debe hacer referencia a una factura: elija el comprobante relacionado.'); return; }
+  if(ref && tipo === 'nc'){ const tNC = items.reduce((a, x) => a + x.neto * 1.21, 0); if(tNC > (ref.total || 0) + 1){ alert('La nota de crédito no puede superar el total de la factura relacionada (' + formatPrice(ref.total) + ').'); return; } }
   const f = g('fv-f').split('-'), total = items.reduce((a, x) => a + x.neto * 1.21, 0);
-  const fa = { numero: g('fv-n'), tipo: g('fv-l'), fecha: `${f[2]}/${f[1]}/${f[0]}`, cliente: g('fv-c'), total: Math.round(total * 100) / 100, items, esNC: tipo === 'nc', esND: tipo === 'nd', devolvieron: true, controlOk: true, razon: g('fv-rz') || 'propia', manual: true };
+  const fa = { numero: g('fv-n'), tipo: g('fv-l'), fecha: `${f[2]}/${f[1]}/${f[0]}`, cliente: g('fv-c'), total: Math.round(total * 100) / 100, items, esNC: tipo === 'nc', esND: tipo === 'nd', devolvieron: true, controlOk: true, razon: g('fv-rz') || 'propia', manual: true, facturaRef: ref ? { id: ref._id || String(ref.numero).replace(/\//g, '-'), numero: `${ref.tipo || ''} ${ref.numero}` } : null };
   const k = claveComprobante(fa); fa.yaEsta = (facturas || []).some(x => claveComprobante(x) === k);
   facturasNuevas.push(fa); const i = facturasNuevas.length - 1; cerrarPublicar(); renderFacturasNuevas();
   if(fa.yaEsta){ alert('Ya hay un comprobante con el mismo punto de venta y número en esa razón social. No se guardó.'); return; }
@@ -12038,7 +12060,7 @@ async function guardarFactura(i, reemplazar){
     facturas = (facturas || []).filter(x => claveComprobante(x) !== k);
   }
   const items = fa.items.map(it => { const c = costoItemFactura(it, fa); return { ...it, sku: skuDeFactura(it.codigo), costo: c, gan: c != null ? it.neto * signoFact(fa) - c : null }; });
-  const doc = { razon: fa.razon || 'propia', confirmados: fa.confirmados || [], esND: !!fa.esND, esNC: !!fa.esNC, devolvieron: fa.devolvieron !== false, numero: fa.numero, tipo: fa.tipo, fecha: fa.fecha, cliente: fa.cliente, total: fa.total, items, neto: items.reduce((a, x) => a + x.neto, 0), costo: items.reduce((a, x) => a + (x.costo || 0), 0), archivo: fa.archivo, guardado: new Date().toISOString() };
+  const doc = { facturaRef: fa.facturaRef || null, razon: fa.razon || 'propia', confirmados: fa.confirmados || [], esND: !!fa.esND, esNC: !!fa.esNC, devolvieron: fa.devolvieron !== false, numero: fa.numero, tipo: fa.tipo, fecha: fa.fecha, cliente: fa.cliente, total: fa.total, items, neto: items.reduce((a, x) => a + x.neto, 0), costo: items.reduce((a, x) => a + (x.costo || 0), 0), archivo: fa.archivo, guardado: new Date().toISOString() };
   const idDoc = (String(fa.numero).replace(/\//g, '-') || String(Date.now())) + (fa.esNC ? '-NC' : '');
   try{ await db.collection('ventas_facturadas').doc(idDoc).set(doc); fa.yaEsta = true; fa.repetidaEnLote = false; (facturas = facturas || []).push({ ...doc, _id: idDoc });
     try{ if(await stockPorFactura(doc, 1, `${doc.tipo || ''} ${doc.numero}`)){ await db.collection('ventas_facturadas').doc(idDoc).set({ stockAplicado: true }, { merge: true }); facturas[facturas.length - 1].stockAplicado = true; } } catch(e){ alert('La factura se guardó, pero no se pudo descontar el stock: ' + e.message); }
@@ -20547,7 +20569,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v306';
+const APP_VERSION = '2026-10-02-v307';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
