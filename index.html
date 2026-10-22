@@ -837,6 +837,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
     <div class="form-card">
       <h2>Nuevo ingreso — Formato gráfico</h2>
       <p class="note" style="margin-bottom:18px;">Paso 2 de 2. Elija qué piezas generar.</p>
+      <div id="ni-links"></div>
 
       <div class="ni-seccion">
         <p class="ni-seccion-tit">Piezas para redes</p>
@@ -1648,7 +1649,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v316</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v317</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -20796,6 +20797,17 @@ function irAFormatoGrafico(){
   }
   errorEl.style.display = 'none';
   mostrarPaso('step-ni-formato');
+  pintarLinksNI(modo);
+}
+// si el producto tiene link en la web, se ofrece para copiar
+async function pintarLinksNI(modo){
+  const box = document.getElementById('ni-links'); if(!box) return; box.innerHTML = '';
+  if(modo !== 'sku') return;
+  if(!Object.keys(linksWeb || {}).length) await cargarLinksWeb();
+  const vistos = new Set(), L = [];
+  [...document.querySelectorAll('#ni-sku-campos input')].map(i => i.value.trim().toUpperCase()).filter(Boolean).forEach(S => { const r = buscarProductoPorSku(S); const l = linkWebDeSku(S) || (r ? linkWebDeProducto(r.producto) : null); if(l && !vistos.has(l)){ vistos.add(l); L.push([r ? r.producto.nombre : S, l]); } });
+  window.__niLinks = L.map(x => x[1]);
+  box.innerHTML = L.map(([n, l], i) => `<div style="display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:12px;background:#fff;font-size:.88rem;"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🔗 ${escaparHtml(n)} · <span class="meta">${escaparHtml(l)}</span></span><button type="button" class="btn-mini" onclick="navigator.clipboard.writeText(window.__niLinks[${i}]).then(()=>{this.textContent='✓ Copiado';setTimeout(()=>this.textContent='Copiar link',1500);}).catch(()=>prompt('Copie el link:', window.__niLinks[${i}]))">Copiar link</button></div>`).join('');
 }
 
 </script>
@@ -20832,7 +20844,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v316';
+const APP_VERSION = '2026-10-02-v317';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
