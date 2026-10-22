@@ -1637,7 +1637,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v313</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v314</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6021,7 +6021,7 @@ const GRUPOS_INICIO = {
 };
 // ===== Barra lateral: las mismas opciones del inicio, con sus permisos =====
 const SB_ORDEN = [['ped', '🛒', 'Pedidos'], ['comp', '🧾', 'Comprobantes'], ['cli', '👥', 'Clientes'], ['art', '📦', 'Artículos'], ['prov', '🏭', 'Proveedores'], ['teso', '💰', 'Fondos'], ['imp', '🧮', 'Impuestos'], ['est', '📊', 'Informes'], ['c', '📣', 'Difusión y creatividad']];
-let sbAbierto = null;
+let sbAbierto = null; const sbSubAbiertos = new Set(); // subcategorias desplegadas (por defecto, contraidas)
 function sbItems(k){ const g = GRUPOS_INICIO[k]; if(!g) return []; const tit = g.titulosColumnas || []; const out = [];
   (g.columnas || []).forEach((col, i) => { const vis = col.filter(([, f]) => puede(permisoGrupoItem(k, f)) && puede(permisoDeAccion(f))); if(vis.length) out.push({ titulo: tit[i] || '', items: vis }); }); return out; }
 function pintarBarraLateral(){
@@ -6031,14 +6031,16 @@ function pintarBarraLateral(){
   window.__sbItems = [];
   const reg = it => { window.__sbItems.push(it); return window.__sbItems.length - 1; };
   const grupo = (k, ic, t) => { const cols = sbItems(k); if(!cols.length) return '';
-    return `<a class="${sbAbierto === k ? 'on' : ''}" onclick="sbAbierto='${k}';pintarBarraLateral();pintarCategoria('${k}')">${ic} ${t}</a>${sbAbierto === k ? `<div class="sb-sub">${cols.map(c => (cols.length > 1 && c.titulo ? `<b>${escaparHtml(c.titulo.replace(/^\d+ · /, ''))}</b>` : '') + c.items.map(([tt, f]) => `<div class="${/ResultadosML|CalculadoraML|VentasML/.test(f) ? 'ml' : ''}" onclick="sbUsar(${reg([tt, f])})">${escaparHtml(tt.replace(/^\S+\s/, ''))}</div>`).join('')).join('')}</div>` : ''}`; };
+    return `<a class="${sbAbierto === k ? 'on' : ''}" onclick="sbAbierto=sbAbierto==='${k}'?null:'${k}';pintarBarraLateral();pintarCategoria('${k}')">${ic} ${t}<span style="margin-left:auto;font-size:.8rem;color:#A89E90;">${sbAbierto === k ? '▾' : '▸'}</span></a>${sbAbierto === k ? `<div class="sb-sub">${cols.map((c, ci) => { const key = k + ':' + ci, abierta = cols.length === 1 || !c.titulo || sbSubAbiertos.has(key);
+      return (cols.length > 1 && c.titulo ? `<b style="cursor:pointer;display:flex;justify-content:space-between;" onclick="sbToggleSub('${key}')"><span>${escaparHtml(c.titulo.replace(/^\d+ · /, ''))}</span><span>${abierta ? '▾' : '▸'}</span></b>` : '') + (abierta ? c.items.map(([tt, f]) => `<div class="${/ResultadosML|CalculadoraML|VentasML/.test(f) ? 'ml' : ''}" onclick="sbUsar(${reg([tt, f])})">${escaparHtml(tt.replace(/^\S+\s/, ''))}</div>`).join('') : ''); }).join('')}</div>` : ''}`; };
   const agentes = [['🎨', 'Director de arte', 'abrirDirectorArte()'], ['🧾', 'Auditor contable', 'abrirAuditor()']].filter(([, , f]) => puede(permisoDeAccion(f)));
   sb.innerHTML = `<div class="sb-logo">OnLineTextil</div>
     <a onclick="sbAbierto=null;irInicio();pintarBarraLateral();document.body.classList.remove('sb-abierta')">🏠 Inicio</a>
     ${SB_ORDEN.map(([k, ic, t]) => grupo(k, ic, t)).join('')}<hr>
-    ${agentes.length ? `<a class="${sbAbierto === 'ag' ? 'on' : ''}" onclick="sbAbierto='ag';pintarBarraLateral();pintarCategoria('ag')">🤖 Agentes IA</a>${sbAbierto === 'ag' ? `<div class="sb-sub">${agentes.map(([ic, t, f]) => `<div onclick="sbUsar(${reg([t, f])})">${ic} ${t}</div>`).join('')}</div>` : ''}` : ''}
+    ${agentes.length ? `<a class="${sbAbierto === 'ag' ? 'on' : ''}" onclick="sbAbierto=sbAbierto==='ag'?null:'ag';pintarBarraLateral();pintarCategoria('ag')">🤖 Agentes IA<span style="margin-left:auto;font-size:.8rem;color:#A89E90;">${sbAbierto === 'ag' ? '▾' : '▸'}</span></a>${sbAbierto === 'ag' ? `<div class="sb-sub">${agentes.map(([ic, t, f]) => `<div onclick="sbUsar(${reg([t, f])})">${ic} ${t}</div>`).join('')}</div>` : ''}` : ''}
     ${grupo('i', '⚙️', 'Configuración')}`;
 }
+function sbToggleSub(key){ if(sbSubAbiertos.has(key)) sbSubAbiertos.delete(key); else sbSubAbiertos.add(key); pintarBarraLateral(); }
 function sbUsar(i){ const it = (window.__sbItems || [])[i]; if(!it) return; document.body.classList.remove('sb-abierta'); window.__iniItems = window.__iniItems || []; window.__iniItems.push(it); usarItemInicio(window.__iniItems.length - 1); }
 // ===== Inicio: vista general (accesos rapidos, numeros del dia, para atender hoy, ventas por canal) =====
 // datos del inicio y de cada categoria: se calculan en paralelo y se guardan 1 minuto
@@ -20779,7 +20781,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v313';
+const APP_VERSION = '2026-10-02-v314';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
