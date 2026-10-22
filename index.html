@@ -471,6 +471,17 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
 #dash .d-box{background:#fff;border:1px solid #E6E0D6;border-radius:14px;padding:14px;}
 #dash .d-box h3{margin:0 0 8px;font-size:.75rem;letter-spacing:.08em;color:#8A8072;text-transform:uppercase;}
 #dash .d-li{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid #F0ECE5;font-size:.9rem;cursor:pointer;}
+#dash details.d-pl{background:#fff;border:1px solid #ECE7DF;border-radius:12px;margin-bottom:8px;}
+#dash details.d-pl > summary{list-style:none;cursor:pointer;padding:11px 14px;display:flex;justify-content:space-between;align-items:center;font-weight:600;color:#3D2B4E;font-size:.95rem;}
+#dash details.d-pl > summary::-webkit-details-marker{display:none;}
+#dash details.d-pl > summary::after{content:'▸';color:#B5AC9F;font-size:.8rem;margin-left:10px;}
+#dash details.d-pl[open] > summary::after{content:'▾';}
+#dash details.d-pl > div{padding:0 14px 10px;}
+#dash details.d-pl .cnt{color:#8A8072;font-weight:400;font-size:.85rem;margin-left:auto;}
+#dash .d-num{display:flex;gap:18px;flex-wrap:wrap;padding:4px 2px 12px;font-size:.9rem;color:#6B6258;}
+#dash .d-num span{cursor:pointer;} #dash .d-num b{color:#2B2420;font-weight:700;}
+#dash .d-acc button{background:#fff;border:1px solid #E6E0D6;}
+#dash .d-acc button.g{background:#fff;border-color:#3D2B4E;font-weight:600;}
 </style>
 <nav id="sb"></nav><div id="sb-velo" onclick="document.body.classList.remove('sb-abierta')"></div>
 <header class="top">
@@ -1637,7 +1648,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v315</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v316</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6116,11 +6127,13 @@ async function pintarDash(){
   window.__dashItems = acc.map(([t, f]) => [t, f]);
   const hora = new Date().getHours(), saludo = hora < 12 ? 'Buenos días' : hora < 20 ? 'Buenas tardes' : 'Buenas noches', nombre = ((firebase.auth().currentUser || {}).displayName || '').split(' ')[0];
   const pintar = V => { if(run !== dashRun) return;
-    box.innerHTML = `<h2 style="font-family:Georgia,serif;color:var(--purple);margin:6px 0 8px;">${saludo}${nombre ? ', ' + escaparHtml(nombre) : ''}</h2>
+    const G = V ? [['plata', 'Plata'], ['costos', 'Costos y precios'], ['stock', 'Stock y operación']].map(([g, tg]) => [tg, V.hoy.map((x, i) => [x, i]).filter(([x]) => (x[3] || 'stock') === g)]).filter(([, L]) => L.length) : [];
+    const num = (t, v, f) => `<span onclick="${f}">${t} <b>${v}</b></span>`;
+    box.innerHTML = `<h2 style="font-family:Georgia,serif;color:var(--purple);margin:6px 0 10px;font-weight:600;">${saludo}${nombre ? ', ' + escaparHtml(nombre) : ''}</h2>
       <div class="d-acc">${acc.map(([t, , c], i) => `<button type="button" class="${c || ''}" onclick="dashUsar(${i})">${t}</button>`).join('')}</div>
-      ${esDueno() ? `<div class="d-cards">${V ? dashCard('Disponible', V.disp != null ? formatPrice(V.disp) : '—', '', 'abrirTesoreria()') + dashCard('A cobrar · vencido', V.cobrar != null ? formatPrice(V.cobrar) : '—', V.venc > 0 ? formatPrice(V.venc) : '', 'abrirCtaCte()') + dashCard('A pagar · vence esta semana', V.pagar != null ? formatPrice(V.pagar) : '—', V.p7 > 0 ? formatPrice(V.p7) : '', 'abrirCompras()') + dashCard('Vendido este mes', dashM(V.tot), '', 'abrirResultadoNegocio()') : dashCard('Calculando…', '…')}</div>` : ''}
-      <div class="d-row"><div class="d-box"><h3>Para atender hoy</h3>${V ? (V.hoy.length ? [['plata', '💰 Plata'], ['costos', '💲 Costos y precios'], ['stock', '📦 Stock y operación']].map(([g, tg]) => { const L = V.hoy.map((x, i) => [x, i]).filter(([x]) => (x[3] || 'stock') === g); return L.length ? `<div style="margin:10px 0 2px;font-weight:800;color:var(--purple);font-size:.88rem;">${tg} <span class="meta">(${L.length})</span></div>` + L.map(([[t, , ml], i]) => `<div class="d-li" onclick="dashHoy(${i})"><span>${t}</span><b ${ml ? 'style="background:#FFE600;color:#2D3277;padding:0 8px;border-radius:6px;"' : ''}>Ver</b></div>`).join('') : ''; }).join('') : '<p class="note" style="text-align:left;margin:0;">✓ Nada pendiente.</p>') : '<p class="note" style="text-align:left;margin:0;">Revisando…</p>'}</div>
-        ${esDueno() ? `<div class="d-box"><h3>Ventas del mes por canal</h3>${V ? [[chipRZ('propia') + ' facturado', V.vPropia], [chipRZ('alberto') + ' Mercado Libre', V.vA], [chipRZ('rita') + ' Mercado Libre', V.vR]].map(([t, v]) => `<div class="d-li" style="cursor:default;"><span>${t}</span><b>${dashM(v)}</b></div>`).join('') + (!V.vA && !V.vR ? '<p class="note" style="text-align:left;margin:6px 0 0;">Para ver Mercado Libre, abra Resultados ML con el mes cargado.</p>' : '') : '…'}</div>` : ''}</div>`;
+      ${esDueno() && V ? `<div class="d-num">${num('Disponible', V.disp != null ? formatPrice(V.disp) : '—', 'abrirTesoreria()')}${num('A cobrar', V.cobrar != null ? formatPrice(V.cobrar) : '—', 'abrirCtaCte()')}${num('A pagar', V.pagar != null ? formatPrice(V.pagar) : '—', 'abrirCompras()')}${num('Vendido en el mes', dashM(V.tot), 'abrirResultadoNegocio()')}</div>` : ''}
+      ${V ? (G.length ? `<details class="d-pl"><summary>Para atender <span class="cnt">${V.hoy.length}</span></summary><div>${G.map(([tg, L]) => `<details class="d-pl" style="border:none;margin:0;"><summary style="padding:8px 0;font-size:.9rem;">${tg} <span class="cnt">${L.length}</span></summary><div style="padding:0 0 6px;">${L.map(([[t, , ml], i]) => `<div class="d-li" onclick="dashHoy(${i})"><span>${t.replace(/^\S+\s/, '')}</span><span style="color:${ml ? '#2D3277' : '#8A8072'};${ml ? 'background:#FFE600;padding:0 8px;border-radius:6px;font-weight:700;' : ''}">Ver</span></div>`).join('')}</div></details>`).join('')}</div></details>` : '<p class="note" style="text-align:left;margin:4px 0;">✓ Nada pendiente.</p>') : '<p class="note" style="text-align:left;margin:4px 0;">Revisando…</p>'}
+      ${esDueno() && V ? `<details class="d-pl"><summary>Ventas del mes por canal <span class="cnt">${dashM(V.tot)}</span></summary><div>${[['Propia (facturado)', V.vPropia], ['Mercado Libre · Alberto', V.vA], ['Mercado Libre · Rita', V.vR]].map(([t, v]) => `<div class="d-li" style="cursor:default;"><span>${t}</span><b>${dashM(v)}</b></div>`).join('')}</div></details>` : ''}`;
     window.__dashHoy = V ? V.hoy : []; };
   pintar(dashCache); // lo ultimo calculado al instante
   try{ pintar(await dashDatos()); } catch(e){ console.error(e); pintar({ hoy: [] }); }
@@ -6133,7 +6146,7 @@ async function pintarCategoria(k){
   const g = GRUPOS_INICIO[k] || {}, cols = k === 'ag' ? [{ titulo: 'Agentes', items: [['🎨 Director de arte', 'abrirDirectorArte()'], ['🧾 Auditor contable', 'abrirAuditor()']].filter(([, f]) => puede(permisoDeAccion(f))) }] : sbItems(k);
   const titulo = k === 'ag' ? '🤖 Agentes IA' : k === 'i' ? '⚙️ Configuración' : (g.titulo || '');
   window.__catItems = []; const reg = it => { window.__catItems.push(it); return window.__catItems.length - 1; };
-  const opciones = cols.map(c => `<div class="d-box" style="margin-bottom:10px;"><h3>${escaparHtml((c.titulo || '').replace(/^\d+ · /, ''))}</h3><div class="d-acc" style="margin:0;">${c.items.map(([t, f]) => `<button type="button" style="${/ResultadosML|CalculadoraML|VentasML/.test(f) ? 'background:#FFE600;border-color:#E6CF00;color:#2D3277;font-weight:700;' : ''}" onclick="catUsar(${reg([t, f])})">${escaparHtml(t)}</button>`).join('')}</div></div>`).join('');
+  const opciones = cols.map(c => `<details class="d-pl" ${cols.length === 1 ? 'open' : ''}><summary>${escaparHtml((c.titulo || titulo).replace(/^\d+ · /, ''))} <span class="cnt">${c.items.length}</span></summary><div><div class="d-acc" style="margin:0;">${c.items.map(([t, f]) => `<button type="button" style="${/ResultadosML|CalculadoraML|VentasML/.test(f) ? 'background:#FFE600;border-color:#E6CF00;color:#2D3277;font-weight:700;' : ''}" onclick="catUsar(${reg([t, f])})">${escaparHtml(t)}</button>`).join('')}</div></div></details>`).join('');
   const resumen = V => { if(!V || !esDueno() && !['art', 'ped'].includes(k)) return '';
     const c = { cli: [['Clientes', V.nClientes != null ? V.nClientes.toLocaleString('es-AR') : '—', '', 'abrirClientes()'], ['A cobrar · vencido', V.cobrar != null ? formatPrice(V.cobrar) : '—', V.venc > 0 ? formatPrice(V.venc) : '', 'abrirCtaCte()'], ['Clientes con saldo', V.conSaldo != null ? V.conSaldo : '—', '', 'abrirCtaCte()']],
       prov: [['Proveedores', V.nProv != null ? V.nProv : '—', '', 'abrirCompras()'], ['A pagar · vence esta semana', V.pagar != null ? formatPrice(V.pagar) : '—', V.p7 > 0 ? formatPrice(V.p7) : '', 'abrirCompras()']],
@@ -6142,8 +6155,8 @@ async function pintarCategoria(k){
       est: [['Vendido este mes', dashM(V.tot), '', 'abrirResultadoNegocio()'], ['Propia', dashM(V.vPropia), '', 'abrirFacturas()'], ['ML Alberto', dashM(V.vA), '', 'abrirResultadosML()'], ['ML Rita', dashM(V.vR), '', 'abrirResultadosML()']],
       art: [['SKU en el catálogo', V.nSku.toLocaleString('es-AR'), '', ''], ['Debajo del stock mínimo', V.bajo || 0, '', 'abrirStock()'], ['Con stock negativo', V.neg || 0, '', 'abrirStock()']],
       imp: [['Posición de IVA del mes', 'Ver', '', 'abrirIVA()']] }[k];
-    return c ? `<div class="d-cards">${c.map(x => dashCard(...x)).join('')}</div>` : ''; };
-  const pintar = V => { if(run !== dashRun) return; box.innerHTML = `<h2 style="font-family:Georgia,serif;color:var(--purple);margin:6px 0 10px;">${titulo}</h2>${resumen(V)}${opciones}`; };
+    return c ? `<div class="d-num">${c.map(([t, v, e, f]) => `<span ${f ? `onclick="${f}"` : ''}>${t} <b>${v}</b>${e ? ` <span style="color:#A6432F;">(vencido ${e})</span>` : ''}</span>`).join('')}</div>` : ''; };
+  const pintar = V => { if(run !== dashRun) return; box.innerHTML = `<h2 style="font-family:Georgia,serif;color:var(--purple);margin:6px 0 10px;font-weight:600;">${titulo.replace(/^\S+\s/, '')}</h2>${resumen(V)}${opciones}`; };
   pintar(dashCache); window.scrollTo(0, 0);
   if(['cli', 'prov', 'comp', 'teso', 'est', 'art'].includes(k)){ try{ pintar(await dashDatos()); } catch(e){ console.error(e); } }
 }
@@ -20819,7 +20832,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v315';
+const APP_VERSION = '2026-10-02-v316';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
