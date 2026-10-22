@@ -455,7 +455,7 @@ body.con-sb #sb{display:block;}
 #sb hr{border:none;border-top:1px solid #EEE;margin:10px 16px;}
 #sb-toggle{display:none;}
 @media(max-width:900px){ body.con-sb #sb-toggle{display:inline-block;} }
-body.con-sb #avisoCtaCte, body.con-sb #avisoCompras, body.con-sb #avisoTeso{display:none !important;} /* ya estan en los numeros del dia */
+body.con-sb #avisoCtaCte, body.con-sb #avisoCompras, body.con-sb #avisoTeso, body.con-sb #avisoCopia, body.con-sb #avisoCostos{display:none !important;} /* ya estan en los numeros del dia */
 #sb-velo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:140;}
 @media(max-width:900px){ body.sb-abierta #sb-velo{display:block;} }
 body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-sb #step-inicio .ini-sec{display:none !important;}
@@ -1637,7 +1637,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v314</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v315</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6062,12 +6062,50 @@ async function dashDatos(forzar){
   const ml = k => Object.values(res).filter(x => x.periodo === mes && String(x.cuenta).toLowerCase() === k).reduce((a, x) => a + (x.vendido || 0) + (x.envios || 0), 0);
   Object.assign(V, { vPropia, nFact, vA: ml('alberto'), vR: ml('rita') }); V.tot = vPropia + V.vA + V.vR;
   V.nSku = 0; CATALOGO.forEach(c => (c.productos || []).forEach(p => V.nSku += (p.variantes || []).length));
-  const rev = Object.values(res).filter(x => x.periodo === mes).reduce((a, x) => a + (x.revisar || 0), 0);
-  if(dueno && rev) V.hoy.push([`⚠️ ${rev} ventas para revisar en Mercado Libre`, 'abrirResultadosML()', true]);
-  if(dueno && V.venc > 0) V.hoy.push([`💳 Cobros vencidos por ${formatPrice(V.venc)}`, 'abrirCtaCte()']);
-  if(dueno && V.p7 > 0) V.hoy.push([`🏭 Pagos vencidos o de esta semana por ${formatPrice(V.p7)}`, 'abrirCompras()']);
-  if(dueno && typeof ccPend !== 'undefined' && ccPend.length) V.hoy.push([`💲 ${ccPend.length} SKU cambiaron de costo`, 'abrirRevisarCostos()']);
-  if(V.bajo) V.hoy.push([`📦 ${V.bajo} SKU debajo del stock mínimo`, 'abrirStock()']); if(V.neg) V.hoy.push([`⚠️ ${V.neg} SKU con stock negativo`, 'abrirStock()']);
+  // ---------- pendientes, agrupados: plata · costos y precios · stock y operacion ----------
+  const P = (g, t, f, ml) => V.hoy.push([t, f, !!ml, g]), hoyISO = new Date().toISOString().slice(0, 10), hace = d => new Date(Date.now() - d * 864e5).toISOString();
+  const mesAnt = (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); })();
+  const extra = await Promise.all([
+    dueno ? t(db.collection('teso_extractos').get().catch(() => null)) : null,
+    (puede('compras') || puede('produccion')) ? t(db.collection('ingresos_taller').get().catch(() => null)) : null,
+    dueno ? t(db.collection('gastos').get().catch(() => null)) : null,
+    puede('pedidos') ? t(db.collection('pedidos').get().catch(() => null)) : null,
+    t(db.collection('presupuestos').get().catch(() => null)),
+    dueno ? t(prepararCostosFacturas().catch(() => null)) : null ]);
+  const [sExt, sIng, sGas, sPed, sPre] = extra;
+  if(dueno){
+    // 1. banco sin registrar (ultimos 60 dias)
+    if(sExt){ const E = sExt.docs.map(d => d.data()).filter(x => x.fecha >= hace(60).slice(0, 10) && (x.cat === 'ingreso' || x.cat === 'egreso')); const reg = (tsMovs || []).filter(x => x.cuenta === 'santander'), us = new Set();
+      const sin = E.filter(x => { const tt = new Date(x.fecha + 'T12:00:00'); const i = reg.findIndex((r, k) => !us.has(k) && Math.abs(r.importe - x.importe) < 1 && Math.abs(new Date(String(r.fecha || r.creado).slice(0, 10) + 'T12:00:00') - tt) <= 3 * 864e5); if(i >= 0){ us.add(i); return false; } return true; }).length;
+      if(sin) P('plata', `🏦 ${sin} movimientos del banco sin registrar en la app`, 'abrirTesoreria().then(() => tsVerExtractos())'); }
+    if(V.venc > 0) P('plata', `💳 Cobros vencidos por ${formatPrice(V.venc)}`, 'abrirCtaCte()');
+    if(V.p7 > 0) P('plata', `🏭 Pagos vencidos o de esta semana por ${formatPrice(V.p7)}`, 'abrirCompras()');
+    const chq = (ccMovs || []).filter(m => m.cheque && (m.cheque.estado || 'cartera') === 'cartera' && m.cheque.fechaCobro && m.cheque.fechaCobro < hoyISO);
+    if(chq.length) P('plata', `🧾 ${chq.length} cheques con fecha de cobro pasada sin depositar`, "abrirCtaCte('cheques')");
+    const viejos = TS_CUENTAS.filter(([k]) => { const s = (tsCfg.saldos || {})[k]; return s && s.fecha < hace(7); }).map(([, t]) => t.replace(/^\S+\s/, ''));
+    if(viejos.length) P('plata', `💰 Saldo real sin actualizar hace más de 7 días: ${viejos.join(', ')}`, 'abrirTesoreria()');
+    if(sGas){ const n = sGas.docs.map(d => d.data()).filter(g => !g.tipo && g.origen !== 'compra' && !g.enML).length; if(n) P('plata', `💸 ${n} gastos sin tipo (fijo o variable)`, 'abrirGastos()'); }
+  }
+  if(sIng){ const L = sIng.docs.map(d => d.data()).filter(x => !x.liquidacion); const pr = L.reduce((a, x) => a + (x.detalle || []).reduce((b, d) => b + (d.buenas || 0), 0), 0); if(pr && (dueno || puede('compras'))) P('plata', `✂️ ${pr.toLocaleString('es-AR')} prendas entregadas por talleres sin liquidar`, "abrirCompras('talleres')"); }
+  // costos y precios
+  const vars = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => vars.push(v))));
+  const sinPrecio = vars.filter(v => v.precio !== 'Consultar' && !(parsePrice(v.precio) > 0)).length; if(sinPrecio) P('costos', `🏷️ ${sinPrecio} productos sin precio de lista`, 'abrirListaPrecios()');
+  if(dueno){
+    let sinCosto = 0; vars.forEach(v => { try{ if(costoUnidadSku(String(v.sku).toUpperCase()) == null) sinCosto++; } catch(e){} }); if(sinCosto) P('costos', `💲 ${sinCosto} SKU sin costo cargado`, 'abrirCostosProductos()');
+    if(typeof ccPend !== 'undefined' && ccPend.length) P('costos', `💲 ${ccPend.length} SKU cambiaron de costo (revisar el precio)`, 'abrirRevisarCostos()');
+    if(vf){ let sinC = 0, rev2 = 0; vf.docs.forEach(d => { const f = d.data(); if(f.razon && f.razon !== 'propia') return; if(ccFechaISO(f.fecha) < hace(60).slice(0, 10)) return; (f.items || []).forEach((it, i) => { try{ const c = costoItemFactura(it, f); if(c == null) sinC++; else if(renglonRevFactura(f, i, (it.neto || 0) * factorIvaFactura(f) * signoFact(f), c)) rev2++; } catch(e){} }); });
+      if(sinC || rev2) P('costos', `🧾 Facturas de los últimos 60 días: ${[sinC ? sinC + ' renglones sin costo' : '', rev2 ? rev2 + ' para revisar' : ''].filter(Boolean).join(' y ')}`, 'abrirFacturas()'); }
+    const revML = Object.values(res).filter(x => x.periodo === mes || x.periodo === mesAnt).reduce((a, x) => a + (x.revisar || 0), 0);
+    if(revML) P('costos', `⚠️ ${revML} ventas de Mercado Libre para revisar`, 'abrirResultadosML()', true);
+    const faltan = ['Alberto', 'Rita'].filter(c => !Object.values(res).some(x => x.periodo === mesAnt && String(x.cuenta).toLowerCase() === c.toLowerCase()));
+    if(faltan.length) P('costos', `📈 Falta el reporte de Mercado Libre de ${new Date(mesAnt + '-15').toLocaleDateString('es-AR', { month: 'long' })}: ${faltan.join(' y ')}`, 'abrirResultadosML()', true);
+  }
+  // stock y operacion
+  if(V.bajo) P('stock', `📦 ${V.bajo} SKU debajo del stock mínimo`, 'abrirStock()'); if(V.neg) P('stock', `⚠️ ${V.neg} SKU con stock negativo`, 'abrirStock()');
+  try{ const tn = Object.values((stockDatos && stockDatos.telas) || {}).filter(x => (+x.metros || 0) < 0).length; if(tn) P('stock', `🧵 ${tn} telas con metros negativos`, "abrirStock().then(() => { skTab = 'telas'; pintarStockTabs(); skRenderTab(); })"); } catch(e){}
+  if(sPed){ const n = sPed.docs.map(d => d.data()).filter(x => ['pendiente', 'parcial'].includes(x.estado || 'pendiente') && x.fecha && new Date(x.fecha) < new Date(Date.now() - 7 * 864e5)).length; if(n) P('stock', `🚚 ${n} pedidos pendientes de entrega con más de 7 días`, 'abrirPendientesEntrega()'); }
+  if(sPre){ const n = sPre.docs.map(d => d.data()).filter(x => !x.pedido && x.estado !== 'rechazado' && x.fecha && x.validez && new Date(new Date(x.fecha).getTime() + x.validez * 864e5) < new Date()).length; if(n) P('stock', `🧾 ${n} presupuestos abiertos con la validez vencida`, 'abrirPresupuestos()'); }
+  if(dueno){ const dc = diasDesdeCopia(); if(dc == null || dc >= 7) P('stock', `💾 ${dc == null ? 'Nunca descargó' : 'Hace ' + dc + ' días que no descarga'} una copia de seguridad`, 'abrirCopiaSeguridad()'); }
   dashCache = V; dashCacheT = Date.now(); return V;
 }
 const dashM = x => x >= 1e6 ? '$ ' + (x / 1e6).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' M' : formatPrice(x || 0);
@@ -6081,7 +6119,7 @@ async function pintarDash(){
     box.innerHTML = `<h2 style="font-family:Georgia,serif;color:var(--purple);margin:6px 0 8px;">${saludo}${nombre ? ', ' + escaparHtml(nombre) : ''}</h2>
       <div class="d-acc">${acc.map(([t, , c], i) => `<button type="button" class="${c || ''}" onclick="dashUsar(${i})">${t}</button>`).join('')}</div>
       ${esDueno() ? `<div class="d-cards">${V ? dashCard('Disponible', V.disp != null ? formatPrice(V.disp) : '—', '', 'abrirTesoreria()') + dashCard('A cobrar · vencido', V.cobrar != null ? formatPrice(V.cobrar) : '—', V.venc > 0 ? formatPrice(V.venc) : '', 'abrirCtaCte()') + dashCard('A pagar · vence esta semana', V.pagar != null ? formatPrice(V.pagar) : '—', V.p7 > 0 ? formatPrice(V.p7) : '', 'abrirCompras()') + dashCard('Vendido este mes', dashM(V.tot), '', 'abrirResultadoNegocio()') : dashCard('Calculando…', '…')}</div>` : ''}
-      <div class="d-row"><div class="d-box"><h3>Para atender hoy</h3>${V ? (V.hoy.length ? V.hoy.map(([t, , ml], i) => `<div class="d-li" onclick="dashHoy(${i})"><span>${t}</span><b ${ml ? 'style="background:#FFE600;color:#2D3277;padding:0 8px;border-radius:6px;"' : ''}>Ver</b></div>`).join('') : '<p class="note" style="text-align:left;margin:0;">✓ Nada pendiente.</p>') : '<p class="note" style="text-align:left;margin:0;">Revisando…</p>'}</div>
+      <div class="d-row"><div class="d-box"><h3>Para atender hoy</h3>${V ? (V.hoy.length ? [['plata', '💰 Plata'], ['costos', '💲 Costos y precios'], ['stock', '📦 Stock y operación']].map(([g, tg]) => { const L = V.hoy.map((x, i) => [x, i]).filter(([x]) => (x[3] || 'stock') === g); return L.length ? `<div style="margin:10px 0 2px;font-weight:800;color:var(--purple);font-size:.88rem;">${tg} <span class="meta">(${L.length})</span></div>` + L.map(([[t, , ml], i]) => `<div class="d-li" onclick="dashHoy(${i})"><span>${t}</span><b ${ml ? 'style="background:#FFE600;color:#2D3277;padding:0 8px;border-radius:6px;"' : ''}>Ver</b></div>`).join('') : ''; }).join('') : '<p class="note" style="text-align:left;margin:0;">✓ Nada pendiente.</p>') : '<p class="note" style="text-align:left;margin:0;">Revisando…</p>'}</div>
         ${esDueno() ? `<div class="d-box"><h3>Ventas del mes por canal</h3>${V ? [[chipRZ('propia') + ' facturado', V.vPropia], [chipRZ('alberto') + ' Mercado Libre', V.vA], [chipRZ('rita') + ' Mercado Libre', V.vR]].map(([t, v]) => `<div class="d-li" style="cursor:default;"><span>${t}</span><b>${dashM(v)}</b></div>`).join('') + (!V.vA && !V.vR ? '<p class="note" style="text-align:left;margin:6px 0 0;">Para ver Mercado Libre, abra Resultados ML con el mes cargado.</p>' : '') : '…'}</div>` : ''}</div>`;
     window.__dashHoy = V ? V.hoy : []; };
   pintar(dashCache); // lo ultimo calculado al instante
@@ -20781,7 +20819,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v314';
+const APP_VERSION = '2026-10-02-v315';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
