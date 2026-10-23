@@ -483,7 +483,15 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
 #dash .d-acc button{background:#fff;border:1px solid #E6E0D6;}
 #dash .d-acc button.g{background:#fff;border-color:#3D2B4E;font-weight:600;}
 </style>
-<nav id="sb"></nav><div id="sb-velo" onclick="document.body.classList.remove('sb-abierta')"></div>
+
+<style>
+#ac-pop{position:absolute;z-index:3000;background:#fff;border:1px solid #DDD5C8;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:280px;overflow:auto;display:none;font-size:.9rem;}
+#ac-pop div{padding:8px 12px;cursor:pointer;border-top:1px solid #F3EFE8;}
+#ac-pop div:first-child{border-top:none;}
+#ac-pop div.on,#ac-pop div:hover{background:#F2EEF7;}
+#ac-pop small{color:#8A8072;margin-left:6px;}
+</style>
+<div id="ac-pop"></div><nav id="sb"></nav><div id="sb-velo" onclick="document.body.classList.remove('sb-abierta')"></div>
 <header class="top">
   <h1>OnLineTextil</h1>
   <p>Pedido mayorista · onlinetextil.com.ar</p>
@@ -1649,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v323</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v324</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6042,6 +6050,45 @@ const GRUPOS_INICIO = {
     [['🎨 Director de arte', 'abrirDirectorArte()'], ['🧾 Auditor contable', 'abrirAuditor()']],
   ] },
 };
+// ===== Buscador con sugerencias en los campos de texto: escribe una parte (ej. "jorg") y ofrece todo lo que la contiene =====
+const AC_FUENTE = { 'rm-cl': 'clientes', 'rc-cl': 'clientes', 'fv-cl': 'clientes', 'pia-clientes': 'clientes', 'pe-clientes': 'clientes',
+  'sm-skus': 'sku', 'rm-skus': 'sku', 'fv-skus': 'sku', 'fa-skus': 'sku', 'da-skus': 'sku', 'pe-productos': 'sku', 'lista-telas': 'telas', 'lista-proveedores-tela': 'proveedores' };
+const acCache = {};
+async function acDatos(fuente){
+  if(acCache[fuente] && Date.now() - acCache[fuente].t < 120000) return acCache[fuente].L;
+  let L = [];
+  try{
+    if(fuente === 'clientes'){ const s = new Map(); const add = (n, extra) => { n = String(n || '').trim(); if(n && !s.has(ccClave(n))) s.set(ccClave(n), { v: n, t: n, x: extra || '' }); };
+      const d = await db.collection('clientes').get(); d.docs.forEach(x => { const c = x.data(); add(c.razonSocial || `${c.apellido || ''} ${c.nombre || ''}`.trim(), [c.cuit, c.localidad].filter(Boolean).join(' · ')); });
+      (facturas || []).forEach(f => add(f.cliente)); (ccMovs || []).forEach(m => add(m.nombre)); L = [...s.values()]; }
+    else if(fuente === 'proveedores'){ const d = await db.collection('proveedores').get(); L = d.docs.map(x => x.data()).map(p => ({ v: p.nombre, t: p.nombre, x: p.rubro || '' })); }
+    else if(fuente === 'talleres'){ if(talleresLista === null) await cargarTalleres(); L = (talleresLista || []).map(n => ({ v: n, t: n })); }
+    else if(fuente === 'sku'){ CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => L.push({ v: String(v.sku).toUpperCase(), t: String(v.sku).toUpperCase(), x: p.nombre + ' · ' + (v.desc || '') })))); }
+    else if(fuente === 'telas'){ L = Object.entries((telasDatos && telasDatos.telas) || {}).map(([k, t]) => ({ v: k, t: k, x: [t.nombre, t.color].filter(Boolean).join(' · ') })); }
+  } catch(e){ console.error(e); }
+  acCache[fuente] = { t: Date.now(), L }; return L;
+}
+let acInput = null, acSel = -1, acOps = [];
+async function acMostrar(inp){
+  const pop = document.getElementById('ac-pop'); acInput = inp;
+  const lid = inp.dataset.acList, fuente = inp.dataset.ac || AC_FUENTE[lid];
+  let L = fuente ? await acDatos(fuente) : [];
+  const dl = lid && document.getElementById(lid); if(dl) [...dl.options].forEach(o => { if(o.value && !L.some(x => x.v === o.value)) L = L.concat([{ v: o.value, t: o.value, x: o.label && o.label !== o.value ? o.label : '' }]); });
+  const q = inp.value.trim(); if(acInput !== inp) return;
+  acOps = (q ? L.filter(x => coincideBusqueda(x.t + ' ' + (x.x || ''), q)) : L).slice(0, 15); acSel = -1;
+  if(!acOps.length || (acOps.length === 1 && acOps[0].v === q)){ pop.style.display = 'none'; return; }
+  pop.innerHTML = acOps.map((x, i) => `<div data-i="${i}" onmousedown="event.preventDefault();acElegir(${i})">${escaparHtml(x.t)}${x.x ? `<small>${escaparHtml(x.x)}</small>` : ''}</div>`).join('');
+  const r = inp.getBoundingClientRect(); pop.style.left = (r.left + window.scrollX) + 'px'; pop.style.top = (r.bottom + window.scrollY + 2) + 'px'; pop.style.width = Math.max(r.width, 260) + 'px'; pop.style.display = 'block';
+}
+function acElegir(i){ const x = acOps[i]; if(!x || !acInput) return; acInput.value = x.v; document.getElementById('ac-pop').style.display = 'none'; acInput.dispatchEvent(new Event('input', { bubbles: true })); acInput.dispatchEvent(new Event('change', { bubbles: true })); document.getElementById('ac-pop').style.display = 'none'; }
+function acPreparar(inp){ if(inp.dataset.acList === undefined && inp.getAttribute('list')){ inp.dataset.acList = inp.getAttribute('list'); inp.removeAttribute('list'); inp.setAttribute('autocomplete', 'off'); } }
+document.addEventListener('focusin', e => { const t = e.target; if(t && t.tagName === 'INPUT' && (t.getAttribute('list') || t.dataset.ac || t.dataset.acList !== undefined)){ acPreparar(t); acMostrar(t); } });
+document.addEventListener('input', e => { const t = e.target; if(t && t.tagName === 'INPUT' && (t.dataset.acList !== undefined || t.dataset.ac)){ clearTimeout(window.__acT); window.__acT = setTimeout(() => acMostrar(t), 120); } });
+document.addEventListener('keydown', e => { const pop = document.getElementById('ac-pop'); if(!pop || pop.style.display !== 'block' || e.target !== acInput) return;
+  if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); acSel = Math.max(0, Math.min(acOps.length - 1, acSel + (e.key === 'ArrowDown' ? 1 : -1))); [...pop.children].forEach((d, i) => d.classList.toggle('on', i === acSel)); }
+  else if(e.key === 'Enter' && acSel >= 0){ e.preventDefault(); acElegir(acSel); } else if(e.key === 'Escape'){ pop.style.display = 'none'; } });
+document.addEventListener('focusout', e => { if(e.target === acInput) setTimeout(() => { const p = document.getElementById('ac-pop'); if(p) p.style.display = 'none'; }, 150); });
+window.addEventListener('scroll', () => { const p = document.getElementById('ac-pop'); if(p && p.style.display === 'block' && acInput){ const r = acInput.getBoundingClientRect(); p.style.top = (r.bottom + window.scrollY + 2) + 'px'; } }, true);
 // ===== Barra lateral: las mismas opciones del inicio, con sus permisos =====
 const SB_ORDEN = [['ped', '🛒', 'Pedidos'], ['comp', '🧾', 'Comprobantes'], ['cli', '👥', 'Clientes'], ['art', '📦', 'Artículos'], ['prov', '🏭', 'Proveedores'], ['teso', '💰', 'Fondos'], ['imp', '🧮', 'Impuestos'], ['est', '📊', 'Informes'], ['c', '📣', 'Difusión y creatividad']];
 let sbAbierto = null; const sbSubAbiertos = new Set(); // subcategorias desplegadas (por defecto, contraidas)
@@ -8087,9 +8134,9 @@ function pvRenderProveedor(r){
 const pvInp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
 function pvElegirProveedor(para, tipoIni){
   if(!pvProv.length){ alert('Primero cargue un proveedor con ➕ Proveedor.'); pvTab = 'proveedores'; renderCompras(); return; }
-  pvModal(para === 'pago' ? '➕ Orden de pago nueva' : '➕ Comprobante de compra', `<label>Proveedor<select id="ep-p" style="${pvInp}">${pvProv.map(p => `<option value="${p._id}">${escaparHtml(p.nombre)}</option>`).join('')}</select></label>
+  pvModal(para === 'pago' ? '➕ Nueva orden de pago' : '➕ Comprobante de compra', `<label>Proveedor<input id="ep-q" data-ac="proveedores" placeholder="Escriba parte del nombre…" autocomplete="off" oninput="const p=pvProv.find(x=>ccClave(x.nombre)===ccClave(this.value));document.getElementById('ep-p').value=p?p._id:'';" style="${pvInp}"><input type="hidden" id="ep-p" value=""></label>
     ${para === 'compra' ? `<label style="margin-top:6px;display:block;">Tipo<select id="ep-t" style="${pvInp}">${[['f', 'Factura'], ['nc', 'Nota de crédito'], ['nd', 'Nota de débito']].map(([v, t]) => `<option value="${v}" ${tipoIni === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>` : ''}
-    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="const id=document.getElementById('ep-p').value, t=(document.getElementById('ep-t')||{}).value; cerrarPublicar(); setTimeout(()=>{ ${para === 'pago' ? 'pvFormPago(id)' : "pvFormCompra(id, t==='nc' ? true : t==='nd' ? 'nd' : false)"} },50);">Seguir</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="const id=document.getElementById('ep-p').value, t=(document.getElementById('ep-t')||{}).value; if(!id){alert('Elija un proveedor de la lista (o créelo con ➕ Proveedor nuevo).');return;} cerrarPublicar(); setTimeout(()=>{ ${para === 'pago' ? 'pvFormPago(id)' : "pvFormCompra(id, t==='nc' ? true : t==='nd' ? 'nd' : false)"} },50);">Seguir</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
 }
 function pvModal(titulo, html){ const t = document.getElementById('pub-titulo'); if(t) t.textContent = titulo; document.getElementById('pub-cont').innerHTML = html; document.getElementById('pub-modal').style.display = 'block'; }
 function pvFormProveedor(id){
@@ -21027,7 +21074,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v323';
+const APP_VERSION = '2026-10-02-v324';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
