@@ -1657,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v348</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v349</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2531,6 +2531,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <input type="text" id="cli-buscador" placeholder="Buscar por nombre, email o teléfono..." style="flex:1;">
       <button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="cliForm()">➕ Cliente nuevo</button>
     </div>
+    <details id="cli-masivo" style="margin:8px 0;border:1px solid var(--line);border-radius:12px;padding:8px 12px;background:#fff;" ontoggle="if(this.open) cliPintarFiltros()"><summary style="cursor:pointer;font-weight:700;color:var(--purple);">🔧 Filtros y cambios masivos</summary><div id="cli-filtros" style="margin-top:8px;"></div></details>
     <div id="cli-lista"><p class="empty-msg">Cargando clientes...</p></div>
     <button class="btn btn-ghost" style="margin-top:10px;" onclick="irAtras()">← Volver</button>
   </div>
@@ -8155,8 +8156,15 @@ function renderCompras(){
   if(pvSel){ return pvRenderProveedor(R[pvSel]); }
   let F = L.sort((a, b) => b.saldo - a.saldo || String(a.p.nombre).localeCompare(String(b.p.nombre))); if(pvBuscar) F = F.filter(r => coincideBusqueda(r.p.nombre + ' ' + (r.p.rubro || '') + ' ' + (r.p.cuit || ''), pvBuscar));
   box.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"><input placeholder="🔍 Buscar proveedor" value="${escapeAttr(pvBuscar)}" oninput="pvBuscar=this.value;clearTimeout(window.__pvT);window.__pvT=setTimeout(renderCompras,250)" style="flex:1;min-width:180px;padding:9px;border:1px solid var(--line);border-radius:10px;"><button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="pvFormProveedor()">➕ Proveedor nuevo</button></div>
-    ${F.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:6px;">Proveedor</td><td style="padding:6px;">Rubro</td><td style="padding:6px;text-align:right;">Saldo</td><td style="padding:6px;text-align:right;">Vencido</td><td style="padding:6px;text-align:right;">Vence en 7 días</td></tr>
-      ${F.map(r => `<tr style="border-top:1px solid var(--line);cursor:pointer;" onclick="pvSel='${r.p._id}';renderCompras()"><td style="padding:7px 6px;"><b>${escaparHtml(r.p.nombre)}</b>${pvMon(r.p) === 'USD' ? ' <span class="meta">USD</span>' : ''}</td><td style="padding:7px 6px;" class="meta">${escaparHtml(r.p.rubro || '')}${r.p.condicion === 'contado' ? ' · contado' : ''}</td><td style="padding:7px 6px;text-align:right;font-weight:800;">${fmtMon(r.saldo, pvMon(r.p))}${Object.entries(r.rz).filter(([, z]) => Math.abs(z.saldo) > 0.5).length > 1 ? `<div style="font-weight:400;font-size:.75rem;">${Object.entries(r.rz).filter(([, z]) => Math.abs(z.saldo) > 0.5).map(([k, z]) => `${chipRZ(k)} ${fmtMon(z.saldo, pvMon(r.p))}`).join(' ')}</div>` : ''}</td><td style="padding:7px 6px;text-align:right;color:${r.vencido > 0 ? '#A6432F' : '#8A8072'};">${r.vencido > 0 ? fmtMon(r.vencido, pvMon(r.p)) : '–'}</td><td style="padding:7px 6px;text-align:right;color:#8A6417;">${r.vence7 > 0 ? fmtMon(r.vence7, pvMon(r.p)) : '–'}</td></tr>`).join('')}</table></div>` : '<p class="empty-msg">Cargue su primer proveedor con ➕ Proveedor.</p>'}`;
+    <details style="margin:0 0 8px;border:1px solid var(--line);border-radius:12px;padding:8px 12px;" ${pvSelM.size ? 'open' : ''}><summary style="cursor:pointer;font-weight:700;color:var(--purple);">🔧 Cambios masivos <span class="meta">${pvSelM.size} seleccionados</span></summary>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:8px;"><label style="font-size:.8rem;"><input type="checkbox" onchange="(window.__pvF||[]).forEach(r=>this.checked?pvSelM.add(r.p._id):pvSelM.delete(r.p._id));renderCompras()" ${F.length && F.every(r => pvSelM.has(r.p._id)) ? 'checked' : ''}> Seleccionar todos${pvBuscar ? ' los filtrados' : ''} (${F.length})</label>
+        <label style="font-size:.8rem;">Condición<select id="pm-cond" style="display:block;padding:7px;border:1px solid var(--line);border-radius:8px;"><option value="">— no cambiar —</option><option value="ctacte">Cuenta corriente</option><option value="contado">Contado</option></select></label>
+        <label style="font-size:.8rem;">Plazo (días)<input id="pm-plazo" inputmode="numeric" placeholder="no cambiar" style="display:block;width:100px;padding:7px;border:1px solid var(--line);border-radius:8px;"></label>
+        <label style="font-size:.8rem;">Rubro<input id="pm-rubro" placeholder="no cambiar" style="display:block;width:140px;padding:7px;border:1px solid var(--line);border-radius:8px;"></label>
+        <label style="font-size:.8rem;">Descuento (%)<input id="pm-desc" inputmode="decimal" placeholder="no cambiar" style="display:block;width:100px;padding:7px;border:1px solid var(--line);border-radius:8px;"></label>
+        <button type="button" class="btn btn-gold" style="width:auto;padding:8px 14px;" onclick="pvAplicarMasivo()">Aplicar</button></div></details>
+    ${F.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td></td><td style="padding:6px;">Proveedor</td><td style="padding:6px;">Rubro</td><td style="padding:6px;text-align:right;">Saldo</td><td style="padding:6px;text-align:right;">Vencido</td><td style="padding:6px;text-align:right;">Vence en 7 días</td></tr>
+      ${(window.__pvF = F, '')}${F.map(r => `<tr style="border-top:1px solid var(--line);cursor:pointer;" onclick="pvSel='${r.p._id}';renderCompras()"><td style="padding:7px 4px;" onclick="event.stopPropagation()"><input type="checkbox" ${pvSelM.has(r.p._id) ? 'checked' : ''} onchange="this.checked?pvSelM.add('${r.p._id}'):pvSelM.delete('${r.p._id}')" style="width:17px;height:17px;"></td><td style="padding:7px 6px;"><b>${escaparHtml(r.p.nombre)}</b>${pvMon(r.p) === 'USD' ? ' <span class="meta">USD</span>' : ''}</td><td style="padding:7px 6px;" class="meta">${escaparHtml(r.p.rubro || '')}${r.p.condicion === 'contado' ? ' · contado' : ''}</td><td style="padding:7px 6px;text-align:right;font-weight:800;">${fmtMon(r.saldo, pvMon(r.p))}${Object.entries(r.rz).filter(([, z]) => Math.abs(z.saldo) > 0.5).length > 1 ? `<div style="font-weight:400;font-size:.75rem;">${Object.entries(r.rz).filter(([, z]) => Math.abs(z.saldo) > 0.5).map(([k, z]) => `${chipRZ(k)} ${fmtMon(z.saldo, pvMon(r.p))}`).join(' ')}</div>` : ''}</td><td style="padding:7px 6px;text-align:right;color:${r.vencido > 0 ? '#A6432F' : '#8A8072'};">${r.vencido > 0 ? fmtMon(r.vencido, pvMon(r.p)) : '–'}</td><td style="padding:7px 6px;text-align:right;color:#8A6417;">${r.vence7 > 0 ? fmtMon(r.vence7, pvMon(r.p)) : '–'}</td></tr>`).join('')}</table></div>` : '<p class="empty-msg">Cargue su primer proveedor con ➕ Proveedor.</p>'}`;
 }
 let pvRzVer = '';
 function pvRenderProveedor(r){
@@ -8361,6 +8369,17 @@ async function facturaDesdeIngreso(ingId, taller, detalle){
   setTimeout(() => { const s = (id, v) => { const e = document.getElementById(id); if(e && v != null) e.value = v; };
     if(imp > 0) s('cf-i', formatoPesos(Math.round(imp * 100) / 100)); s('cf-d', `Entrega de ${prendas} prendas · ${detalle.map(d => d.articulo).filter(Boolean).slice(0, 4).join(', ')}`);
     const t = document.getElementById('pub-titulo'); if(t) t.textContent = '➕ Factura de compra · entrega de ' + taller; try{ cfDesglose(); } catch(e){} }, 80);
+}
+let pvSelM = new Set();
+async function pvAplicarMasivo(){
+  if(!pvSelM.size){ alert('Tilde los proveedores a modificar.'); return; }
+  const v = id => (document.getElementById(id).value || '').trim(), c = {};
+  if(v('pm-cond')) c.condicion = v('pm-cond'); if(v('pm-plazo') !== '') c.plazo = Math.max(0, Math.round(numAr(v('pm-plazo')) || 0)); if(v('pm-rubro')) c.rubro = v('pm-rubro'); if(v('pm-desc') !== '') c.desc = Math.min(100, Math.max(0, numAr(v('pm-desc')) || 0));
+  if(!Object.keys(c).length){ alert('Elija al menos un cambio.'); return; }
+  if(!confirm(`¿Aplicar a ${pvSelM.size} proveedores?\n${JSON.stringify(c).replace(/[{}"]/g, '').replace(/,/g, ' · ')}`)) return;
+  try{ const b = db.batch(); [...pvSelM].forEach(id => b.set(db.collection('proveedores').doc(id), c, { merge: true })); await b.commit(); pvProv.forEach(p => { if(pvSelM.has(p._id)) Object.assign(p, c); }); await ccLog('Cambio masivo de proveedores', `${pvSelM.size} · ${JSON.stringify(c)}`); }
+  catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  pvSelM.clear(); renderCompras(); alert('✓ Cambios aplicados.');
 }
 async function pvLiquidar(taller, ids, importe, prendas){
   if(!(importe > 0)){ alert('El importe da cero: cargue el costo de confección de los artículos.'); return; }
@@ -15647,28 +15666,69 @@ function cargarClientes(){
   });
 }
 
+let cliF = { condicion: '', lista: '', provincia: '', transporte: '', desc: '', grupo: '', cuit: '' }, cliSel = new Set();
+function cliPintarFiltros(){
+  const L = listaClientes || [], uniq = k => [...new Set(L.map(c => (c[k] || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const sel = (k, t, ops) => `<label style="font-size:.8rem;">${t}<select onchange="cliF.${k}=this.value;renderClientes(document.getElementById('cli-buscador').value)" style="display:block;padding:7px;border:1px solid var(--line);border-radius:8px;min-width:140px;"><option value="">Todos</option>${ops.map(([v, x]) => `<option value="${escapeAttr(v)}" ${cliF[k] === v ? 'selected' : ''}>${escaparHtml(x)}</option>`).join('')}</select></label>`;
+  const LP = listasPrecios || [{ id: 'general', nombre: 'Lista general' }];
+  document.getElementById('cli-filtros').innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+      ${sel('condicion', 'Condición', [['ctacte', 'Cuenta corriente'], ['contado', 'Contado']])}${sel('lista', 'Lista de precios', LP.map(l => [l.id, l.nombre]))}${sel('desc', 'Descuento', [['con', 'Con descuento'], ['sin', 'Sin descuento']])}
+      ${sel('provincia', 'Provincia', uniq('provincia').map(x => [x, x]))}${sel('transporte', 'Transporte', uniq('transporte').map(x => [x, x]))}${sel('grupo', 'Casa central', [['si', 'Pagan por casa central'], ['no', 'Pagan ellos']])}${sel('cuit', 'CUIT', [['con', 'Con CUIT'], ['sin', 'Sin CUIT']])}
+      <button type="button" class="btn-mini" onclick="cliF={condicion:'',lista:'',provincia:'',transporte:'',desc:'',grupo:'',cuit:''};cliPintarFiltros();renderClientes(document.getElementById('cli-buscador').value)">Limpiar filtros</button></div>
+    <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px;"><b style="font-size:.85rem;">Cambiar a los seleccionados</b> <span class="meta" id="cli-nsel">${cliSel.size} seleccionados</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:6px;">
+        <label style="font-size:.8rem;">Condición<select id="cm-cond" style="display:block;padding:7px;border:1px solid var(--line);border-radius:8px;"><option value="">— no cambiar —</option><option value="ctacte">Cuenta corriente</option><option value="contado">Contado</option></select></label>
+        <label style="font-size:.8rem;">Lista de precios<select id="cm-lista" style="display:block;padding:7px;border:1px solid var(--line);border-radius:8px;"><option value="">— no cambiar —</option>${LP.map(l => `<option value="${escapeAttr(l.id)}">${escaparHtml(l.nombre)}</option>`).join('')}</select></label>
+        <label style="font-size:.8rem;">Descuento (%)<input id="cm-desc" inputmode="decimal" placeholder="no cambiar" style="display:block;width:100px;padding:7px;border:1px solid var(--line);border-radius:8px;"></label>
+        <label style="font-size:.8rem;">Plazo (días)<input id="cm-plazo" inputmode="numeric" placeholder="no cambiar" style="display:block;width:100px;padding:7px;border:1px solid var(--line);border-radius:8px;"></label>
+        <label style="font-size:.8rem;">Transporte<input id="cm-transp" placeholder="no cambiar" style="display:block;width:140px;padding:7px;border:1px solid var(--line);border-radius:8px;"></label>
+        <button type="button" class="btn btn-gold" style="width:auto;padding:8px 14px;" onclick="cliAplicarMasivo()">Aplicar</button></div></div>`;
+}
+function cliFiltroOk(c){ const f = cliF; if(f.condicion && (c.condicion === 'contado' ? 'contado' : 'ctacte') !== f.condicion) return false; if(f.lista && (c.lista || 'general') !== f.lista) return false;
+  if(f.desc && ((+c.descuento || 0) > 0 ? 'con' : 'sin') !== f.desc) return false; if(f.provincia && (c.provincia || '').trim() !== f.provincia) return false; if(f.transporte && (c.transporte || '').trim() !== f.transporte) return false;
+  if(f.grupo && (c.grupo ? 'si' : 'no') !== f.grupo) return false; if(f.cuit && ((c.cuit || '').replace(/\D/g, '') ? 'con' : 'sin') !== f.cuit) return false; return true; }
+function cliSelTodos(on){ (window.__cliFiltrados || []).forEach(c => on ? cliSel.add(c.id) : cliSel.delete(c.id)); renderClientes(document.getElementById('cli-buscador').value); }
+async function cliAplicarMasivo(){
+  if(!cliSel.size){ alert('Tilde los clientes a modificar (o "Seleccionar todos los filtrados").'); return; }
+  const v = id => (document.getElementById(id).value || '').trim(), cambios = {};
+  if(v('cm-cond')) cambios.condicion = v('cm-cond'); if(v('cm-lista')) cambios.lista = v('cm-lista');
+  if(v('cm-desc') !== '') cambios.descuento = Math.min(100, Math.max(0, numAr(v('cm-desc')) || 0)); if(v('cm-plazo') !== '') cambios.plazo = Math.max(0, Math.round(numAr(v('cm-plazo')) || 0)); if(v('cm-transp')) cambios.transporte = v('cm-transp');
+  if(!Object.keys(cambios).length){ alert('Elija al menos un cambio.'); return; }
+  const txt = Object.entries(cambios).map(([k, x]) => `${{ condicion: 'condición', lista: 'lista', descuento: 'descuento', plazo: 'plazo', transporte: 'transporte' }[k]}: ${k === 'lista' ? ((listasPrecios || []).find(l => l.id === x) || {}).nombre || x : k === 'condicion' ? (x === 'contado' ? 'contado' : 'cuenta corriente') : x}${k === 'descuento' ? ' %' : k === 'plazo' ? ' días' : ''}`).join(' · ');
+  if(!confirm(`¿Aplicar a ${cliSel.size} clientes?\n${txt}`)) return;
+  try{ const ids = [...cliSel]; for(let i = 0; i < ids.length; i += 400){ const b = db.batch(); ids.slice(i, i + 400).forEach(id => b.set(db.collection('clientes').doc(id), cambios, { merge: true })); await b.commit(); }
+    (listaClientes || []).forEach(c => { if(cliSel.has(c.id)) Object.assign(c, cambios); }); ccClientesDB = []; try{ if(acCache) delete acCache.clientes; } catch(e){}
+    await ccLog('Cambio masivo de clientes', `${ids.length} clientes · ${txt}`); }
+  catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  cliSel.clear(); renderClientes(document.getElementById('cli-buscador').value); cliPintarFiltros(); alert('✓ Cambios aplicados.');
+}
 function renderClientes(filtro){
   filtro = (filtro||'').trim().toLowerCase();
   const cont = document.getElementById('cli-lista');
   const clientes = listaClientes || [];
   const filtrados = clientes.filter(c => {
+    if(!cliFiltroOk(c)) return false;
     if(!filtro) return true;
-    const haystack = [c.nombre, c.apellido, c.email, c.telefono, c.cuit].join(' ').toLowerCase();
-    return haystack.includes(filtro);
+    const haystack = [c.razonSocial, c.nombre, c.apellido, c.email, c.telefono, c.cuit, c.localidad].join(' ').toLowerCase();
+    return haystack.includes(filtro) || coincideBusqueda(haystack, filtro);
   });
+  window.__cliFiltrados = filtrados;
+  { const n = document.getElementById('cli-nsel'); if(n) n.textContent = cliSel.size + ' seleccionados'; }
+  const hayFiltro = Object.values(cliF).some(Boolean) || filtro;
 
   if(filtrados.length === 0){
     cont.innerHTML = '<p class="empty-msg">No hay clientes que coincidan.</p>';
     return;
   }
 
-  cont.innerHTML = filtrados.map(c => {
+  cont.innerHTML = `<div style="display:flex;gap:10px;align-items:center;margin:4px 2px 8px;font-size:.85rem;"><label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" ${filtrados.every(c => cliSel.has(c.id)) ? 'checked' : ''} onchange="cliSelTodos(this.checked)" style="width:18px;height:18px;"> Seleccionar todos${hayFiltro ? ' los filtrados' : ''} (${filtrados.length})</label>${cliSel.size ? `<span class="meta">${cliSel.size} seleccionados</span>` : ''}</div>` + filtrados.map(c => {
     const ultimaFecha = c.ultimaFecha ? new Date(c.ultimaFecha).toLocaleString('es-AR') : '';
     return `
       <div class="hist-pedido">
         <div class="hist-head" style="cursor:default;">
-          <div>
-            <div class="num">${c.razonSocial ? escaparHtml(c.razonSocial) + ' · ' : ''}${c.nombre||''} ${c.apellido||''} <span class="meta" style="font-size:.75rem;">· ${c.condicion === 'contado' ? 'contado' : 'cuenta corriente'}</span></div>
+          <input type="checkbox" ${cliSel.has(c.id) ? 'checked' : ''} onchange="this.checked?cliSel.add('${escapeAttr(c.id)}'):cliSel.delete('${escapeAttr(c.id)}');const n=document.getElementById('cli-nsel');if(n)n.textContent=cliSel.size+' seleccionados';" style="width:18px;height:18px;margin-right:10px;flex:0 0 auto;">
+          <div style="flex:1;">
+            <div class="num">${c.razonSocial ? escaparHtml(c.razonSocial) + ' · ' : ''}${c.nombre||''} ${c.apellido||''} <span class="meta" style="font-size:.75rem;">· ${c.condicion === 'contado' ? 'contado' : 'cuenta corriente'}${c.lista && c.lista !== 'general' ? ' · ' + escaparHtml(((listasPrecios || []).find(l => l.id === c.lista) || {}).nombre || '') : ''}${+c.descuento ? ' · ' + c.descuento + ' % desc.' : ''}</span></div>
             <div class="meta">${c.email||''} · ${c.telefono||''} · CUIT ${c.cuit||''}</div>
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
@@ -15690,6 +15750,7 @@ function renderClientes(filtro){
 }
 
 document.getElementById('cli-buscador').addEventListener('input', e => renderClientes(e.target.value));
+cargarListasPrecios && setTimeout(() => { try{ if(typeof db !== 'undefined') cargarListasPrecios(); } catch(e){} }, 3000);
 
 function mostrarEdicionCliente(id){
   const c = (listaClientes || []).find(x => x.id === id);
@@ -21414,7 +21475,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v348';
+const APP_VERSION = '2026-10-02-v349';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
