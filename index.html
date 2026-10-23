@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v361</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v362</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -12928,16 +12928,16 @@ function acCargarImg(src){ return new Promise(res => { if(!src){ res(null); retu
 function acTexto(ctx, t, x, y, maxW, lh, maxL){ const pal = String(t || '').split(/\s+/); let l = '', n = 0; for(const w of pal){ const pr = l ? l + ' ' + w : w; if(ctx.measureText(pr).width > maxW && l){ ctx.fillText(l, x, y + n * lh); n++; l = w; if(maxL && n >= maxL) return n; } else l = pr; } if(l){ ctx.fillText(l, x, y + n * lh); n++; } return n; }
 // dibuja varias fotos llenando el recuadro (1 grande; 2 lado a lado; 3 = una grande y dos; 4 en 2x2; 5-6 en 3x2)
 function acRecorte(c, im, x, y, w, hh){ c.save(); c.beginPath(); c.rect(x, y, w, hh); c.clip(); const r = Math.min(w / im.width, hh / im.height), dw = im.width * r, dh = im.height * r; /* entera, sin recortar el producto */ c.drawImage(im, x + (w - dw) / 2, y + (hh - dh) / 2, dw, dh); c.restore(); }
-function acGrilla(c, ims, x, y, w, hh){ const g = 10, n = ims.length; let celdas = [];
-  if(n === 1) celdas = [[x, y, w, hh]];
-  else if(n === 2) celdas = [[x, y, (w - g) / 2, hh], [x + (w + g) / 2, y, (w - g) / 2, hh]];
-  else if(n === 3){ const a = w * .62; celdas = [[x, y, a, hh], [x + a + g, y, w - a - g, (hh - g) / 2], [x + a + g, y + (hh + g) / 2, w - a - g, (hh - g) / 2]]; }
-  else if(n === 4) celdas = [0, 1, 2, 3].map(k => [x + (k % 2) * (w + g) / 2, y + Math.floor(k / 2) * (hh + g) / 2, (w - g) / 2, (hh - g) / 2]);
-  else { const cw = (w - 2 * g) / 3, ch = (hh - g) / 2; celdas = ims.map((_, k) => [x + (k % 3) * (cw + g), y + Math.floor(k / 3) * (ch + g), cw, ch]); }
-  ims.forEach((im, k) => { const [cx, cy, cw, ch] = celdas[k]; c.fillStyle = '#fff'; c.fillRect(cx, cy, cw, ch); if(im) acRecorte(c, im, cx, cy, cw, ch); }); }
+function acGrilla(c, ims, x, y, w, hh){ const g = 10, n = Math.max(1, ims.length);
+  // elige filas y columnas para que TODAS entren en una sola lamina con el mayor tamanio posible
+  let mejor = { cols: 1, tam: 0 };
+  for(let cols = 1; cols <= n; cols++){ const rows = Math.ceil(n / cols), cw = (w - g * (cols - 1)) / cols, ch = (hh - g * (rows - 1)) / rows, tam = Math.min(cw, ch * 1.1); if(tam > mejor.tam) mejor = { cols, tam }; }
+  const cols = mejor.cols, rows = Math.ceil(n / cols), cw = (w - g * (cols - 1)) / cols, ch = (hh - g * (rows - 1)) / rows;
+  ims.forEach((im, k) => { const r = Math.floor(k / cols), enFila = r === rows - 1 ? n - cols * (rows - 1) : cols, off = (w - (enFila * cw + g * (enFila - 1))) / 2; // la ultima fila, centrada
+    const cx = x + off + (k % cols) * (cw + g), cy = y + r * (ch + g); c.fillStyle = '#fff'; c.fillRect(cx, cy, cw, ch); if(im) acRecorte(c, im, cx, cy, cw, ch); }); }
 async function acLamina(x){
   const W = 1080, H = 1350, VIO = '#3D2B4E', ORO = '#F4C430', CRE = '#F5F3EF';
-  const fotos = acFotos(x).slice(0, 12), grupos = []; for(let k = 0; k < Math.max(1, fotos.length); k += 6) grupos.push(fotos.slice(k, k + 6)); // hasta 6 fotos por lamina; si hay mas, sigue en otra
+  const fotos = acFotos(x).slice(0, 40), grupos = []; for(let k = 0; k < Math.max(1, fotos.length); k += 20) grupos.push(fotos.slice(k, k + 20)); // todas en una lamina (hasta 20; si hubiera mas, sigue en otra)
   const vs = x.v ? [x.v] : (x.p.variantes || []), filas = vs.slice(0, 9), f = factorCliente({ lista: acState.lista }), out = [];
   for(let gi = 0; gi < grupos.length; gi++){
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d'), primera = gi === 0;
@@ -21695,7 +21695,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v361';
+const APP_VERSION = '2026-10-02-v362';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
