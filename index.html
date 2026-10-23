@@ -485,7 +485,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
 </style>
 
 <style>
-#ac-pop{position:absolute;z-index:3000;background:#fff;border:1px solid #DDD5C8;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:280px;overflow:auto;display:none;font-size:.9rem;}
+#ac-pop{position:fixed;z-index:10050;background:#fff;border:1px solid #DDD5C8;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:280px;overflow:auto;display:none;font-size:.9rem;}
 #ac-pop div{padding:8px 12px;cursor:pointer;border-top:1px solid #F3EFE8;}
 #ac-pop div:first-child{border-top:none;}
 #ac-pop div.on,#ac-pop div:hover{background:#F2EEF7;}
@@ -1657,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v341</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v342</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6081,7 +6081,7 @@ async function acMostrar(inp){
   acOps = (q ? L.filter(x => coincideBusqueda(x.t + ' ' + (x.x || ''), q)) : L).slice(0, 15); acSel = -1;
   if(!acOps.length || (acOps.length === 1 && acOps[0].v === q)){ pop.style.display = 'none'; return; }
   pop.innerHTML = acOps.map((x, i) => `<div data-i="${i}" onmousedown="event.preventDefault();acElegir(${i})">${escaparHtml(x.t)}${x.x ? `<small>${escaparHtml(x.x)}</small>` : ''}</div>`).join('');
-  const r = inp.getBoundingClientRect(); pop.style.left = (r.left + window.scrollX) + 'px'; pop.style.top = (r.bottom + window.scrollY + 2) + 'px'; pop.style.width = Math.max(r.width, 260) + 'px'; pop.style.display = 'block';
+  const r = inp.getBoundingClientRect(); pop.style.left = r.left + 'px'; pop.style.top = (r.bottom + 2) + 'px'; pop.style.width = Math.max(r.width, 260) + 'px'; pop.style.maxHeight = Math.max(140, Math.min(280, window.innerHeight - r.bottom - 12)) + 'px'; pop.style.display = 'block';
 }
 function acElegir(i){ const x = acOps[i]; if(!x || !acInput) return; acInput.value = x.v; document.getElementById('ac-pop').style.display = 'none'; acInput.dispatchEvent(new Event('input', { bubbles: true })); acInput.dispatchEvent(new Event('change', { bubbles: true })); document.getElementById('ac-pop').style.display = 'none'; }
 function acPreparar(inp){ if(inp.dataset.acList === undefined && inp.getAttribute('list')){ inp.dataset.acList = inp.getAttribute('list'); inp.removeAttribute('list'); inp.setAttribute('autocomplete', 'off'); } }
@@ -6091,7 +6091,7 @@ document.addEventListener('keydown', e => { const pop = document.getElementById(
   if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); acSel = Math.max(0, Math.min(acOps.length - 1, acSel + (e.key === 'ArrowDown' ? 1 : -1))); [...pop.children].forEach((d, i) => d.classList.toggle('on', i === acSel)); }
   else if(e.key === 'Enter' && acSel >= 0){ e.preventDefault(); acElegir(acSel); } else if(e.key === 'Escape'){ pop.style.display = 'none'; } });
 document.addEventListener('focusout', e => { if(e.target === acInput) setTimeout(() => { const p = document.getElementById('ac-pop'); if(p) p.style.display = 'none'; }, 150); });
-window.addEventListener('scroll', () => { const p = document.getElementById('ac-pop'); if(p && p.style.display === 'block' && acInput){ const r = acInput.getBoundingClientRect(); p.style.top = (r.bottom + window.scrollY + 2) + 'px'; } }, true);
+window.addEventListener('scroll', () => { const p = document.getElementById('ac-pop'); if(p && p.style.display === 'block' && acInput){ const r = acInput.getBoundingClientRect(); p.style.top = (r.bottom + 2) + 'px'; p.style.left = r.left + 'px'; } }, true);
 // ===== Barra lateral: las mismas opciones del inicio, con sus permisos =====
 const SB_ORDEN = [['ped', '🛒', 'Pedidos'], ['comp', '🧾', 'Comprobantes'], ['cli', '👥', 'Clientes'], ['art', '📦', 'Artículos'], ['prov', '🏭', 'Proveedores'], ['teso', '💰', 'Fondos'], ['imp', '🧮', 'Impuestos'], ['est', '📊', 'Informes'], ['c', '📣', 'Difusión y creatividad']];
 let sbAbierto = null; const sbSubAbiertos = new Set(); // subcategorias desplegadas (por defecto, contraidas)
@@ -21344,7 +21344,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v341';
+const APP_VERSION = '2026-10-02-v342';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
