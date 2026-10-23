@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v353</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v354</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -8259,7 +8259,7 @@ function pvFormCompra(pid, nc){
     <div style="grid-column:1/-1;"><b style="font-size:.85rem;">A nombre de (razón social)</b>${selectorRZ('cf-rz', 'propia')}</div>
     <label>Tipo<select id="cf-t" onchange="cfDesglose()" style="${pvInp}">${['A', 'B', 'C', 'X'].map(x => `<option>${x}</option>`).join('')}</select></label>
     <label style="grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:.88rem;"><input type="checkbox" id="cf-fis" checked style="width:18px;height:18px;"> Comprobante fiscal (con CAE o CAI). Destildar si es un comprobante X o no fiscal: no cuenta para el IVA.</label>
-    <label>Número (punto de venta - número)<input id="cf-n" placeholder="00001-00001234" style="${pvInp}"></label><label>Fecha<input type="date" id="cf-f" value="${hoy}" style="${pvInp}"></label>
+    <label>Punto de venta – Número${campoNumComp('cf-n', '')}</label><label>Fecha<input type="date" id="cf-f" value="${hoy}" style="${pvInp}"></label>
     <label>Importe antes de descuentos (opcional)<input id="cf-sub" inputmode="decimal" placeholder="si la factura trae descuento" oninput="cfDescuento()" style="${pvInp}"></label><label>Descuento o bonificación (%)<input id="cf-dto" inputmode="decimal" placeholder="0" oninput="cfDescuento()" style="${pvInp}"></label>
     <label>Total ${m === 'USD' ? '(US$)' : '($)'}<input id="cf-i" inputmode="decimal" oninput="cfDesglose()" style="${pvInp}"><small id="cf-neto" class="note" style="display:block;text-align:left;margin:2px 0 0;"></small></label><label>IVA de la factura<input id="cf-iva" inputmode="decimal" placeholder="opcional" oninput="this.dataset.auto=''" style="${pvInp}"></label><label>Percepción de IVA<input id="cf-piva" inputmode="decimal" placeholder="opcional" oninput="cfDesglose()" style="${pvInp}"></label><label>Percepción de IIBB<input id="cf-piibb" inputmode="decimal" placeholder="opcional" oninput="cfDesglose()" style="${pvInp}"></label><label>Provincia (IIBB)<input id="cf-pprov" placeholder="ej.: CABA" style="${pvInp}"></label><span></span>
     <label>Vence<input type="date" id="cf-v" value="${new Date(Date.now() + (p.plazo || 0) * 864e5).toISOString().slice(0, 10)}" style="${pvInp}"></label><label>Detalle<input id="cf-d" placeholder="opcional" style="${pvInp}"></label>
@@ -8274,7 +8274,7 @@ async function pvLeerPDF(inp){
     const pv = (t.match(/Punto de Venta:?\s*(\d{1,5})/i) || [])[1], nro = (t.match(/Comp\.?\s*Nro:?\s*(\d{1,8})/i) || [])[1];
     const fe = (t.match(/Fecha de Emisi[oó]n:?\s*(\d{2}\/\d{2}\/\d{4})/i) || [])[1], tot = (t.match(/Importe Total:?\s*\$?\s*([\d.,]+)/i) || [])[1];
     const iva = [...t.matchAll(/IVA\s*\d+(?:[.,]\d+)?\s*%:?\s*\$?\s*([\d.,]+)/gi)].reduce((a, m) => a + (numAr(m[1]) || 0), 0), let_ = (t.match(/\b(FACTURA|NOTA DE CR[EÉ]DITO)\s*([ABC])\b/i) || t.match(/\bCOD\.?\s*0?(\d{2})/i) || []);
-    if(pv && nro) document.getElementById('cf-n').value = pv.padStart(5, '0') + '-' + nro.padStart(8, '0');
+    if(pv && nro) numCompPoner('cf-n', pv + '-' + nro);
     if(fe) document.getElementById('cf-f').value = ccFechaISO(fe);
     if(tot) document.getElementById('cf-i').value = formatoPesos(Math.round(numAr(tot) * 100) / 100);
     if(iva > 0) document.getElementById('cf-iva').value = formatoPesos(Math.round(iva * 100) / 100);
@@ -12839,6 +12839,12 @@ async function abrirDatosRazones(){
 }
 async function guardarDatosRazones(){ const r = {}; PV_RAZONES.forEach(([k]) => { r[k] = {}; ['nombre', 'cuit', 'domicilio', 'iibb', 'inicio', 'iva'].forEach(c => r[k][c] = (document.getElementById(`dr-${k}-${c}`).value || '').trim()); });
   try{ await db.collection('config').doc('razones').set({ r }); datosRZ = r; } catch(e){ alert('No se pudo guardar: ' + e.message); return; } await ccLog('Datos de razones sociales', 'actualizados'); cerrarPublicar(); }
+// punto de venta y numero en dos casilleros; el valor completo (00010-00001234) queda en el campo oculto de siempre
+function fvPvSegunTipo(){ const e = document.getElementById('fv-n-pv'); if(!e || e.dataset.tocado) return; const fis = (document.querySelector('input[name=fv-fis]:checked') || {}).value !== 'no', rz = (document.getElementById('fv-rz') || {}).value || 'propia';
+  e.value = String(fis ? (((cfgFiscal.pv || {})[rz] || [])[0] || ((cfgFiscal.pv || {}).propia || ['10'])[0]) : (cfgFiscal.pvInterno || '99')).padStart(5, '0'); numCompUnir('fv-n'); }
+function campoNumComp(id, pvDef, ancho){ return `<div style="display:flex;gap:6px;align-items:center;"><input id="${id}-pv" inputmode="numeric" maxlength="5" placeholder="P. vta." value="${escapeAttr(pvDef || '')}" oninput="this.dataset.tocado='1';numCompUnir('${id}')" onblur="this.value=this.value.replace(/\\D/g,'')?this.value.replace(/\\D/g,'').padStart(5,'0'):'';numCompUnir('${id}')" style="flex:0 0 ${ancho || 90}px;width:${ancho || 90}px;text-align:center;"><span style="color:#8A8072;">–</span><input id="${id}-nro" inputmode="numeric" maxlength="8" placeholder="Número" oninput="numCompUnir('${id}')" onblur="this.value=this.value.replace(/\\D/g,'')?this.value.replace(/\\D/g,'').padStart(8,'0'):'';numCompUnir('${id}')" style="flex:1;min-width:0;"><input type="hidden" id="${id}"></div>`; }
+function numCompUnir(id){ const pv = (document.getElementById(id + '-pv').value || '').replace(/\D/g, ''), n = (document.getElementById(id + '-nro').value || '').replace(/\D/g, ''); document.getElementById(id).value = pv && n ? pv.padStart(5, '0') + '-' + n.padStart(8, '0') : ''; }
+function numCompPoner(id, valor){ const m = String(valor || '').match(/(\d{1,5})\D+(\d{1,8})/); if(!m) return; const a = document.getElementById(id + '-pv'), b = document.getElementById(id + '-nro'); if(a) a.value = m[1].padStart(5, '0'); if(b) b.value = m[2].padStart(8, '0'); numCompUnir(id); }
 // ===== Vista previa de comprobantes (antes de confirmar) =====
 let __previa = null; // si esta activa, las funciones de guardar arman el comprobante y lo devuelven sin guardar
 function capturarImpresion(fn){ const orig = window.open; let html = ''; window.open = () => ({ document: { write(x){ html += x; }, close(){} }, focus(){}, print(){} }); try{ fn(); } finally { window.open = orig; } return html; }
@@ -12892,7 +12898,7 @@ function htmlRecibo(m){
 }
 function imprimirHtml(html){ const w = window.open('', '_blank'); if(!w){ alert('Permita ventanas emergentes para imprimir.'); return; } w.document.write(html); w.document.close(); }
 // ===== Comprobante de venta cargado a mano (factura, NC o ND): pasa por los mismos controles que los subidos =====
-function fvManual(tipo){ cargarListasPrecios(); if(!ccClientesDB || !ccClientesDB.length) db.collection('clientes').get().then(s => { ccClientesDB = s.docs.map(d => d.data()); }).catch(() => {});
+function fvManual(tipo){ cargarListasPrecios(); cargarCfgFiscal().then(() => { try{ fvPvSegunTipo(); } catch(e){} }); if(!ccClientesDB || !ccClientesDB.length) db.collection('clientes').get().then(s => { ccClientesDB = s.docs.map(d => d.data()); }).catch(() => {});
   const inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
   const nom = { f: 'Factura de venta', nc: 'Nota de crédito de venta', nd: 'Nota de débito de venta' }[tipo];
   let clientes = []; try{ clientes = (listaClientes || []).map(c => c.razonSocial || `${c.apellido || ''} ${c.nombre || ''}`.trim()).filter(Boolean); } catch(e){}
@@ -12902,11 +12908,11 @@ function fvManual(tipo){ cargarListasPrecios(); if(!ccClientesDB || !ccClientesD
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:14px;">${selectorRZ('fv-rz', (document.getElementById('fc-rz') || {}).value || 'propia')}${seg('fv-cond', [['ctacte', 'Cuenta corriente'], ['contado', 'Contado']], 'ctacte')}</div>
     <div class="fila"><div><span class="fl">Cliente</span><input id="fv-c" list="fv-cl" autocomplete="off" onchange="fvFacturasCliente('${tipo}');fvNotaCliente();{const c=clientePorNombre(this.value);if(c){const r=document.querySelector('input[name=fv-cond][value='+(c.condicion==='contado'?'contado':'ctacte')+']');if(r)r.checked=true;}}[...document.querySelectorAll('.fv-r')].forEach(fvPrecioFila)"><div id="fv-notacli" class="nota"></div></div></div>
     ${tipo !== 'f' ? `<div class="fila"><div><span class="fl">Comprobante relacionado${tipo === 'nc' ? ' (obligatorio)' : ' (opcional)'}</span><select id="fv-ref" onchange="fvTraerRenglones()"><option value="">Primero elija el cliente…</option></select></div></div>` : ''}<datalist id="fv-cl">${[...new Set(clientes)].sort().map(n => `<option value="${escapeAttr(n)}">`).join('')}</datalist>
-    <div class="fila" style="grid-template-columns:110px 1fr 160px auto;align-items:end;">
-      <div><span class="fl">Letra</span><select id="fv-l" onmousedown="this.dataset.tocada='1'" onkeydown="this.dataset.tocada='1'" onchange="{const r=document.querySelector('input[name=fv-fis][value='+(this.value==='X'?'no':'si')+']');if(r)r.checked=true;}fvTot()"><option>A</option><option>B</option><option>C</option><option value="X">X</option></select></div>
-      <div><span class="fl">Número</span><input id="fv-n" placeholder="00010-00001234"></div>
+    <div class="fila" style="grid-template-columns:90px 1fr 160px auto;align-items:end;">
+      <div><span class="fl">Letra</span><select id="fv-l" onmousedown="this.dataset.tocada='1'" onkeydown="this.dataset.tocada='1'" onchange="{const r=document.querySelector('input[name=fv-fis][value='+(this.value==='X'?'no':'si')+']');if(r)r.checked=true;fvPvSegunTipo();}fvTot()"><option>A</option><option>B</option><option>C</option><option value="X">X</option></select></div>
+      <div><span class="fl">Punto de venta – Número</span>${campoNumComp('fv-n', String(((cfgFiscal.pv || {}).propia || ['10'])[0] || '10').padStart(5, '0'))}</div>
       <div><span class="fl">Fecha</span><input type="date" id="fv-f" value="${ccHoy()}"></div>
-      <div>${seg('fv-fis', [['si', 'Fiscal'], ['no', 'Sin CAE']], 'si', 'fvTot()')}</div></div>
+      <div>${seg('fv-fis', [['si', 'Fiscal'], ['no', 'Sin CAE']], 'si', 'fvPvSegunTipo();fvTot()')}</div></div>
     <details style="margin:-4px 0 4px;"><summary>CAE (opcional)</summary><div class="fila" style="grid-template-columns:1fr 1fr;margin-top:8px;"><div><span class="fl">CAE</span><input id="fv-cae" inputmode="numeric" placeholder="14 dígitos"></div><div><span class="fl">Vencimiento</span><input type="date" id="fv-caev"></div></div></details>
     <div class="sep"></div>
     <div class="rhead"><span style="flex:2 1 160px;">Producto (SKU)</span><span style="flex:0 0 80px;">Cant.</span><span style="flex:0 0 80px;">% bonif.</span><span style="flex:1 1 140px;min-width:120px;">Importe c/IVA</span><span style="flex:0 0 34px;"></span></div>
@@ -21598,7 +21604,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v353';
+const APP_VERSION = '2026-10-02-v354';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
