@@ -1339,20 +1339,34 @@ async function aplicarPackSug(cta,sku,n){
 async function confirmarTodasSku(s){
   const os=allRows().filter(o=>o.revisar&&o.costoRev!=null&&String(o.skuBase).toUpperCase()===String(s).toUpperCase());
   if(!os.length)return; if(!confirm(`¿Las ${os.length} ventas de ${s} están bien? Dejan de figurar para revisar.`))return;
-  os.forEach(o=>{CONFIRMADAS[String(o.op)+'|'+String(o.skuBaseML||o.skuBase)]=true;});
+  const meta={por:((firebase.auth().currentUser||{}).email||''),fecha:new Date().toISOString(),como:'todas'};
+  os.forEach(o=>{CONFIRMADAS[String(o.op)+'|'+String(o.skuBaseML||o.skuBase)]=meta;});
   try{await db.collection('config').doc('ml_confirmadas').set({ops:CONFIRMADAS});}catch(e){showErr('No se pudo guardar: '+e.message);return;}
   render(); alertOk('✓ '+os.length+' ventas de '+s+' confirmadas');
 }
 async function confirmarVenta(op,sku){
-  CONFIRMADAS[String(op)+'|'+sku]=true;
+  CONFIRMADAS[String(op)+'|'+sku]={por:((firebase.auth().currentUser||{}).email||''),fecha:new Date().toISOString(),como:'una'};
   try{await db.collection('config').doc('ml_confirmadas').set({ops:CONFIRMADAS});}catch(e){showErr('No se pudo guardar: '+e.message);return;}
   render();
 }
+const escHtml=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// confirmadas: quien, cuando y deshacer
+function htmlConfirmadas(){
+  const K=Object.keys(CONFIRMADAS); if(!K.length) return '';
+  const idx={}; allRows().forEach(o=>{ if(o.tipo==='Venta'&&o.pcd>0) idx[String(o.op||'')+'|'+String(o.skuBaseML||o.skuBase)]=o; });
+  const L=K.map(k=>({k,m:CONFIRMADAS[k],o:idx[k]})).sort((a,b)=>String((b.m&&b.m.fecha)||'').localeCompare(String((a.m&&a.m.fecha)||'')));
+  return `<details style="margin-top:12px;"><summary style="cursor:pointer;font-size:.88rem;">✓ Ver confirmadas (${L.length})</summary>
+    <div style="max-height:50vh;overflow:auto;margin-top:6px;">${L.map(x=>{const [op,sku]=x.k.split('|'),m=x.m&&typeof x.m==='object'?x.m:null;
+      return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line);font-size:.84rem;"><b>${escHtml(sku||'')}</b><span class="meta">${x.o?`${escHtml(x.o.cuenta)} · ${escHtml(x.o.fecha||'')} · ${fmt(x.o.pcd)}`:'venta '+escHtml(op)+' (mes no cargado)'}</span><span class="meta" style="margin-left:auto;">${m?`${escHtml(m.por||'')} · ${new Date(m.fecha).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})}${m.como==='todas'?' · "todas están bien"':''}`:'confirmada antes del registro'}</span><button type="button" style="padding:3px 9px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="deshacerConfirmada('${x.k.replace(/'/g,'')}')">Deshacer</button></div>`;}).join('')}</div></details>`;
+}
+async function deshacerConfirmada(k){ if(!confirm('¿Volver a poner esta venta en la lista para revisar?'))return; const prev=CONFIRMADAS[k]; delete CONFIRMADAS[k];
+  try{await db.collection('config').doc('ml_confirmadas').set({ops:CONFIRMADAS});}catch(e){CONFIRMADAS[k]=prev;showErr('No se pudo guardar: '+e.message);return;}
+  render(); if(window.__pantallaML==='revisar') abrirPantallaML('revisar',true); }
 function renderRevisar(){
   const fc=$('fCuenta').value;
   const L=allRows().filter(o=>o.revisar&&(!fc||o.cuenta===fc)&&!CONFIRMADAS[String(o.op||'')+'|'+String(o.skuBaseML||o.skuBase)]);
   const box=$('revisarBox'); if(!box)return;
-  if(!L.length){box.innerHTML='<p class="note">✓ No hay ventas para revisar.</p>';return;}
+  if(!L.length){box.innerHTML='<p class="note">✓ No hay ventas para revisar.</p>'+htmlConfirmadas();return;}
   const abierta=!!(box.querySelector('details')&&box.querySelector('details').open)||window.__revAbierta;
   box.innerHTML=`<details class="pleg" style="margin:10px 0;" ${abierta?'open':''} ontoggle="window.__revAbierta=this.open"><summary style="background:#FDEBE7;border-color:#E3B8AE;color:#A6432F;">⚠️ ${L.length} ${L.length===1?'venta para revisar':'ventas para revisar'} <small style="color:#A6432F;">· se suman igual; revisá el costo o la unidad y corregilo</small></summary><div class="pleg-body">
     ${(()=>{ const G={}; L.forEach(o=>{const s=String(o.skuBase||'').toUpperCase();(G[s]=G[s]||[]).push(o);});
@@ -1378,7 +1392,7 @@ function renderRevisar(){
               <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="const v=prompt('Costo correcto de ${sq} por '+uvTxt('${sq}')+':','');const n=leerMonto(v);if(n>0)aplicarCostoTodas('${sq}',n);">✏️ Corregir costo mal cargado</button>
               <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="window.__revGrupos=window.__revGrupos||{};window.__revGrupos['${sq}']=!window.__revGrupos['${sq}'];renderRevisar();">${abierto?'Ocultar ventas':'Ver ventas'}</button></span></div>
           ${abierto?`<div style="padding:0 10px 6px;">${os.map(item).join('')}</div>`:''}</div>`; }).join(''); })()}
-    <p class="note">Si el número está bien, tocá <b>✓ Está bien</b> y pasa a contarse. Si está mal, corregí el costo, la unidad (docena) o la equivalencia y la alerta desaparece sola.</p></div></details>`;
+    <p class="note">Si el número está bien, tocá <b>✓ Está bien</b>. Si está mal, corregí el costo, la unidad (docena) o la equivalencia y la alerta desaparece sola.</p>${htmlConfirmadas()}</div></details>`;
 }
 // ===== Menu con tarjetas (como la app): cada seccion es una pantalla con Volver =====
 let menuArmado=false;
@@ -1428,7 +1442,7 @@ function abrirPantallaML(k,sinScroll){
   $('menuML').style.display='none'; $('volverML').style.display='flex'; $('volverTit').textContent=p[1]+' '+p[2];
   el.style.display=''; el.classList.add('pantallaML'); if(el.tagName==='DETAILS') el.open=true;
   if(k==='revisar'&&!sinScroll){ try{applyCadete();renderRevisar();}catch(e){console.error(e);} }
-  if(k==='revisar'){ const d=el.querySelector('details'); if(d){ d.open=true; d.querySelector('summary').style.display='none'; } if(!el.innerHTML.trim()) el.innerHTML='<p class="note">✓ No hay ventas para revisar.</p>'; }
+  if(k==='revisar'){ const d=el.querySelector('details.pleg'); if(d){ d.open=true; d.querySelector('summary').style.display='none'; } if(!el.innerHTML.trim()) el.innerHTML='<p class="note">✓ No hay ventas para revisar.</p>'; }
   const misma=window.__pantallaML===k; window.__pantallaML=k; if(!sinScroll&&!misma) window.scrollTo({top:$('volverML').offsetTop-10,behavior:'smooth'});
 }
 function volverMenuML(){
