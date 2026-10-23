@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v359</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v360</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -12926,35 +12926,48 @@ function acPintar(nuevoFiltro){ const L = acProductos(), box = document.getEleme
     + L.map(x => { const fs = acFotos(x), im = fs[0]; return `<label style="display:flex;gap:10px;align-items:center;padding:5px 0;border-top:1px solid #F3EFE8;font-size:.85rem;"><input type="checkbox" ${acState.sel.has(x.key) ? 'checked' : ''} onchange="this.checked?acState.sel.add('${x.key}'):acState.sel.delete('${x.key}');"><span style="width:38px;height:38px;border-radius:6px;background:#F3EFE8 center/cover;${im ? `background-image:url('${String(im).replace(/'/g, '%27')}');` : ''}"></span><span style="flex:1;"><b>${x.sku ? escaparHtml(x.sku) + ' · ' : ''}${escaparHtml(x.p.nombre)}</b> <span class="meta">${escaparHtml(x.cat)} · ${x.v ? escaparHtml(x.v.desc || '') : (x.p.variantes || []).length + ' medidas'}${x.sku ? ` · ${fs.length} foto(s)${(fotosSku[x.sku] || []).length ? ' propias' : ' del producto'}` : ''}</span></span>${im ? '' : '<span class="meta">sin foto</span>'}</label>`; }).join(''); }
 function acCargarImg(src){ return new Promise(res => { if(!src){ res(null); return; } const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = () => res(null); i.src = src; }); }
 function acTexto(ctx, t, x, y, maxW, lh, maxL){ const pal = String(t || '').split(/\s+/); let l = '', n = 0; for(const w of pal){ const pr = l ? l + ' ' + w : w; if(ctx.measureText(pr).width > maxW && l){ ctx.fillText(l, x, y + n * lh); n++; l = w; if(maxL && n >= maxL) return n; } else l = pr; } if(l){ ctx.fillText(l, x, y + n * lh); n++; } return n; }
+// dibuja varias fotos llenando el recuadro (1 grande; 2 lado a lado; 3 = una grande y dos; 4 en 2x2; 5-6 en 3x2)
+function acRecorte(c, im, x, y, w, hh){ c.save(); c.beginPath(); c.rect(x, y, w, hh); c.clip(); const r = Math.min(w / im.width, hh / im.height), dw = im.width * r, dh = im.height * r; /* entera, sin recortar el producto */ c.drawImage(im, x + (w - dw) / 2, y + (hh - dh) / 2, dw, dh); c.restore(); }
+function acGrilla(c, ims, x, y, w, hh){ const g = 10, n = ims.length; let celdas = [];
+  if(n === 1) celdas = [[x, y, w, hh]];
+  else if(n === 2) celdas = [[x, y, (w - g) / 2, hh], [x + (w + g) / 2, y, (w - g) / 2, hh]];
+  else if(n === 3){ const a = w * .62; celdas = [[x, y, a, hh], [x + a + g, y, w - a - g, (hh - g) / 2], [x + a + g, y + (hh + g) / 2, w - a - g, (hh - g) / 2]]; }
+  else if(n === 4) celdas = [0, 1, 2, 3].map(k => [x + (k % 2) * (w + g) / 2, y + Math.floor(k / 2) * (hh + g) / 2, (w - g) / 2, (hh - g) / 2]);
+  else { const cw = (w - 2 * g) / 3, ch = (hh - g) / 2; celdas = ims.map((_, k) => [x + (k % 3) * (cw + g), y + Math.floor(k / 3) * (ch + g), cw, ch]); }
+  ims.forEach((im, k) => { const [cx, cy, cw, ch] = celdas[k]; c.fillStyle = '#fff'; c.fillRect(cx, cy, cw, ch); if(im) acRecorte(c, im, cx, cy, cw, ch); }); }
 async function acLamina(x){
-  const W = 1080, H = 1350, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
-  const VIO = '#3D2B4E', ORO = '#F4C430', CRE = '#F5F3EF';
-  c.fillStyle = CRE; c.fillRect(0, 0, W, H);
-  c.fillStyle = VIO; c.fillRect(0, 0, W, 110); c.fillStyle = '#fff'; c.font = '600 46px Georgia, serif'; c.textBaseline = 'middle'; c.fillText('OnLineTextil', 60, 56);
-  c.font = '500 24px Arial'; c.textAlign = 'right'; c.fillStyle = ORO; c.fillText(String(x.cat || '').toUpperCase(), W - 60, 58); c.textAlign = 'left';
-  // foto
-  const fotos = acFotos(x), extras = x.sku ? fotos.slice(1, 4) : [], im = await acCargarImg(fotos[0]); const fx = 60, fy = 150, fw = W - 120, fh = 640, mh = extras.length ? 150 : 0, fhP = fh - (mh ? mh + 12 : 0);
-  c.fillStyle = '#fff'; c.fillRect(fx, fy, fw, fh);
-  if(im){ const r = Math.min(fw / im.width, fhP / im.height), w = im.width * r, hh = im.height * r; c.drawImage(im, fx + (fw - w) / 2, fy + (fhP - hh) / 2, w, hh); }
-  if(extras.length){ const mw = (fw - 24 * (extras.length - 1) - 24) / extras.length; for(let k = 0; k < extras.length; k++){ const e = await acCargarImg(extras[k]); const bx = fx + 12 + k * (mw + 24), by = fy + fhP + 12; c.fillStyle = '#F3EFE8'; c.fillRect(bx, by, mw, mh - 12); if(e){ const r = Math.min(mw / e.width, (mh - 12) / e.height), w = e.width * r, hh = e.height * r; c.drawImage(e, bx + (mw - w) / 2, by + (mh - 12 - hh) / 2, w, hh); } } } else { c.fillStyle = '#B5AB9C'; c.font = '24px Arial'; c.textAlign = 'center'; c.fillText('Sin foto', W / 2, fy + fh / 2); c.textAlign = 'left'; }
-  // nombre y composicion
-  c.textBaseline = 'alphabetic'; c.fillStyle = VIO; c.font = '600 46px Georgia, serif'; let y = 860; const nl = acTexto(c, x.p.nombre, 60, y, W - 120, 52, 2); y += nl * 52;
-  if(x.p.composicion){ c.fillStyle = '#6B6258'; c.font = '26px Arial'; y += acTexto(c, x.p.composicion, 60, y, W - 120, 32, 1) * 32; }
-  y += 18;
-  // tabla de medidas
-  const vs = x.v ? [x.v] : (x.p.variantes || []), f = factorCliente({ lista: acState.lista }), filas = vs.slice(0, 9), alto = Math.min(48, Math.floor((H - 120 - y - 60) / Math.max(1, filas.length + 1)));
-  c.fillStyle = VIO; c.fillRect(60, y, W - 120, alto); c.fillStyle = '#fff'; c.font = `700 ${Math.round(alto * .45)}px Arial`;
-  const colM = 80, colS = acState.skus ? 640 : 0, colP = W - 80; c.fillText('MEDIDA', colM, y + alto * .65); if(acState.skus) c.fillText('SKU', colS, y + alto * .65); if(acState.precios){ c.textAlign = 'right'; c.fillText('PRECIO', colP, y + alto * .65); c.textAlign = 'left'; }
-  y += alto;
-  filas.forEach((v, i) => { c.fillStyle = i % 2 ? '#fff' : '#FBF9F5'; c.fillRect(60, y, W - 120, alto); c.fillStyle = '#3B3530'; c.font = `${Math.round(alto * .46)}px Arial`;
-    const md = String(v.desc || '').slice(0, acState.skus ? 36 : 52); c.fillText(md, colM, y + alto * .65); if(acState.skus){ c.fillStyle = '#8A8072'; c.fillText(String(v.sku), colS, y + alto * .65); }
-    if(acState.precios){ const base = parsePrice(v.precio); if(base > 0){ c.fillStyle = VIO; c.font = `700 ${Math.round(alto * .46)}px Arial`; c.textAlign = 'right'; c.fillText(formatPrice(Math.round(base * f.factor * 100) / 100) + (divisorVenta(v.sku) > 1 ? ' x ' + ({ 12: 'docena', 6: 'media doc.', 2: 'par' })[divisorVenta(v.sku)] : ''), colP, y + alto * .65); c.textAlign = 'left'; } }
-    y += alto; });
-  if(vs.length > filas.length){ c.fillStyle = '#8A8072'; c.font = '22px Arial'; c.fillText(`+ ${vs.length - filas.length} medidas más`, colM, y + 30); }
-  // pie
-  c.fillStyle = ORO; c.fillRect(0, H - 70, W, 70); c.fillStyle = VIO; c.font = '600 26px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.fillText(acState.pie || '', W / 2, H - 35); c.textAlign = 'left';
-  return cv;
+  const W = 1080, H = 1350, VIO = '#3D2B4E', ORO = '#F4C430', CRE = '#F5F3EF';
+  const fotos = acFotos(x).slice(0, 12), grupos = []; for(let k = 0; k < Math.max(1, fotos.length); k += 6) grupos.push(fotos.slice(k, k + 6)); // hasta 6 fotos por lamina; si hay mas, sigue en otra
+  const vs = x.v ? [x.v] : (x.p.variantes || []), filas = vs.slice(0, 9), f = factorCliente({ lista: acState.lista }), out = [];
+  for(let gi = 0; gi < grupos.length; gi++){
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d'), primera = gi === 0;
+    c.fillStyle = CRE; c.fillRect(0, 0, W, H);
+    c.fillStyle = VIO; c.fillRect(0, 0, W, 90); c.fillStyle = '#fff'; c.font = '600 40px Georgia, serif'; c.textBaseline = 'middle'; c.fillText('OnLineTextil', 50, 46);
+    c.font = '500 22px Arial'; c.textAlign = 'right'; c.fillStyle = ORO; c.fillText(String(x.cat || '').toUpperCase(), W - 50, 47); c.textAlign = 'left';
+    // alto del bloque de textos y tabla, para que las fotos ocupen todo lo demas
+    const alto = 46, bloqueTxt = primera ? 70 + (x.p.composicion ? 36 : 0) + 18 + alto * (filas.length + 1) + (vs.length > filas.length ? 34 : 0) : 70;
+    const fy = 108, fh = H - 70 - 24 - bloqueTxt - fy, fx = 40, fw = W - 80;
+    const ims = []; for(const s of grupos[gi]) ims.push(await acCargarImg(s));
+    if(ims.filter(Boolean).length) acGrilla(c, ims.length ? ims : [null], fx, fy, fw, fh);
+    else { c.fillStyle = '#fff'; c.fillRect(fx, fy, fw, fh); c.fillStyle = '#B5AB9C'; c.font = '24px Arial'; c.textAlign = 'center'; c.fillText('Sin foto', W / 2, fy + fh / 2); c.textAlign = 'left'; }
+    let y = fy + fh + 54; c.textBaseline = 'alphabetic';
+    c.fillStyle = VIO; c.font = '600 40px Georgia, serif'; acTexto(c, x.p.nombre + (primera ? '' : ' (continuación)') + (x.v && primera ? '' : ''), 50, y, W - 100, 44, 1);
+    if(primera){
+      if(x.p.composicion){ y += 36; c.fillStyle = '#6B6258'; c.font = '24px Arial'; acTexto(c, x.p.composicion, 50, y, W - 100, 28, 1); }
+      y += 22;
+      c.fillStyle = VIO; c.fillRect(40, y, W - 80, alto); c.fillStyle = '#fff'; c.font = '700 20px Arial';
+      const colM = 60, colS = acState.skus ? 640 : 0, colP = W - 60; c.fillText('MEDIDA', colM, y + 30); if(acState.skus) c.fillText('SKU', colS, y + 30); if(acState.precios){ c.textAlign = 'right'; c.fillText('PRECIO', colP, y + 30); c.textAlign = 'left'; }
+      y += alto;
+      filas.forEach((v, i) => { c.fillStyle = i % 2 ? '#fff' : '#FBF9F5'; c.fillRect(40, y, W - 80, alto); c.fillStyle = '#3B3530'; c.font = '22px Arial';
+        c.fillText(String(v.desc || '').slice(0, acState.skus ? 40 : 58), colM, y + 30); if(acState.skus){ c.fillStyle = '#8A8072'; c.fillText(String(v.sku), colS, y + 30); }
+        if(acState.precios){ const base = parsePrice(v.precio); if(base > 0){ c.fillStyle = VIO; c.font = '700 22px Arial'; c.textAlign = 'right'; c.fillText(formatPrice(Math.round(base * f.factor * 100) / 100) + (divisorVenta(v.sku) > 1 ? ' x ' + ({ 12: 'docena', 6: 'media doc.', 2: 'par' })[divisorVenta(v.sku)] : ''), colP, y + 30); c.textAlign = 'left'; } }
+        y += alto; });
+      if(vs.length > filas.length){ c.fillStyle = '#8A8072'; c.font = '20px Arial'; c.fillText(`+ ${vs.length - filas.length} medidas más`, colM, y + 26); }
+    }
+    c.fillStyle = ORO; c.fillRect(0, H - 70, W, 70); c.fillStyle = VIO; c.font = '600 26px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(acState.pie || '', W / 2, H - 35); c.textAlign = 'left';
+    out.push(cv);
+  }
+  return out;
 }
 function acPortada(n){ const W = 1080, H = 1350, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
   c.fillStyle = '#3D2B4E'; c.fillRect(0, 0, W, H); c.fillStyle = '#F4C430'; c.fillRect(0, H - 14, W, 14); c.textAlign = 'center'; c.textBaseline = 'middle';
@@ -12964,7 +12977,7 @@ function acPortada(n){ const W = 1080, H = 1350, cv = document.createElement('ca
 async function acGenerar(modo){
   const L = acProductos().filter(x => acState.sel.has(x.key)); if(!L.length){ alert('Elija al menos un producto.'); return; }
   procesando(`Armando ${L.length} láminas…`);
-  try{ const lams = []; if(acState.portada) lams.push(acPortada(L.length)); for(const x of L) lams.push(await acLamina(x));
+  try{ const lams = []; if(acState.portada) lams.push(acPortada(L.length)); for(const x of L) lams.push(...(await acLamina(x)));
     procesando.listo('');
     if(modo === 'previa'){ mostrarVistaPrevia(`<html><body style="margin:0;background:#E9E4DC;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;">${lams.map(cv => `<img src="${cv.toDataURL('image/jpeg', .82)}" style="width:100%;box-shadow:0 4px 14px rgba(0,0,0,.15);">`).join('')}</body></html>`, () => acGenerar('pdf')); const b = document.getElementById('vp-ok'); if(b) b.textContent = '📄 Descargar PDF'; return; }
     const nombre = `catalogo-${acState.tipo}-${new Date().toISOString().slice(0, 10)}`;
@@ -21679,7 +21692,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v359';
+const APP_VERSION = '2026-10-02-v360';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
