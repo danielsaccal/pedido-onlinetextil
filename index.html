@@ -1657,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v326</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v327</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13367,7 +13367,8 @@ async function enviarDA(){
   const btn = document.getElementById('da-enviar'); btn.disabled = true;
   try{
     procesando('Preparando el pedido…');
-    let cuerpo = (daCanal ? `Canal: ${daCanal}\n` : '') + (daProds.length ? `Fichas de producto (desde la app):\n${daProds.map(fichaDA).join('\n\n')}\n\n` : '') + `Pedido: ${texto}`;
+    const recordatorio = /Mercado Libre|Tienda Nube/.test(daCanal) ? 'OBLIGATORIO: usá la PLANTILLA FIJA del canal tal cual (portada y detalle empiezan con "Edit this photo. Do NOT redraw"); un solo prompt para todas las fotos; antes de responder, verificá la lista de control.\n' : '';
+    let cuerpo = (daCanal ? `Canal: ${daCanal}\n` + recordatorio : '') + (daProds.length ? `Fichas de producto (desde la app):\n${daProds.map(fichaDA).join('\n\n')}\n\n` : '') + `Pedido: ${texto}`;
     const content = [{ type: 'text', text: cuerpo }];
     for(const S of daProds){ const r = buscarProductoPorSku(S); if(!r) continue; const fs = fotosDeSkuOProducto(S, r.ci, r.pi, r.producto).slice(0, 3);
       for(const f of fs){ const b64 = await imagenABase64DA(f); if(b64) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } }); } }
@@ -21096,7 +21097,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v326';
+const APP_VERSION = '2026-10-02-v327';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
