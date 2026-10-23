@@ -696,17 +696,17 @@ function aplicarCostos(){for(const d of DATA)for(const o of d.rows){
   }
 }
   // segunda pasada, por operacion: unidades devueltas enteras y nunca mas que las vendidas
-  const G={};for(const d of DATA)for(const o of d.rows){if(o.esDevol&&o.c2!=null)(G[o.op]=G[o.op]||[]).push(o);}
+  const G={};for(const d of DATA)for(const o of d.rows){if(o.esDevol)(G[o.op]=G[o.op]||[]).push(o);}
   for(const rs of Object.values(G)){
-    rs.filter(o=>o.pcd<0&&esCargoDevol(o)).forEach(o=>{o.uDev=0;o.costoAj=0;});
+    rs.filter(o=>o.pcd<0&&esCargoDevol(o)).forEach(o=>{o.uDev=0;o.costoAj=o.c2!=null?0:null;}); /* unidades devueltas aunque falte el costo (para el stock) */
     const ventas=rs.filter(o=>o.pcd>0), reint=rs.filter(o=>o.pcd<0&&!esCargoDevol(o)); if(!reint.length)continue;
     let tope=ventas.length?ventas.reduce((a,o)=>a+o.unid,0):Math.max(...reint.map(o=>o.unid));
     for(const o of reint){
       // venta cancelada entera: vuelven todas las unidades (en el primer reintegro); los demas reintegros son solo plata
-      if(/cancel/i.test(o.estado)){o.uDev=Math.max(0,tope);tope=0;o.costoAj=-o.c2*o.uDev;if(!o.uDev)o.reintDinero=true;continue;}
+      if(/cancel/i.test(o.estado)){o.uDev=Math.max(0,tope);tope=0;o.costoAj=o.c2!=null?-o.c2*o.uDev:null;if(!o.uDev)o.reintDinero=true;continue;}
       const tot=o.prodTotal>0?o.prodTotal:Math.abs(o.pcd), u=o.unid*Math.min(1,Math.abs(o.pcd)/tot), ui=Math.round(u);
-      if(ui<1||Math.abs(u-ui)>0.1){o.uDev=0;o.reintDinero=true;o.costoAj=0;continue;} // devolvieron plata, no mercaderia (reclamo, bonificacion)
-      o.uDev=Math.min(ui,Math.max(0,tope)); tope-=o.uDev; o.costoAj=-o.c2*o.uDev;
+      if(ui<1||Math.abs(u-ui)>0.1){o.uDev=0;o.reintDinero=true;o.costoAj=o.c2!=null?0:null;continue;} // devolvieron plata, no mercaderia (reclamo, bonificacion)
+      o.uDev=Math.min(ui,Math.max(0,tope)); tope-=o.uDev; o.costoAj=o.c2!=null?-o.c2*o.uDev:null;
     }
   }
 }
@@ -1598,10 +1598,13 @@ async function aplicarStockML(cuenta, periodo, quitar){
     st.skus=st.skus||{}; const aref=db.collection('ml_stock_aplicado').doc(cuenta+'_'+periodo), ad=await aref.get(), prev=ad.exists?(ad.data().m||{}):{};
     const iso=f=>{const m=String(f||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);return m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:'';};
     const now={};
-    if(!quitar) allRows().filter(o=>o.cuenta===cuenta&&o.periodo===periodo&&o.tipo==='Venta'&&o.pcd>0&&!o.excl&&o.skuBase&&iso(o.fecha)>=st.inicio).forEach(o=>{
+    if(!quitar) allRows().filter(o=>o.cuenta===cuenta&&o.periodo===periodo&&o.tipo==='Venta'&&o.pcd>0&&!o.excl&&o.skuBase&&!/cancel/i.test(o.estado||'')&&iso(o.fecha)>=st.inicio).forEach(o=>{ // las canceladas no salieron del deposito
       const S=String(o.skuBase).toUpperCase(); if(!NAMES[S]&&!st.skus[S]) return; const k=S+'|'+(/full/i.test(o.log||'')?'full':'stock'); now[k]=(now[k]||0)-(+o.unid||0); });
     const claves=new Set([...Object.keys(prev),...Object.keys(now)]), movs=[];
     claves.forEach(k=>{ const d=(now[k]||0)-(prev[k]||0); if(!d) return; const [S,u]=k.split('|'); const x=st.skus[S]||{stock:0,minimo:0}; x[u]=Math.round(((+x[u]||0)+d)*100)/100; st.skus[S]=x; movs.push({S,u,d}); });
+    // devoluciones: no vuelven solas al stock; quedan para revisar en la app (si volvio bien, fallada o no volvio)
+    if(!quitar){ const dv = allRows().filter(o => o.cuenta === cuenta && o.periodo === periodo && o.esDevol && o.uDev > 0 && o.skuBase && !/cancel/i.test(o.estado || '') && iso(o.fecha) >= st.inicio); // solo devoluciones reales (la mercaderia salio y volvio)
+      for(const o of dv){ const S = String(o.skuBase).toUpperCase(), id = (cuenta + '_' + periodo + '_' + o.op + '_' + S).replace(/[^A-Za-z0-9_-]/g, ''); try{ const r = db.collection('devoluciones_ml').doc(id), x = await r.get(); if(!x.exists) await r.set({ cuenta, periodo, op: String(o.op), sku: S, unid: o.uDev, fecha: iso(o.fecha), log: o.log || '', estado: 'pendiente', creado: new Date().toISOString() }); } catch(e){ console.error(e); } } }
     if(!movs.length) return;
     await sref.set(st); if(quitar) await aref.delete(); else await aref.set({m:now,actualizado:new Date().toISOString()});
     const f=new Date().toISOString(); movs.forEach(m=>db.collection('stock_movs').add({sku:m.S,cantidad:m.d,ubic:m.u,tipo:quitar?'mes de ML quitado':'venta Mercado Libre',ref:cuenta+' '+periodo,fecha:f}).catch(()=>{}));
