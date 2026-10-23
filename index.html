@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v355</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v356</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6007,7 +6007,7 @@ const GRUPOS_INICIO = {
     [['🔗 Compartir por rubro', 'abrirCompartirRubro()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()']],
     [['🎬 Crear video promocional', 'abrirCrearVideo()'], ['🎞️ Compartir video de producto', 'abrirCompartirVideoProducto()']],
     [['🖼️ Nuevo ingreso (flyers)', 'abrirNuevoIngreso()'], ['📣 Anuncios y promociones', 'abrirAnuncio()'], ['🎨 Director de arte (IA)', 'abrirDirectorArte()']],
-    [['📸 Prompt para Gemini (un SKU)', 'abrirPromptGemini()'], ['📸 Prompts para Gemini en lote', 'abrirPromptGeminiLote()']],
+    [['📸 Prompt para Gemini (un SKU)', 'abrirPromptGemini()'], ['📸 Prompts para Gemini en lote', 'abrirPromptGeminiLote()'], ['📚 Armar catálogo (láminas)', 'abrirArmarCatalogo()']],
   ] },
   ped: { lado: 'int', titulo: '🛒 Pedidos', titulosColumnas: ['Tomar pedido', 'Seguimiento'], columnas: [
     [['📚 Tomar pedido (catálogo)', "irACatalogoDesdeInicio()"], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()'], ['📄 Pedido desde una foto', "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)"]],
@@ -12898,6 +12898,72 @@ function htmlRecibo(m){
     <script>setTimeout(()=>print(),400)<\/script></body></html>`;
 }
 function imprimirHtml(html){ const w = window.open('', '_blank'); if(!w){ alert('Permita ventanas emergentes para imprimir.'); return; } w.document.write(html); w.document.close(); }
+// ===== Catalogo en laminas (sin IA, sin creditos): plantilla fija 1080x1350 por producto, PDF y JPG =====
+let acState = { cat: '', q: '', sel: new Set(), lista: 'general', precios: true, skus: true, tipo: 'mayorista', pie: 'onlinetextil.com.ar', portada: true, titulo: 'Catálogo' };
+function acProductos(){ const L = []; CATALOGO.forEach((c, ci) => { if(acState.cat && c.categoria !== acState.cat) return; (c.productos || []).forEach((p, pi) => { if(acState.q && !coincideBusqueda(p.nombre + ' ' + (p.variantes || []).map(v => v.sku + ' ' + v.desc).join(' '), acState.q)) return; L.push({ ci, pi, p, key: ci + ':' + pi, cat: c.categoria }); }); }); return L; }
+async function abrirArmarCatalogo(){
+  await cargarListasPrecios();
+  const cats = [...new Set(CATALOGO.map(c => c.categoria).filter(Boolean))];
+  pvModal('📚 Armar catálogo', `<div class="fx">
+    <div class="fila" style="grid-template-columns:1fr 1fr 1fr;"><div><span class="fl">Tipo</span><select onchange="acState.tipo=this.value;acState.skus=this.value==='mayorista';document.getElementById('ac-skus').checked=acState.skus"><option value="mayorista">Mayorista</option><option value="minorista">Minorista</option></select></div>
+      <div><span class="fl">Lista de precios</span><select onchange="acState.lista=this.value">${(listasPrecios || []).map(l => `<option value="${escapeAttr(l.id)}">${escaparHtml(l.nombre)}</option>`).join('')}</select></div>
+      <div><span class="fl">Título de la portada</span><input value="${escapeAttr(acState.titulo)}" oninput="acState.titulo=this.value"></div></div>
+    <div class="fila" style="grid-template-columns:1fr 1fr;"><div><span class="fl">Categoría</span><select onchange="acState.cat=this.value;acPintar()"><option value="">Todas</option>${cats.map(c => `<option>${escaparHtml(c)}</option>`).join('')}</select></div><div><span class="fl">Buscar</span><input placeholder="ej.: century, toallón" oninput="acState.q=this.value;clearTimeout(window.__acT2);window.__acT2=setTimeout(acPintar,250)"></div></div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.85rem;margin-bottom:8px;"><label><input type="checkbox" checked onchange="acState.precios=this.checked"> Mostrar precios</label><label><input type="checkbox" id="ac-skus" checked onchange="acState.skus=this.checked"> Mostrar SKU</label><label><input type="checkbox" checked onchange="acState.portada=this.checked"> Portada</label><label style="flex:1;min-width:200px;">Pie de página <input value="${escapeAttr(acState.pie)}" oninput="acState.pie=this.value" style="height:30px !important;"></label></div>
+    <div id="ac-lista" style="max-height:38vh;overflow:auto;border-top:1px solid #EEE9E1;"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap;"><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="acGenerar('previa')">👁️ Vista previa</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="acGenerar('jpg')">🖼️ Láminas JPG (zip)</button><button class="btn btn-gold" style="width:auto;padding:10px 22px;" onclick="acGenerar('pdf')">📄 Catálogo PDF</button></div></div>`, 920);
+  acState.sel = new Set(acProductos().map(x => x.key)); acPintar();
+}
+function acPintar(){ const L = acProductos(), box = document.getElementById('ac-lista'); if(!box) return;
+  box.innerHTML = `<label style="display:flex;gap:8px;padding:6px 0;font-size:.85rem;font-weight:700;"><input type="checkbox" ${L.every(x => acState.sel.has(x.key)) ? 'checked' : ''} onchange="acProductos().forEach(x=>this.checked?acState.sel.add(x.key):acState.sel.delete(x.key));acPintar()"> Todos (${L.length}) · ${[...acState.sel].length} elegidos</label>`
+    + L.map(x => { const im = imagenesEfectivas(x.ci, x.pi, x.p)[0]; return `<label style="display:flex;gap:10px;align-items:center;padding:5px 0;border-top:1px solid #F3EFE8;font-size:.85rem;"><input type="checkbox" ${acState.sel.has(x.key) ? 'checked' : ''} onchange="this.checked?acState.sel.add('${x.key}'):acState.sel.delete('${x.key}');"><span style="width:38px;height:38px;border-radius:6px;background:#F3EFE8 center/cover;${im ? `background-image:url('${String(im).replace(/'/g, '%27')}');` : ''}"></span><span style="flex:1;"><b>${escaparHtml(x.p.nombre)}</b> <span class="meta">${escaparHtml(x.cat)} · ${(x.p.variantes || []).length} medidas</span></span>${im ? '' : '<span class="meta">sin foto</span>'}</label>`; }).join(''); }
+function acCargarImg(src){ return new Promise(res => { if(!src){ res(null); return; } const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = () => res(null); i.src = src; }); }
+function acTexto(ctx, t, x, y, maxW, lh, maxL){ const pal = String(t || '').split(/\s+/); let l = '', n = 0; for(const w of pal){ const pr = l ? l + ' ' + w : w; if(ctx.measureText(pr).width > maxW && l){ ctx.fillText(l, x, y + n * lh); n++; l = w; if(maxL && n >= maxL) return n; } else l = pr; } if(l){ ctx.fillText(l, x, y + n * lh); n++; } return n; }
+async function acLamina(x){
+  const W = 1080, H = 1350, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
+  const VIO = '#3D2B4E', ORO = '#F4C430', CRE = '#F5F3EF';
+  c.fillStyle = CRE; c.fillRect(0, 0, W, H);
+  c.fillStyle = VIO; c.fillRect(0, 0, W, 110); c.fillStyle = '#fff'; c.font = '600 46px Georgia, serif'; c.textBaseline = 'middle'; c.fillText('OnLineTextil', 60, 56);
+  c.font = '500 24px Arial'; c.textAlign = 'right'; c.fillStyle = ORO; c.fillText(String(x.cat || '').toUpperCase(), W - 60, 58); c.textAlign = 'left';
+  // foto
+  const im = await acCargarImg(imagenesEfectivas(x.ci, x.pi, x.p)[0]); const fx = 60, fy = 150, fw = W - 120, fh = 640;
+  c.fillStyle = '#fff'; c.fillRect(fx, fy, fw, fh);
+  if(im){ const r = Math.min(fw / im.width, fh / im.height), w = im.width * r, hh = im.height * r; c.drawImage(im, fx + (fw - w) / 2, fy + (fh - hh) / 2, w, hh); } else { c.fillStyle = '#B5AB9C'; c.font = '24px Arial'; c.textAlign = 'center'; c.fillText('Sin foto', W / 2, fy + fh / 2); c.textAlign = 'left'; }
+  // nombre y composicion
+  c.textBaseline = 'alphabetic'; c.fillStyle = VIO; c.font = '600 46px Georgia, serif'; let y = 860; const nl = acTexto(c, x.p.nombre, 60, y, W - 120, 52, 2); y += nl * 52;
+  if(x.p.composicion){ c.fillStyle = '#6B6258'; c.font = '26px Arial'; y += acTexto(c, x.p.composicion, 60, y, W - 120, 32, 1) * 32; }
+  y += 18;
+  // tabla de medidas
+  const vs = x.p.variantes || [], f = factorCliente({ lista: acState.lista }), filas = vs.slice(0, 9), alto = Math.min(48, Math.floor((H - 120 - y - 60) / Math.max(1, filas.length + 1)));
+  c.fillStyle = VIO; c.fillRect(60, y, W - 120, alto); c.fillStyle = '#fff'; c.font = `700 ${Math.round(alto * .45)}px Arial`;
+  const colM = 80, colS = acState.skus ? 640 : 0, colP = W - 80; c.fillText('MEDIDA', colM, y + alto * .65); if(acState.skus) c.fillText('SKU', colS, y + alto * .65); if(acState.precios){ c.textAlign = 'right'; c.fillText('PRECIO', colP, y + alto * .65); c.textAlign = 'left'; }
+  y += alto;
+  filas.forEach((v, i) => { c.fillStyle = i % 2 ? '#fff' : '#FBF9F5'; c.fillRect(60, y, W - 120, alto); c.fillStyle = '#3B3530'; c.font = `${Math.round(alto * .46)}px Arial`;
+    const md = String(v.desc || '').slice(0, acState.skus ? 36 : 52); c.fillText(md, colM, y + alto * .65); if(acState.skus){ c.fillStyle = '#8A8072'; c.fillText(String(v.sku), colS, y + alto * .65); }
+    if(acState.precios){ const base = parsePrice(v.precio); if(base > 0){ c.fillStyle = VIO; c.font = `700 ${Math.round(alto * .46)}px Arial`; c.textAlign = 'right'; c.fillText(formatPrice(Math.round(base * f.factor * 100) / 100) + (divisorVenta(v.sku) > 1 ? ' x ' + ({ 12: 'docena', 6: 'media doc.', 2: 'par' })[divisorVenta(v.sku)] : ''), colP, y + alto * .65); c.textAlign = 'left'; } }
+    y += alto; });
+  if(vs.length > filas.length){ c.fillStyle = '#8A8072'; c.font = '22px Arial'; c.fillText(`+ ${vs.length - filas.length} medidas más`, colM, y + 30); }
+  // pie
+  c.fillStyle = ORO; c.fillRect(0, H - 70, W, 70); c.fillStyle = VIO; c.font = '600 26px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(acState.pie || '', W / 2, H - 35); c.textAlign = 'left';
+  return cv;
+}
+function acPortada(n){ const W = 1080, H = 1350, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
+  c.fillStyle = '#3D2B4E'; c.fillRect(0, 0, W, H); c.fillStyle = '#F4C430'; c.fillRect(0, H - 14, W, 14); c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillStyle = '#fff'; c.font = '600 96px Georgia, serif'; c.fillText('OnLineTextil', W / 2, 520); c.fillStyle = '#F4C430'; c.font = '600 48px Arial'; c.fillText(acState.titulo || 'Catálogo', W / 2, 640);
+  c.fillStyle = 'rgba(255,255,255,.75)'; c.font = '28px Arial'; c.fillText(`${acState.tipo === 'mayorista' ? 'Mayorista' : 'Minorista'} · ${new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}`, W / 2, 720);
+  c.fillText(acState.pie || '', W / 2, H - 80); return cv; }
+async function acGenerar(modo){
+  const L = acProductos().filter(x => acState.sel.has(x.key)); if(!L.length){ alert('Elija al menos un producto.'); return; }
+  procesando(`Armando ${L.length} láminas…`);
+  try{ const lams = []; if(acState.portada) lams.push(acPortada(L.length)); for(const x of L) lams.push(await acLamina(x));
+    procesando.listo('');
+    if(modo === 'previa'){ mostrarVistaPrevia(`<html><body style="margin:0;background:#E9E4DC;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;">${lams.map(cv => `<img src="${cv.toDataURL('image/jpeg', .82)}" style="width:100%;box-shadow:0 4px 14px rgba(0,0,0,.15);">`).join('')}</body></html>`, () => acGenerar('pdf')); const b = document.getElementById('vp-ok'); if(b) b.textContent = '📄 Descargar PDF'; return; }
+    const nombre = `catalogo-${acState.tipo}-${new Date().toISOString().slice(0, 10)}`;
+    if(modo === 'pdf'){ const { jsPDF } = window.jspdf; const d = new jsPDF({ unit: 'px', format: [1080, 1350], hotfixes: ['px_scaling'] }); lams.forEach((cv, i) => { if(i) d.addPage([1080, 1350]); d.addImage(cv.toDataURL('image/jpeg', .85), 'JPEG', 0, 0, 1080, 1350); }); d.save(nombre + '.pdf'); }
+    else { await cargarJSZip(); const z = new JSZip(); lams.forEach((cv, i) => z.file(`${String(i + 1).padStart(2, '0')}.jpg`, cv.toDataURL('image/jpeg', .9).split(',')[1], { base64: true })); const blob = await z.generateAsync({ type: 'blob' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre + '.zip'; a.click(); }
+  } catch(e){ procesando.error(e.message); alert('No se pudo armar el catálogo: ' + e.message); }
+}
 // ===== Comprobante de venta cargado a mano (factura, NC o ND): pasa por los mismos controles que los subidos =====
 function fvManual(tipo){ cargarListasPrecios(); cargarCfgFiscal().then(() => { try{ fvPvSegunTipo(); } catch(e){} }); if(!ccClientesDB || !ccClientesDB.length) db.collection('clientes').get().then(s => { ccClientesDB = s.docs.map(d => d.data()); }).catch(() => {});
   const inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
@@ -13798,7 +13864,7 @@ async function enviarDA(){
   const btn = document.getElementById('da-enviar'); btn.disabled = true;
   try{
     procesando('Preparando el pedido…');
-    const recordatorio = /Mercado Libre|Tienda Nube/.test(daCanal) ? 'OBLIGATORIO: usá la PLANTILLA FIJA del canal tal cual (portada y detalle empiezan con "Edit this photo. Do NOT redraw"); un solo prompt para todas las fotos; antes de responder, verificá la lista de control.\n' : '';
+    const recordatorio = /Mercado Libre|Tienda Nube/.test(daCanal) ? 'OBLIGATORIO: usá la PLANTILLA FIJA del canal tal cual (portada y detalle empiezan con "Edit this photo. Do NOT redraw"); un solo prompt para todas las fotos; antes de responder, verificá la lista de control.\n' : /Catálogo/.test(daCanal) ? 'OBLIGATORIO: usá la PLANTILLA FIJA DE LÁMINA DE CATÁLOGO tal cual, sin conceptos; la foto del producto se EDITA ("Edit this photo. Do NOT redraw"); textos y precios exactos de la ficha; antes de responder, verificá la lista de control.\n' : '';
     let cuerpo = (daCanal ? `Canal: ${daCanal}\n` + recordatorio : '') + (daProds.length ? `Fichas de producto (desde la app):\n${daProds.map(fichaDA).join('\n\n')}\n\n` : '') + `Pedido: ${texto}`;
     const content = [{ type: 'text', text: cuerpo }];
     for(const S of daProds){ const r = buscarProductoPorSku(S); if(!r) continue; const fs = fotosDeSkuOProducto(S, r.ci, r.pi, r.producto).slice(0, 3);
@@ -21605,7 +21671,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v355';
+const APP_VERSION = '2026-10-02-v356';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
