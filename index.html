@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v357</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v358</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -12899,14 +12899,18 @@ function htmlRecibo(m){
 }
 function imprimirHtml(html){ const w = window.open('', '_blank'); if(!w){ alert('Permita ventanas emergentes para imprimir.'); return; } w.document.write(html); w.document.close(); }
 // ===== Catalogo en laminas (sin IA, sin creditos): plantilla fija 1080x1350 por producto, PDF y JPG =====
-let acState = { cat: '', q: '', sel: new Set(), lista: 'general', precios: true, skus: true, tipo: 'mayorista', pie: 'onlinetextil.com.ar', portada: true, titulo: 'Catálogo' };
+let acState = { modo: 'producto', cat: '', q: '', sel: new Set(), lista: 'general', precios: true, skus: true, tipo: 'mayorista', pie: 'onlinetextil.com.ar', portada: true, titulo: 'Catálogo' };
 function acProductos(){ const L = [], qs = String(acState.q || '').split(/[,;]+/).map(s => s.trim()).filter(Boolean);
-  CATALOGO.forEach((c, ci) => { if(acState.cat && c.categoria !== acState.cat) return; (c.productos || []).forEach((p, pi) => { const txt = p.nombre + ' ' + (p.variantes || []).map(v => v.sku + ' ' + v.desc).join(' '); if(qs.length && !qs.some(q => coincideBusqueda(txt, q))) return; L.push({ ci, pi, p, key: ci + ':' + pi, cat: c.categoria }); }); }); return L; }
+  CATALOGO.forEach((c, ci) => { if(acState.cat && c.categoria !== acState.cat) return; (c.productos || []).forEach((p, pi) => {
+    if(acState.modo === 'sku'){ (p.variantes || []).forEach(v => { const S = String(v.sku).toUpperCase(), txt = S + ' ' + p.nombre + ' ' + (v.desc || ''); if(qs.length && !qs.some(q => S === q.toUpperCase() || coincideBusqueda(txt, q))) return; L.push({ ci, pi, p, v, sku: S, key: ci + ':' + pi + ':' + S, cat: c.categoria }); }); return; }
+    const txt = p.nombre + ' ' + (p.variantes || []).map(v => v.sku + ' ' + v.desc).join(' '); if(qs.length && !qs.some(q => coincideBusqueda(txt, q))) return; L.push({ ci, pi, p, key: ci + ':' + pi, cat: c.categoria }); }); }); return L; }
+// fotos de cada lamina: las del SKU (si tiene propias) o las del producto
+function acFotos(x){ if(x.sku){ const pr = fotosSku[x.sku] || []; if(pr.length) return pr; } return imagenesEfectivas(x.ci, x.pi, x.p) || []; }
 async function abrirArmarCatalogo(){
   await cargarListasPrecios();
   const cats = [...new Set(CATALOGO.map(c => c.categoria).filter(Boolean))];
   pvModal('📚 Armar catálogo', `<div class="fx">
-    <div class="fila" style="grid-template-columns:1fr 1fr 1fr;"><div><span class="fl">Tipo</span><select onchange="acState.tipo=this.value;acState.skus=this.value==='mayorista';document.getElementById('ac-skus').checked=acState.skus"><option value="mayorista">Mayorista</option><option value="minorista">Minorista</option></select></div>
+    <div class="fila" style="grid-template-columns:1fr 1fr 1fr 1fr;"><div><span class="fl">Una lámina por</span><select onchange="acState.modo=this.value;acPintar(true)"><option value="producto">Producto (todas sus medidas)</option><option value="sku" ${acState.modo === 'sku' ? 'selected' : ''}>SKU (solo esa medida, con sus fotos)</option></select></div><div><span class="fl">Tipo</span><select onchange="acState.tipo=this.value;acState.skus=this.value==='mayorista';document.getElementById('ac-skus').checked=acState.skus"><option value="mayorista">Mayorista</option><option value="minorista">Minorista</option></select></div>
       <div><span class="fl">Lista de precios</span><select onchange="acState.lista=this.value">${(listasPrecios || []).map(l => `<option value="${escapeAttr(l.id)}">${escaparHtml(l.nombre)}</option>`).join('')}</select></div>
       <div><span class="fl">Título de la portada</span><input value="${escapeAttr(acState.titulo)}" oninput="acState.titulo=this.value"></div></div>
     <div class="fila" style="grid-template-columns:1fr 1fr;"><div><span class="fl">Categoría</span><select onchange="acState.cat=this.value;acPintar(true)"><option value="">Todas</option>${cats.map(c => `<option>${escaparHtml(c)}</option>`).join('')}</select></div><div><span class="fl">Buscar</span><input placeholder="SKU o nombre; varios separados por coma" oninput="acState.q=this.value;clearTimeout(window.__acT2);window.__acT2=setTimeout(()=>acPintar(true),250)"></div></div>
@@ -12919,7 +12923,7 @@ function acPintar(nuevoFiltro){ const L = acProductos(), box = document.getEleme
   if(nuevoFiltro) acState.sel = new Set(L.map(x => x.key));
   if(!L.length){ box.innerHTML = `<p class="note" style="text-align:left;padding:10px 0;">No hay productos con ese filtro${acState.cat ? ` en la categoría <b>${escaparHtml(acState.cat)}</b> (pruebe con "Todas")` : ''}. Para varios, sepárelos con coma: <i>toa171b, toa141b</i>.</p>`; return; }
   box.innerHTML = `<label style="display:flex;gap:8px;padding:6px 0;font-size:.85rem;font-weight:700;"><input type="checkbox" ${L.every(x => acState.sel.has(x.key)) ? 'checked' : ''} onchange="acProductos().forEach(x=>this.checked?acState.sel.add(x.key):acState.sel.delete(x.key));acPintar()"> Todos (${L.length}) · ${[...acState.sel].length} elegidos</label>`
-    + L.map(x => { const im = imagenesEfectivas(x.ci, x.pi, x.p)[0]; return `<label style="display:flex;gap:10px;align-items:center;padding:5px 0;border-top:1px solid #F3EFE8;font-size:.85rem;"><input type="checkbox" ${acState.sel.has(x.key) ? 'checked' : ''} onchange="this.checked?acState.sel.add('${x.key}'):acState.sel.delete('${x.key}');"><span style="width:38px;height:38px;border-radius:6px;background:#F3EFE8 center/cover;${im ? `background-image:url('${String(im).replace(/'/g, '%27')}');` : ''}"></span><span style="flex:1;"><b>${escaparHtml(x.p.nombre)}</b> <span class="meta">${escaparHtml(x.cat)} · ${(x.p.variantes || []).length} medidas</span></span>${im ? '' : '<span class="meta">sin foto</span>'}</label>`; }).join(''); }
+    + L.map(x => { const fs = acFotos(x), im = fs[0]; return `<label style="display:flex;gap:10px;align-items:center;padding:5px 0;border-top:1px solid #F3EFE8;font-size:.85rem;"><input type="checkbox" ${acState.sel.has(x.key) ? 'checked' : ''} onchange="this.checked?acState.sel.add('${x.key}'):acState.sel.delete('${x.key}');"><span style="width:38px;height:38px;border-radius:6px;background:#F3EFE8 center/cover;${im ? `background-image:url('${String(im).replace(/'/g, '%27')}');` : ''}"></span><span style="flex:1;"><b>${x.sku ? escaparHtml(x.sku) + ' · ' : ''}${escaparHtml(x.p.nombre)}</b> <span class="meta">${escaparHtml(x.cat)} · ${x.v ? escaparHtml(x.v.desc || '') : (x.p.variantes || []).length + ' medidas'}${x.sku ? ` · ${fs.length} foto(s)${(fotosSku[x.sku] || []).length ? ' propias' : ' del producto'}` : ''}</span></span>${im ? '' : '<span class="meta">sin foto</span>'}</label>`; }).join(''); }
 function acCargarImg(src){ return new Promise(res => { if(!src){ res(null); return; } const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = () => res(null); i.src = src; }); }
 function acTexto(ctx, t, x, y, maxW, lh, maxL){ const pal = String(t || '').split(/\s+/); let l = '', n = 0; for(const w of pal){ const pr = l ? l + ' ' + w : w; if(ctx.measureText(pr).width > maxW && l){ ctx.fillText(l, x, y + n * lh); n++; l = w; if(maxL && n >= maxL) return n; } else l = pr; } if(l){ ctx.fillText(l, x, y + n * lh); n++; } return n; }
 async function acLamina(x){
@@ -12929,15 +12933,16 @@ async function acLamina(x){
   c.fillStyle = VIO; c.fillRect(0, 0, W, 110); c.fillStyle = '#fff'; c.font = '600 46px Georgia, serif'; c.textBaseline = 'middle'; c.fillText('OnLineTextil', 60, 56);
   c.font = '500 24px Arial'; c.textAlign = 'right'; c.fillStyle = ORO; c.fillText(String(x.cat || '').toUpperCase(), W - 60, 58); c.textAlign = 'left';
   // foto
-  const im = await acCargarImg(imagenesEfectivas(x.ci, x.pi, x.p)[0]); const fx = 60, fy = 150, fw = W - 120, fh = 640;
+  const fotos = acFotos(x), extras = x.sku ? fotos.slice(1, 4) : [], im = await acCargarImg(fotos[0]); const fx = 60, fy = 150, fw = W - 120, fh = 640, mh = extras.length ? 150 : 0, fhP = fh - (mh ? mh + 12 : 0);
   c.fillStyle = '#fff'; c.fillRect(fx, fy, fw, fh);
-  if(im){ const r = Math.min(fw / im.width, fh / im.height), w = im.width * r, hh = im.height * r; c.drawImage(im, fx + (fw - w) / 2, fy + (fh - hh) / 2, w, hh); } else { c.fillStyle = '#B5AB9C'; c.font = '24px Arial'; c.textAlign = 'center'; c.fillText('Sin foto', W / 2, fy + fh / 2); c.textAlign = 'left'; }
+  if(im){ const r = Math.min(fw / im.width, fhP / im.height), w = im.width * r, hh = im.height * r; c.drawImage(im, fx + (fw - w) / 2, fy + (fhP - hh) / 2, w, hh); }
+  if(extras.length){ const mw = (fw - 24 * (extras.length - 1) - 24) / extras.length; for(let k = 0; k < extras.length; k++){ const e = await acCargarImg(extras[k]); const bx = fx + 12 + k * (mw + 24), by = fy + fhP + 12; c.fillStyle = '#F3EFE8'; c.fillRect(bx, by, mw, mh - 12); if(e){ const r = Math.min(mw / e.width, (mh - 12) / e.height), w = e.width * r, hh = e.height * r; c.drawImage(e, bx + (mw - w) / 2, by + (mh - 12 - hh) / 2, w, hh); } } } else { c.fillStyle = '#B5AB9C'; c.font = '24px Arial'; c.textAlign = 'center'; c.fillText('Sin foto', W / 2, fy + fh / 2); c.textAlign = 'left'; }
   // nombre y composicion
   c.textBaseline = 'alphabetic'; c.fillStyle = VIO; c.font = '600 46px Georgia, serif'; let y = 860; const nl = acTexto(c, x.p.nombre, 60, y, W - 120, 52, 2); y += nl * 52;
   if(x.p.composicion){ c.fillStyle = '#6B6258'; c.font = '26px Arial'; y += acTexto(c, x.p.composicion, 60, y, W - 120, 32, 1) * 32; }
   y += 18;
   // tabla de medidas
-  const vs = x.p.variantes || [], f = factorCliente({ lista: acState.lista }), filas = vs.slice(0, 9), alto = Math.min(48, Math.floor((H - 120 - y - 60) / Math.max(1, filas.length + 1)));
+  const vs = x.v ? [x.v] : (x.p.variantes || []), f = factorCliente({ lista: acState.lista }), filas = vs.slice(0, 9), alto = Math.min(48, Math.floor((H - 120 - y - 60) / Math.max(1, filas.length + 1)));
   c.fillStyle = VIO; c.fillRect(60, y, W - 120, alto); c.fillStyle = '#fff'; c.font = `700 ${Math.round(alto * .45)}px Arial`;
   const colM = 80, colS = acState.skus ? 640 : 0, colP = W - 80; c.fillText('MEDIDA', colM, y + alto * .65); if(acState.skus) c.fillText('SKU', colS, y + alto * .65); if(acState.precios){ c.textAlign = 'right'; c.fillText('PRECIO', colP, y + alto * .65); c.textAlign = 'left'; }
   y += alto;
@@ -21674,7 +21679,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v357';
+const APP_VERSION = '2026-10-02-v358';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
