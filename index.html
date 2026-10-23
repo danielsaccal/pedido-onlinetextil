@@ -1657,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v350</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v351</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -12632,10 +12632,13 @@ function rmForm(pre){
   pre = pre || {}; const inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
   const skus = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => skus.push(v.sku))));
   pvModal('🚚 Remito', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-    <label style="grid-column:1/-1;">Cliente<input id="rm-c" value="${escapeAttr(pre.cliente || '')}" list="rm-cl" onchange="sucursalesDe(this.value, 'rm-suc', { dir: 'rm-d', transp: 'rm-t' })" style="${inp}"></label><div id="rm-suc" style="grid-column:1/-1;"></div><datalist id="rm-cl">${(listaClientes || []).map(c => c.razonSocial || `${c.apellido || ''} ${c.nombre || ''}`.trim()).filter(Boolean).map(n => `<option value="${escapeAttr(n)}">`).join('')}</datalist>
+    <label style="grid-column:1/-1;">Cliente<input id="rm-c" value="${escapeAttr(pre.cliente || '')}" list="rm-cl" onchange="rmDatosCliente(this.value);sucursalesDe(this.value, 'rm-suc', { dir: 'rm-d', transp: 'rm-t', tel: 'rm-tel' })" style="${inp}"></label><div id="rm-suc" style="grid-column:1/-1;"></div><div id="rm-ped" style="grid-column:1/-1;"></div>
+    <label>CUIT<input id="rm-cuit" value="${escapeAttr(pre.cuit || '')}" style="${inp}"></label><label>Condición frente al IVA<input id="rm-iva" value="${escapeAttr(pre.condicionIva || '')}" style="${inp}"></label>
+    <label>Contacto / teléfono<input id="rm-tel" value="${escapeAttr(pre.tel || '')}" style="${inp}"></label><label>Orden de compra del cliente (opcional)<input id="rm-oc" value="${escapeAttr(pre.oc || '')}" style="${inp}"></label><datalist id="rm-cl">${(listaClientes || []).map(c => c.razonSocial || `${c.apellido || ''} ${c.nombre || ''}`.trim()).filter(Boolean).map(n => `<option value="${escapeAttr(n)}">`).join('')}</datalist>
     <label>Fecha<input type="date" id="rm-f" value="${ccHoy()}" style="${inp}"></label><label>Bultos<input id="rm-b" inputmode="numeric" value="${pre.bultos || 1}" style="${inp}"></label>
     <label style="grid-column:1/-1;">Transporte<input id="rm-t" value="${escapeAttr(pre.transporte || '')}" style="${inp}"></label>
-    <label style="grid-column:1/-1;">Dirección de entrega<input id="rm-d" value="${escapeAttr(pre.direccion || '')}" style="${inp}"></label></div>
+    <label style="grid-column:1/-1;">Dirección de entrega<input id="rm-d" value="${escapeAttr(pre.direccion || '')}" style="${inp}"></label>
+    <label>Valor declarado (opcional, para el transporte)<input id="rm-vd" inputmode="decimal" value="${pre.valor ? formatoPesos(Math.round(pre.valor)) : ''}" style="${inp}"></label><span></span></div>
     <b style="display:block;margin:10px 0 4px;font-size:.88rem;">Mercadería (cantidad en su unidad de venta)</b><div id="rm-rows"></div><datalist id="rm-skus">${skus.map(s => `<option value="${s}">`).join('')}</datalist>
     <button type="button" class="btn-mini" onclick="rmFila()">➕ Renglón</button>
     <label style="display:block;margin-top:8px;">Observaciones<input id="rm-o" value="${escapeAttr(pre.obs || '')}" style="${inp}"></label>
@@ -12645,13 +12648,24 @@ function rmForm(pre){
 function rmFila(x){ x = x || {}; const d = document.createElement('div'); d.className = 'rm-r'; d.style.cssText = 'display:grid;grid-template-columns:1fr 2fr .6fr 32px;gap:6px;margin-bottom:6px;'; if(x.precio) d.dataset.precio = x.precio;
   d.innerHTML = `<input class="rm-s" list="rm-skus" placeholder="SKU" value="${escapeAttr(x.sku || '')}" onchange="const r=buscarProductoPorSku(this.value.trim().toUpperCase());if(r){this.parentNode.querySelector('.rm-de').value=r.producto.nombre+' '+(r.variante.desc||'');}" style="padding:7px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;"><input class="rm-de" placeholder="Descripción" value="${escapeAttr(x.desc || '')}" style="padding:7px;border:1px solid var(--line);border-radius:8px;"><input class="rm-q" inputmode="decimal" placeholder="Cant." value="${x.cant != null ? x.cant : ''}" style="padding:7px;border:1px solid var(--line);border-radius:8px;"><button type="button" onclick="this.parentNode.remove()" style="border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;">✕</button>`;
   document.getElementById('rm-rows').appendChild(d); }
+// al elegir el cliente: todos sus datos para el remito (domicilio, transporte, CUIT, IVA, contacto) y sus pedidos pendientes
+async function rmDatosCliente(nombre){
+  let L = ccClientesDB; if(!L || !L.length){ try{ L = ccClientesDB = (await db.collection('clientes').get()).docs.map(d => d.data()); } catch(e){ L = []; } }
+  const c = clientePorNombre(nombre); const set = (id, v, forzar) => { const e = document.getElementById(id); if(e && v && (forzar || !e.value)) e.value = v; };
+  if(c){ set('rm-d', [c.direccion, c.localidad, c.provincia].filter(Boolean).join(', '), true); set('rm-t', c.transporte, true); set('rm-cuit', c.cuit, true); set('rm-iva', c.condicionIva || '', true);
+    set('rm-tel', [c.contacto, c.telefono].filter(Boolean).join(' · '), true); }
+  const box = document.getElementById('rm-ped'); if(!box) return; box.innerHTML = '';
+  try{ if(!historialPedidos || !historialPedidos.length) historialPedidos = (await db.collection('pedidos').get()).docs.map(d => d.data()); } catch(e){}
+  const k = ccClave(nombre), pend = (historialPedidos || []).filter(p => !/entregado|cancelado/i.test(p.estado || '') && [ccClave(`${(p.cliente || {}).nombre || ''} ${(p.cliente || {}).apellido || ''}`), ccClave(`${(p.cliente || {}).apellido || ''} ${(p.cliente || {}).nombre || ''}`), ccClave((p.cliente || {}).razonSocial || '')].includes(k));
+  if(pend.length) box.innerHTML = `<div style="background:#F2EEF7;border-radius:10px;padding:8px 10px;font-size:.86rem;"><b>Pedidos pendientes de este cliente:</b> ${pend.map(p => `<button type="button" class="btn-mini" onclick="cerrarPublicar();setTimeout(()=>remitoDesdePedido('${escapeAttr(p.numero)}'),80)">🚚 ${escaparHtml(p.numero)} · ${(p.items || []).length} renglones</button>`).join(' ')}</div>`;
+}
 async function rmGuardar(pedido){
   const g = id => (document.getElementById(id).value || '').trim();
   const items = [...document.querySelectorAll('.rm-r')].map(d => ({ sku: d.querySelector('.rm-s').value.trim().toUpperCase(), desc: d.querySelector('.rm-de').value.trim(), cant: numAr(d.querySelector('.rm-q').value) || 0, precio: d.dataset.precio ? +d.dataset.precio : null })).filter(x => (x.sku || x.desc) && x.cant > 0);
   if(!g('rm-c') || !items.length){ alert('Complete el cliente y al menos un renglón con cantidad.'); return; }
   if(await mesBloqueado(g('rm-f'))) return;
   try{ const ref = db.collection('config').doc('remito_num'), d0 = await ref.get(), numero = ((d0.exists && d0.data().n) || 0) + 1; await ref.set({ n: numero });
-    const r = { sucursal: window.__sucElegida || '', numero, fecha: g('rm-f') || ccHoy(), cliente: g('rm-c'), transporte: g('rm-t'), direccion: g('rm-d'), bultos: Math.max(1, Math.round(numAr(g('rm-b')) || 1)), obs: g('rm-o'), items, pedido: pedido || '', creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
+    const r = { cuit: g('rm-cuit'), condicionIva: g('rm-iva'), tel: g('rm-tel'), oc: g('rm-oc'), valor: numAr(g('rm-vd')) || 0, sucursal: window.__sucElegida || '', numero, fecha: g('rm-f') || ccHoy(), cliente: g('rm-c'), transporte: g('rm-t'), direccion: g('rm-d'), bultos: Math.max(1, Math.round(numAr(g('rm-b')) || 1)), obs: g('rm-o'), items, pedido: pedido || '', creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
     if(stockDatos === null) await cargarStock();
     if(stockDatos.bajaCon === 'remito'){ const movs = items.filter(x => x.sku && skuControlado(x.sku)).map(x => ({ sku: x.sku, cantidad: -(x.cant * divisorVenta(x.sku)) })); await moverStockVarios(movs, 'remito', 'R ' + numero); r.stockAplicado = movs.length > 0; }
     const res = await db.collection('remitos').add(r); remitos.push({ _id: res.id, ...r });
@@ -12665,14 +12679,17 @@ async function remitoDesdePedido(numero){
   if(!remitos.length){ try{ const s = await db.collection('remitos').get(); remitos = s.docs.map(d => ({ _id: d.id, ...d.data() })); } catch(e){} }
   const c = p.cliente || {}; const ya = remitos.filter(r => r.pedido === numero && !r.anulado).length;
   if(ya && !confirm(`Este pedido ya tiene ${ya} remito(s). ¿Hacer otro (por ejemplo, una entrega parcial)?`)) return;
-  rmForm({ cliente: c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim(), transporte: c.transporte || '', direccion: [c.direccion, c.localidad, c.provincia].filter(Boolean).join(', '), bultos: p.bultos || 1, obs: p.observaciones || '', pedido: numero,
+  const cdb = clientePorNombre(c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim()) || {};
+  const valor = (p.items || []).reduce((a, i) => a + (parsePrice(i.precio) || 0) * (+i.cantidad || 0) * (1 - (i.descuentoItemPct || 0) / 100), 0) * (1 - (p.descuentoPct || 0) / 100);
+  rmForm({ cliente: c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim(), cuit: c.cuit || cdb.cuit || '', condicionIva: cdb.condicionIva || '', tel: [cdb.contacto, c.telefono || cdb.telefono].filter(Boolean).join(' · '), valor, transporte: c.transporte || cdb.transporte || '', direccion: [c.direccion || cdb.direccion, c.localidad || cdb.localidad, c.provincia || cdb.provincia].filter(Boolean).join(', '), bultos: p.bultos || 1, obs: p.observaciones || '', pedido: numero,
     items: (p.items || []).map(i => ({ sku: i.sku, desc: (i.nombreProducto || '') + ' ' + (i.desc || ''), cant: i.cantidad, precio: (parsePrice(i.precio) || 0) * (1 - (i.descuentoItemPct || 0) / 100) * (1 - (p.descuentoPct || 0) / 100) })) });
 }
 function rmImprimir(id){
   const r = remitos.find(x => x._id === id); if(!r) return; const w = window.open('', '_blank'); if(!w){ alert('Permita ventanas emergentes para imprimir.'); return; }
   w.document.write(`<html><head><title>Remito R ${String(r.numero).padStart(6, '0')}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#222}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}td,th{padding:6px;border-bottom:1px solid #ddd;text-align:left}.r{text-align:right}h1{font-size:20px;margin:0}.firma{margin-top:70px;display:flex;gap:30px}.firma div{flex:1;border-top:1px solid #444;padding-top:6px;font-size:12px;text-align:center}.x{font-size:11px;color:#666}</style></head><body>
     <h1>OnLineTextil · Remito N.º R ${String(r.numero).padStart(6, '0')}</h1><p class="x">Remito interno · documento no válido como factura</p>
-    <p>Fecha: ${String(r.fecha).split('-').reverse().join('/')}<br>Cliente: <b>${escaparHtml(r.cliente)}</b>${r.direccion ? '<br>Entrega: ' + escaparHtml(r.direccion) : ''}${r.transporte ? '<br>Transporte: ' + escaparHtml(r.transporte) : ''}<br>Bultos: ${r.bultos || 1}${r.pedido ? '<br>Pedido: ' + escaparHtml(r.pedido) : ''}</p>
+    <table style="margin-top:6px;font-size:13px;"><tr><td style="width:50%;vertical-align:top;border:none;">Fecha: ${String(r.fecha).split('-').reverse().join('/')}<br>Señor(es): <b>${escaparHtml(r.cliente)}</b>${r.sucursal ? ' · ' + escaparHtml(r.sucursal) : ''}${r.cuit ? '<br>CUIT: ' + escaparHtml(r.cuit) : ''}${r.condicionIva ? '<br>IVA: ' + escaparHtml(r.condicionIva) : ''}${r.tel ? '<br>Contacto: ' + escaparHtml(r.tel) : ''}</td>
+      <td style="vertical-align:top;border:none;">${r.direccion ? 'Lugar de entrega: ' + escaparHtml(r.direccion) + '<br>' : ''}${r.transporte ? 'Transporte: ' + escaparHtml(r.transporte) + '<br>' : ''}Bultos: ${r.bultos || 1}${r.valor ? '<br>Valor declarado: ' + formatPrice(r.valor) : ''}${r.pedido ? '<br>Nuestro pedido: ' + escaparHtml(r.pedido) : ''}${r.oc ? '<br>Su orden de compra: ' + escaparHtml(r.oc) : ''}</td></tr></table>
     <table><tr><th>SKU</th><th>Descripción</th><th class="r">Cantidad</th></tr>${(r.items || []).map(x => `<tr><td>${escaparHtml(x.sku || '')}</td><td>${escaparHtml(x.desc || '')}</td><td class="r">${x.cant}</td></tr>`).join('')}</table>
     ${r.obs ? `<p>${escaparHtml(r.obs)}</p>` : ''}<div class="firma"><div>Recibí conforme · Firma</div><div>Aclaración</div><div>DNI · Fecha</div></div><script>setTimeout(()=>print(),400)<\/script></body></html>`); w.document.close();
 }
@@ -21478,7 +21495,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v350';
+const APP_VERSION = '2026-10-02-v351';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
