@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v352</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v353</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6078,7 +6078,7 @@ const GRUPOS_INICIO = {
     [['🧮 Calculadora de costos', 'abrirCalculadoraCostos()']]
   ] },
   i: { lado: 'int', titulo: 'Configuración', titulosColumnas: ['1 · Cuenta', '2 · Datos de la app', '3 · Pantallas anteriores'], columnas: [
-    [['👥 Usuarios', 'abrirUsuarios()'], ['💾 Copia de seguridad', 'abrirCopiaSeguridad()'], ['🔔 Avisos push', 'abrirConfigPush()']],
+    [['👥 Usuarios', 'abrirUsuarios()'], ['🏢 Datos de las razones sociales', 'abrirDatosRazones()'], ['💾 Copia de seguridad', 'abrirCopiaSeguridad()'], ['🔔 Avisos push', 'abrirConfigPush()']],
     [['📝 Listas y opciones', 'abrirListas()'], ['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['📖 Palabras de la app', 'abrirGlosario()']],
     [['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']]
   ] },
@@ -8311,7 +8311,7 @@ async function pvFormPago(pid){
     <label style="grid-column:1/-1;">Comprobante de transferencia (foto o PDF, opcional)<input type="file" id="op-cp" accept="image/*,application/pdf" style="${pvInp}"></label>
     <label style="grid-column:1/-1;">Detalle<input id="op-d" placeholder="opcional" style="${pvInp}"></label></div>
     <p id="op-tot" style="font-weight:700;margin:8px 0;"></p><p class="note" style="text-align:left;">Saldo del proveedor: <b>${fmtMon(r.saldo, m)}</b>. Se aplica a las facturas más viejas.</p>
-    <div style="display:flex;gap:8px;"><button class="btn btn-gold" style="flex:1;" onclick="pvGuardarPago('${pid}')">Guardar y ver la orden de pago</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
+    <div style="display:flex;gap:8px;"><button class="btn btn-gold" style="flex:1;" onclick="pvGuardarPago('${pid}')">Guardar y ver la orden de pago</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="vistaPrevia('op','${pid}')">👁️ Vista previa</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
   pvAgregarMedio();
 }
 function pvAgregarMedio(){
@@ -8330,13 +8330,14 @@ function pvLeerOP(){
 }
 function pvTotOP(){ const o = pvLeerOP(), e = document.getElementById('op-tot'); if(!e) return; e.textContent = `Total pagado: ${formatPrice(o.totalARS)}${o.retT ? ` + retenciones ${formatPrice(o.retT)}` : ''}${o.tc ? ` = US$ ${((o.totalARS + o.retT) / o.tc).toLocaleString('es-AR', { maximumFractionDigits: 2 })}` : ''}`; }
 const pvArchivoB64 = f => new Promise((res, rej) => { if(/^image\//.test(f.type)) return comprimirImagenAFotoBase64(f).then(res, rej); if(f.size > 700000) return rej(new Error('el PDF pesa más de 700 KB: adjunte una foto o captura')); const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(f); });
-async function pvGuardarPago(pid){ dashCache = null; if(await mesBloqueado(document.getElementById('op-f').value || ccHoy())) return;
+async function pvGuardarPago(pid){ dashCache = null; if(!__previa && await mesBloqueado(document.getElementById('op-f').value || ccHoy())) return;
   const p = pvProv.find(x => x._id === pid), m = pvMon(p), o = pvLeerOP();
   if(!o.medios.length){ alert('Cargue al menos un medio de pago con su importe.'); return; }
   if(m === 'USD' && !(o.tc > 0)){ alert('Escriba el tipo de cambio.'); return; }
   if(o.medios.some(x => x.medio === 'Cheque de terceros' && !x.chequeId)){ alert('Elija el cheque de la cartera.'); return; }
-  let comp = null; const fi = document.getElementById('op-cp').files[0]; if(fi){ try{ comp = await pvArchivoB64(fi); } catch(e){ alert('Comprobante: ' + e.message); return; } }
   const aplicadoMon = m === 'USD' ? Math.round((o.totalARS + o.retT) / o.tc * 100) / 100 : o.totalARS + o.retT;
+  if(__previa){ __previa({ proveedorId: pid, razon: (document.getElementById('op-rz') || {}).value || 'propia', fecha: document.getElementById('op-f').value || ccHoy(), numero: '(borrador)', medios: o.medios, retenciones: o.ret, tc: o.tc || null, totalARS: o.totalARS, aplicadoMon, moneda: m, detalle: document.getElementById('op-d').value.trim() }); return; }
+  let comp = null; const fi = document.getElementById('op-cp').files[0]; if(fi){ try{ comp = await pvArchivoB64(fi); } catch(e){ alert('Comprobante: ' + e.message); return; } }
   let numero = 1;
   try{ const ref = db.collection('config').doc('op_num'); const d = await ref.get(); numero = ((d.exists && d.data().n) || 0) + 1; await ref.set({ n: numero });
     const pago = { proveedorId: pid, razon: (document.getElementById('op-rz') || {}).value || 'propia', fecha: document.getElementById('op-f').value || ccHoy(), numero, medios: o.medios, retenciones: o.ret, tc: o.tc || null, totalARS: o.totalARS, aplicadoMon, moneda: m, detalle: document.getElementById('op-d').value.trim(), creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
@@ -8351,7 +8352,7 @@ function pvImprimirOP(id){
   const efectivo = (x.medios || []).some(m => /Efectivo|Cheque/.test(m.medio)) || !x.comprobante;
   const w = window.open('', '_blank'); if(!w){ alert('Permita ventanas emergentes para imprimir.'); return; }
   w.document.write(`<html><head><title>Orden de pago ${String(x.numero).padStart(5, '0')}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#222}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}td,th{padding:6px;border-bottom:1px solid #ddd;text-align:left}.r{text-align:right}h1{font-size:20px;margin:0}.firma{margin-top:60px;display:flex;gap:40px}.firma div{flex:1;border-top:1px solid #444;padding-top:6px;font-size:12px;text-align:center}img{max-width:100%;margin-top:14px;border:1px solid #ddd}</style></head><body>
-    <h1>OnLineTextil · Orden de pago N.º ${String(x.numero).padStart(5, '0')}</h1><p>Fecha: ${String(x.fecha).split('-').reverse().join('/')}<br>Paga: <b>${escaparHtml((PV_RAZONES.find(y => y[0] === (x.razon || 'propia')) || [, ''])[1])}</b><br>Proveedor: <b>${escaparHtml(p.nombre || '')}</b>${p.cuit ? ' · CUIT ' + escaparHtml(p.cuit) : ''}</p>
+    <div style="display:flex;justify-content:space-between;gap:10px;"><div>${encabezadoRZ(x.razon || 'propia')}</div><h1 style="font-size:18px;">Orden de pago N.º ${String(x.numero).padStart(5, '0')}</h1></div><p>Fecha: ${String(x.fecha).split('-').reverse().join('/')}<br>Paga: <b>${escaparHtml((PV_RAZONES.find(y => y[0] === (x.razon || 'propia')) || [, ''])[1])}</b><br>Proveedor: <b>${escaparHtml(p.nombre || '')}</b>${p.cuit ? ' · CUIT ' + escaparHtml(p.cuit) : ''}</p>
     <table><tr><th>Medio</th><th class="r">Importe</th></tr>${(x.medios || []).map(m => `<tr><td>${escaparHtml(m.medio)}</td><td class="r">${formatPrice(m.importe)}</td></tr>`).join('')}
     ${Object.entries(x.retenciones || {}).map(([k, v]) => `<tr><td>Retención ${k.toUpperCase()}</td><td class="r">${formatPrice(v)}</td></tr>`).join('')}
     <tr><td><b>Total</b></td><td class="r"><b>${formatPrice((x.totalARS || 0) + Object.values(x.retenciones || {}).reduce((a, v) => a + v, 0))}</b>${x.tc ? `<br>US$ ${x.aplicadoMon} (TC ${x.tc})` : ''}</td></tr></table>
@@ -8505,7 +8506,7 @@ function renderCtaCte(){
     const R = ccMovs.filter(m => m.tipo === 'cobro' || m.tipo === 'sena').sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)) || String(b.creado || '').localeCompare(String(a.creado || '')));
     box.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"><button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="ccElegirCliente()">➕ Recibo nuevo</button></div>
       ${R.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.86rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:5px;">Fecha</td><td style="padding:5px;">Cliente</td><td style="padding:5px;">Medio</td><td style="padding:5px;">Detalle</td><td style="padding:5px;text-align:right;">Importe</td><td></td></tr>
-        ${R.map(m => { const ret = Object.values(m.retenciones || {}).reduce((x, y) => x + (+y || 0), 0); return `<tr style="border-top:1px solid var(--line);"><td style="padding:5px;white-space:nowrap;">${String(m.fecha).split('-').reverse().join('/')}</td><td style="padding:5px;"><a href="#" onclick="event.preventDefault();ccTab='clientes';ccCli='${escapeAttr(m.cliente)}';renderCtaCte()"><b>${escaparHtml(m.nombre || m.cliente)}</b></a>${m.tipo === 'sena' ? ' <span class="meta">seña</span>' : ''}</td><td style="padding:5px;">${escaparHtml(m.medio || '')}${m.cheque ? ` N.º ${escaparHtml(m.cheque.numero || '')}` : ''}</td><td style="padding:5px;" class="meta">${escaparHtml(m.detalle || '')}${ret ? ` · ret. ${formatPrice(ret)}` : ''}${(m.retAdj || []).map((a, i) => ` <a href="#" title="${escapeAttr(a.nombre)}" onclick="event.preventDefault();verAdjuntoMov('${m._id}',${i})">📎</a>`).join('')}</td><td style="padding:5px;text-align:right;font-weight:700;">${formatPrice(m.importe + ret)}</td><td style="padding:5px;"><a href="#" title="Borrar" onclick="event.preventDefault();ccBorrarMov('${m._id}')">🗑️</a></td></tr>`; }).join('')}</table></div>` : '<p class="empty-msg">Todavía no hay recibos.</p>'}`; return; }
+        ${R.map(m => { const ret = Object.values(m.retenciones || {}).reduce((x, y) => x + (+y || 0), 0); return `<tr style="border-top:1px solid var(--line);"><td style="padding:5px;white-space:nowrap;">${String(m.fecha).split('-').reverse().join('/')}</td><td style="padding:5px;"><a href="#" onclick="event.preventDefault();ccTab='clientes';ccCli='${escapeAttr(m.cliente)}';renderCtaCte()"><b>${escaparHtml(m.nombre || m.cliente)}</b></a>${m.tipo === 'sena' ? ' <span class="meta">seña</span>' : ''}</td><td style="padding:5px;">${escaparHtml(m.medio || '')}${m.cheque ? ` N.º ${escaparHtml(m.cheque.numero || '')}` : ''}</td><td style="padding:5px;" class="meta">${escaparHtml(m.detalle || '')}${ret ? ` · ret. ${formatPrice(ret)}` : ''}${(m.retAdj || []).map((a, i) => ` <a href="#" title="${escapeAttr(a.nombre)}" onclick="event.preventDefault();verAdjuntoMov('${m._id}',${i})">📎</a>`).join('')} <a href="#" title="Imprimir el recibo" onclick="event.preventDefault();ccImprimirRecibo('${m._id}')">🖨️</a></td><td style="padding:5px;text-align:right;font-weight:700;">${formatPrice(m.importe + ret)}</td><td style="padding:5px;"><a href="#" title="Borrar" onclick="event.preventDefault();ccBorrarMov('${m._id}')">🗑️</a></td></tr>`; }).join('')}</table></div>` : '<p class="empty-msg">Todavía no hay recibos.</p>'}`; return; }
   if(ccTab === 'cheques'){
     const ch = ccMovs.filter(m => m.cheque).sort((a, b) => String(a.cheque.fechaCobro || '').localeCompare(String(b.cheque.fechaCobro || '')));
     box.innerHTML = ch.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.85rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:5px;">Cobro</td><td style="padding:5px;">Cliente</td><td style="padding:5px;">Cheque</td><td style="padding:5px;text-align:right;">Importe</td><td style="padding:5px;">Estado</td></tr>
@@ -8555,6 +8556,9 @@ async function ccMarcarContado(id){
 }
 // abrir un comprobante adjunto (imagen o PDF guardado como data:)
 function verAdjunto(data, nombre){ try{ const [cab, b64] = String(data).split(','), tipo = (cab.match(/data:([^;]+)/) || [])[1] || 'application/octet-stream'; const bin = atob(b64), u = new Uint8Array(bin.length); for(let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); const url = URL.createObjectURL(new Blob([u], { type: tipo })); const w = window.open(url, '_blank'); if(!w){ const a = document.createElement('a'); a.href = url; a.download = nombre || 'comprobante'; a.click(); } setTimeout(() => URL.revokeObjectURL(url), 60000); } catch(e){ alert('No se pudo abrir el comprobante.'); } }
+function ccImprimirRecibo(id){ const m = (ccMovs || []).find(x => x._id === id); if(m) imprimirHtml(htmlRecibo(m)); }
+async function imprimirFacturaGuardadaAsync(id){ await cargarDatosRZ(); imprimirFacturaGuardada(id); }
+function imprimirFacturaGuardada(id){ const f = (facturas || []).find(x => (x._id || String(x.numero).replace(/\//g, '-')) === id); if(f) imprimirHtml(htmlFactura(f)); }
 function verAdjuntoMov(id, i){ const m = (ccMovs || []).find(x => x._id === id); const a = m && (m.retAdj || [])[i]; if(a) verAdjunto(a.data, a.nombre); }
 // si el cliente tiene sucursales, se elige una y se completan sus datos
 async function sucursalesDe(nombre, boxId, campos){
@@ -8590,7 +8594,7 @@ function ccFormCobro(k, tipo){
       <label style="grid-column:1/-1;">Detalle (opcional)<input id="cb-d" placeholder="Recibo N.º, observación…" style="${inp}"></label>
       ${c.miembros ? `<label style="grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:.88rem;"><input type="checkbox" id="cb-grupo" checked style="width:18px;height:18px;"> Aplicar a todo el grupo (${c.miembros.length + 1} empresas): cancela las facturas más viejas de cualquiera</label>` : ''}</div>
     <p class="note" style="text-align:left;">Se aplica a las facturas más viejas. Saldo actual: <b>${formatPrice(c.saldo || 0)}</b>.</p>
-    <div style="display:flex;gap:8px;"><button class="btn btn-gold" style="flex:1;" onclick="ccGuardarCobro('${escapeAttr(k)}','${tipo}')">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`;
+    <div style="display:flex;gap:8px;"><button class="btn btn-gold" style="flex:1;" onclick="ccGuardarCobro('${escapeAttr(k)}','${tipo}')">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="vistaPrevia('recibo','${escapeAttr(k)}','${tipo}')">👁️ Vista previa</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`;
   document.getElementById('pub-modal').style.display = 'block';
 }
 async function ccGuardarCobro(k, tipo){
@@ -8599,6 +8603,7 @@ async function ccGuardarCobro(k, tipo){
   const medio = g('cb-m'), ret = {}, retCert = {}; ['iva', 'iibb', 'gan', 'otras'].forEach(r => { const v = numAr(g('cb-r-' + r)); if(v > 0){ ret[r] = v; if(g('cb-c-' + r)) retCert[r] = g('cb-c-' + r); } });
   const mov = { cliente: k, nombre: (ccCalcular()[k] || {}).nombre || (document.getElementById('rc-c') || {}).value || window.__ccNombreNuevo || k, tipo, fecha: g('cb-f') || ccHoy(), importe: imp, medio, retenciones: ret, retCert, retProv: g('cb-rprov'), detalle: g('cb-d'), aGrupo: !!(document.getElementById('cb-grupo') || {}).checked };
   if(/Cheque|E-cheq/.test(medio)){ if(!g('cb-cn')){ alert('Escriba el número de cheque.'); return; } mov.cheque = { electronico: medio === 'E-cheq', banco: g('cb-cb'), numero: g('cb-cn'), fechaCobro: g('cb-cf') || '', librador: g('cb-cl'), estado: 'cartera' }; }
+  if(__previa){ __previa(mov); return; }
   const archivos = [...((document.getElementById('cb-adj') || {}).files || [])];
   if(archivos.length){ try{ mov.retAdj = []; let tam = 0; for(const f of archivos){ const d = await pvArchivoB64(f); tam += d.length; if(tam > 850000) throw new Error('los comprobantes pesan demasiado: adjunte fotos más livianas o menos archivos'); mov.retAdj.push({ nombre: f.name, data: d }); } } catch(e){ alert('Comprobantes de retención: ' + e.message); return; } }
   cerrarPublicar(); await ccGuardarMov(mov); if(ccTab === 'recibos'){ ccCli = null; renderCtaCte(); }
@@ -12666,7 +12671,7 @@ function rmForm(pre){
     <b style="display:block;margin:10px 0 4px;font-size:.88rem;">Mercadería (cantidad en su unidad de venta)</b><div id="rm-rows"></div><datalist id="rm-skus">${skus.map(s => `<option value="${s}">`).join('')}</datalist>
     <button type="button" class="btn-mini" onclick="rmFila()">➕ Renglón</button>
     <label style="display:block;margin-top:8px;">Observaciones<input id="rm-o" value="${escapeAttr(pre.obs || '')}" style="${inp}"></label>
-    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="rmGuardar('${escapeAttr(pre.pedido || '')}')">Guardar e imprimir</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="rmGuardar('${escapeAttr(pre.pedido || '')}')">Guardar e imprimir</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="vistaPrevia('remito','${escapeAttr(pre.pedido || '')}')">👁️ Vista previa</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
   (pre.items && pre.items.length ? pre.items : [{}]).forEach(x => rmFila(x));
 }
 function rmFila(x){ x = x || {}; const d = document.createElement('div'); d.className = 'rm-r'; d.style.cssText = 'display:grid;grid-template-columns:1fr 2fr .6fr 32px;gap:6px;margin-bottom:6px;'; if(x.precio) d.dataset.precio = x.precio;
@@ -12687,9 +12692,10 @@ async function rmGuardar(pedido){
   const g = id => (document.getElementById(id).value || '').trim();
   const items = [...document.querySelectorAll('.rm-r')].map(d => ({ sku: d.querySelector('.rm-s').value.trim().toUpperCase(), desc: d.querySelector('.rm-de').value.trim(), cant: numAr(d.querySelector('.rm-q').value) || 0, precio: d.dataset.precio ? +d.dataset.precio : null })).filter(x => (x.sku || x.desc) && x.cant > 0);
   if(!g('rm-c') || !items.length){ alert('Complete el cliente y al menos un renglón con cantidad.'); return; }
-  if(await mesBloqueado(g('rm-f'))) return;
-  try{ const ref = db.collection('config').doc('remito_num'), d0 = await ref.get(), numero = ((d0.exists && d0.data().n) || 0) + 1; await ref.set({ n: numero });
+  if(!__previa && await mesBloqueado(g('rm-f'))) return;
+  try{ const numero = __previa ? '(borrador)' : await (async () => { const ref = db.collection('config').doc('remito_num'), d0 = await ref.get(), n = ((d0.exists && d0.data().n) || 0) + 1; await ref.set({ n }); return n; })();
     const r = { cuit: g('rm-cuit'), condicionIva: g('rm-iva'), tel: g('rm-tel'), oc: g('rm-oc'), valor: numAr(g('rm-vd')) || 0, sucursal: window.__sucElegida || '', numero, fecha: g('rm-f') || ccHoy(), cliente: g('rm-c'), transporte: g('rm-t'), direccion: g('rm-d'), bultos: Math.max(1, Math.round(numAr(g('rm-b')) || 1)), obs: g('rm-o'), items, pedido: pedido || '', creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
+    if(__previa){ __previa(r); return; }
     if(stockDatos === null) await cargarStock();
     if(stockDatos.bajaCon === 'remito'){ const movs = items.filter(x => x.sku && skuControlado(x.sku)).map(x => ({ sku: x.sku, cantidad: -(x.cant * divisorVenta(x.sku)) })); await moverStockVarios(movs, 'remito', 'R ' + numero); r.stockAplicado = movs.length > 0; }
     const res = await db.collection('remitos').add(r); remitos.push({ _id: res.id, ...r });
@@ -12711,7 +12717,7 @@ async function remitoDesdePedido(numero){
 function rmImprimir(id){
   const r = remitos.find(x => x._id === id); if(!r) return; const w = window.open('', '_blank'); if(!w){ alert('Permita ventanas emergentes para imprimir.'); return; }
   w.document.write(`<html><head><title>Remito R ${String(r.numero).padStart(6, '0')}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#222}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}td,th{padding:6px;border-bottom:1px solid #ddd;text-align:left}.r{text-align:right}h1{font-size:20px;margin:0}.firma{margin-top:70px;display:flex;gap:30px}.firma div{flex:1;border-top:1px solid #444;padding-top:6px;font-size:12px;text-align:center}.x{font-size:11px;color:#666}</style></head><body>
-    <h1>OnLineTextil · Remito N.º R ${String(r.numero).padStart(6, '0')}</h1><p class="x">Remito interno · documento no válido como factura</p>
+    <div style="display:flex;justify-content:space-between;gap:10px;"><div>${encabezadoRZ('propia')}</div><h1 style="font-size:18px;">Remito N.º R ${String(r.numero).padStart(6, '0')}</h1></div><p class="x">Remito interno · documento no válido como factura</p>
     <table style="margin-top:6px;font-size:13px;"><tr><td style="width:50%;vertical-align:top;border:none;">Fecha: ${String(r.fecha).split('-').reverse().join('/')}<br>Señor(es): <b>${escaparHtml(r.cliente)}</b>${r.sucursal ? ' · ' + escaparHtml(r.sucursal) : ''}${r.cuit ? '<br>CUIT: ' + escaparHtml(r.cuit) : ''}${r.condicionIva ? '<br>IVA: ' + escaparHtml(r.condicionIva) : ''}${r.tel ? '<br>Contacto: ' + escaparHtml(r.tel) : ''}</td>
       <td style="vertical-align:top;border:none;">${r.direccion ? 'Lugar de entrega: ' + escaparHtml(r.direccion) + '<br>' : ''}${r.transporte ? 'Transporte: ' + escaparHtml(r.transporte) + '<br>' : ''}Bultos: ${r.bultos || 1}${r.valor ? '<br>Valor declarado: ' + formatPrice(r.valor) : ''}${r.pedido ? '<br>Nuestro pedido: ' + escaparHtml(r.pedido) : ''}${r.oc ? '<br>Su orden de compra: ' + escaparHtml(r.oc) : ''}</td></tr></table>
     <table><tr><th>SKU</th><th>Descripción</th><th class="r">Cantidad</th></tr>${(r.items || []).map(x => `<tr><td>${escaparHtml(x.sku || '')}</td><td>${escaparHtml(x.desc || '')}</td><td class="r">${x.cant}</td></tr>`).join('')}</table>
@@ -12819,6 +12825,72 @@ function fvNotaCliente(){ const e = document.getElementById('fv-notacli'); if(!e
   e.innerHTML = `<b>${escaparHtml(iva)}</b>${c.cuit ? ' · CUIT ' + escaparHtml(c.cuit) : ''} · ${escaparHtml(f.lista.nombre)}${f.ajuste ? ' (' + (f.ajuste > 0 ? '+' : '') + f.ajuste + ' %)' : ''}${f.desc ? ' · descuento ' + f.desc + ' %' : ''} · ${c.condicion === 'contado' ? 'contado' : 'cuenta corriente'}`;
   const sl = document.getElementById('fv-l'); if(sl && sl.value !== 'X' && !sl.dataset.tocada && sl.value !== letra){ sl.value = letra; sl.dispatchEvent(new Event('change')); } // letra segun la condicion del cliente (RI -> A; monotributo, exento, consumidor final -> B)
   const dg = document.getElementById('fv-dg'); if(dg && (!dg.value || dg.dataset.auto === '1')){ dg.value = f.desc || ''; dg.dataset.auto = f.desc ? '1' : ''; fvTot(); } }
+// datos legales de cada razon social (encabezado de facturas, recibos, remitos y ordenes de pago)
+let datosRZ = {};
+async function cargarDatosRZ(){ try{ const d = await db.collection('config').doc('razones').get(); datosRZ = d.exists ? (d.data().r || {}) : {}; } catch(e){} return datosRZ; }
+function encabezadoRZ(k){ const d = datosRZ[k || 'propia'] || {}, nom = d.nombre || (PV_RAZONES.find(x => x[0] === (k || 'propia')) || [, 'OnLineTextil'])[1];
+  return `<h1>${escaparHtml(nom)}</h1><span class="x">${[d.domicilio, d.cuit ? 'CUIT ' + d.cuit : '', d.iibb ? 'IIBB ' + d.iibb : '', d.inicio ? 'Inicio de actividades ' + d.inicio : '', d.iva || 'Responsable inscripto'].filter(Boolean).map(escaparHtml).join(' · ')}</span>`; }
+async function abrirDatosRazones(){
+  if(!esDueno()){ alert('Solo el dueño.'); return; } await cargarDatosRZ();
+  const f = (k, c, t, ph) => `<label style="display:block;margin:4px 0;"><span class="fl">${t}</span><input id="dr-${k}-${c}" value="${escapeAttr((datosRZ[k] || {})[c] || '')}" placeholder="${ph || ''}"></label>`;
+  pvModal('🏢 Datos de las razones sociales', `<p class="note" style="text-align:left;">Se imprimen en el encabezado de facturas, recibos, remitos y órdenes de pago de cada razón social.</p>
+    ${PV_RAZONES.map(([k, t]) => `<details ${k === 'propia' ? 'open' : ''} style="border-top:1px solid var(--line);padding:8px 0;"><summary>${chipRZ(k)}</summary><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;">${f(k, 'nombre', 'Razón social legal', 'como figura en AFIP')}${f(k, 'cuit', 'CUIT')}${f(k, 'domicilio', 'Domicilio comercial')}${f(k, 'iibb', 'Ingresos brutos', 'N.º o Convenio multilateral')}${f(k, 'inicio', 'Inicio de actividades', 'dd/mm/aaaa')}${f(k, 'iva', 'Condición frente al IVA', 'Responsable inscripto')}</div></details>`).join('')}
+    <button class="btn btn-gold" style="width:100%;margin-top:10px;" onclick="guardarDatosRazones()">Guardar</button>`, 920);
+}
+async function guardarDatosRazones(){ const r = {}; PV_RAZONES.forEach(([k]) => { r[k] = {}; ['nombre', 'cuit', 'domicilio', 'iibb', 'inicio', 'iva'].forEach(c => r[k][c] = (document.getElementById(`dr-${k}-${c}`).value || '').trim()); });
+  try{ await db.collection('config').doc('razones').set({ r }); datosRZ = r; } catch(e){ alert('No se pudo guardar: ' + e.message); return; } await ccLog('Datos de razones sociales', 'actualizados'); cerrarPublicar(); }
+// ===== Vista previa de comprobantes (antes de confirmar) =====
+let __previa = null; // si esta activa, las funciones de guardar arman el comprobante y lo devuelven sin guardar
+function capturarImpresion(fn){ const orig = window.open; let html = ''; window.open = () => ({ document: { write(x){ html += x; }, close(){} }, focus(){}, print(){} }); try{ fn(); } finally { window.open = orig; } return html; }
+function mostrarVistaPrevia(html, alConfirmar){
+  html = String(html || '').replace(/<script>setTimeout\(\(\)=>print\(\),\d+\)<\/script>/g, '').replace(/<\/body>/, '<div style="position:fixed;top:40%;left:0;right:0;text-align:center;font:700 70px Arial;color:rgba(166,67,47,.12);transform:rotate(-20deg);pointer-events:none;">VISTA PREVIA</div></body>');
+  let ov = document.getElementById('vp-ov'); if(ov) ov.remove();
+  ov = document.createElement('div'); ov.id = 'vp-ov'; ov.style.cssText = 'position:fixed;inset:0;z-index:10080;background:rgba(30,20,40,.55);display:flex;flex-direction:column;align-items:center;padding:16px;gap:10px;';
+  ov.innerHTML = `<div style="display:flex;gap:8px;width:100%;max-width:880px;justify-content:flex-end;"><span style="color:#fff;font-weight:700;margin-right:auto;align-self:center;">👁️ Vista previa · así se va a ver e imprimir</span><button type="button" class="btn btn-ghost" style="width:auto;padding:9px 16px;background:#fff;" onclick="document.getElementById('vp-ov').remove()">← Seguir editando</button><button type="button" class="btn btn-gold" style="width:auto;padding:9px 18px;" id="vp-ok">Confirmar y guardar</button></div><iframe id="vp-if" style="flex:1;width:100%;max-width:880px;border:none;border-radius:12px;background:#fff;"></iframe>`;
+  document.body.appendChild(ov); document.getElementById('vp-if').srcdoc = html;
+  document.getElementById('vp-ok').onclick = () => { ov.remove(); alConfirmar(); };
+}
+// arma el comprobante con la misma funcion de guardar (sin guardar nada) y lo muestra
+async function vistaPrevia(tipoComp, arg1, arg2){ await cargarDatosRZ();
+  let obj = null; __previa = o => { obj = o; };
+  try{ if(tipoComp === 'factura') await fvGuardar(arg1); else if(tipoComp === 'remito') await rmGuardar(arg1); else if(tipoComp === 'recibo') await ccGuardarCobro(arg1, arg2); else if(tipoComp === 'op') await pvGuardarPago(arg1); }
+  finally { __previa = null; }
+  if(!obj) return; // falto algun dato: ya se aviso
+  let html = '';
+  if(tipoComp === 'factura') html = htmlFactura(obj);
+  else if(tipoComp === 'recibo') html = htmlRecibo(obj);
+  else if(tipoComp === 'remito'){ obj._id = '__prev'; remitos.push(obj); try{ html = capturarImpresion(() => rmImprimir('__prev')); } finally { remitos = remitos.filter(x => x._id !== '__prev'); } }
+  else if(tipoComp === 'op'){ obj._id = '__prev'; pvPagos.push(obj); try{ html = capturarImpresion(() => pvImprimirOP('__prev')); } finally { pvPagos = pvPagos.filter(x => x._id !== '__prev'); } }
+  mostrarVistaPrevia(html, () => vistaPreviaConfirmar(tipoComp, arg1, arg2));
+}
+function vistaPreviaConfirmar(t, a, b){ if(t === 'factura') fvGuardar(a); else if(t === 'remito') rmGuardar(a); else if(t === 'recibo') ccGuardarCobro(a, b); else if(t === 'op') pvGuardarPago(a); }
+const estiloDoc = `body{font-family:Arial,sans-serif;padding:28px;color:#222;font-size:13px}table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #ddd;text-align:left}.r{text-align:right}h1{font-size:19px;margin:0}.box{border:1px solid #333;border-radius:6px;padding:10px 12px}.letra{border:2px solid #222;width:46px;height:46px;font:800 28px Arial;display:flex;align-items:center;justify-content:center;margin:0 auto}.x{font-size:11px;color:#666}`;
+function htmlFactura(fa){
+  const c = clientePorNombre(fa.cliente) || {}, rz = (PV_RAZONES.find(x => x[0] === (fa.razon || 'propia')) || [, 'OnLineTextil'])[1], A = /^A$/i.test(fa.tipo) && fa.fiscal !== false;
+  const nom = fa.esNC ? 'NOTA DE CRÉDITO' : fa.esND ? 'NOTA DE DÉBITO' : 'FACTURA', tot = fa.total || 0;
+  const filas = (fa.items || []).map(it => { const conIva = it.neto * 1.21, base = A ? it.neto : conIva, b = Math.min(99.99, +it.bonif || 0), unit = base / (1 - b / 100) / (it.cant || 1); /* precio de lista, antes de la bonificacion */ return `<tr><td>${escaparHtml(it.codigo || '')}</td><td>${escaparHtml(it.desc || '')}</td><td class="r">${(+it.cant || 0).toLocaleString('es-AR')}</td><td class="r">${formatPrice(unit)}</td><td class="r">${it.bonif ? it.bonif + ' %' : ''}</td><td class="r">${formatPrice(base)}</td></tr>`; }).join('');
+  return `<html><head><title>${nom} ${escaparHtml(fa.tipo || '')} ${escaparHtml(fa.numero || '')}</title><style>${estiloDoc}</style></head><body>
+    <table style="margin-bottom:10px;"><tr><td style="width:42%;border:none;vertical-align:top;">${encabezadoRZ(fa.razon)}</td><td style="width:16%;border:none;text-align:center;"><div class="letra">${escaparHtml(fa.tipo || 'X')}</div><div class="x">${fa.fiscal === false ? 'no válido como factura' : ''}</div></td>
+      <td style="border:none;vertical-align:top;text-align:right;"><b>${nom}</b><br>N.º ${escaparHtml(fa.numero || '')}<br>Fecha: ${escaparHtml(fa.fecha || '')}${fa.facturaRef ? '<br>Comprobante asociado: ' + escaparHtml(fa.facturaRef.numero) : ''}</td></tr></table>
+    <div class="box" style="margin-bottom:12px;">Señor(es): <b>${escaparHtml(fa.cliente || '')}</b>${c.cuit ? ' · CUIT ' + escaparHtml(c.cuit) : ''}<br>IVA: ${escaparHtml(c.condicionIva || '—')} · Condición de venta: ${fa.condicion === 'contado' ? 'Contado' : 'Cuenta corriente'}${c.direccion || c.localidad ? '<br>Domicilio: ' + escaparHtml([c.direccion, c.localidad, c.provincia].filter(Boolean).join(', ')) : ''}</div>
+    <table><tr><th>Código</th><th>Descripción</th><th class="r">Cant.</th><th class="r">Precio unit.${A ? ' (neto)' : ''}</th><th class="r">Bonif.</th><th class="r">Importe${A ? ' (neto)' : ''}</th></tr>${filas}</table>
+    <table style="width:320px;margin:12px 0 0 auto;">${fa.descGeneral ? `<tr><td>Descuento general</td><td class="r">${fa.descGeneral} % (incluido)</td></tr>` : ''}${A ? `<tr><td>Neto gravado</td><td class="r">${formatPrice(tot / 1.21)}</td></tr><tr><td>IVA 21 %</td><td class="r">${formatPrice(tot - tot / 1.21)}</td></tr>` : ''}<tr><td><b>Total</b></td><td class="r"><b>${formatPrice(tot)}</b></td></tr></table>
+    <p class="x" style="margin-top:20px;">${fa.fiscal === false ? 'Comprobante interno sin CAE · documento no válido como factura.' : fa.cae ? 'CAE N.º ' + escaparHtml(fa.cae) + (fa.caeVto ? ' · Vto. ' + escaparHtml(fa.caeVto) : '') : 'El CAE lo asigna el sistema de facturación electrónica al emitirla.'}</p>
+    <script>setTimeout(()=>print(),400)<\/script></body></html>`;
+}
+function htmlRecibo(m){
+  const c = clientePorNombre(m.nombre) || {}, ret = Object.entries(m.retenciones || {}).filter(([, v]) => +v), rt = ret.reduce((a, [, v]) => a + +v, 0), nomR = { iva: 'Retención IVA', iibb: 'Retención IIBB', gan: 'Retención Ganancias', otras: 'Otras retenciones' };
+  return `<html><head><title>Recibo ${escaparHtml(m.numero || '')}</title><style>${estiloDoc}</style></head><body>
+    <table style="margin-bottom:10px;"><tr><td style="border:none;">${encabezadoRZ('propia')}</td><td style="border:none;text-align:right;"><b>${m.tipo === 'sena' ? 'RECIBO DE SEÑA' : 'RECIBO'}</b>${m.numero ? '<br>N.º ' + escaparHtml(m.numero) : ''}<br>Fecha: ${String(m.fecha).split('-').reverse().join('/')}</td></tr></table>
+    <div class="box" style="margin-bottom:12px;">Recibimos de: <b>${escaparHtml(m.nombre || '')}</b>${c.cuit ? ' · CUIT ' + escaparHtml(c.cuit) : ''}</div>
+    <table><tr><th>Concepto</th><th class="r">Importe</th></tr><tr><td>${escaparHtml(m.medio || '')}${m.cheque ? ` · ${m.cheque.electronico ? 'E-cheq' : 'Cheque'} ${escaparHtml(m.cheque.banco || '')} N.º ${escaparHtml(m.cheque.numero || '')}${m.cheque.fechaCobro ? ' · cobro ' + m.cheque.fechaCobro.split('-').reverse().join('/') : ''}` : ''}</td><td class="r">${formatPrice(m.importe)}</td></tr>
+      ${ret.map(([k, v]) => `<tr><td>${nomR[k] || k}${(m.retCert || {})[k] ? ' · certificado ' + escaparHtml(m.retCert[k]) : ''}</td><td class="r">${formatPrice(+v)}</td></tr>`).join('')}
+      <tr><td><b>Total cancelado</b></td><td class="r"><b>${formatPrice(m.importe + rt)}</b></td></tr></table>
+    ${m.detalle ? `<p>${escaparHtml(m.detalle)}</p>` : ''}${m.aGrupo ? '<p class="x">Aplicado a las facturas del grupo de empresas.</p>' : ''}
+    <div style="margin-top:70px;display:flex;justify-content:flex-end;"><div style="width:240px;border-top:1px solid #444;text-align:center;padding-top:6px;font-size:12px;">Firma y aclaración</div></div>
+    <script>setTimeout(()=>print(),400)<\/script></body></html>`;
+}
+function imprimirHtml(html){ const w = window.open('', '_blank'); if(!w){ alert('Permita ventanas emergentes para imprimir.'); return; } w.document.write(html); w.document.close(); }
 // ===== Comprobante de venta cargado a mano (factura, NC o ND): pasa por los mismos controles que los subidos =====
 function fvManual(tipo){ cargarListasPrecios(); if(!ccClientesDB || !ccClientesDB.length) db.collection('clientes').get().then(s => { ccClientesDB = s.docs.map(d => d.data()); }).catch(() => {});
   const inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
@@ -12842,7 +12914,7 @@ function fvManual(tipo){ cargarListasPrecios(); if(!ccClientesDB || !ccClientesD
     <button type="button" class="lnk" onclick="fvFila()">+ Agregar renglón</button>
     <div class="sep"></div>
     <div class="tot"><div class="l"><span>Descuento general</span><span><input id="fv-dg" inputmode="decimal" placeholder="0" oninput="this.dataset.auto='';fvTot()" style="width:70px;height:30px;text-align:right;"> %</span></div><div id="fv-tot"></div></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;"><button class="btn btn-ghost" style="width:auto;padding:10px 18px;" onclick="cerrarPublicar()">Cancelar</button><button class="btn btn-gold" style="width:auto;padding:10px 28px;" onclick="fvGuardar('${tipo}')">Guardar</button></div></div>`);
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;"><button class="btn btn-ghost" style="width:auto;padding:10px 18px;" onclick="cerrarPublicar()">Cancelar</button><button class="btn btn-ghost" style="width:auto;padding:10px 18px;" onclick="vistaPrevia('factura','${tipo}')">👁️ Vista previa</button><button class="btn btn-gold" style="width:auto;padding:10px 28px;" onclick="fvGuardar('${tipo}')">Guardar</button></div></div>`);
   fvFila();
 }
 function fvFila(x){ x = x || {}; const d = document.createElement('div'); d.className = 'fv-r'; d.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;align-items:center;'; if(x.unit) d.dataset.unit = x.unit; if(x.max) d.dataset.max = x.max;
@@ -12884,6 +12956,7 @@ async function fvGuardar(tipo){
   if(ref && tipo === 'nc'){ const tNC = items.reduce((a, x) => a + x.neto * 1.21, 0); if(tNC > (ref.total || 0) + 1){ alert('La nota de crédito no puede superar el total de la factura relacionada (' + formatPrice(ref.total) + ').'); return; } }
   const f = g('fv-f').split('-'), total = items.reduce((a, x) => a + (x._conIva != null ? x._conIva : x.neto * 1.21), 0); items.forEach(x => delete x._conIva); // el total es exactamente el que se ve en pantalla
   const fa = { numero: g('fv-n'), tipo: g('fv-l'), fecha: `${f[2]}/${f[1]}/${f[0]}`, cliente: g('fv-c'), total: Math.round(total * 100) / 100, items, esNC: tipo === 'nc', esND: tipo === 'nd', devolvieron: true, controlOk: true, razon: g('fv-rz') || 'propia', manual: true, descGeneral: dg, condicion: (document.querySelector('input[name=fv-cond]:checked') || {}).value || 'ctacte', fiscal: (document.querySelector('input[name=fv-fis]:checked') || {}).value === 'si', cae: g('fv-cae').replace(/\D/g, ''), caeVto: g('fv-caev') ? g('fv-caev').split('-').reverse().join('/') : '', facturaRef: ref ? { id: ref._id || String(ref.numero).replace(/\//g, '-'), numero: `${ref.tipo || ''} ${ref.numero}` } : null };
+  if(__previa){ __previa(fa); return; }
   const k = claveComprobante(fa); fa.yaEsta = (facturas || []).some(x => claveComprobante(x) === k);
   if(window.__rmFacturando){ fa.remitoRef = window.__rmFacturando; }
   facturasNuevas.push(fa); const i = facturasNuevas.length - 1; cerrarPublicar(); renderFacturasNuevas();
@@ -12950,7 +13023,7 @@ function renderFacturas(){
     <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;"><small class="note">Costo de los productos</small><div style="font-weight:800;font-size:1.2rem;color:#D97A3A;">${formatPrice(C)}</div><small class="note">sin impuestos ni costos de logística</small></div>
     <div style="background:${GAN < 0 ? '#FDEBE7' : '#EEF6F0'};border-radius:12px;padding:10px;"><small class="note">Ganancia ${fcModoIva === 'con' ? '(con IVA)' : '(sin IVA)'}</small><div style="font-weight:800;font-size:1.2rem;color:${GAN < 0 ? '#A6432F' : '#2F7A47'};">${formatPrice(GAN)}</div><small class="note">${C > 0 ? Math.round(GAN / C * 100) + ' % sobre el costo' : ''}${nRevT ? ` · ⚠️ ${nRevT} renglones para revisar (incluidos)` : ''}</small></div></div>` : '';
   setTimeout(() => { const bar = document.getElementById('fc-barra'); if(bar) bar.style.display = L.length ? 'flex' : 'none'; actualizarSelFact(); }, 0);
-  document.getElementById('fc-lista').innerHTML = L.length ? L.map(f => `<details style="border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:6px;background:#fff;"><summary style="cursor:pointer;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><input type="checkbox" class="fc-sel" value="${escapeAttr(f._id || String(f.numero).replace(/\//g, '-'))}" onclick="event.stopPropagation();" onchange="actualizarSelFact()" style="width:18px;height:18px;">${chipRZ(f.razon)}${!esFiscalVenta(f) ? chipNF() : ''}<b style="flex:1;">▸ ${f.esNC ? '<span style="color:#A6432F;">NC</span> ' : ''}${escaparHtml(f.tipo || '')} ${escaparHtml(f.numero)} · ${escaparHtml(f.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(f.cliente || '')}</span><span style="text-align:right;"><b style="font-size:.9rem;">${formatPrice(f.total || (f.neto || 0) * 1.21)}</b>${esFiscalVenta(f) ? `<small class="note" style="display:block;margin:0;">sin IVA ${formatPrice((f.total || (f.neto || 0) * 1.21) / 1.21)}</small>` : ''}</span><button type="button" class="btn-mini" title="Quitar de la app" onclick="event.preventDefault();event.stopPropagation();borrarFactura('${escapeAttr(f._id || f.numero)}')">🗑️</button></summary>${tablaFactura(f, true, (f._id || String(f.numero).replace(/\//g, '-')))}</details>`).join('') : '<p class="empty-msg">Todavía no guardaste facturas.</p>';
+  document.getElementById('fc-lista').innerHTML = L.length ? L.map(f => `<details style="border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:6px;background:#fff;"><summary style="cursor:pointer;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><input type="checkbox" class="fc-sel" value="${escapeAttr(f._id || String(f.numero).replace(/\//g, '-'))}" onclick="event.stopPropagation();" onchange="actualizarSelFact()" style="width:18px;height:18px;">${chipRZ(f.razon)}${!esFiscalVenta(f) ? chipNF() : ''}<b style="flex:1;">▸ ${f.esNC ? '<span style="color:#A6432F;">NC</span> ' : ''}${escaparHtml(f.tipo || '')} ${escaparHtml(f.numero)} · ${escaparHtml(f.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(f.cliente || '')}</span><span style="text-align:right;"><b style="font-size:.9rem;">${formatPrice(f.total || (f.neto || 0) * 1.21)}</b>${esFiscalVenta(f) ? `<small class="note" style="display:block;margin:0;">sin IVA ${formatPrice((f.total || (f.neto || 0) * 1.21) / 1.21)}</small>` : ''}</span><button type="button" class="btn-mini" title="Quitar de la app" onclick="event.preventDefault();event.stopPropagation();borrarFactura('${escapeAttr(f._id || f.numero)}')">🗑️</button></summary>${`<div style="text-align:right;margin:4px 0;"><button type="button" class="btn-mini" onclick="imprimirFacturaGuardadaAsync('${escapeAttr(f._id || String(f.numero).replace(/\//g, '-'))}')">🖨️ Imprimir</button></div>` + tablaFactura(f, true, (f._id || String(f.numero).replace(/\//g, '-')))}</details>`).join('') : '<p class="empty-msg">Todavía no guardaste facturas.</p>';
 }
 
 // ===== Precio sugerido minimo en Mercado Libre (con los cargos reales de tus ventas: config/ml_parametros) =====
@@ -21525,7 +21598,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v352';
+const APP_VERSION = '2026-10-02-v353';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
