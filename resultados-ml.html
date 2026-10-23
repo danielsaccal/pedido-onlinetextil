@@ -1335,6 +1335,14 @@ async function aplicarPackSug(cta,sku,n){
   try{await guardarEquivalencias();}catch(e){showErr('No se pudo guardar: '+e.message);return;}
   render();alertOk(sku+' → pack de '+n+' (cuenta '+cta+')');
 }
+// confirma de una vez todas las ventas para revisar de un SKU (en las cuentas y meses que se estan viendo)
+async function confirmarTodasSku(s){
+  const os=allRows().filter(o=>o.revisar&&o.costoRev!=null&&String(o.skuBase).toUpperCase()===String(s).toUpperCase());
+  if(!os.length)return; if(!confirm(`¿Las ${os.length} ventas de ${s} están bien? Dejan de figurar para revisar.`))return;
+  os.forEach(o=>{CONFIRMADAS[String(o.op)+'|'+String(o.skuBaseML||o.skuBase)]=true;});
+  try{await db.collection('config').doc('ml_confirmadas').set({ops:CONFIRMADAS});}catch(e){showErr('No se pudo guardar: '+e.message);return;}
+  render(); alertOk('✓ '+os.length+' ventas de '+s+' confirmadas');
+}
 async function confirmarVenta(op,sku){
   CONFIRMADAS[String(op)+'|'+sku]=true;
   try{await db.collection('config').doc('ml_confirmadas').set({ops:CONFIRMADAS});}catch(e){showErr('No se pudo guardar: '+e.message);return;}
@@ -1365,6 +1373,7 @@ function renderRevisar(){
             <span style="color:#A6432F;font-weight:700;">${os.length} ${os.length===1?'venta':'ventas'} para revisar</span>
             <span class="meta">costo usado ${usados.slice(0,3).map(fmt).join(' / ')}${usados.length>3?'…':''} · costo actual ${act!=null?fmt(act):'—'}</span>
             <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;">
+              <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid #BFE3CB;background:#EEF8F1;color:#2F7A47;font-weight:700;cursor:pointer;" onclick="confirmarTodasSku('${sq}')">✓ Todas están bien</button>
               ${act!=null?`<button type="button" style="padding:4px 10px;border-radius:8px;border:none;background:#3d1466;color:#fff;font-weight:700;cursor:pointer;" onclick="aplicarCostoTodas('${sq}',${act}*cantUV('${sq}'))">Corregir con el costo actual</button>`:''}
               <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="const v=prompt('Costo correcto de ${sq} por '+uvTxt('${sq}')+':','');const n=leerMonto(v);if(n>0)aplicarCostoTodas('${sq}',n);">✏️ Corregir costo mal cargado</button>
               <button type="button" style="padding:4px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="window.__revGrupos=window.__revGrupos||{};window.__revGrupos['${sq}']=!window.__revGrupos['${sq}'];renderRevisar();">${abierto?'Ocultar ventas':'Ver ventas'}</button></span></div>
