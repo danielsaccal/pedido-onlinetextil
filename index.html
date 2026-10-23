@@ -1657,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v325</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v326</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13266,7 +13266,7 @@ async function llamarAgente(body){
 function renderChatsDA(){
   document.getElementById('da-chats').innerHTML = daChats.map(c => `<div onclick="abrirChatDA('${c._id}')" style="padding:8px;border-radius:10px;margin-bottom:4px;cursor:pointer;font-size:.85rem;${daChat && daChat._id === c._id ? 'background:#3D2B4E;color:#fff;' : 'background:#fff;border:1px solid var(--line);'}"><b>${escaparHtml(c.titulo || 'Sin título')}</b><div style="font-size:.72rem;opacity:.7;">${new Date(c.actualizado || c.creado).toLocaleString('es-AR')}</div></div>`).join('') || '<p class="note">Sin conversaciones.</p>';
 }
-function nuevoChatDA(){ daChat = null; daProds = []; daImgs = []; daDocs = []; renderChatsDA(); renderMsgsDA(); renderAdjuntosDA(); }
+function nuevoChatDA(){ daChat = null; daProds = []; daImgs = []; daDocs = []; daCanal = ''; document.querySelectorAll('.da-canal').forEach(b => b.style.background = ''); renderChatsDA(); renderMsgsDA(); renderAdjuntosDA(); }
 function abrirChatDA(id){ daChat = daChats.find(c => c._id === id) || null; renderChatsDA(); renderMsgsDA(); }
 function renderMsgsDA(){
   const box = document.getElementById('da-msgs'), ms = (daChat && daChat.mensajes) || [];
@@ -13363,6 +13363,7 @@ function fichaDA(S){
 async function enviarDA(){
   if(!daCfg || !daCfg.url){ alert('Primero conecte el agente.'); return; }
   const texto = document.getElementById('da-texto').value.trim(); if(!texto && !daProds.length){ alert('Escriba el pedido.'); return; }
+  if(daAgente !== 'auditor' && !daCanal){ alert('Antes de enviar, elija para qué es: Mercado Libre, Tienda Nube, Post, Historia, Carrusel o Catálogo.'); const c = document.getElementById('da-canales'); if(c){ c.style.outline = '2px solid #A6432F'; c.style.borderRadius = '10px'; setTimeout(() => c.style.outline = '', 2500); c.scrollIntoView({ block: 'center' }); } return; }
   const btn = document.getElementById('da-enviar'); btn.disabled = true;
   try{
     procesando('Preparando el pedido…');
@@ -21095,7 +21096,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v325';
+const APP_VERSION = '2026-10-02-v326';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
