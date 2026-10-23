@@ -1657,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v332</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v333</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -12308,10 +12308,13 @@ function parsearFactura(L, nombreArchivo){
   const suma = items.reduce((a, x) => a + x.importe, 0);
   items.forEach(it => { it.ok = renglonOk(it); });
   // nota de credito: resta (devolucion o descuento posterior)
-  const esNC = /nota\s+de\s+cr[ée]dito/i.test(tit + ' ' + txt.slice(0, 600)) || /^NC[\s_-]/i.test(nombreArchivo || '');
+  const esNC = /nota\s+de\s+cr[ée]dito|cr[ée]dito\s+de\s+venta|c[oó]d(igo)?\.?\s*0?0?(3|8|13)\b/i.test(tit + ' ' + txt.slice(0, 800)) || /^(NC|nota.?de.?cr|cr[ée]dito)/i.test(nombreArchivo || ''), esND = !esNC && (/nota\s+de\s+d[ée]bito|d[ée]bito\s+de\s+venta|c[oó]d(igo)?\.?\s*0?0?(2|7|12)\b/i.test(tit + ' ' + txt.slice(0, 800)) || /^(ND|nota.?de.?d[ée]b|d[ée]bito)/i.test(nombreArchivo || ''));
+  // comprobante asociado (las NC y ND de TFactura lo indican): se relaciona con la factura guardada
+  const asoc = (txt.match(/(?:asociad|relacionad|referencia|s\/\s*fact)[^\n]{0,40}?([ABC])?\s*(\d{4,5})\s*-\s*(\d{8})/i) || []);
   const malos = items.filter(it => !it.ok).length;
   const cae = m(/C\.?A\.?E\.?\s*(?:N[º°o]?)?:?\s*(\d{14})/i), caeVto = m(/(?:Vto\.?|Vencimiento)\s*(?:de(?:l)?\s*)?C\.?A\.?E\.?:?\s*(\d{2}\/\d{2}\/\d{4})/i);
-  return { cae, caeVto, numero, tipo, fecha, cliente, total, items, archivo: nombreArchivo, hojas: lineasPDF.hojas, subtotal, malos, esNC, devolvieron: true, controlOk: malos === 0 && (!subtotal || Math.abs(suma - subtotal) < 1) && items.length > 0 };
+  const refNum = asoc[2] ? asoc[2].padStart(5, '0') + '-' + asoc[3] : '', refF = refNum ? (facturas || []).find(f => !f.esNC && String(f.numero).replace(/\D/g, '').endsWith(asoc[3]) && String(f.numero).includes(asoc[2].replace(/^0+/, ''))) : null;
+  return { cae, caeVto, esND, facturaRef: refF ? { id: refF._id || String(refF.numero).replace(/\//g, '-'), numero: `${refF.tipo || ''} ${refF.numero}` } : (refNum ? { id: '', numero: `${asoc[1] || ''} ${refNum}`.trim() } : null), numero, tipo, fecha, cliente, total, items, archivo: nombreArchivo, hojas: lineasPDF.hojas, subtotal, malos, esNC, devolvieron: true, controlOk: malos === 0 && (!subtotal || Math.abs(suma - subtotal) < 1) && items.length > 0 };
 }
 function skuDeFactura(cod){ const c = String(cod).toUpperCase(); return (fcEquiv && fcEquiv[c]) || c; }
 // en las facturas la cantidad va en la unidad de venta del catalogo (ej: docenas); el costo de la app es por unidad suelta
@@ -21212,7 +21215,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v332';
+const APP_VERSION = '2026-10-02-v333';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
