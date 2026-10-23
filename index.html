@@ -1657,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v330</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v331</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5982,7 +5982,7 @@ const GRUPOS_INICIO = {
   comp: { lado: 'int', titulo: '🧾 Comprobantes', titulosColumnas: ['Presupuestos', 'Remitos', 'Ventas', 'Cobros', 'Compras', 'Pagos'], columnas: [
     [['🧾 Presupuestos', 'abrirPresupuestos()']],
     [['➕ Nuevo remito', 'abrirRemitos().then(() => rmForm())'], ['📋 Ver remitos', 'abrirRemitos()']],
-    [['➕ Factura de venta', "abrirFacturas().then(() => fvManual('f'))"], ['➕ Nota de crédito de venta', "abrirFacturas().then(() => fvManual('nc'))"], ['➕ Nota de débito de venta', "abrirFacturas().then(() => fvManual('nd'))"], ['📋 Ver comprobantes de venta', 'abrirFacturas()']],
+    [['➕ Factura de venta', "abrirFacturas().then(() => fvManual('f'))"], ['➕ Nota de crédito de venta', "abrirFacturas().then(() => fvManual('nc'))"], ['➕ Nota de débito de venta', "abrirFacturas().then(() => fvManual('nd'))"], ['📥 Subir facturas de venta (PDF o Excel)', "abrirFacturas().then(() => document.getElementById('fc-rz-sel').scrollIntoView({ block: 'center' }))"], ['📋 Ver comprobantes de venta', 'abrirFacturas()']],
     [['➕ Nuevo recibo', "abrirCtaCte('recibos').then(() => ccElegirCliente())"], ['📋 Ver recibos', "abrirCtaCte('recibos')"]],
     [['➕ Factura de compra', "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'f'))"], ['➕ Nota de crédito de compra', "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nc'))"], ['➕ Nota de débito de compra', "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nd'))"], ['📋 Ver comprobantes de compra', "abrirCompras('compras')"]],
     [['➕ Nueva orden de pago', "abrirCompras('pagos').then(() => pvElegirProveedor('pago'))"], ['📋 Ver órdenes de pago', "abrirCompras('pagos')"]],
@@ -21210,7 +21210,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v330';
+const APP_VERSION = '2026-10-02-v331';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
