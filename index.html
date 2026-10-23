@@ -1649,7 +1649,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v322</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v323</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2479,7 +2479,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
 
   <div class="step" id="step-remitos">
     <div class="form-card" style="max-width:980px;">
-      <h2>Notas de entrega</h2>
+      <h2>Remitos</h2>
       <div id="rm-body"></div>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
@@ -5970,9 +5970,9 @@ const GRUPOS_INICIO = {
     [['📚 Tomar pedido (catálogo)', "irACatalogoDesdeInicio()"], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()'], ['📄 Pedido desde una foto', "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)"]],
     [['📋 Historial de pedidos', 'abrirHistorial()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']],
   ] },
-  comp: { lado: 'int', titulo: '🧾 Comprobantes', titulosColumnas: ['Presupuestos', 'Entregas', 'Ventas', 'Cobros', 'Compras', 'Pagos'], columnas: [
+  comp: { lado: 'int', titulo: '🧾 Comprobantes', titulosColumnas: ['Presupuestos', 'Remitos', 'Ventas', 'Cobros', 'Compras', 'Pagos'], columnas: [
     [['🧾 Presupuestos', 'abrirPresupuestos()']],
-    [['➕ Nueva nota de entrega', 'abrirRemitos().then(() => rmForm())'], ['📋 Ver notas de entrega', 'abrirRemitos()']],
+    [['➕ Nuevo remito', 'abrirRemitos().then(() => rmForm())'], ['📋 Ver remitos', 'abrirRemitos()']],
     [['➕ Factura de venta', "abrirFacturas().then(() => fvManual('f'))"], ['➕ Nota de crédito de venta', "abrirFacturas().then(() => fvManual('nc'))"], ['➕ Nota de débito de venta', "abrirFacturas().then(() => fvManual('nd'))"], ['📋 Ver comprobantes de venta', 'abrirFacturas()']],
     [['➕ Nuevo recibo', "abrirCtaCte('recibos').then(() => ccElegirCliente())"], ['📋 Ver recibos', "abrirCtaCte('recibos')"]],
     [['➕ Factura de compra', "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'f'))"], ['➕ Nota de crédito de compra', "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nc'))"], ['➕ Nota de débito de compra', "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nd'))"], ['📋 Ver comprobantes de compra', "abrirCompras('compras')"]],
@@ -6128,7 +6128,7 @@ async function dashDatos(forzar){
   try{ const tn = Object.values((stockDatos && stockDatos.telas) || {}).filter(x => (+x.metros || 0) < 0).length; if(tn) P('stock', `🧵 ${tn} telas con metros negativos`, "abrirStock().then(() => { skTab = 'telas'; pintarStockTabs(); skRenderTab(); })"); } catch(e){}
   if(sPed){ const n = sPed.docs.map(d => d.data()).filter(x => ['pendiente', 'parcial'].includes(x.estado || 'pendiente') && x.fecha && new Date(x.fecha) < new Date(Date.now() - 7 * 864e5)).length; if(n) P('stock', `🚚 ${n} pedidos pendientes de entrega con más de 7 días`, 'abrirPendientesEntrega()'); }
   if(sPre){ const n = sPre.docs.map(d => d.data()).filter(x => !x.pedido && x.estado !== 'rechazado' && x.fecha && x.validez && new Date(new Date(x.fecha).getTime() + x.validez * 864e5) < new Date()).length; if(n) P('stock', `🧾 ${n} presupuestos abiertos con la validez vencida`, 'abrirPresupuestos()'); }
-  try{ const sR = await t(db.collection('remitos').get().catch(() => null)); if(sR){ const n = sR.docs.map(d => d.data()).filter(r => !r.facturaRef && !r.anulado && r.fecha < hace(7).slice(0, 10)).length; if(n) P('stock', `🚚 ${n} notas de entrega sin facturar con más de 7 días`, 'abrirRemitos()'); } } catch(e){}
+  try{ const sR = await t(db.collection('remitos').get().catch(() => null)); if(sR){ const n = sR.docs.map(d => d.data()).filter(r => !r.facturaRef && !r.anulado && r.fecha < hace(7).slice(0, 10)).length; if(n) P('stock', `🚚 ${n} remitos sin facturar con más de 7 días`, 'abrirRemitos()'); } } catch(e){}
   if(dueno){ const dc = diasDesdeCopia(); if(dc == null || dc >= 7) P('stock', `💾 ${dc == null ? 'Nunca descargó' : 'Hace ' + dc + ' días que no descarga'} una copia de seguridad`, 'abrirCopiaSeguridad()'); }
   dashCache = V; dashCacheT = Date.now(); return V;
 }
@@ -12351,20 +12351,20 @@ async function abrirRemitos(){ mostrarPaso('step-remitos'); document.getElementB
 function renderRemitos(){
   const box = document.getElementById('rm-body'), conRem = stockDatos && stockDatos.bajaCon === 'remito';
   const L = remitos.filter(r => rmFiltro === 'todos' || (rmFiltro === 'pend' ? !r.facturaRef && !r.anulado : r.facturaRef)).sort((a, b) => (b.numero || 0) - (a.numero || 0));
-  box.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;"><button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="rmForm()">➕ Nota de entrega</button>
+  box.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;"><button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="rmForm()">➕ Nuevo remito</button>
       <select onchange="rmFiltro=this.value;renderRemitos()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"><option value="pend" ${rmFiltro === 'pend' ? 'selected' : ''}>Sin facturar</option><option value="fact" ${rmFiltro === 'fact' ? 'selected' : ''}>Facturados</option><option value="todos" ${rmFiltro === 'todos' ? 'selected' : ''}>Todos</option></select>
-      <span class="note" style="margin:0 0 0 auto;">El stock baja con: <b>${conRem ? 'la nota de entrega' : 'la factura'}</b> <a href="#" onclick="event.preventDefault();rmCambiarBaja()">cambiar</a></span></div>
-    ${L.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.87rem;">${L.map(r => `<tr style="border-top:1px solid var(--line);${r.anulado ? 'opacity:.5;' : ''}"><td style="padding:6px;">NE ${String(r.numero).padStart(6, '0')}</td><td style="padding:6px;white-space:nowrap;">${String(r.fecha).split('-').reverse().join('/')}</td><td style="padding:6px;"><b>${escaparHtml(r.cliente || '')}</b>${r.pedido ? ` <span class="meta">pedido ${escaparHtml(r.pedido)}</span>` : ''}</td><td style="padding:6px;" class="meta">${(r.items || []).reduce((a, x) => a + (+x.cant || 0), 0)} u. · ${r.bultos || 1} bulto(s)</td>
+      <span class="note" style="margin:0 0 0 auto;">El stock baja con: <b>${conRem ? 'el remito' : 'la factura'}</b> <a href="#" onclick="event.preventDefault();rmCambiarBaja()">cambiar</a></span></div>
+    ${L.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.87rem;">${L.map(r => `<tr style="border-top:1px solid var(--line);${r.anulado ? 'opacity:.5;' : ''}"><td style="padding:6px;">R ${String(r.numero).padStart(6, '0')}</td><td style="padding:6px;white-space:nowrap;">${String(r.fecha).split('-').reverse().join('/')}</td><td style="padding:6px;"><b>${escaparHtml(r.cliente || '')}</b>${r.pedido ? ` <span class="meta">pedido ${escaparHtml(r.pedido)}</span>` : ''}</td><td style="padding:6px;" class="meta">${(r.items || []).reduce((a, x) => a + (+x.cant || 0), 0)} u. · ${r.bultos || 1} bulto(s)</td>
       <td style="padding:6px;">${r.anulado ? 'anulado' : r.facturaRef ? `<span class="meta">facturado ${escaparHtml(r.facturaRef.numero || '')}</span>` : `<button type="button" class="btn-mini" onclick="rmFacturar('${r._id}')">🧾 Facturar</button>`}</td>
-      <td style="padding:6px;white-space:nowrap;"><button type="button" class="btn-mini" onclick="rmImprimir('${r._id}')">🖨️</button>${!r.anulado && !r.facturaRef ? ` <button type="button" class="btn-mini" onclick="rmAnular('${r._id}')">Anular</button>` : ''}</td></tr>`).join('')}</table></div>` : '<p class="empty-msg">No hay notas de entrega en esta vista.</p>'}`;
+      <td style="padding:6px;white-space:nowrap;"><button type="button" class="btn-mini" onclick="rmImprimir('${r._id}')">🖨️</button>${!r.anulado && !r.facturaRef ? ` <button type="button" class="btn-mini" onclick="rmAnular('${r._id}')">Anular</button>` : ''}</td></tr>`).join('')}</table></div>` : '<p class="empty-msg">No hay remitos en esta vista.</p>'}`;
 }
 async function rmCambiarBaja(){ const nuevo = stockDatos.bajaCon === 'remito' ? 'factura' : 'remito';
-  if(!confirm(`¿Que el stock baje con ${nuevo === 'remito' ? 'la NOTA DE ENTREGA (cuando sale la mercadería)' : 'la FACTURA'}?\nAplica a lo que se cargue desde ahora.`)) return;
+  if(!confirm(`¿Que el stock baje con ${nuevo === 'remito' ? 'el REMITO (cuando sale la mercadería)' : 'la FACTURA'}?\nAplica a lo que se cargue desde ahora.`)) return;
   stockDatos.bajaCon = nuevo; try{ await db.collection('config').doc('stock').set(JSON.parse(JSON.stringify(stockDatos))); } catch(e){ alert('No se pudo guardar: ' + e.message); return; } renderRemitos(); }
 function rmForm(pre){
   pre = pre || {}; const inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
   const skus = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => skus.push(v.sku))));
-  pvModal('🚚 Nota de entrega', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+  pvModal('🚚 Remito', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     <label style="grid-column:1/-1;">Cliente<input id="rm-c" value="${escapeAttr(pre.cliente || '')}" list="rm-cl" style="${inp}"></label><datalist id="rm-cl">${(listaClientes || []).map(c => c.razonSocial || `${c.apellido || ''} ${c.nombre || ''}`.trim()).filter(Boolean).map(n => `<option value="${escapeAttr(n)}">`).join('')}</datalist>
     <label>Fecha<input type="date" id="rm-f" value="${ccHoy()}" style="${inp}"></label><label>Bultos<input id="rm-b" inputmode="numeric" value="${pre.bultos || 1}" style="${inp}"></label>
     <label style="grid-column:1/-1;">Transporte<input id="rm-t" value="${escapeAttr(pre.transporte || '')}" style="${inp}"></label>
@@ -12388,7 +12388,7 @@ async function rmGuardar(pedido){
     if(stockDatos === null) await cargarStock();
     if(stockDatos.bajaCon === 'remito'){ const movs = items.filter(x => x.sku && skuControlado(x.sku)).map(x => ({ sku: x.sku, cantidad: -(x.cant * divisorVenta(x.sku)) })); await moverStockVarios(movs, 'remito', 'R ' + numero); r.stockAplicado = movs.length > 0; }
     const res = await db.collection('remitos').add(r); remitos.push({ _id: res.id, ...r });
-    await ccLog('Nota de entrega', `NE ${numero} · ${r.cliente}`);
+    await ccLog('Remito', `R ${numero} · ${r.cliente}`);
     if(pedido && confirm('¿Marcar el pedido ' + pedido + ' como entregado?')){ try{ await db.collection('pedidos').doc(pedido).update({ estado: 'entregado' }); } catch(e){} }
     cerrarPublicar(); if(document.getElementById('step-remitos').classList.contains('active')) renderRemitos(); rmImprimir(res.id);
   } catch(e){ alert('No se pudo guardar: ' + e.message); }
@@ -12397,19 +12397,19 @@ async function remitoDesdePedido(numero){
   const p = (historialPedidos || []).find(x => x.numero === numero); if(!p){ alert('No encontré el pedido.'); return; }
   if(!remitos.length){ try{ const s = await db.collection('remitos').get(); remitos = s.docs.map(d => ({ _id: d.id, ...d.data() })); } catch(e){} }
   const c = p.cliente || {}; const ya = remitos.filter(r => r.pedido === numero && !r.anulado).length;
-  if(ya && !confirm(`Este pedido ya tiene ${ya} nota(s) de entrega. ¿Hacer otra (por ejemplo, una entrega parcial)?`)) return;
+  if(ya && !confirm(`Este pedido ya tiene ${ya} remito(s). ¿Hacer otro (por ejemplo, una entrega parcial)?`)) return;
   rmForm({ cliente: c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim(), transporte: c.transporte || '', direccion: [c.direccion, c.localidad, c.provincia].filter(Boolean).join(', '), bultos: p.bultos || 1, obs: p.observaciones || '', pedido: numero,
     items: (p.items || []).map(i => ({ sku: i.sku, desc: (i.nombreProducto || '') + ' ' + (i.desc || ''), cant: i.cantidad, precio: (parsePrice(i.precio) || 0) * (1 - (i.descuentoItemPct || 0) / 100) * (1 - (p.descuentoPct || 0) / 100) })) });
 }
 function rmImprimir(id){
   const r = remitos.find(x => x._id === id); if(!r) return; const w = window.open('', '_blank'); if(!w){ alert('Permita ventanas emergentes para imprimir.'); return; }
-  w.document.write(`<html><head><title>Nota de entrega NE ${String(r.numero).padStart(6, '0')}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#222}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}td,th{padding:6px;border-bottom:1px solid #ddd;text-align:left}.r{text-align:right}h1{font-size:20px;margin:0}.firma{margin-top:70px;display:flex;gap:30px}.firma div{flex:1;border-top:1px solid #444;padding-top:6px;font-size:12px;text-align:center}.x{font-size:11px;color:#666}</style></head><body>
-    <h1>OnLineTextil · Nota de entrega N.º NE ${String(r.numero).padStart(6, '0')}</h1><p class="x">Comprobante interno de entrega · no válido como factura ni como remito</p>
+  w.document.write(`<html><head><title>Remito R ${String(r.numero).padStart(6, '0')}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#222}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}td,th{padding:6px;border-bottom:1px solid #ddd;text-align:left}.r{text-align:right}h1{font-size:20px;margin:0}.firma{margin-top:70px;display:flex;gap:30px}.firma div{flex:1;border-top:1px solid #444;padding-top:6px;font-size:12px;text-align:center}.x{font-size:11px;color:#666}</style></head><body>
+    <h1>OnLineTextil · Remito N.º R ${String(r.numero).padStart(6, '0')}</h1><p class="x">Remito interno · documento no válido como factura</p>
     <p>Fecha: ${String(r.fecha).split('-').reverse().join('/')}<br>Cliente: <b>${escaparHtml(r.cliente)}</b>${r.direccion ? '<br>Entrega: ' + escaparHtml(r.direccion) : ''}${r.transporte ? '<br>Transporte: ' + escaparHtml(r.transporte) : ''}<br>Bultos: ${r.bultos || 1}${r.pedido ? '<br>Pedido: ' + escaparHtml(r.pedido) : ''}</p>
     <table><tr><th>SKU</th><th>Descripción</th><th class="r">Cantidad</th></tr>${(r.items || []).map(x => `<tr><td>${escaparHtml(x.sku || '')}</td><td>${escaparHtml(x.desc || '')}</td><td class="r">${x.cant}</td></tr>`).join('')}</table>
     ${r.obs ? `<p>${escaparHtml(r.obs)}</p>` : ''}<div class="firma"><div>Recibí conforme · Firma</div><div>Aclaración</div><div>DNI · Fecha</div></div><script>setTimeout(()=>print(),400)<\/script></body></html>`); w.document.close();
 }
-async function rmAnular(id){ const r = remitos.find(x => x._id === id); if(!r || !confirm(`¿Anular la nota de entrega NE ${r.numero}?${r.stockAplicado ? ' La mercadería vuelve al stock.' : ''}`)) return; if(await mesBloqueado(r.fecha)) return;
+async function rmAnular(id){ const r = remitos.find(x => x._id === id); if(!r || !confirm(`¿Anular el remito R ${r.numero}?${r.stockAplicado ? ' La mercadería vuelve al stock.' : ''}`)) return; if(await mesBloqueado(r.fecha)) return;
   try{ if(r.stockAplicado) await moverStockVarios(r.items.filter(x => x.sku && skuControlado(x.sku)).map(x => ({ sku: x.sku, cantidad: x.cant * divisorVenta(x.sku) })), 'remito anulado', 'R ' + r.numero);
     await db.collection('remitos').doc(id).set({ anulado: true }, { merge: true }); r.anulado = true; } catch(e){ alert('No se pudo anular: ' + e.message); return; }
   await ccLog('Remito anulado', 'R ' + r.numero); renderRemitos(); }
@@ -12419,7 +12419,7 @@ async function rmFacturar(id){
   await abrirFacturas(); fvManual('f');
   setTimeout(() => { document.getElementById('fv-c').value = r.cliente; document.getElementById('fv-rows').innerHTML = '';
     r.items.forEach(x => { const pl = x.precio != null ? x.precio : (() => { const q = buscarProductoPorSku(x.sku); return q ? parsePrice(q.variante.precio) || 0 : 0; })(); fvFila({ sku: x.sku, cant: x.cant, imp: pl * x.cant, unit: pl }); });
-    const t = document.getElementById('pub-titulo'); if(t) t.textContent = '➕ Factura de venta · nota de entrega NE ' + r.numero; }, 80);
+    const t = document.getElementById('pub-titulo'); if(t) t.textContent = '➕ Factura de venta · remito R ' + r.numero; }, 80);
 }
 // ===== Comprobante de venta cargado a mano (factura, NC o ND): pasa por los mismos controles que los subidos =====
 function fvManual(tipo){
@@ -15133,7 +15133,7 @@ function renderHistorial(filtro){
           <table>${itemsRows}</table>
           ${p.descuentoPct > 0 ? `<p style="text-align:right;margin:6px 0 0;">Subtotal: ${formatPrice(p.subtotal)} — Descuento ${p.descuentoPct}%</p>` : ''}
           <div class="hist-acciones">
-            <button class="btn-mini" onclick="event.stopPropagation(); remitoDesdePedido('${p.numero}')">🚚 Nota de entrega</button>
+            <button class="btn-mini" onclick="event.stopPropagation(); remitoDesdePedido('${p.numero}')">🚚 Remito</button>
             <button class="btn-mini" onclick="event.stopPropagation(); reenviarEmailHistorial('${p.numero}')">📧 Reenviar email</button>
             <button class="btn-mini" onclick="event.stopPropagation(); compartirHistorial('${p.numero}')">📤 Compartir</button>
             <button class="btn-mini" onclick="event.stopPropagation(); imprimirHistorial('${p.numero}')">🖨️ Imprimir</button>
@@ -21027,7 +21027,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v322';
+const APP_VERSION = '2026-10-02-v323';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
@@ -21085,7 +21085,7 @@ window.addEventListener('load', () => {
     ['abrirFacturas', 'Cargando facturas…'], ['leerFacturasPDF', 'Leyendo facturas…'], ['guardarFactura', 'Guardando la factura…'], ['borrarFacturasSel', 'Borrando facturas…'],
     ['importarLinksWeb', 'Leyendo el archivo de Tienda Nube…'], ['analizarPedidoIA', 'La IA está armando el pedido…'],
     ['generarFlyersNuevoIngreso', 'Generando las piezas…'], ['abrirResultadosML', 'Preparando Resultados ML…'], ['descargarCopia', 'Preparando la copia…'],
-    ['abrirFaltantes', 'Cargando faltantes…'], ['abrirRemitos', 'Cargando notas de entrega…'], ['tsVerExtractos', 'Cargando movimientos del banco…'], ['abrirIVA', 'Calculando el IVA…'], ['abrirTesoreria', 'Cargando saldos…'], ['abrirCompras', 'Cargando proveedores…'], ['pvGuardarPago', 'Guardando la orden de pago…'], ['pvGuardarCompra', 'Guardando…'], ['abrirCtaCte', 'Cargando cuentas corrientes…'], ['ccGuardarCobro', 'Guardando…'], ['abrirRankings', 'Armando los rankings…'], ['abrirResultadoNegocio', 'Calculando el resultado…'], ['guardarTodoCP', 'Guardando…'],  ['abrirRevisarHistorial', 'Revisando el historial…'], ['corregirHistorialSel', 'Corrigiendo…'], ['abrirRevisarCostos', 'Cargando…'], ['ccAplicar', 'Actualizando precios…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
+    ['abrirFaltantes', 'Cargando faltantes…'], ['abrirRemitos', 'Cargando remitos…'], ['tsVerExtractos', 'Cargando movimientos del banco…'], ['abrirIVA', 'Calculando el IVA…'], ['abrirTesoreria', 'Cargando saldos…'], ['abrirCompras', 'Cargando proveedores…'], ['pvGuardarPago', 'Guardando la orden de pago…'], ['pvGuardarCompra', 'Guardando…'], ['abrirCtaCte', 'Cargando cuentas corrientes…'], ['ccGuardarCobro', 'Guardando…'], ['abrirRankings', 'Armando los rankings…'], ['abrirResultadoNegocio', 'Calculando el resultado…'], ['guardarTodoCP', 'Guardando…'],  ['abrirRevisarHistorial', 'Revisando el historial…'], ['corregirHistorialSel', 'Corrigiendo…'], ['abrirRevisarCostos', 'Cargando…'], ['ccAplicar', 'Actualizando precios…'], ['guardarFotosSkuModal', 'Guardando fotos…'], ['guardarSkuCompleto', 'Guardando…'], ['abrirPresupuestos', 'Cargando presupuestos…'], ['guardarPresupuesto', 'Guardando el presupuesto…'], ['enviarPresupuesto', 'Preparando el PDF…'], ['crearListaFaltantes', 'Armando el listado…'], ['faltanteRepuesto', 'Guardando…']
   ];
   setTimeout(() => W.forEach(([n, t]) => conProcesando(n, t)), 0);
 });
