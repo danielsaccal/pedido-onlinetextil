@@ -1657,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v327</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v328</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -5969,10 +5969,11 @@ const GRUPOS_INICIO = {
     [['📚 Catálogo', "irACatalogoDesdeInicio()"]],
     [['📷 Escanear etiqueta (SKU)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto').click()"], ['🤖 Buscar por foto (IA)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto-producto').click()"], ['📄 Pedido desde una foto', "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)"]]
   ] },
-  c: { lado: 'int', titulo: '📣 Difusión y creatividad', titulosColumnas: ['1 · Catálogo a clientes', '2 · Videos', '3 · Redes y anuncios'], columnas: [
+  c: { lado: 'int', titulo: '📣 Difusión y creatividad', titulosColumnas: ['1 · Catálogo a clientes', '2 · Videos', '3 · Redes y anuncios', '4 · Fotos de producto'], columnas: [
     [['🔗 Compartir por rubro', 'abrirCompartirRubro()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()']],
     [['🎬 Crear video promocional', 'abrirCrearVideo()'], ['🎞️ Compartir video de producto', 'abrirCompartirVideoProducto()']],
     [['🖼️ Nuevo ingreso (flyers)', 'abrirNuevoIngreso()'], ['📣 Anuncios y promociones', 'abrirAnuncio()'], ['🎨 Director de arte (IA)', 'abrirDirectorArte()']],
+    [['📸 Prompt para Gemini (un SKU)', 'abrirPromptGemini()'], ['📸 Prompts para Gemini en lote', 'abrirPromptGeminiLote()']],
   ] },
   ped: { lado: 'int', titulo: '🛒 Pedidos', titulosColumnas: ['Tomar pedido', 'Seguimiento'], columnas: [
     [['📚 Tomar pedido (catálogo)', "irACatalogoDesdeInicio()"], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()'], ['📄 Pedido desde una foto', "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)"]],
@@ -7803,7 +7804,7 @@ function renderListaPrecios(){
   L.sort((a, b) => (a.S === q.toUpperCase() ? -1 : 0) - (b.S === q.toUpperCase() ? -1 : 0));
   box.innerHTML = L.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:6px;">SKU</td><td style="padding:6px;">Se vende por</td><td style="padding:6px;text-align:right;">Precio de lista</td>${esDueno() ? '<td style="padding:6px;text-align:right;">Costo</td><td style="padding:6px;text-align:right;">% s/costo</td>' : ''}</tr>
     ${L.slice(0, 40).map(({ S, p, v }) => { const pr = parsePrice(v.precio); let cu = null; try{ cu = costoUnidadSku(S); } catch(e){} const c = cu > 0 ? cu * divisorVenta(S) : null, m = c > 0 && pr > 0 ? (pr - c) / c : null;
-      return `<tr style="border-top:1px solid var(--line);"><td style="padding:7px 6px;"><b>${escaparHtml(S)}</b><div class="note" style="text-align:left;margin:0;">${escaparHtml(p.nombre)} · ${escaparHtml(v.desc || '')}</div></td><td style="padding:7px 6px;">${escaparHtml(unidadVentaSku(S) || 'unidad')}</td><td style="padding:7px 6px;text-align:right;font-weight:800;">${pr ? formatPrice(pr) : '—'}</td>${esDueno() ? `<td style="padding:7px 6px;text-align:right;">${c != null ? formatPrice(c) : '—'}</td><td style="padding:7px 6px;text-align:right;font-weight:700;color:${colorPct(m)};">${m != null ? Math.round(m * 100) + ' %' : '—'}</td>` : ''}</tr>`; }).join('')}</table></div>${L.length > 40 ? `<p class="note">Y ${L.length - 40} más: escriba más para achicar la búsqueda.</p>` : ''}` : '<p class="empty-msg">No encontré ese SKU o producto.</p>';
+      return `<tr style="border-top:1px solid var(--line);"><td style="padding:7px 6px;"><b>${escaparHtml(S)}</b><div class="note" style="text-align:left;margin:0;">${escaparHtml(p.nombre)} · ${escaparHtml(v.desc || '')}</div></td><td style="padding:7px 6px;">${escaparHtml(unidadVentaSku(S) || 'unidad')}</td><td style="padding:7px 6px;text-align:right;font-weight:800;">${pr ? formatPrice(pr) : '—'} <a href="#" title="Prompt para Gemini" onclick="event.preventDefault();abrirPromptGemini('${escapeAttr(S)}')">📸</a></td>${esDueno() ? `<td style="padding:7px 6px;text-align:right;">${c != null ? formatPrice(c) : '—'}</td><td style="padding:7px 6px;text-align:right;font-weight:700;color:${colorPct(m)};">${m != null ? Math.round(m * 100) + ' %' : '—'}</td>` : ''}</tr>`; }).join('')}</table></div>${L.length > 40 ? `<p class="note">Y ${L.length - 40} más: escriba más para achicar la búsqueda.</p>` : ''}` : '<p class="empty-msg">No encontré ese SKU o producto.</p>';
 }
 // ===== Cierre de mes: un mes cerrado no admite cambios en comprobantes, cobros, pagos, gastos ni caja (solo el duenio lo reabre) =====
 let cierres = null;
@@ -12488,6 +12489,68 @@ async function rmFacturar(id){
   setTimeout(() => { document.getElementById('fv-c').value = r.cliente; document.getElementById('fv-rows').innerHTML = '';
     r.items.forEach(x => { const pl = x.precio != null ? x.precio : (() => { const q = buscarProductoPorSku(x.sku); return q ? parsePrice(q.variante.precio) || 0 : 0; })(); fvFila({ sku: x.sku, cant: x.cant, imp: pl * x.cant, unit: pl }); });
     const t = document.getElementById('pub-titulo'); if(t) t.textContent = '➕ Factura de venta · remito R ' + r.numero; }, 80);
+}
+// ===== Prompt para Gemini con plantilla fija (sin IA, sin creditos): 3 imagenes por SKU =====
+function tipoProductoPG(S){
+  const r = buscarProductoPorSku(S); if(!r) return null; const cat = normBusqueda((CATALOGO[r.ci] || {}).categoria || ''), n = normBusqueda(r.producto.nombre + ' ' + cat);
+  const t = /mantel|manteleria|camino de mesa/.test(n) ? 'mantel' : /cubrecama|acolchado|frazada|edredon|quilt|cobertor|plaid/.test(n) ? 'cubrecama' : /sabana|juego/.test(n) ? 'sabanas' : /toalla|toallon|bano|alfombra de bano/.test(n) ? 'toalla' : /repasador|secaplatos|pano de cocina/.test(n) ? 'repasador' : /bata/.test(n) ? 'bata' : /almohad/.test(n) ? 'almohada' : /cortina/.test(n) ? 'cortina' : 'otro';
+  return { r, t, blanco: /blanc/.test(n) };
+}
+function promptGemini(S, canal){
+  const x = tipoProductoPG(S); if(!x) return '';
+  const { r, t, blanco } = x, nombre = r.producto.nombre, medida = r.variante.desc || '', comp = r.producto.composicion || '';
+  const tn = canal === 'tn', px = tn ? '1024x1024' : '1200x1200', fondo = tn ? 'pure white #FFFFFF (or light cream #F5F3EF)' : 'pure white seamless background #FFFFFF';
+  const prod = { mantel: 'tablecloth', cubrecama: 'bedspread', sabanas: 'sheet set', toalla: 'towel', repasador: 'kitchen towel', bata: 'bathrobe', almohada: 'pillow', cortina: 'curtain', otro: 'textile product' }[t];
+  const escena = {
+    mantel: `In this image the tablecloth must be FULLY UNFOLDED AND SPREAD OPEN, never folded. The same tablecloth (${medida}) fully spread over a rectangular dining table of the right size, covering the entire tabletop and hanging about 25 cm on every side, with soft natural folds at the corners. View from above at about 45°, nothing on the table covering the print.`,
+    sabanas: `The same sheet set (${medida}) on a bed of that size: fitted sheet on the mattress, flat sheet folded back about 30 cm at the head, pillow(s) in the matching pillowcase(s). Neat hotel-style making, smooth with soft natural folds. View from the foot of the bed at about 30°.`,
+    cubrecama: `In this image the bedspread must be FULLY UNFOLDED, laid over a bed of the right size (${medida}), covering the bed and hanging naturally on the sides, with matching pillow shams if the set includes them. View from the foot of the bed at about 30°.`,
+    toalla: `The same towel (${medida}) hanging OPEN on a simple towel bar in a clean bathroom, showing its full size, with natural soft folds.`,
+    repasador: `The same kitchen towel (${medida}) hanging OPEN from an oven handle or a hook in a clean kitchen, showing its full size.`,
+    bata: `The same bathrobe hanging open on a simple hanger or hook in a clean bathroom, showing its full shape, sleeves and length.`,
+    almohada: `The same pillow on a neatly made bed, showing its real size and shape.`,
+    cortina: `The same curtain hanging OPEN and straight from a rod in a bright room, showing its full width and length.`,
+    otro: `The same product in use in a simple, realistic setting that shows its real size.`
+  }[t];
+  const color = blanco ? ` The product is WHITE: keep it a natural, clean white; never make it grey, blue, yellow or cream.` : '';
+  const forma = t === 'sabanas' ? ' The set is folded as a compact package, with the pillowcase(s) lying flat on top.' : '';
+  return `Using the attached photo of the real product, generate these 3 images, one after another, in this order. The print, colors, motif size, fabric and finishing must stay EXACTLY as in the photo in all 3 images.${color} Product: ${nombre} — ${medida}${comp ? ' — ' + comp : ''}.
+
+IMAGE 1 – MAIN: Edit this photo. Do NOT redraw, regenerate or reinterpret the product. Keep the ${prod} exactly as it is: same print, same motifs or stripes with the same widths, size and position, same shape and folds; hems and stitching ONLY where they are visible in the photo.${forma} Remove any shadows or darker areas caused by the room light (they are not part of the fabric) so the whole product has even, uniform brightness, keeping its real colors exactly, without saturating or shifting them. Straighten the outline and smooth small wrinkles without changing the print. ${fondo}, soft contact shadow under the product, centered, filling 85-95% of the frame. Square 1:1, ${px}.
+
+IMAGE 2 – IN USE: Use the photo only as an exact texture reference for the print, color and fabric. ${escena} Copy the print exactly at the same scale as in the photo: motifs keep their real size, never shrink or enlarge them. Do not invent seams, center lines, borders, trims, embroidery or piping that are not in the photo. Simple bright room, neutral colors, soft daylight, no brand names. Square 1:1, ${px}.
+
+IMAGE 3 – DETAIL: Edit this photo. Do NOT redraw the print. Crop a close-up from the CENTER of the fabric only: completely inside the fabric surface, with NO edges, NO hems, NO corners and NO stitching visible. Show the print and the fabric weave sharply, with even neutral white light. Same colors. Square 1:1, ${px}.
+
+For all images: no text, no logos, no watermark, no props over the product.`;
+}
+function copiarTexto(t, btn){ navigator.clipboard.writeText(t).then(() => { if(btn){ const o = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(() => btn.textContent = o, 1500); } }).catch(() => prompt('Copie el texto:', t)); }
+function abrirPromptGemini(S){
+  pvModal('📸 Prompt para Gemini', `<input id="pg-s" data-ac="sku" value="${escapeAttr(S || '')}" placeholder="SKU o nombre del producto" autocomplete="off" oninput="pgPintar()" onchange="pgPintar()" style="padding:9px;border:1px solid var(--line);border-radius:10px;width:100%;box-sizing:border-box;">
+    <div style="display:flex;gap:6px;margin:8px 0;"><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pg-c" value="ml" checked onchange="pgPintar()"> Mercado Libre</label><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pg-c" value="tn" onchange="pgPintar()"> Tienda Nube</label></div>
+    <div id="pg-res"></div>`);
+  pgPintar();
+}
+function pgPintar(){ const S = (document.getElementById('pg-s').value || '').trim().toUpperCase().split(/\s/)[0], c = (document.querySelector('input[name=pg-c]:checked') || {}).value || 'ml', box = document.getElementById('pg-res'); if(!S){ box.innerHTML = ''; return; }
+  const t = promptGemini(S, c); window.__pgTxt = t;
+  box.innerHTML = t ? `<p class="note" style="text-align:left;margin:0 0 6px;">En Gemini: chat nuevo → suba UNA foto real del producto → pegue el texto.</p><textarea readonly style="width:100%;height:240px;box-sizing:border-box;font-size:.78rem;border:1px solid var(--line);border-radius:10px;padding:8px;">${escaparHtml(t)}</textarea><button type="button" class="btn btn-gold" style="width:100%;margin-top:6px;" onclick="copiarTexto(window.__pgTxt, this)">📋 Copiar prompt</button>` : '<p class="note">Ese SKU no está en el catálogo.</p>'; }
+// lote: todos los SKU de un producto, de una categoria o de una busqueda
+function abrirPromptGeminiLote(){
+  const cats = [...new Set(CATALOGO.map(c => c.categoria).filter(Boolean))];
+  pvModal('📸 Prompts para Gemini en lote', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><label>Categoría<select id="pl-cat" onchange="plPintar()" style="padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;"><option value="">Todas</option>${cats.map(c => `<option>${escaparHtml(c)}</option>`).join('')}</select></label><label>Buscar<input id="pl-q" oninput="clearTimeout(window.__plT);window.__plT=setTimeout(plPintar,250)" placeholder="ej.: mantel, century" style="padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;"></label></div>
+    <div style="display:flex;gap:6px;margin:8px 0;"><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pl-c" value="ml" checked onchange="plPintar()"> Mercado Libre</label><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pl-c" value="tn" onchange="plPintar()"> Tienda Nube</label><label class="btn-mini" style="cursor:pointer;margin-left:auto;"><input type="checkbox" id="pl-uno" checked onchange="plPintar()"> uno por producto (no por medida)</label></div>
+    <div id="pl-res"></div>`);
+  plPintar();
+}
+function plPintar(){
+  const cat = document.getElementById('pl-cat').value, q = document.getElementById('pl-q').value.trim(), c = (document.querySelector('input[name=pl-c]:checked') || {}).value || 'ml', uno = document.getElementById('pl-uno').checked, box = document.getElementById('pl-res');
+  const L = []; CATALOGO.forEach(ca => { if(cat && ca.categoria !== cat) return; (ca.productos || []).forEach(p => { const vs = (p.variantes || []).filter(v => !q || coincideBusqueda(v.sku + ' ' + p.nombre + ' ' + (v.desc || ''), q)); (uno ? vs.slice(0, 1) : vs).forEach(v => L.push({ S: String(v.sku).toUpperCase(), n: p.nombre, d: v.desc || '' })); }); });
+  if(!L.length){ box.innerHTML = '<p class="note">No hay productos con ese filtro.</p>'; return; }
+  window.__plTxt = L.map((x, i) => `===== ${i + 1}. ${x.S} · ${x.n} · ${x.d} =====\n\n` + promptGemini(x.S, c)).join('\n\n\n');
+  window.__plItems = L;
+  box.innerHTML = `<p class="note" style="text-align:left;margin:0 0 6px;">${L.length} prompts. En Gemini, un chat por producto: suba su foto y pegue su prompt.</p>
+    <div style="display:flex;gap:6px;margin-bottom:8px;"><button type="button" class="btn btn-gold" style="flex:1;" onclick="copiarTexto(window.__plTxt, this)">📋 Copiar todos</button><button type="button" class="btn-mini" onclick="const b=new Blob([window.__plTxt],{type:'text/plain'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='prompts-gemini.txt';a.click();">⬇️ Descargar .txt</button></div>
+    <div style="max-height:45vh;overflow:auto;">${L.map((x, i) => `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line);font-size:.86rem;"><span style="flex:1;"><b>${escaparHtml(x.S)}</b> <span class="meta">${escaparHtml(x.n)} · ${escaparHtml(x.d)}</span></span><button type="button" class="btn-mini" onclick="copiarTexto(promptGemini(window.__plItems[${i}].S, '${c}'), this)">📋 Copiar</button></div>`).join('')}</div>`;
 }
 // ===== Comprobante de venta cargado a mano (factura, NC o ND): pasa por los mismos controles que los subidos =====
 function fvManual(tipo){
@@ -21060,7 +21123,8 @@ async function pintarLinksNI(modo){
   const vistos = new Set(), L = [];
   [...document.querySelectorAll('#ni-sku-campos input')].map(i => i.value.trim().toUpperCase()).filter(Boolean).forEach(S => { const r = buscarProductoPorSku(S); const l = linkWebDeSku(S) || (r ? linkWebDeProducto(r.producto) : null); if(l && !vistos.has(l)){ vistos.add(l); L.push([r ? r.producto.nombre : S, l]); } });
   window.__niLinks = L.map(x => x[1]);
-  box.innerHTML = L.map(([n, l], i) => `<div style="display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:12px;background:#fff;font-size:.88rem;"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🔗 ${escaparHtml(n)} · <span class="meta">${escaparHtml(l)}</span></span><button type="button" class="btn-mini" onclick="navigator.clipboard.writeText(window.__niLinks[${i}]).then(()=>{this.textContent='✓ Copiado';setTimeout(()=>this.textContent='Copiar link',1500);}).catch(()=>prompt('Copie el link:', window.__niLinks[${i}]))">Copiar link</button></div>`).join('');
+  const skusNI = [...document.querySelectorAll('#ni-sku-campos input')].map(i => i.value.trim().toUpperCase()).filter(Boolean);
+  box.innerHTML = L.map(([n, l], i) => `<div style="display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:12px;background:#fff;font-size:.88rem;"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🔗 ${escaparHtml(n)} · <span class="meta">${escaparHtml(l)}</span></span><button type="button" class="btn-mini" onclick="navigator.clipboard.writeText(window.__niLinks[${i}]).then(()=>{this.textContent='✓ Copiado';setTimeout(()=>this.textContent='Copiar link',1500);}).catch(()=>prompt('Copie el link:', window.__niLinks[${i}]))">Copiar link</button></div>`).join('') + (skusNI.length ? `<div style="margin:-4px 0 12px;"><button type="button" class="btn-mini" onclick="abrirPromptGemini('${escapeAttr(skusNI[0])}')">📸 Prompt para Gemini (fotos de Mercado Libre)</button></div>` : '');
 }
 
 </script>
@@ -21097,7 +21161,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v327';
+const APP_VERSION = '2026-10-02-v328';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
