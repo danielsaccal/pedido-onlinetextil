@@ -1657,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v331</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v332</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2305,7 +2305,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <div style="margin:10px 0 4px;"><b style="font-size:.88rem;">Razón social de las facturas que va a subir</b><div id="fc-rz-sel"></div></div>
       <label class="btn btn-gold" style="display:block;text-align:center;cursor:pointer;margin:10px 0;">📄 Subir facturas (PDF o Excel de TFactura)<input type="file" id="fc-file" accept="application/pdf,.pdf,.xlsx,.xls,.csv" multiple style="display:none;" onchange="leerFacturasPDF(this)"></label>
       <div id="fc-nuevas"></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 8px;align-items:center;"><b style="flex:1;color:var(--purple);">Facturas guardadas</b><select id="fc-rzf" onchange="renderFacturas()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"><option value="">Todas las razones sociales</option><option value="propia">Propia</option><option value="alberto">Alberto</option><option value="rita">Rita</option></select><select id="fc-mes" onchange="renderFacturas()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"></select></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 8px;align-items:center;"><b style="color:var(--purple);">Facturas guardadas</b><input id="fc-q" placeholder="🔍 Buscar por número, cliente o SKU" oninput="clearTimeout(window.__fcQ);window.__fcQ=setTimeout(renderFacturas,250)" style="flex:1;min-width:200px;padding:8px;border:1px solid var(--line);border-radius:10px;"><select id="fc-rzf" onchange="renderFacturas()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"><option value="">Todas las razones sociales</option><option value="propia">Propia</option><option value="alberto">Alberto</option><option value="rita">Rita</option></select><select id="fc-mes" onchange="renderFacturas()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"></select></div>
       <div id="fc-resumen"></div>
       <button type="button" class="btn-mini" style="margin:6px 0;" onclick="enviarAAuditar(['facturas'], (document.getElementById('fc-mes') || {}).value)">🧾 Enviar a auditar</button>
       <div id="fc-barra" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
@@ -12654,9 +12654,10 @@ async function guardarFactura(i, reemplazar){
   }
   const items = fa.items.map(it => { const c = costoItemFactura(it, fa); return { ...it, sku: skuDeFactura(it.codigo), costo: c, gan: c != null ? it.neto * signoFact(fa) - c : null }; });
   const doc = { manual: !!fa.manual, cae: fa.cae || '', caeVto: fa.caeVto || '', facturaRef: fa.facturaRef || null, razon: fa.razon || 'propia', confirmados: fa.confirmados || [], esND: !!fa.esND, esNC: !!fa.esNC, devolvieron: fa.devolvieron !== false, numero: fa.numero, tipo: fa.tipo, fecha: fa.fecha, cliente: fa.cliente, total: fa.total, items, neto: items.reduce((a, x) => a + x.neto, 0), costo: items.reduce((a, x) => a + (x.costo || 0), 0), archivo: fa.archivo, guardado: new Date().toISOString() };
-  const idDoc = (String(fa.numero).replace(/\//g, '-') || String(Date.now())) + (fa.esNC ? '-NC' : '');
+  const idDoc = (fa.razon && fa.razon !== 'propia' ? fa.razon + '-' : '') + (String(fa.numero).replace(/\//g, '-') || String(Date.now())) + (fa.esNC ? '-NC' : fa.esND ? '-ND' : '');
   try{ await db.collection('ventas_facturadas').doc(idDoc).set(doc); fa.yaEsta = true; fa.repetidaEnLote = false; (facturas = facturas || []).push({ ...doc, _id: idDoc });
     try{ if(await stockPorFactura(doc, 1, `${doc.tipo || ''} ${doc.numero}`)){ await db.collection('ventas_facturadas').doc(idDoc).set({ stockAplicado: true }, { merge: true }); facturas[facturas.length - 1].stockAplicado = true; } } catch(e){ alert('La factura se guardó, pero no se pudo descontar el stock: ' + e.message); }
+    { const k = facturasNuevas.indexOf(fa); if(k >= 0) facturasNuevas.splice(k, 1); } // ya guardada: sale de la lista de nuevas
     renderFacturasNuevas(); renderFacturas(); }
   catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
@@ -12685,7 +12686,8 @@ async function borrarFactura(id){ { const f0 = (facturas || []).find(f => (f._id
   renderFacturasNuevas(); renderFacturas(); }
 function renderFacturas(){
  const mes = document.getElementById('fc-mes').value, rzf = (document.getElementById('fc-rzf') || {}).value || '';
-  const L = (facturas || []).filter(f => !rzf || (f.razon || 'propia') === rzf).filter(f => !mes || (f.fecha || '').split('/').reverse().slice(0, 2).join('-') === mes).sort((a, b) => String(b.fecha).split('/').reverse().join('').localeCompare(String(a.fecha).split('/').reverse().join('')));
+  const fq = ((document.getElementById('fc-q') || {}).value || '').trim();
+  const L = (facturas || []).filter(f => !rzf || (f.razon || 'propia') === rzf).filter(f => !fq || coincideBusqueda(`${f.tipo || ''} ${f.numero || ''} ${String(f.numero || '').replace(/^0+|-0+/g, ' ')} ${f.cliente || ''} ${(f.items || []).map(it => it.codigo).join(' ')}`, fq)).filter(f => !mes || (f.fecha || '').split('/').reverse().slice(0, 2).join('-') === mes).sort((a, b) => String(b.fecha).split('/').reverse().join('').localeCompare(String(a.fecha).split('/').reverse().join('')));
   let N = 0, C = 0, T = 0, TV = 0, nRevT = 0; L.forEach(f => { const fx = factorIvaFactura(f), sg = signoFact(f); f.items.forEach((it, i) => { const c = costoItemFactura(it, f), v = it.neto * fx * sg; N += it.neto * sg; T += v; if(c != null){ if(renglonRevFactura(f, i, v, c)) nRevT++; C += c; TV += v; } }); });
   const GAN = TV - C;
   document.getElementById('fc-resumen').innerHTML = L.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px;">
@@ -21210,7 +21212,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v331';
+const APP_VERSION = '2026-10-02-v332';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
