@@ -1657,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v339</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v340</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6220,7 +6220,9 @@ async function pintarCategoria(k){
       art: [['SKU en el catálogo', V.nSku.toLocaleString('es-AR'), '', ''], ['Debajo del stock mínimo', V.bajo || 0, '', 'abrirStock()'], ['Con stock negativo', V.neg || 0, '', 'abrirStock()']],
       imp: [['Posición de IVA del mes', 'Ver', '', 'abrirIVA()']] }[k];
     return c ? `<div class="d-num">${c.map(([t, v, e, f]) => `<span ${f ? `onclick="${f}"` : ''}>${t} <b>${v}</b>${e ? ` <span style="color:#A6432F;">(vencido ${e})</span>` : ''}</span>`).join('')}</div>` : ''; };
-  const pintar = V => { if(run !== dashRun) return; box.innerHTML = `<h2 style="font-family:Georgia,serif;color:var(--purple);margin:6px 0 10px;font-weight:600;">${titulo.replace(/^\S+\s/, '')}</h2>${resumen(V)}${opciones}`; };
+  const altas = cols.flatMap(c => c.items).filter(([t]) => /^➕/.test(t)); // las altas ("nuevo") siempre a la vista
+  const accRapidas = altas.length ? `<div class="d-acc">${altas.map(([t, f]) => `<button type="button" onclick="catUsar(${reg([t, f])})">${escaparHtml(t)}</button>`).join('')}</div>` : '';
+  const pintar = V => { if(run !== dashRun) return; box.innerHTML = `<h2 style="font-family:Georgia,serif;color:var(--purple);margin:6px 0 10px;font-weight:600;">${titulo.replace(/^\S+\s/, '')}</h2>${accRapidas}${resumen(V)}${opciones}`; };
   pintar(dashCache); window.scrollTo(0, 0);
   if(['cli', 'prov', 'comp', 'teso', 'est', 'art'].includes(k)){ try{ pintar(await dashDatos()); } catch(e){ console.error(e); } }
 }
@@ -8142,7 +8144,7 @@ function renderCompras(){
   if(pvTab === 'talleres'){ return pvRenderTalleres(); }
   if(pvSel){ return pvRenderProveedor(R[pvSel]); }
   let F = L.sort((a, b) => b.saldo - a.saldo || String(a.p.nombre).localeCompare(String(b.p.nombre))); if(pvBuscar) F = F.filter(r => coincideBusqueda(r.p.nombre + ' ' + (r.p.rubro || '') + ' ' + (r.p.cuit || ''), pvBuscar));
-  box.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"><input placeholder="🔍 Buscar proveedor" value="${escapeAttr(pvBuscar)}" oninput="pvBuscar=this.value;clearTimeout(window.__pvT);window.__pvT=setTimeout(renderCompras,250)" style="flex:1;min-width:180px;padding:9px;border:1px solid var(--line);border-radius:10px;"><button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="pvFormProveedor()">➕ Proveedor</button></div>
+  box.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"><input placeholder="🔍 Buscar proveedor" value="${escapeAttr(pvBuscar)}" oninput="pvBuscar=this.value;clearTimeout(window.__pvT);window.__pvT=setTimeout(renderCompras,250)" style="flex:1;min-width:180px;padding:9px;border:1px solid var(--line);border-radius:10px;"><button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="pvFormProveedor()">➕ Proveedor nuevo</button></div>
     ${F.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:6px;">Proveedor</td><td style="padding:6px;">Rubro</td><td style="padding:6px;text-align:right;">Saldo</td><td style="padding:6px;text-align:right;">Vencido</td><td style="padding:6px;text-align:right;">Vence en 7 días</td></tr>
       ${F.map(r => `<tr style="border-top:1px solid var(--line);cursor:pointer;" onclick="pvSel='${r.p._id}';renderCompras()"><td style="padding:7px 6px;"><b>${escaparHtml(r.p.nombre)}</b>${pvMon(r.p) === 'USD' ? ' <span class="meta">USD</span>' : ''}</td><td style="padding:7px 6px;" class="meta">${escaparHtml(r.p.rubro || '')}${r.p.condicion === 'contado' ? ' · contado' : ''}</td><td style="padding:7px 6px;text-align:right;font-weight:800;">${fmtMon(r.saldo, pvMon(r.p))}${Object.entries(r.rz).filter(([, z]) => Math.abs(z.saldo) > 0.5).length > 1 ? `<div style="font-weight:400;font-size:.75rem;">${Object.entries(r.rz).filter(([, z]) => Math.abs(z.saldo) > 0.5).map(([k, z]) => `${chipRZ(k)} ${fmtMon(z.saldo, pvMon(r.p))}`).join(' ')}</div>` : ''}</td><td style="padding:7px 6px;text-align:right;color:${r.vencido > 0 ? '#A6432F' : '#8A8072'};">${r.vencido > 0 ? fmtMon(r.vencido, pvMon(r.p)) : '–'}</td><td style="padding:7px 6px;text-align:right;color:#8A6417;">${r.vence7 > 0 ? fmtMon(r.vence7, pvMon(r.p)) : '–'}</td></tr>`).join('')}</table></div>` : '<p class="empty-msg">Cargue su primer proveedor con ➕ Proveedor.</p>'}`;
 }
@@ -8179,9 +8181,9 @@ function pvEstadoCuenta(pid){
 const pvInp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
 function pvElegirProveedor(para, tipoIni){
   if(!pvProv.length){ alert('Primero cargue un proveedor con ➕ Proveedor.'); pvTab = 'proveedores'; renderCompras(); return; }
-  pvModal(para === 'pago' ? '➕ Nueva orden de pago' : '➕ Comprobante de compra', `<label>Proveedor<input id="ep-q" data-ac="proveedores" placeholder="Escriba parte del nombre…" autocomplete="off" oninput="const p=pvProv.find(x=>ccClave(x.nombre)===ccClave(this.value));document.getElementById('ep-p').value=p?p._id:'';" style="${pvInp}"><input type="hidden" id="ep-p" value=""></label>
+  pvModal(para === 'pago' ? '➕ Nueva orden de pago' : '➕ Comprobante de compra', `<div style="text-align:right;margin-bottom:4px;"><a href="#" onclick="event.preventDefault();cerrarPublicar();setTimeout(()=>pvFormProveedor(),80)">➕ Proveedor nuevo</a></div><label>Proveedor<input id="ep-q" data-ac="proveedores" placeholder="Escriba parte del nombre…" autocomplete="off" oninput="const p=pvProv.find(x=>ccClave(x.nombre)===ccClave(this.value));document.getElementById('ep-p').value=p?p._id:'';" style="${pvInp}"><input type="hidden" id="ep-p" value=""></label>
     ${para === 'compra' ? `<label style="margin-top:6px;display:block;">Tipo<select id="ep-t" style="${pvInp}">${[['f', 'Factura'], ['nc', 'Nota de crédito'], ['nd', 'Nota de débito']].map(([v, t]) => `<option value="${v}" ${tipoIni === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>` : ''}
-    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="const id=document.getElementById('ep-p').value, t=(document.getElementById('ep-t')||{}).value; if(!id){alert('Elija un proveedor de la lista (o créelo con ➕ Proveedor nuevo).');return;} cerrarPublicar(); setTimeout(()=>{ ${para === 'pago' ? 'pvFormPago(id)' : "pvFormCompra(id, t==='nc' ? true : t==='nd' ? 'nd' : false)"} },50);">Seguir</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="const id=document.getElementById('ep-p').value, t=(document.getElementById('ep-t')||{}).value; if(!id){if(confirm('Ese proveedor no existe. ¿Crearlo ahora?')){cerrarPublicar();setTimeout(()=>{pvFormProveedor();setTimeout(()=>{document.getElementById('pf-n').value=document.getElementById('ep-q')?document.getElementById('ep-q').value:'';},50);},80);}return;} cerrarPublicar(); setTimeout(()=>{ ${para === 'pago' ? 'pvFormPago(id)' : "pvFormCompra(id, t==='nc' ? true : t==='nd' ? 'nd' : false)"} },50);">Seguir</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
 }
 function pvModal(titulo, html){ const t = document.getElementById('pub-titulo'); if(t) t.textContent = titulo; document.getElementById('pub-cont').innerHTML = html; document.getElementById('pub-modal').style.display = 'block'; }
 function pvFormProveedor(id){
@@ -8423,7 +8425,7 @@ function renderCtaCte(){
         <td style="padding:5px;"><select onchange="ccEstadoCheque('${m._id}', this.value)" style="padding:4px;border:1px solid var(--line);border-radius:8px;">${[['cartera', 'En cartera'], ['depositado', 'Depositado'], ['entregado', 'Entregado a proveedor'], ['rechazado', 'Rechazado']].map(([v, t]) => `<option value="${v}" ${(m.cheque.estado || 'cartera') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></td></tr>`).join('')}</table></div>` : '<p class="empty-msg">No hay cheques registrados.</p>'; return; }
   if(ccCli){ return renderCtaCteCliente(C[ccCli] || { k: ccCli, nombre: ccCli, facts: [], movs: [], saldo: 0, buckets: [0, 0, 0, 0], vencido: 0 }); }
   let F = L.sort((a, b) => b.saldo - a.saldo); if(ccBuscar) F = F.filter(c => coincideBusqueda(c.nombre, ccBuscar));
-  box.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"><input placeholder="🔍 Buscar cliente" value="${escapeAttr(ccBuscar)}" oninput="ccBuscar=this.value;clearTimeout(window.__ccT);window.__ccT=setTimeout(renderCtaCte,250)" style="flex:1;min-width:180px;padding:9px;border:1px solid var(--line);border-radius:10px;"><button type="button" class="btn-mini" onclick="ccNuevoCliente()">➕ Saldo inicial de un cliente</button></div>
+  box.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"><input placeholder="🔍 Buscar cliente" value="${escapeAttr(ccBuscar)}" oninput="ccBuscar=this.value;clearTimeout(window.__ccT);window.__ccT=setTimeout(renderCtaCte,250)" style="flex:1;min-width:180px;padding:9px;border:1px solid var(--line);border-radius:10px;"><button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="cliForm()">➕ Cliente nuevo</button><button type="button" class="btn-mini" onclick="ccNuevoCliente()">Saldo inicial de un cliente</button></div>
     ${F.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:6px;">Cliente</td><td style="padding:6px;text-align:right;">Saldo</td><td style="padding:6px;text-align:right;">Vencido</td><td style="padding:6px;text-align:right;">0-30</td><td style="padding:6px;text-align:right;">31-60</td><td style="padding:6px;text-align:right;">61-90</td><td style="padding:6px;text-align:right;">+90</td></tr>
       ${F.map(c => `<tr style="border-top:1px solid var(--line);cursor:pointer;" onclick="ccCli='${escapeAttr(c.k)}';renderCtaCte()"><td style="padding:7px 6px;"><b>${escaparHtml(c.nombre)}</b></td><td style="padding:7px 6px;text-align:right;font-weight:800;color:${c.saldo > 0 ? 'inherit' : '#2F7A47'};">${formatPrice(c.saldo)}</td><td style="padding:7px 6px;text-align:right;color:${c.vencido > 0 ? '#A6432F' : '#8A8072'};">${c.vencido > 0 ? formatPrice(c.vencido) : '–'}</td>${c.buckets.map(x => `<td style="padding:7px 6px;text-align:right;color:#6B6258;">${x > 0.5 ? fP0(x) : '–'}</td>`).join('')}</tr>`).join('')}</table></div>` : '<p class="empty-msg">No hay saldos pendientes.</p>'}`;
 }
@@ -8463,7 +8465,7 @@ function verAdjuntoMov(id, i){ const m = (ccMovs || []).find(x => x._id === id);
 // recibo nuevo: elegir el cliente (de la cuenta corriente, de la base de clientes o uno nuevo)
 function ccElegirCliente(){
   const C = ccCalcular(), nombres = new Set(Object.values(C).map(c => c.nombre)); ccClientesDB.forEach(x => { const n = x.razonSocial || `${x.apellido || ''} ${x.nombre || ''}`.trim(); if(n) nombres.add(n); });
-  pvModal('➕ Recibo nuevo', `<label>Cliente<input id="rc-c" list="rc-cl" placeholder="Escriba para buscar…" style="padding:9px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;"></label><datalist id="rc-cl">${[...nombres].sort().map(n => `<option value="${escapeAttr(n)}">`).join('')}</datalist>
+  pvModal('➕ Recibo nuevo', `<div style="text-align:right;margin-bottom:4px;"><a href="#" onclick="event.preventDefault();cerrarPublicar();setTimeout(()=>cliForm(),80)">➕ Cliente nuevo</a></div><label>Cliente<input id="rc-c" list="rc-cl" placeholder="Escriba para buscar…" style="padding:9px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;"></label><datalist id="rc-cl">${[...nombres].sort().map(n => `<option value="${escapeAttr(n)}">`).join('')}</datalist>
     <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="const n=document.getElementById('rc-c').value.trim();if(!n){alert('Elija el cliente.');return;}cerrarPublicar();setTimeout(()=>ccFormCobro(ccClave(n)),50);">Seguir</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
   setTimeout(() => { const e = document.getElementById('rc-c'); if(e) e.focus(); }, 50);
 }
@@ -15642,7 +15644,8 @@ async function cliGuardar(idViejo){
   try{ await db.collection('clientes').doc(id).set({ ...d, ultimaFecha: c0.ultimaFecha || new Date().toISOString(), cantidadPedidos: c0.cantidadPedidos || 0 }, { merge: true }); }
   catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   try{ await ccLog(idViejo ? 'Cliente editado' : 'Cliente nuevo', d.razonSocial || `${d.nombre} ${d.apellido}`); } catch(e){}
-  cerrarPublicar(); cargarClientes();
+  cerrarPublicar(); try{ cargarClientes(); } catch(e){} try{ ccClientesDB = (await db.collection('clientes').get()).docs.map(d => d.data()); } catch(e){}
+  if(document.getElementById('step-ctacte').classList.contains('active')) renderCtaCte();
 }
 async function guardarEdicionCliente(idViejo){
   const c = (listaClientes || []).find(x => x.id === idViejo);
@@ -21294,7 +21297,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v339';
+const APP_VERSION = '2026-10-02-v340';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
