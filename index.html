@@ -1657,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v340</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v341</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2354,7 +2354,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <h2 id="pe-titulo">Nuevo presupuesto</h2>
       <p class="note" style="text-align:left;">Ningún dato es obligatorio. Precios con IVA incluido.</p>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;">
-        <div class="field" style="margin:0;"><label>Razón social / Nombre</label><input id="pe-nombre" list="pe-clientes" oninput="completarClientePresu()"></div>
+        <div class="field" style="margin:0;"><label>Razón social / Nombre</label><input id="pe-nombre" list="pe-clientes" oninput="completarClientePresu()" onchange="sucursalesDe(this.value, 'pe-suc', { dir: 'pe-dir', loc: 'pe-loc', tel: 'pe-tel' })"><div id="pe-suc"></div></div>
         <div class="field" style="margin:0;"><label>CUIT</label><input id="pe-cuit"></div>
         <div class="field" style="margin:0;"><label>Teléfono</label><input id="pe-tel" inputmode="tel"></div>
         <div class="field" style="margin:0;"><label>Email</label><input id="pe-email" inputmode="email"></div>
@@ -8371,16 +8371,20 @@ async function abrirCtaCte(tab){ if(typeof tab === 'string'){ ccTab = tab; ccCli
   renderCtaCte();
 }
 // saldo y estado de cada factura, aplicando los cobros (primero a lo que se indico, el resto a las facturas mas viejas)
+// nombre de factura -> cliente principal (las sucursales "como figura en las facturas" van a su cliente)
+function ccAlias(){ const A = {}; ccClientesDB.forEach(x => { const main = ccClave(x.razonSocial || `${x.apellido || ''} ${x.nombre || ''}`.trim()); if(!main) return;
+  [x.razonSocial, `${x.apellido || ''} ${x.nombre || ''}`, `${x.nombre || ''} ${x.apellido || ''}`].forEach(n => { const k = ccClave(n || ''); if(k) A[k] = { main, suc: '' }; });
+  (x.sucursales || []).forEach(s => [s.comoFactura, s.nombre ? (x.razonSocial || '') + ' ' + s.nombre : ''].forEach(n => { const k = ccClave(n || ''); if(k) A[k] = { main, suc: s.nombre || s.comoFactura }; })); }); return A; }
 function ccCalcular(){
-  const C = {};
+  const C = {}, AL = ccAlias(), mainDe = n => (AL[ccClave(n)] || {}).main || ccClave(n);
   const cli = k => C[k] = C[k] || { k, nombre: k, facts: [], movs: [], saldo: 0 };
   const contadoCli = new Set(ccClientesDB.filter(x => x.condicion === 'contado').flatMap(x => [ccClave(x.razonSocial || ''), ccClave(`${x.apellido || ''} ${x.nombre || ''}`), ccClave(`${x.nombre || ''} ${x.apellido || ''}`)]).filter(Boolean));
-  ccFacts.forEach(f => { if(/consumidor final/i.test(f.cliente)) return; /* mostrador: siempre contado */ if(contadoCli.has(ccClave(f.cliente))) return; /* cliente de contado: no va a cuenta corriente */ const c = cli(ccClave(f.cliente)); c.nombre = f.cliente; if(ccCfg.contado && ccCfg.contado[f.id]) return; c.facts.push({ ...f, pendiente: f.importe }); });
-  ccMovs.forEach(m => { const c = cli(m.cliente); if(m.nombre) c.nombre = m.nombre; c.movs.push(m); });
+  ccFacts.forEach(f => { if(/consumidor final/i.test(f.cliente)) return; /* mostrador: siempre contado */ if(contadoCli.has(ccClave(f.cliente))) return; /* cliente de contado: no va a cuenta corriente */ const al = AL[ccClave(f.cliente)], c = cli(al ? al.main : ccClave(f.cliente)); if(!c._nom) c.nombre = al ? ((ccClientesDB.find(x => ccClave(x.razonSocial || `${x.apellido || ''} ${x.nombre || ''}`.trim()) === al.main) || {}).razonSocial || f.cliente) : f.cliente; if(ccCfg.contado && ccCfg.contado[f.id]) return; c.facts.push({ ...f, pendiente: f.importe, sucursal: al ? al.suc : '' }); });
+  ccMovs.forEach(m => { const c = cli(mainDe(m.nombre || m.cliente) || m.cliente); if(m.nombre){ c.nombre = m.nombre; c._nom = true; } c.movs.push(m); });
   Object.values(C).forEach(c => {
     c.facts.sort((a, b) => a.fecha.localeCompare(b.fecha));
     const debe = c.facts.reduce((a, f) => a + f.importe, 0) + c.movs.filter(m => m.tipo === 'ajuste' || m.tipo === 'inicial').reduce((a, m) => a + m.importe, 0);
-    const haber = c.movs.filter(m => m.tipo === 'cobro' || m.tipo === 'sena').reduce((a, m) => a + m.importe + Object.values(m.retenciones || {}).reduce((x, y) => x + (+y || 0), 0), 0);
+    const haber = c.movs.filter(m => (m.tipo === 'cobro' || m.tipo === 'sena') && !m.aGrupo).reduce((a, m) => a + m.importe + Object.values(m.retenciones || {}).reduce((x, y) => x + (+y || 0), 0), 0);
     c.saldo = Math.round((debe - haber) * 100) / 100;
     // aplicacion: NC y cobros contra facturas, de la mas vieja a la mas nueva
     // las NC relacionadas se aplican a su factura; el resto (cobros y NC sin relacion) a las facturas mas viejas
@@ -8395,10 +8399,20 @@ function ccCalcular(){
     const db0 = ccClientesDB.find(x => { const a = ccClave(`${x.apellido || ''} ${x.nombre || ''}`), b = ccClave(`${x.nombre || ''} ${x.apellido || ''}`), r = ccClave(x.razonSocial || ''); return a === c.k || b === c.k || (r && r === c.k); });
     c.tel = db0 ? db0.telefono : '';
   });
+  // grupos: las empresas que paga una casa central; los recibos "a todo el grupo" cancelan las facturas mas viejas de cualquiera
+  const grupoDe = {}; ccClientesDB.forEach(x => { if(x.grupo){ const k = ccClave(x.razonSocial || `${x.apellido || ''} ${x.nombre || ''}`.trim()); if(k && k !== x.grupo) grupoDe[k] = x.grupo; } });
+  Object.entries(grupoDe).forEach(([k, g]) => { if(C[k]) C[k].casaCentral = g; if(!C[g]) C[g] = { k: g, nombre: (ccClientesDB.find(x => ccClave(x.razonSocial || `${x.apellido || ''} ${x.nombre || ''}`.trim()) === g) || {}).razonSocial || g, facts: [], movs: [], saldo: 0, vencido: 0, buckets: [0, 0, 0, 0] }; (C[g].miembros = C[g].miembros || []).push(k); });
+  Object.values(C).filter(c => c.miembros).forEach(g => {
+    let disp = g.movs.filter(m => m.aGrupo && (m.tipo === 'cobro' || m.tipo === 'sena')).reduce((a, m) => a + m.importe + Object.values(m.retenciones || {}).reduce((x, y) => x + (+y || 0), 0), 0);
+    const todas = [g, ...g.miembros.map(k => C[k]).filter(Boolean)].flatMap(c => c.facts.filter(f => f.pendiente > 0.5).map(f => ({ f, c }))).sort((a, b) => a.f.fecha.localeCompare(b.f.fecha));
+    todas.forEach(({ f, c }) => { if(disp <= 0) return; const ap = Math.min(disp, f.pendiente); f.pendiente = Math.round((f.pendiente - ap) * 100) / 100; c.saldo = Math.round((c.saldo - ap) * 100) / 100; if(f.vencida) c.vencido = Math.max(0, c.vencido - ap); disp -= ap; });
+    if(disp > 0.5) g.saldo = Math.round((g.saldo - disp) * 100) / 100; // sobrante: queda a favor de la casa central
+    g.saldoGrupo = Math.round(([g, ...g.miembros.map(k => C[k]).filter(Boolean)].reduce((a, c) => a + c.saldo, 0)) * 100) / 100;
+  });
   return C;
 }
 function renderCtaCte(){
-  const C = ccCalcular(), L = Object.values(C).filter(c => Math.abs(c.saldo) > 0.5 || c.movs.length);
+  const C = ccCalcular(), L = Object.values(C).filter(c => Math.abs(c.saldo) > 0.5 || c.movs.length || (c.miembros && Math.abs(c.saldoGrupo || 0) > 0.5));
   const tot = L.reduce((a, c) => a + Math.max(0, c.saldo), 0), venc = L.reduce((a, c) => a + c.vencido, 0);
   const cheques = ccMovs.filter(m => m.cheque && (m.cheque.estado || 'cartera') === 'cartera'), totCh = cheques.reduce((a, m) => a + m.importe, 0);
   const caja = (t, v, col) => `<div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff;"><small class="note" style="margin:0;">${t}</small><div style="font-weight:800;font-size:1.25rem;color:${col || 'inherit'};">${v}</div></div>`;
@@ -8427,11 +8441,16 @@ function renderCtaCte(){
   let F = L.sort((a, b) => b.saldo - a.saldo); if(ccBuscar) F = F.filter(c => coincideBusqueda(c.nombre, ccBuscar));
   box.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"><input placeholder="🔍 Buscar cliente" value="${escapeAttr(ccBuscar)}" oninput="ccBuscar=this.value;clearTimeout(window.__ccT);window.__ccT=setTimeout(renderCtaCte,250)" style="flex:1;min-width:180px;padding:9px;border:1px solid var(--line);border-radius:10px;"><button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="cliForm()">➕ Cliente nuevo</button><button type="button" class="btn-mini" onclick="ccNuevoCliente()">Saldo inicial de un cliente</button></div>
     ${F.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:6px;">Cliente</td><td style="padding:6px;text-align:right;">Saldo</td><td style="padding:6px;text-align:right;">Vencido</td><td style="padding:6px;text-align:right;">0-30</td><td style="padding:6px;text-align:right;">31-60</td><td style="padding:6px;text-align:right;">61-90</td><td style="padding:6px;text-align:right;">+90</td></tr>
-      ${F.map(c => `<tr style="border-top:1px solid var(--line);cursor:pointer;" onclick="ccCli='${escapeAttr(c.k)}';renderCtaCte()"><td style="padding:7px 6px;"><b>${escaparHtml(c.nombre)}</b></td><td style="padding:7px 6px;text-align:right;font-weight:800;color:${c.saldo > 0 ? 'inherit' : '#2F7A47'};">${formatPrice(c.saldo)}</td><td style="padding:7px 6px;text-align:right;color:${c.vencido > 0 ? '#A6432F' : '#8A8072'};">${c.vencido > 0 ? formatPrice(c.vencido) : '–'}</td>${c.buckets.map(x => `<td style="padding:7px 6px;text-align:right;color:#6B6258;">${x > 0.5 ? fP0(x) : '–'}</td>`).join('')}</tr>`).join('')}</table></div>` : '<p class="empty-msg">No hay saldos pendientes.</p>'}`;
+      ${F.map(c => `<tr style="border-top:1px solid var(--line);cursor:pointer;" onclick="ccCli='${escapeAttr(c.k)}';renderCtaCte()"><td style="padding:7px 6px;"><b>${escaparHtml(c.nombre)}</b>${c.miembros ? ` <span class="meta">· grupo de ${c.miembros.length + 1}: ${formatPrice(c.saldoGrupo)}</span>` : ''}${c.casaCentral ? ` <span class="meta">· paga ${escaparHtml((C[c.casaCentral] || {}).nombre || c.casaCentral)}</span>` : ''}</td><td style="padding:7px 6px;text-align:right;font-weight:800;color:${c.saldo > 0 ? 'inherit' : '#2F7A47'};">${formatPrice(c.saldo)}</td><td style="padding:7px 6px;text-align:right;color:${c.vencido > 0 ? '#A6432F' : '#8A8072'};">${c.vencido > 0 ? formatPrice(c.vencido) : '–'}</td>${c.buckets.map(x => `<td style="padding:7px 6px;text-align:right;color:#6B6258;">${x > 0.5 ? fP0(x) : '–'}</td>`).join('')}</tr>`).join('')}</table></div>` : '<p class="empty-msg">No hay saldos pendientes.</p>'}`;
 }
 const fP0 = x => '$ ' + formatoPesos(Math.round(x));
+let ccSucVer = '';
 function renderCtaCteCliente(c){
-  const box = document.getElementById('cc-body');
+  const box = document.getElementById('cc-body'); const C0 = ccCalcular();
+  const sucs = [...new Set(c.facts.map(f => f.sucursal).filter(Boolean))];
+  const grupoHtml = c.miembros ? `<div style="border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:10px;"><b style="font-size:.88rem;">Grupo que paga esta casa central · total ${formatPrice(c.saldoGrupo)}</b>${[c.k, ...c.miembros].map(k => C0[k]).filter(Boolean).map(m => `<div class="d-li" style="display:flex;justify-content:space-between;padding:5px 0;border-top:1px solid var(--line);font-size:.86rem;cursor:pointer;" onclick="ccCli='${escapeAttr(m.k)}';renderCtaCte()"><span>${escaparHtml(m.nombre)}${m.k === c.k ? ' (casa central)' : ''}</span><b>${formatPrice(m.saldo)}</b></div>`).join('')}</div>` : c.casaCentral ? `<p class="note" style="text-align:left;">Paga la casa central: <a href="#" onclick="event.preventDefault();ccCli='${escapeAttr(c.casaCentral)}';renderCtaCte()">${escaparHtml((C0[c.casaCentral] || {}).nombre || c.casaCentral)}</a></p>` : '';
+  const sucHtml = sucs.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;font-size:.84rem;"><button type="button" class="btn-mini" style="${!ccSucVer ? 'font-weight:700;border-color:var(--purple);' : ''}" onclick="ccSucVer='';renderCtaCte()">Todas las sucursales</button>${sucs.map(s => `<button type="button" class="btn-mini" style="${ccSucVer === s ? 'font-weight:700;border-color:var(--purple);' : ''}" onclick="ccSucVer='${escapeAttr(s)}';renderCtaCte()">${escaparHtml(s)}</button>`).join('')}</div>` : '';
+  if(ccSucVer && sucs.includes(ccSucVer)) c = { ...c, facts: c.facts.filter(f => f.sucursal === ccSucVer), movs: [] };
   const filas = [...c.facts.map(f => ({ fecha: f.fecha, t: f.esNC ? 'Nota de crédito' : 'Factura', det: f.numero, debe: f.importe > 0 ? f.importe : 0, haber: f.importe < 0 ? -f.importe : 0, f })),
     ...c.movs.map(m => { const ret = Object.values(m.retenciones || {}).reduce((x, y) => x + (+y || 0), 0); const neg = m.tipo === 'cobro' || m.tipo === 'sena';
       return { fecha: m.fecha, t: { cobro: 'Cobro', sena: 'Seña', ajuste: 'Ajuste', inicial: 'Saldo inicial' }[m.tipo] || m.tipo, det: [m.medio, m.cheque ? `${m.cheque.electronico ? 'E-cheq' : 'Cheque'} ${m.cheque.banco || ''} N.º ${m.cheque.numero || ''}` : '', ret ? 'retenciones ' + formatPrice(ret) : '', m.detalle].filter(Boolean).join(' · '), debe: neg ? 0 : Math.max(0, m.importe), haber: neg ? m.importe + ret : Math.max(0, -m.importe), m }; })]
@@ -8441,6 +8460,7 @@ function renderCtaCteCliente(c){
   box.innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;"><a href="#" onclick="event.preventDefault();ccCli=null;renderCtaCte()">← Todos los clientes</a><b style="font-size:1.1rem;margin-left:8px;">${escaparHtml(c.nombre)}</b>
       <span style="margin-left:auto;font-weight:800;font-size:1.15rem;">Saldo ${formatPrice(c.saldo)}</span></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"><button type="button" class="btn btn-gold" style="width:auto;padding:9px 16px;" onclick="ccFormCobro('${escapeAttr(c.k)}','cobro')">💵 Registrar cobro</button><button type="button" class="btn-mini" onclick="ccFormCobro('${escapeAttr(c.k)}','sena')">Seña</button><button type="button" class="btn-mini" onclick="ccFormAjuste('${escapeAttr(c.k)}')">Ajuste / saldo inicial</button><button type="button" class="btn-mini" onclick="ccResumenPDF('${escapeAttr(c.k)}')">🖨️ Resumen de cuenta</button><button type="button" class="btn-mini" onclick="ccWhatsapp('${escapeAttr(c.k)}')">💬 WhatsApp</button></div>
+    ${grupoHtml}${sucHtml}
     ${pend.length ? `<div style="display:flex;gap:8px;align-items:center;margin:6px 0;"><b style="color:var(--purple);">Facturas pendientes</b>${pend.length > 1 ? `<a href="#" style="margin-left:auto;font-size:.82rem;" onclick="event.preventDefault();ccMarcarContado(${escapeAttr(JSON.stringify(pend.map(f => f.id)))})">todas fueron de contado</a>` : ''}</div>${pend.map(f => `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:5px 0;border-top:1px solid var(--line);font-size:.86rem;"><span>${f.fecha.split('-').reverse().join('/')}</span><span>${escaparHtml(f.numero)}</span><span class="meta">${f.dias} días</span>${f.vencida ? '<span style="color:#A6432F;font-weight:700;">vencida</span>' : ''}<span style="margin-left:auto;">pendiente <b>${formatPrice(f.pendiente)}</b> de ${formatPrice(f.importe)}</span><a href="#" title="Fue cobrada en el momento: no va a cuenta corriente" onclick="event.preventDefault();ccMarcarContado('${f.id}')">fue de contado</a></div>`).join('')}` : ''}
     <div style="font-weight:700;color:var(--purple);margin:12px 0 6px;">Movimientos</div>
     <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.85rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:5px;">Fecha</td><td style="padding:5px;">Concepto</td><td style="padding:5px;text-align:right;">Debe</td><td style="padding:5px;text-align:right;">Haber</td><td style="padding:5px;text-align:right;">Saldo</td><td></td></tr>
@@ -8462,6 +8482,14 @@ async function ccMarcarContado(id){
 // abrir un comprobante adjunto (imagen o PDF guardado como data:)
 function verAdjunto(data, nombre){ try{ const [cab, b64] = String(data).split(','), tipo = (cab.match(/data:([^;]+)/) || [])[1] || 'application/octet-stream'; const bin = atob(b64), u = new Uint8Array(bin.length); for(let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); const url = URL.createObjectURL(new Blob([u], { type: tipo })); const w = window.open(url, '_blank'); if(!w){ const a = document.createElement('a'); a.href = url; a.download = nombre || 'comprobante'; a.click(); } setTimeout(() => URL.revokeObjectURL(url), 60000); } catch(e){ alert('No se pudo abrir el comprobante.'); } }
 function verAdjuntoMov(id, i){ const m = (ccMovs || []).find(x => x._id === id); const a = m && (m.retAdj || [])[i]; if(a) verAdjunto(a.data, a.nombre); }
+// si el cliente tiene sucursales, se elige una y se completan sus datos
+async function sucursalesDe(nombre, boxId, campos){
+  const box = document.getElementById(boxId); if(!box) return; box.innerHTML = '';
+  let L = ccClientesDB; if(!L || !L.length){ try{ L = ccClientesDB = (await db.collection('clientes').get()).docs.map(d => d.data()); } catch(e){ return; } }
+  const k = ccClave(nombre); const c = L.find(x => [ccClave(x.razonSocial || ''), ccClave(`${x.apellido || ''} ${x.nombre || ''}`), ccClave(`${x.nombre || ''} ${x.apellido || ''}`)].includes(k)); if(!c || !(c.sucursales || []).length) return;
+  window.__sucs = c.sucursales; window.__sucCampos = campos;
+  box.innerHTML = `<label style="display:block;font-size:.85rem;margin-top:4px;">Sucursal<select onchange="const s=window.__sucs[this.value];if(!s)return;const C=window.__sucCampos;const set=(id,v)=>{const e=id&&document.getElementById(id);if(e&&v)e.value=v;};set(C.dir,[s.direccion,s.localidad].filter(Boolean).join(', '));set(C.loc,s.localidad);set(C.prov,s.provincia);set(C.transp,s.transporte);set(C.tel,s.telefono);window.__sucElegida=s.nombre;" style="padding:7px;border:1px solid var(--line);border-radius:8px;width:100%;"><option value="">Casa central / sin sucursal</option>${c.sucursales.map((s, i) => `<option value="${i}">${escaparHtml(s.nombre || s.comoFactura || 'Sucursal ' + (i + 1))}${s.localidad ? ' · ' + escaparHtml(s.localidad) : ''}</option>`).join('')}</select></label>`;
+}
 // recibo nuevo: elegir el cliente (de la cuenta corriente, de la base de clientes o uno nuevo)
 function ccElegirCliente(){
   const C = ccCalcular(), nombres = new Set(Object.values(C).map(c => c.nombre)); ccClientesDB.forEach(x => { const n = x.razonSocial || `${x.apellido || ''} ${x.nombre || ''}`.trim(); if(n) nombres.add(n); });
@@ -8485,7 +8513,8 @@ function ccFormCobro(k, tipo){
       <label style="grid-column:1/-1;">Medio<select id="cb-m" onchange="document.getElementById('cb-ch').style.display=/Cheque|E-cheq/.test(this.value)?'grid':'none'" style="${inp}">${['Efectivo', 'Transferencia a Santander', 'Transferencia a Mercado Pago', 'Cheque', 'E-cheq', 'Otro'].map(x => `<option>${x}</option>`).join('')}</select></label>
       <div id="cb-ch" style="display:none;grid-column:1/-1;grid-template-columns:1fr 1fr;gap:8px;"><label>Banco<input id="cb-cb" style="${inp}"></label><label>N.º de cheque<input id="cb-cn" style="${inp}"></label><label>Fecha de cobro<input type="date" id="cb-cf" style="${inp}"></label><label>Librador<input id="cb-cl" style="${inp}"></label></div>
       <details style="grid-column:1/-1;"><summary style="cursor:pointer;font-size:.88rem;">Retenciones que le hizo el cliente (opcional)</summary><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px;">${[['iva', 'IVA'], ['iibb', 'IIBB'], ['gan', 'Ganancias'], ['otras', 'Otras']].map(([k2, t2]) => `<label style="font-size:.8rem;">${t2}<input id="cb-r-${k2}" inputmode="decimal" placeholder="$" style="${inp}"><input id="cb-c-${k2}" placeholder="N.º certificado" style="${inp}margin-top:4px;font-size:.78rem;"></label>`).join('')}<label style="font-size:.8rem;grid-column:1/-1;">Provincia de la retención de IIBB<input id="cb-rprov" placeholder="ej.: Buenos Aires" style="${inp}"></label><label style="font-size:.8rem;grid-column:1/-1;">📎 Comprobantes de las retenciones (foto o PDF, uno o varios)<input type="file" id="cb-adj" accept="image/*,application/pdf" multiple style="${inp}"></label></div></details>
-      <label style="grid-column:1/-1;">Detalle (opcional)<input id="cb-d" placeholder="Recibo N.º, observación…" style="${inp}"></label></div>
+      <label style="grid-column:1/-1;">Detalle (opcional)<input id="cb-d" placeholder="Recibo N.º, observación…" style="${inp}"></label>
+      ${c.miembros ? `<label style="grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:.88rem;"><input type="checkbox" id="cb-grupo" checked style="width:18px;height:18px;"> Aplicar a todo el grupo (${c.miembros.length + 1} empresas): cancela las facturas más viejas de cualquiera</label>` : ''}</div>
     <p class="note" style="text-align:left;">Se aplica a las facturas más viejas. Saldo actual: <b>${formatPrice(c.saldo || 0)}</b>.</p>
     <div style="display:flex;gap:8px;"><button class="btn btn-gold" style="flex:1;" onclick="ccGuardarCobro('${escapeAttr(k)}','${tipo}')">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`;
   document.getElementById('pub-modal').style.display = 'block';
@@ -8494,7 +8523,7 @@ async function ccGuardarCobro(k, tipo){
   const g = id => document.getElementById(id).value.trim(), imp = numAr(g('cb-i'));
   if(!(imp > 0)){ alert('Escriba el importe.'); return; }
   const medio = g('cb-m'), ret = {}, retCert = {}; ['iva', 'iibb', 'gan', 'otras'].forEach(r => { const v = numAr(g('cb-r-' + r)); if(v > 0){ ret[r] = v; if(g('cb-c-' + r)) retCert[r] = g('cb-c-' + r); } });
-  const mov = { cliente: k, nombre: (ccCalcular()[k] || {}).nombre || (document.getElementById('rc-c') || {}).value || window.__ccNombreNuevo || k, tipo, fecha: g('cb-f') || ccHoy(), importe: imp, medio, retenciones: ret, retCert, retProv: g('cb-rprov'), detalle: g('cb-d') };
+  const mov = { cliente: k, nombre: (ccCalcular()[k] || {}).nombre || (document.getElementById('rc-c') || {}).value || window.__ccNombreNuevo || k, tipo, fecha: g('cb-f') || ccHoy(), importe: imp, medio, retenciones: ret, retCert, retProv: g('cb-rprov'), detalle: g('cb-d'), aGrupo: !!(document.getElementById('cb-grupo') || {}).checked };
   if(/Cheque|E-cheq/.test(medio)){ if(!g('cb-cn')){ alert('Escriba el número de cheque.'); return; } mov.cheque = { electronico: medio === 'E-cheq', banco: g('cb-cb'), numero: g('cb-cn'), fechaCobro: g('cb-cf') || '', librador: g('cb-cl'), estado: 'cartera' }; }
   const archivos = [...((document.getElementById('cb-adj') || {}).files || [])];
   if(archivos.length){ try{ mov.retAdj = []; let tam = 0; for(const f of archivos){ const d = await pvArchivoB64(f); tam += d.length; if(tam > 850000) throw new Error('los comprobantes pesan demasiado: adjunte fotos más livianas o menos archivos'); mov.retAdj.push({ nombre: f.name, data: d }); } } catch(e){ alert('Comprobantes de retención: ' + e.message); return; } }
@@ -8519,7 +8548,8 @@ async function ccEstadoCheque(id, est){
   await ccLog('Cheque', `N.º ${ch.numero} → ${est}${extra.entregadoA ? ' (' + extra.entregadoA + ')' : ''}`); renderCtaCte();
 }
 function ccResumenPDF(k){
-  const c = ccCalcular()[k]; if(!c) return; const pend = c.facts.filter(f => f.pendiente > 0.5);
+  const C0 = ccCalcular(), c0 = C0[k]; if(c0 && c0.miembros && confirm('¿Estado de cuenta de todo el grupo (un bloque por empresa)?\nCancelar = solo la casa central.')){ return ccResumenGrupo(C0, c0); }
+  const c = C0[k]; if(!c) return; const pend = c.facts.filter(f => f.pendiente > 0.5);
   const filas = [...c.facts.map(f => ({ fecha: f.fecha, t: (f.esNC ? '' : 'Factura ') + f.numero, debe: f.importe > 0 ? f.importe : 0, haber: f.importe < 0 ? -f.importe : 0 })),
     ...c.movs.map(m => { const ret = Object.values(m.retenciones || {}).reduce((x, y) => x + (+y || 0), 0), neg = m.tipo === 'cobro' || m.tipo === 'sena';
       return { fecha: m.fecha, t: ({ cobro: 'Recibo', sena: 'Seña', ajuste: 'Ajuste', inicial: 'Saldo inicial' }[m.tipo] || m.tipo) + (m.detalle ? ' · ' + m.detalle : '') + (ret ? ' (incluye retenciones ' + formatPrice(ret) + ')' : ''), debe: neg ? 0 : Math.max(0, m.importe), haber: neg ? m.importe + ret : Math.max(0, -m.importe) }; })].sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
@@ -8533,6 +8563,13 @@ function ccResumenPDF(k){
     <script>setTimeout(()=>print(),300)<\/script></body></html>`); w.document.close();
 }
 
+function ccResumenGrupo(C0, g){
+  const emp = [g.k, ...g.miembros].map(x => C0[x]).filter(Boolean);
+  const bloques = emp.map(c => { const filas = [...c.facts.map(f => ({ fecha: f.fecha, t: (f.esNC ? '' : 'Factura ') + f.numero + (f.sucursal ? ' · ' + f.sucursal : ''), debe: f.importe > 0 ? f.importe : 0, haber: f.importe < 0 ? -f.importe : 0 })), ...c.movs.filter(m => !m.aGrupo || c === g).map(m => { const ret = Object.values(m.retenciones || {}).reduce((x, y) => x + (+y || 0), 0), neg = m.tipo === 'cobro' || m.tipo === 'sena'; return { fecha: m.fecha, t: ({ cobro: 'Recibo', sena: 'Seña', ajuste: 'Ajuste', inicial: 'Saldo inicial' }[m.tipo] || m.tipo) + (m.aGrupo ? ' (a todo el grupo)' : ''), debe: neg ? 0 : Math.max(0, m.importe), haber: neg ? m.importe + ret : Math.max(0, -m.importe) }; })].sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+    return `<h3>${escaparHtml(c.nombre)}${c === g ? ' (casa central)' : ''}</h3><table><tr><th>Fecha</th><th>Comprobante</th><th class="r">Debe</th><th class="r">Haber</th></tr>${filas.map(f => `<tr><td>${String(f.fecha).split('-').reverse().join('/')}</td><td>${escaparHtml(f.t)}</td><td class="r">${f.debe ? formatPrice(f.debe) : ''}</td><td class="r">${f.haber ? formatPrice(f.haber) : ''}</td></tr>`).join('')}<tr><td colspan="3"><b>Saldo</b></td><td class="r"><b>${formatPrice(c.saldo)}</b></td></tr></table>`; }).join('');
+  const w = window.open('', '_blank'); if(!w){ alert('Permita ventanas emergentes para imprimir.'); return; }
+  w.document.write(`<html><head><title>Estado de cuenta · grupo ${escaparHtml(g.nombre)}</title><style>body{font-family:Arial,sans-serif;padding:26px;color:#222}table{width:100%;border-collapse:collapse;font-size:12.5px}td,th{padding:6px;border-bottom:1px solid #ddd;text-align:left}.r{text-align:right}h1{font-size:20px;margin:0}h3{margin:18px 0 6px;color:#3D2B4E}</style></head><body><h1>OnLineTextil · Estado de cuenta del grupo</h1><p>Casa central: <b>${escaparHtml(g.nombre)}</b> · al ${new Date().toLocaleDateString('es-AR')}</p>${bloques}<p style="margin-top:16px;font-size:15px;"><b>Saldo total del grupo: ${formatPrice(g.saldoGrupo)}</b></p><script>setTimeout(()=>print(),300)<\/script></body></html>`); w.document.close();
+}
 function ccWhatsapp(k){
   const c = ccCalcular()[k]; if(!c) return; const pend = c.facts.filter(f => f.pendiente > 0.5);
   const txt = `Hola, ${c.nombre}. Le enviamos el estado de su cuenta en OnLineTextil al ${new Date().toLocaleDateString('es-AR')}:\n` + pend.map(f => `• ${f.numero} del ${f.fecha.split('-').reverse().join('/')}: ${formatPrice(f.pendiente)}`).join('\n') + `\nSaldo: ${formatPrice(c.saldo)}.\nMuchas gracias.`;
@@ -12545,7 +12582,7 @@ function rmForm(pre){
   pre = pre || {}; const inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
   const skus = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => skus.push(v.sku))));
   pvModal('🚚 Remito', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-    <label style="grid-column:1/-1;">Cliente<input id="rm-c" value="${escapeAttr(pre.cliente || '')}" list="rm-cl" style="${inp}"></label><datalist id="rm-cl">${(listaClientes || []).map(c => c.razonSocial || `${c.apellido || ''} ${c.nombre || ''}`.trim()).filter(Boolean).map(n => `<option value="${escapeAttr(n)}">`).join('')}</datalist>
+    <label style="grid-column:1/-1;">Cliente<input id="rm-c" value="${escapeAttr(pre.cliente || '')}" list="rm-cl" onchange="sucursalesDe(this.value, 'rm-suc', { dir: 'rm-d', transp: 'rm-t' })" style="${inp}"></label><div id="rm-suc" style="grid-column:1/-1;"></div><datalist id="rm-cl">${(listaClientes || []).map(c => c.razonSocial || `${c.apellido || ''} ${c.nombre || ''}`.trim()).filter(Boolean).map(n => `<option value="${escapeAttr(n)}">`).join('')}</datalist>
     <label>Fecha<input type="date" id="rm-f" value="${ccHoy()}" style="${inp}"></label><label>Bultos<input id="rm-b" inputmode="numeric" value="${pre.bultos || 1}" style="${inp}"></label>
     <label style="grid-column:1/-1;">Transporte<input id="rm-t" value="${escapeAttr(pre.transporte || '')}" style="${inp}"></label>
     <label style="grid-column:1/-1;">Dirección de entrega<input id="rm-d" value="${escapeAttr(pre.direccion || '')}" style="${inp}"></label></div>
@@ -12564,7 +12601,7 @@ async function rmGuardar(pedido){
   if(!g('rm-c') || !items.length){ alert('Complete el cliente y al menos un renglón con cantidad.'); return; }
   if(await mesBloqueado(g('rm-f'))) return;
   try{ const ref = db.collection('config').doc('remito_num'), d0 = await ref.get(), numero = ((d0.exists && d0.data().n) || 0) + 1; await ref.set({ n: numero });
-    const r = { numero, fecha: g('rm-f') || ccHoy(), cliente: g('rm-c'), transporte: g('rm-t'), direccion: g('rm-d'), bultos: Math.max(1, Math.round(numAr(g('rm-b')) || 1)), obs: g('rm-o'), items, pedido: pedido || '', creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
+    const r = { sucursal: window.__sucElegida || '', numero, fecha: g('rm-f') || ccHoy(), cliente: g('rm-c'), transporte: g('rm-t'), direccion: g('rm-d'), bultos: Math.max(1, Math.round(numAr(g('rm-b')) || 1)), obs: g('rm-o'), items, pedido: pedido || '', creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
     if(stockDatos === null) await cargarStock();
     if(stockDatos.bajaCon === 'remito'){ const movs = items.filter(x => x.sku && skuControlado(x.sku)).map(x => ({ sku: x.sku, cantidad: -(x.cant * divisorVenta(x.sku)) })); await moverStockVarios(movs, 'remito', 'R ' + numero); r.stockAplicado = movs.length > 0; }
     const res = await db.collection('remitos').add(r); remitos.push({ _id: res.id, ...r });
@@ -15514,6 +15551,7 @@ function elegirClienteAutocompletado(idx){
   document.getElementById('f-provincia').value = c.provincia || '';
   document.getElementById('f-transporte').value = c.transporte || '';
   cont.style.display = 'none';
+  { let box = document.getElementById('f-suc'); if(!box){ box = document.createElement('div'); box.id = 'f-suc'; document.getElementById('f-nombre').parentNode.appendChild(box); } sucursalesDe(c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim(), 'f-suc', { loc: 'f-localidad', prov: 'f-provincia', transp: 'f-transporte', tel: 'f-telefono' }); }
 }
 
 document.addEventListener('click', (e) => {
@@ -15622,6 +15660,7 @@ function mostrarEdicionCliente(id){
 
 // ficha de cliente: alta y edicion (la cuenta corriente toma el plazo de aca)
 function cliForm(id){
+  setTimeout(() => { const c0 = id ? ((listaClientes || []).find(x => x.id === id) || {}) : {}; (c0.sucursales || []).forEach(s => cliFilaSuc(s)); }, 0);
   const c = id ? ((listaClientes || []).find(x => x.id === id) || {}) : {}, inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
   const f = (k, t, extra) => `<label>${t}<input id="cf2-${k}" value="${escapeAttr(c[k] != null ? c[k] : '')}" ${extra || ''} style="${inp}"></label>`;
   pvModal(id ? '✏️ Cliente' : '➕ Cliente nuevo', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
@@ -15630,12 +15669,20 @@ function cliForm(id){
     ${f('telefono', 'Teléfono')}${f('email', 'Email')}<div style="grid-column:1/-1;">${f('direccion', 'Dirección')}</div>${f('localidad', 'Localidad')}${f('provincia', 'Provincia')}
     <label>Condición de venta por defecto<select id="cf2-condicion" style="${inp}"><option value="ctacte" ${c.condicion !== 'contado' ? 'selected' : ''}>Cuenta corriente</option><option value="contado" ${c.condicion === 'contado' ? 'selected' : ''}>Contado</option></select></label>
     ${f('transporte', 'Transporte habitual')}${f('descuento', 'Descuento habitual (%)', 'inputmode="decimal"')}${f('plazo', 'Plazo de cuenta corriente (días)', 'inputmode="numeric"')}
-    <label style="grid-column:1/-1;">Notas<textarea id="cf2-notas" rows="2" style="${inp}">${escaparHtml(c.notas || '')}</textarea></label></div>
+    <label style="grid-column:1/-1;">Notas<textarea id="cf2-notas" rows="2" style="${inp}">${escaparHtml(c.notas || '')}</textarea></label>
+    <label style="grid-column:1/-1;">Paga la casa central (otro CUIT del mismo grupo)<input id="cf2-grupo" data-ac="clientes" value="${escapeAttr(c.grupoNombre || '')}" placeholder="Dejar vacío si paga él mismo" autocomplete="off" style="${inp}"></label>
+    <details style="grid-column:1/-1;" ${(c.sucursales || []).length ? 'open' : ''}><summary style="cursor:pointer;font-size:.88rem;">Sucursales (opcional) <span class="meta">${(c.sucursales || []).length || ''}</span></summary><div id="cf2-sucs" style="margin-top:6px;"></div><button type="button" class="btn-mini" onclick="cliFilaSuc()">➕ Agregar sucursal</button></details></div>
     <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="cliGuardar('${id || ''}')">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
 }
+function cliFilaSuc(s){ s = s || {}; const d = document.createElement('div'); d.className = 'cf2-suc'; d.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;border-top:1px solid var(--line);padding:6px 0;';
+  const i = (k, t) => `<input class="sc-${k}" placeholder="${t}" value="${escapeAttr(s[k] || '')}" style="padding:7px;border:1px solid var(--line);border-radius:8px;">`;
+  d.innerHTML = i('nombre', 'Nombre de la sucursal') + i('comoFactura', 'Cómo figura en las facturas') + i('direccion', 'Dirección') + i('localidad', 'Localidad') + i('provincia', 'Provincia') + i('contacto', 'Contacto') + i('telefono', 'Teléfono') + i('transporte', 'Transporte') + `<button type="button" onclick="this.parentNode.remove()" style="border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;">✕ Quitar</button>`;
+  document.getElementById('cf2-sucs').appendChild(d); }
 async function cliGuardar(idViejo){
   const g = k => (document.getElementById('cf2-' + k).value || '').trim();
-  const d = { razonSocial: g('razonSocial'), nombre: g('nombre'), apellido: g('apellido'), cuit: g('cuit'), condicionIva: g('condicionIva'), telefono: g('telefono'), email: g('email'), direccion: g('direccion'), localidad: g('localidad'), provincia: g('provincia'), transporte: g('transporte'), condicion: g('condicion') || 'ctacte', descuento: numAr(g('descuento')) || 0, plazo: Math.round(numAr(g('plazo')) || 0), notas: g('notas') };
+  const sucursales = [...document.querySelectorAll('.cf2-suc')].map(x => { const o = {}; ['nombre', 'comoFactura', 'direccion', 'localidad', 'provincia', 'contacto', 'telefono', 'transporte'].forEach(k => o[k] = (x.querySelector('.sc-' + k).value || '').trim()); return o; }).filter(o => o.nombre || o.comoFactura || o.direccion);
+  const grupoNombre = (document.getElementById('cf2-grupo').value || '').trim();
+  const d = { sucursales, grupoNombre, grupo: grupoNombre ? ccClave(grupoNombre) : '', razonSocial: g('razonSocial'), nombre: g('nombre'), apellido: g('apellido'), cuit: g('cuit'), condicionIva: g('condicionIva'), telefono: g('telefono'), email: g('email'), direccion: g('direccion'), localidad: g('localidad'), provincia: g('provincia'), transporte: g('transporte'), condicion: g('condicion') || 'ctacte', descuento: numAr(g('descuento')) || 0, plazo: Math.round(numAr(g('plazo')) || 0), notas: g('notas') };
   if(!d.razonSocial && !d.nombre && !d.apellido){ alert('Escriba la razón social o el nombre.'); return; }
   const cuitLimpio = d.cuit.replace(/[\/\s.-]/g, '');
   if(!idViejo && cuitLimpio && (listaClientes || []).some(x => String(x.cuit || '').replace(/[\/\s.-]/g, '') === cuitLimpio)){ alert('Ya existe un cliente con ese CUIT.'); return; }
@@ -21297,7 +21344,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v340';
+const APP_VERSION = '2026-10-02-v341';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
