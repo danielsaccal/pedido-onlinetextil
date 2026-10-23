@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v354</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v355</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6209,7 +6209,8 @@ async function dashDatos(forzar){
   // stock y operacion
   if(V.bajo) P('stock', `📦 ${V.bajo} SKU debajo del stock mínimo`, 'abrirStock()'); if(V.neg) P('stock', `⚠️ ${V.neg} SKU con stock negativo`, 'abrirStock()');
   try{ const tn = Object.values((stockDatos && stockDatos.telas) || {}).filter(x => (+x.metros || 0) < 0).length; if(tn) P('stock', `🧵 ${tn} telas con metros negativos`, "abrirStock().then(() => { skTab = 'telas'; pintarStockTabs(); skRenderTab(); })"); } catch(e){}
-  if(sPed){ const n = sPed.docs.map(d => d.data()).filter(x => ['pendiente', 'parcial'].includes(x.estado || 'pendiente') && x.fecha && new Date(x.fecha) < new Date(Date.now() - 7 * 864e5)).length; if(n) P('stock', `🚚 ${n} pedidos pendientes de entrega con más de 7 días`, 'abrirPendientesEntrega()'); }
+  if(sPed){ const pend = sPed.docs.map(d => d.data()).filter(x => ['pendiente', 'parcial'].includes(x.estado || 'pendiente')), viejos = pend.filter(x => x.fecha && new Date(x.fecha) < new Date(Date.now() - 7 * 864e5)).length;
+    if(pend.length) P('stock', `🚚 ${pend.length} ${pend.length === 1 ? 'pedido pendiente' : 'pedidos pendientes'} de entrega${viejos ? ` (${viejos} con más de 7 días)` : ''}`, 'abrirPendientesEntrega()'); }
   if(sPre){ const n = sPre.docs.map(d => d.data()).filter(x => !x.pedido && x.estado !== 'rechazado' && x.fecha && x.validez && new Date(new Date(x.fecha).getTime() + x.validez * 864e5) < new Date()).length; if(n) P('stock', `🧾 ${n} presupuestos abiertos con la validez vencida`, 'abrirPresupuestos()'); }
   try{ const sD = await t(db.collection('devoluciones_ml').get().catch(() => null)); if(sD){ const n = sD.docs.map(d => d.data()).filter(x => x.estado === 'pendiente').length; if(n) P('stock', `↩️ ${n} devoluciones de Mercado Libre para revisar (¿volvieron bien?)`, "abrirStock().then(() => { skTab = 'devol'; pintarStockTabs(); skRenderTab(); })", true); } } catch(e){}
   try{ const sR = await t(db.collection('remitos').get().catch(() => null)); if(sR){ const n = sR.docs.map(d => d.data()).filter(r => !r.facturaRef && !r.anulado && r.fecha < hace(7).slice(0, 10)).length; if(n) P('stock', `🚚 ${n} remitos sin facturar con más de 7 días`, 'abrirRemitos()'); } } catch(e){}
@@ -21604,7 +21605,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v354';
+const APP_VERSION = '2026-10-02-v355';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
