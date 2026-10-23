@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v360</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v361</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -18247,11 +18247,12 @@ function agregarVarianteEP(datos){
   const row = document.createElement('div');
   row.className = 'edit-item-row-nuevo';
   row.id = id;
-  row.style.cssText = 'display:grid;grid-template-columns:100px 1fr 110px 32px;gap:6px;align-items:center;margin-bottom:6px;';
+  row.style.cssText = 'display:grid;grid-template-columns:100px 1fr 110px auto 32px;gap:6px;align-items:center;margin-bottom:6px;';
   row.innerHTML = `
     <input type="text" placeholder="SKU" class="epv-sku" value="${datos ? escapeAttr(datos.sku) : ''}">
     <input type="text" placeholder="Descripción" class="epv-desc" value="${datos ? escapeAttr(datos.desc) : ''}">
     <input type="text" placeholder="Precio" class="epv-precio" value="${datos ? escapeAttr(datos.precio) : ''}">
+    <button type="button" class="btn-mini epv-foto" title="Fotos de esta medida (SKU)" onclick="const s=this.parentNode.querySelector('.epv-sku').value.trim().toUpperCase();if(!s){alert('Escriba primero el SKU.');return;}editarFotosSku(s)" style="white-space:nowrap;">📷 ${(fotosSku[String(datos ? datos.sku : '' || '').toUpperCase()] || []).length || ''}</button>
     <button type="button" class="btn-mini" onclick="document.getElementById('${id}').remove();">✕</button>
   `;
   cont.appendChild(row);
@@ -18399,12 +18400,13 @@ function agregarVarianteNP(){
   row.className = 'edit-item-row-nuevo';
   row.id = id;
   const conCosto = typeof esDueno === 'function' && esDueno();
-  row.style.cssText = `display:grid;grid-template-columns:100px 1fr 110px ${conCosto ? '120px ' : ''}32px;gap:6px;align-items:center;margin-bottom:6px;`;
+  row.style.cssText = `display:grid;grid-template-columns:100px 1fr 110px ${conCosto ? '120px ' : ''}auto 32px;gap:6px;align-items:center;margin-bottom:6px;`;
   row.innerHTML = `
     <input type="text" placeholder="SKU" class="npv-sku">
     <input type="text" placeholder="Descripción (ej: 1 Plaza)" class="npv-desc">
     <input type="text" placeholder="Precio de venta" class="npv-precio">
     ${conCosto ? '<div><input type="text" placeholder="Costo por unidad de venta (privado)" class="npv-costo" title="Costo de compra: no se muestra en el catálogo, queda en Costos de reventa" style="background:#FFF8E6;border-color:#EBD9A8;width:100%;box-sizing:border-box;"></div>' : ''}
+    <button type="button" class="btn-mini epv-foto" title="Fotos de esta medida (SKU)" onclick="const s=this.parentNode.querySelector('.npv-sku').value.trim().toUpperCase();if(!s){alert('Escriba primero el SKU.');return;}editarFotosSku(s)" style="white-space:nowrap;">📷 </button>
     <button type="button" class="btn-mini" onclick="document.getElementById('${id}').remove();">✕</button>
   `;
   cont.appendChild(row);
@@ -18620,6 +18622,7 @@ async function guardarFotosSkuModal(){
     else { await db.collection('fotos_sku').doc(efsSku).delete(); delete fotosSku[efsSku]; } }
   catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   cerrarPublicar(); try{ renderCatalogo(document.getElementById('buscador').value); } catch(e){}
+  document.querySelectorAll('.epv-foto').forEach(b => { const s = (b.parentNode.querySelector('.epv-sku, .npv-sku') || {}).value; if(String(s || '').trim().toUpperCase() === efsSku) b.textContent = '📷 ' + ((fotosSku[efsSku] || []).length || ''); });
 }
 function mostrarFotoSku(sku, ci, pi, el){
   const card = el && el.closest('.producto'); if(!card) return; const img = card.querySelector('img.producto-img'); if(!img) return;
@@ -21692,7 +21695,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v360';
+const APP_VERSION = '2026-10-02-v361';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
