@@ -1657,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v344</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v345</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1981,7 +1981,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
     </div>
   </div>
   <div id="pub-modal" style="display:none;position:fixed;inset:0;background:rgba(30,20,40,.45);z-index:9999;overflow-y:auto;padding:20px 10px;">
-    <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;padding:16px 18px;box-shadow:0 10px 40px rgba(0,0,0,.25);">
+    <div id="pub-caja" style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;padding:16px 18px;box-shadow:0 10px 40px rgba(0,0,0,.25);">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><b id="pub-titulo" style="font-size:1.1rem;color:var(--purple);">📸 Publicar en el catálogo</b><button type="button" onclick="cerrarPublicar()" style="border:1px solid var(--line);border-radius:10px;background:#fff;font-size:0.9rem;cursor:pointer;color:var(--purple);padding:6px 12px;">✕ Cerrar</button></div>
       <div id="pub-cont"></div>
     </div>
@@ -8194,7 +8194,10 @@ function pvElegirProveedor(para, tipoIni){
     ${para === 'compra' ? `<label style="margin-top:6px;display:block;">Tipo<select id="ep-t" style="${pvInp}">${[['f', 'Factura'], ['nc', 'Nota de crédito'], ['nd', 'Nota de débito']].map(([v, t]) => `<option value="${v}" ${tipoIni === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>` : ''}
     <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="const id=document.getElementById('ep-p').value, t=(document.getElementById('ep-t')||{}).value; if(!id){if(confirm('Ese proveedor no existe. ¿Crearlo ahora?')){cerrarPublicar();setTimeout(()=>{pvFormProveedor();setTimeout(()=>{document.getElementById('pf-n').value=document.getElementById('ep-q')?document.getElementById('ep-q').value:'';},50);},80);}return;} cerrarPublicar(); setTimeout(()=>{ ${para === 'pago' ? 'pvFormPago(id)' : "pvFormCompra(id, t==='nc' ? true : t==='nd' ? 'nd' : false)"} },50);">Seguir</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
 }
-function pvModal(titulo, html){ const t = document.getElementById('pub-titulo'); if(t) t.textContent = titulo; document.getElementById('pub-cont').innerHTML = html; document.getElementById('pub-modal').style.display = 'block'; }
+// los comprobantes y fichas se abren en una ventana ancha (que no recorte nada)
+function pvModal(titulo, html, ancho){ const t = document.getElementById('pub-titulo'); if(t) t.textContent = titulo; const caja = document.getElementById('pub-caja');
+  if(caja) caja.style.maxWidth = (ancho || (/factura|nota de|comprobante|orden de pago|remito|recibo|cobro|seña|cliente|proveedor/i.test(titulo) ? 920 : 560)) + 'px';
+  document.getElementById('pub-cont').innerHTML = html; document.getElementById('pub-modal').style.display = 'block'; }
 function pvFormProveedor(id){
   const p = pvProv.find(x => x._id === id) || {};
   pvModal(id ? '✏️ Proveedor' : '➕ Proveedor nuevo', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
@@ -8221,10 +8224,10 @@ function pvFormCompra(pid, nc){
   pvModal((nc ? 'Nota de crédito de ' : esND ? 'Nota de débito de ' : 'Factura de compra de ') + p.nombre, `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     <label style="grid-column:1/-1;font-size:.85rem;">📄 Leer del PDF de la factura (opcional)<input type="file" id="cf-pdf" accept="application/pdf" onchange="pvLeerPDF(this)" style="${pvInp}"></label>
     <div style="grid-column:1/-1;"><b style="font-size:.85rem;">A nombre de (razón social)</b>${selectorRZ('cf-rz', 'propia')}</div>
-    <label>Tipo<select id="cf-t" style="${pvInp}">${['A', 'B', 'C', 'X'].map(x => `<option>${x}</option>`).join('')}</select></label>
+    <label>Tipo<select id="cf-t" onchange="cfDesglose()" style="${pvInp}">${['A', 'B', 'C', 'X'].map(x => `<option>${x}</option>`).join('')}</select></label>
     <label style="grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:.88rem;"><input type="checkbox" id="cf-fis" checked style="width:18px;height:18px;"> Comprobante fiscal (con CAE o CAI). Destildar si es un comprobante X o no fiscal: no cuenta para el IVA.</label>
     <label>Número (punto de venta - número)<input id="cf-n" placeholder="00001-00001234" style="${pvInp}"></label><label>Fecha<input type="date" id="cf-f" value="${hoy}" style="${pvInp}"></label>
-    <label>Total ${m === 'USD' ? '(US$)' : '($)'}<input id="cf-i" inputmode="decimal" style="${pvInp}"></label><label>IVA de la factura<input id="cf-iva" inputmode="decimal" placeholder="opcional" style="${pvInp}"></label><label>Percepción de IVA<input id="cf-piva" inputmode="decimal" placeholder="opcional" style="${pvInp}"></label><label>Percepción de IIBB<input id="cf-piibb" inputmode="decimal" placeholder="opcional" style="${pvInp}"></label><label>Provincia (IIBB)<input id="cf-pprov" placeholder="ej.: CABA" style="${pvInp}"></label><span></span>
+    <label>Total ${m === 'USD' ? '(US$)' : '($)'}<input id="cf-i" inputmode="decimal" oninput="cfDesglose()" style="${pvInp}"><small id="cf-neto" class="note" style="display:block;text-align:left;margin:2px 0 0;"></small></label><label>IVA de la factura<input id="cf-iva" inputmode="decimal" placeholder="opcional" oninput="this.dataset.auto=''" style="${pvInp}"></label><label>Percepción de IVA<input id="cf-piva" inputmode="decimal" placeholder="opcional" oninput="cfDesglose()" style="${pvInp}"></label><label>Percepción de IIBB<input id="cf-piibb" inputmode="decimal" placeholder="opcional" oninput="cfDesglose()" style="${pvInp}"></label><label>Provincia (IIBB)<input id="cf-pprov" placeholder="ej.: CABA" style="${pvInp}"></label><span></span>
     <label>Vence<input type="date" id="cf-v" value="${new Date(Date.now() + (p.plazo || 0) * 864e5).toISOString().slice(0, 10)}" style="${pvInp}"></label><label>Detalle<input id="cf-d" placeholder="opcional" style="${pvInp}"></label>
     <label style="grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:.88rem;"><input type="checkbox" id="cf-g" ${p.rubro === 'Servicios' ? 'checked' : ''} style="width:18px;height:18px;"> Es un gasto (luz, alquiler, servicios…): que figure también en Gastos comerciales</label>
     <label id="cf-gt-l" style="grid-column:1/-1;">Tipo de gasto<select id="cf-gt" style="${pvInp}"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></label></div>
@@ -8245,6 +8248,8 @@ async function pvLeerPDF(inp){
     if(!(pv && nro && tot)) alert('Leí parte de los datos. Complete lo que falta a mano.');
   } catch(e){ alert('No pude leer el PDF: complete a mano.'); }
 }
+function cfDesglose(){ const t = numAr(document.getElementById('cf-i').value) || 0, tipo = document.getElementById('cf-t').value, iv = document.getElementById('cf-iva'), pi = numAr((document.getElementById('cf-piva') || {}).value) || 0, pb = numAr((document.getElementById('cf-piibb') || {}).value) || 0, e = document.getElementById('cf-neto'); if(!e) return;
+  if(tipo === 'A' && t > 0){ const base = t - pi - pb, iva = base - base / 1.21; if(iv && (!iv.value || iv.dataset.auto === '1')){ iv.value = formatoPesos(Math.round(iva * 100) / 100); iv.dataset.auto = '1'; } e.textContent = `neto ${formatPrice(base / 1.21)} + IVA 21 % ${formatPrice(iva)}${pi || pb ? ' + percepciones ' + formatPrice(pi + pb) : ''}`; } else e.textContent = ''; }
 async function pvGuardarCompra(pid, nc){ dashCache = null; if(await mesBloqueado(document.getElementById('cf-f').value)) return; const esND = nc === 'nd'; if(esND) nc = false;
   const g = x => document.getElementById(x).value.trim(), p = pvProv.find(x => x._id === pid);
   const d = { proveedorId: pid, razon: g('cf-rz'), tipo: g('cf-t'), numero: g('cf-n'), fecha: g('cf-f'), vence: g('cf-v') || g('cf-f'), importe: numAr(g('cf-i')), iva: numAr(g('cf-iva')) || 0, fiscal: document.getElementById('cf-fis').checked && g('cf-t') !== 'X', percIva: numAr(g('cf-piva')) || 0, percIibb: numAr(g('cf-piibb')) || 0, provIibb: g('cf-pprov'), moneda: pvMon(p), detalle: g('cf-d'), nc: !!nc, nd: esND, creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
@@ -8516,7 +8521,7 @@ function ccFormCobro(k, tipo){
   tipo = tipo || 'cobro';
   const c = ccCalcular()[k] || { nombre: (document.getElementById('rc-c') || {}).value || k }; window.__ccNombreNuevo = c.nombre;
   const inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
-  const t = document.getElementById('pub-titulo'); if(t) t.textContent = (tipo === 'sena' ? '💵 Seña de ' : '💵 Cobro de ') + c.nombre;
+  const t = document.getElementById('pub-titulo'); if(t) t.textContent = (tipo === 'sena' ? '💵 Seña de ' : '💵 Cobro de ') + c.nombre; { const caja = document.getElementById('pub-caja'); if(caja) caja.style.maxWidth = '920px'; }
   document.getElementById('pub-cont').innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
       <label>Fecha<input type="date" id="cb-f" value="${ccHoy()}" style="${inp}"></label><label>Importe recibido<input id="cb-i" inputmode="decimal" placeholder="$" style="${inp}"></label>
       <label style="grid-column:1/-1;">Medio<select id="cb-m" onchange="document.getElementById('cb-ch').style.display=/Cheque|E-cheq/.test(this.value)?'grid':'none'" style="${inp}">${['Efectivo', 'Transferencia a Santander', 'Transferencia a Mercado Pago', 'Cheque', 'E-cheq', 'Otro'].map(x => `<option>${x}</option>`).join('')}</select></label>
@@ -9753,7 +9758,7 @@ function cambioProductoPublicar(){
   document.getElementById('pub-nuevo').style.display = nuevo ? 'block' : 'none';
   document.getElementById('pub-foto-lbl').textContent = nuevo ? 'Foto del producto' : 'Foto (opcional: reemplaza la del producto)';
 }
-function cerrarPublicar(){ document.getElementById('pub-modal').style.display = 'none'; pubSku = null; const t = document.getElementById('pub-titulo'); if(t) t.textContent = '📸 Publicar en el catálogo'; }
+function cerrarPublicar(){ { const caja = document.getElementById('pub-caja'); if(caja) caja.style.maxWidth = '560px'; } document.getElementById('pub-modal').style.display = 'none'; pubSku = null; const t = document.getElementById('pub-titulo'); if(t) t.textContent = '📸 Publicar en el catálogo'; }
 // el boton "atras" del celular cierra la ventana abierta en vez de cambiar de pantalla
 new MutationObserver(() => {
   const m = document.getElementById('pub-modal');
@@ -12744,17 +12749,17 @@ function fvManual(tipo){ cargarListasPrecios(); if(!ccClientesDB || !ccClientesD
     <div style="grid-column:1/-1;"><b style="font-size:.85rem;">Razón social</b>${selectorRZ('fv-rz', (document.getElementById('fc-rz') || {}).value || 'propia')}</div>
     <label style="grid-column:1/-1;">Cliente<input id="fv-c" list="fv-cl" onchange="fvFacturasCliente('${tipo}');fvNotaCliente();[...document.querySelectorAll('.fv-r')].forEach(fvPrecioFila)" style="${inp}"><small id="fv-notacli" class="note" style="display:block;text-align:left;margin:2px 0 0;"></small></label>
     ${tipo !== 'f' ? `<label style="grid-column:1/-1;">Comprobante relacionado${tipo === 'nc' ? ' (obligatorio)' : ' (opcional)'}<select id="fv-ref" onchange="fvTraerRenglones()" style="${inp}"><option value="">Primero elija el cliente…</option></select></label>` : ''}<datalist id="fv-cl">${[...new Set(clientes)].sort().map(n => `<option value="${escapeAttr(n)}">`).join('')}</datalist>
-    <label>Letra<select id="fv-l" style="${inp}"><option>A</option><option>B</option><option>C</option></select></label><label>Número (punto de venta - número)<input id="fv-n" placeholder="00010-00001234" style="${inp}"></label>
+    <label>Letra<select id="fv-l" onchange="if(this.value==='A'){const r=document.querySelector('input[name=fv-fis][value=si]');if(r)r.checked=true;}fvTot()" style="${inp}"><option>A</option><option>B</option><option>C</option></select></label><label>Número (punto de venta - número)<input id="fv-n" placeholder="00010-00001234" style="${inp}"></label>
     <label>Fecha<input type="date" id="fv-f" value="${ccHoy()}" style="${inp}"></label><span></span>
-    <div style="grid-column:1/-1;display:flex;gap:12px;font-size:.88rem;"><b>Tipo:</b><label><input type="radio" name="fv-fis" value="si"> Fiscal (con CAE)</label><label><input type="radio" name="fv-fis" value="no" checked> No fiscal (sin CAE)</label></div>
+    <div style="grid-column:1/-1;display:flex;gap:12px;font-size:.88rem;"><b>Tipo:</b><label><input type="radio" name="fv-fis" value="si" onchange="fvTot()"> Fiscal (con CAE)</label><label><input type="radio" name="fv-fis" value="no" checked onchange="fvTot()"> No fiscal (sin CAE)</label></div>
     <label>CAE (14 dígitos)<input id="fv-cae" inputmode="numeric" placeholder="si ya lo emitió en TFactura" style="${inp}"></label><label>Vencimiento del CAE<input type="date" id="fv-caev" style="${inp}"></label></div>
     <b style="display:block;margin:10px 0 4px;font-size:.88rem;">Renglones (importe con IVA)</b><div id="fv-rows"></div><datalist id="fv-skus">${skus.map(s => `<option value="${s}">`).join('')}</datalist>
     <button type="button" class="btn-mini" onclick="fvFila()">➕ Renglón</button><p id="fv-tot" style="font-weight:800;margin:8px 0;"></p>
     <div style="display:flex;gap:8px;"><button class="btn btn-gold" style="flex:1;" onclick="fvGuardar('${tipo}')">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
   fvFila();
 }
-function fvFila(x){ x = x || {}; const d = document.createElement('div'); d.className = 'fv-r'; d.style.cssText = 'display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,.6fr) minmax(0,1fr) 34px;gap:6px;margin-bottom:6px;align-items:center;'; if(x.unit) d.dataset.unit = x.unit; if(x.max) d.dataset.max = x.max;
-  d.innerHTML = `<input class="fv-s" list="fv-skus" placeholder="SKU" value="${escapeAttr(x.sku || '')}" onchange="fvPrecioFila(this.parentNode)" style="width:100%;min-width:0;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;"><input class="fv-q" inputmode="decimal" placeholder="Cant." value="${x.cant != null ? x.cant : ''}" oninput="fvCant(this)" style="width:100%;min-width:0;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:8px;"><input class="fv-i" inputmode="decimal" placeholder="Importe $" value="${x.imp ? formatoPesos(Math.round(x.imp * 100) / 100) : ''}" oninput="this.dataset.auto='';fvTot()" style="width:100%;min-width:0;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:8px;"><button type="button" title="Quitar renglón" onclick="this.parentNode.remove();fvTot()" style="width:34px;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;">✕</button>`;
+function fvFila(x){ x = x || {}; const d = document.createElement('div'); d.className = 'fv-r'; d.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;align-items:center;'; if(x.unit) d.dataset.unit = x.unit; if(x.max) d.dataset.max = x.max;
+  d.innerHTML = `<input class="fv-s" list="fv-skus" placeholder="SKU" value="${escapeAttr(x.sku || '')}" onchange="fvPrecioFila(this.parentNode)" style="flex:2 1 160px;min-width:0;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;"><input class="fv-q" inputmode="decimal" placeholder="Cant." value="${x.cant != null ? x.cant : ''}" oninput="fvCant(this)" style="flex:0 0 80px;width:80px;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:8px;"><input class="fv-i" inputmode="decimal" placeholder="Importe $" value="${x.imp ? formatoPesos(Math.round(x.imp * 100) / 100) : ''}" oninput="this.dataset.auto='';fvTot()" style="flex:1 1 140px;min-width:120px;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:8px;"><button type="button" title="Quitar renglón" onclick="this.parentNode.remove();fvTot()" style="flex:0 0 34px;width:34px;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;">✕</button><small class="fv-iva note" style="flex:1 0 100%;text-align:right;margin:0;"></small>`;
   document.getElementById('fv-rows').appendChild(d); fvTot(); }
 // al cambiar la cantidad de un renglon traido de la factura, el importe se recalcula con el precio de esa factura
 function fvCant(e){ const d = e.parentNode, u = +d.dataset.unit, q = numAr(e.value) || 0, mx = +d.dataset.max; if(mx && q > mx){ alert('No puede superar lo facturado (' + mx + ').'); e.value = mx; } if(u) d.querySelector('.fv-i').value = formatoPesos(Math.round(u * (numAr(e.value) || 0) * 100) / 100); fvTot(); }
@@ -12772,7 +12777,10 @@ function fvTraerRenglones(){
   (f.items || []).forEach(it => { const imp = (it.neto || 0) * fx, q = +it.cant || 1; fvFila({ sku: skuDeFactura(it.codigo), cant: q, imp, unit: imp / q, max: q }); });
   document.getElementById('fv-l').value = f.tipo || document.getElementById('fv-l').value;
 }
-function fvTot(){ const t = [...document.querySelectorAll('.fv-i')].reduce((a, e) => a + (numAr(e.value) || 0), 0); document.getElementById('fv-tot').textContent = 'Total con IVA: ' + formatPrice(t); }
+function fvTot(){ const t = [...document.querySelectorAll('.fv-i')].reduce((a, e) => a + (numAr(e.value) || 0), 0), l = (document.getElementById('fv-l') || {}).value, fis = (document.querySelector('input[name=fv-fis]:checked') || {}).value !== 'no';
+  const desg = l === 'A' && fis; // factura A: precio neto + IVA discriminado
+  document.querySelectorAll('.fv-r').forEach(d => { const e = d.querySelector('.fv-iva'), v = numAr(d.querySelector('.fv-i').value) || 0; if(e) e.textContent = desg && v ? `neto ${formatPrice(v / 1.21)} + IVA 21 % ${formatPrice(v - v / 1.21)}` : ''; });
+  document.getElementById('fv-tot').innerHTML = desg ? `Neto gravado ${formatPrice(t / 1.21)} · IVA 21 % ${formatPrice(t - t / 1.21)} · <b>Total ${formatPrice(t)}</b>` : 'Total' + (fis ? ' con IVA' : '') + ': ' + formatPrice(t); }
 async function fvGuardar(tipo){
   const g = id => (document.getElementById(id).value || '').trim();
   const items = [...document.querySelectorAll('.fv-r')].map(d => { const s = d.querySelector('.fv-s').value.trim().toUpperCase(), q = numAr(d.querySelector('.fv-q').value) || 0, i = numAr(d.querySelector('.fv-i').value) || 0; const r = s ? buscarProductoPorSku(s) : null;
@@ -21382,7 +21390,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v344';
+const APP_VERSION = '2026-10-02-v345';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
