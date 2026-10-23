@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v362</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v363</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6110,13 +6110,16 @@ async function acMostrar(inp){
   const lid = inp.dataset.acList, fuente = inp.dataset.ac || AC_FUENTE[lid];
   let L = fuente ? await acDatos(fuente) : [];
   const dl = lid && document.getElementById(lid); if(dl) [...dl.options].forEach(o => { if(o.value && !L.some(x => x.v === o.value)) L = L.concat([{ v: o.value, t: o.value, x: o.label && o.label !== o.value ? o.label : '' }]); });
-  const q = inp.value.trim(); if(acInput !== inp) return;
+  const multi = inp.dataset.acMulti === '1', q = (multi ? inp.value.split(',').pop() : inp.value).trim(); if(acInput !== inp) return;
+  if(multi && !q){ pop.style.display = 'none'; return; }
   acOps = (q ? L.filter(x => coincideBusqueda(x.t + ' ' + (x.x || ''), q)) : L).slice(0, 15); acSel = -1;
   if(!acOps.length || (acOps.length === 1 && acOps[0].v === q)){ pop.style.display = 'none'; return; }
   pop.innerHTML = acOps.map((x, i) => `<div data-i="${i}" onmousedown="event.preventDefault();acElegir(${i})">${escaparHtml(x.t)}${x.x ? `<small>${escaparHtml(x.x)}</small>` : ''}</div>`).join('');
   const r = inp.getBoundingClientRect(); pop.style.left = r.left + 'px'; pop.style.top = (r.bottom + 2) + 'px'; pop.style.width = Math.max(r.width, 260) + 'px'; pop.style.maxHeight = Math.max(140, Math.min(280, window.innerHeight - r.bottom - 12)) + 'px'; pop.style.display = 'block';
 }
-function acElegir(i){ const x = acOps[i]; if(!x || !acInput) return; acInput.value = x.v; document.getElementById('ac-pop').style.display = 'none'; acInput.dispatchEvent(new Event('input', { bubbles: true })); acInput.dispatchEvent(new Event('change', { bubbles: true })); document.getElementById('ac-pop').style.display = 'none'; }
+function acElegir(i){ const x = acOps[i]; if(!x || !acInput) return;
+  if(acInput.dataset.acMulti === '1'){ const partes = acInput.value.split(','); partes.pop(); acInput.value = [...partes.map(s => s.trim()).filter(Boolean), x.v].join(', ') + ', '; acInput.focus(); }
+  else acInput.value = x.v; document.getElementById('ac-pop').style.display = 'none'; acInput.dispatchEvent(new Event('input', { bubbles: true })); acInput.dispatchEvent(new Event('change', { bubbles: true })); document.getElementById('ac-pop').style.display = 'none'; }
 function acPreparar(inp){ if(inp.dataset.acList === undefined && inp.getAttribute('list')){ inp.dataset.acList = inp.getAttribute('list'); inp.removeAttribute('list'); inp.setAttribute('autocomplete', 'off'); } }
 document.addEventListener('focusin', e => { const t = e.target; if(t && t.tagName === 'INPUT' && (t.getAttribute('list') || t.dataset.ac || t.dataset.acList !== undefined)){ acPreparar(t); acMostrar(t); } });
 document.addEventListener('input', e => { const t = e.target; if(t && t.tagName === 'INPUT' && (t.dataset.acList !== undefined || t.dataset.ac)){ clearTimeout(window.__acT); window.__acT = setTimeout(() => acMostrar(t), 120); } });
@@ -12913,7 +12916,7 @@ async function abrirArmarCatalogo(){
     <div class="fila" style="grid-template-columns:1fr 1fr 1fr 1fr;"><div><span class="fl">Una lámina por</span><select onchange="acState.modo=this.value;acPintar(true)"><option value="producto">Producto (todas sus medidas)</option><option value="sku" ${acState.modo === 'sku' ? 'selected' : ''}>SKU (solo esa medida, con sus fotos)</option></select></div><div><span class="fl">Tipo</span><select onchange="acState.tipo=this.value;acState.skus=this.value==='mayorista';document.getElementById('ac-skus').checked=acState.skus"><option value="mayorista">Mayorista</option><option value="minorista">Minorista</option></select></div>
       <div><span class="fl">Lista de precios</span><select onchange="acState.lista=this.value">${(listasPrecios || []).map(l => `<option value="${escapeAttr(l.id)}">${escaparHtml(l.nombre)}</option>`).join('')}</select></div>
       <div><span class="fl">Título de la portada</span><input value="${escapeAttr(acState.titulo)}" oninput="acState.titulo=this.value"></div></div>
-    <div class="fila" style="grid-template-columns:1fr 1fr;"><div><span class="fl">Categoría</span><select onchange="acState.cat=this.value;acPintar(true)"><option value="">Todas</option>${cats.map(c => `<option>${escaparHtml(c)}</option>`).join('')}</select></div><div><span class="fl">Buscar</span><input placeholder="SKU o nombre; varios separados por coma" oninput="acState.q=this.value;clearTimeout(window.__acT2);window.__acT2=setTimeout(()=>acPintar(true),250)"></div></div>
+    <div class="fila" style="grid-template-columns:1fr 1fr;"><div><span class="fl">Categoría</span><select onchange="acState.cat=this.value;acPintar(true)"><option value="">Todas</option>${cats.map(c => `<option>${escaparHtml(c)}</option>`).join('')}</select></div><div><span class="fl">Buscar</span><input data-ac="sku" data-ac-multi="1" autocomplete="off" placeholder="Escriba parte del SKU o nombre; puede agregar varios" oninput="acState.q=this.value;clearTimeout(window.__acT2);window.__acT2=setTimeout(()=>acPintar(true),250)"></div></div>
     <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.85rem;margin-bottom:8px;"><label><input type="checkbox" checked onchange="acState.precios=this.checked"> Mostrar precios</label><label><input type="checkbox" id="ac-skus" checked onchange="acState.skus=this.checked"> Mostrar SKU</label><label><input type="checkbox" checked onchange="acState.portada=this.checked"> Portada</label><label style="flex:1;min-width:200px;">Pie de página <input value="${escapeAttr(acState.pie)}" oninput="acState.pie=this.value" style="height:30px !important;"></label></div>
     <div id="ac-lista" style="max-height:38vh;overflow:auto;border-top:1px solid #EEE9E1;"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap;"><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="acGenerar('previa')">👁️ Vista previa</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="acGenerar('jpg')">🖼️ Láminas JPG (zip)</button><button class="btn btn-gold" style="width:auto;padding:10px 22px;" onclick="acGenerar('pdf')">📄 Catálogo PDF</button></div></div>`, 920);
@@ -21695,7 +21698,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v362';
+const APP_VERSION = '2026-10-02-v363';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
