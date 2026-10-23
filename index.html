@@ -1657,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v328</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v329</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -11398,6 +11398,7 @@ function abrirCrearVideo(){
       <button type="button" class="btn btn-ghost" style="text-align:left;" onclick="cerrarPublicar(); location.href='videos.html?v=' + Date.now()">✍️ <b>Manual</b><br><span class="note">Subís las fotos y escribís cada escena.</span></button>
       <button type="button" class="btn btn-ghost" style="text-align:left;" onclick="videoPorCategoria()">🗂️ <b>Automático: una categoría completa</b><br><span class="note">Toma los productos de la categoría con sus fotos.</span></button>
       <button type="button" class="btn btn-ghost" style="text-align:left;" onclick="videoPorProductos()">🏷️ <b>Automático: elegir productos</b><br><span class="note">Buscás y tildás los productos que querés mostrar.</span></button>
+      <button type="button" class="btn btn-ghost" style="text-align:left;" onclick="videoPorSku()">📸 <b>Automático: un SKU con todas sus fotos</b><br><span class="note">Una escena por cada foto de esa medida.</span></button>
     </div>`;
   document.getElementById('pub-modal').style.display = 'block';
 }
@@ -11412,6 +11413,35 @@ function videoPorCategoria(){
     <button class="btn btn-gold" onclick="generarVideoAuto('cat')">🎬 Armar video</button>`;
 }
 let vpSel = new Set();
+// video de un solo SKU: una escena por cada foto (las de la medida; si no tiene, las del producto)
+function videoPorSku(){
+  document.getElementById('pub-cont').innerHTML = `
+    <input id="vs-s" data-ac="sku" placeholder="🔍 SKU o nombre del producto" autocomplete="off" oninput="vsPintar()" onchange="vsPintar()" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;box-sizing:border-box;">
+    <div id="vs-fotos"></div>
+    <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;margin:10px 0 6px;"><input type="checkbox" id="vc-precio"> Mostrar el precio</label>
+    <div class="field"><label>Descuento % (opcional)</label><input id="vc-desc" type="number" min="0" max="90" placeholder="Ej: 15"></div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:0.85rem;margin:4px 0 10px;"><span class="note" style="margin:0;">Mostrar:</span><label><input type="checkbox" id="vc-med" checked> Medida</label><label><input type="checkbox" id="vc-gr" checked> Gramaje</label><label><input type="checkbox" id="vc-comp" checked> Composición</label></div>
+    <button class="btn btn-gold" id="vs-btn" onclick="generarVideoSku()" disabled>🎬 Armar video</button>`;
+}
+function vsFotos(S){ const r = buscarProductoPorSku(S); if(!r) return { r: null, fotos: [] }; const pi = (CATALOGO[r.ci].productos || []).indexOf(r.producto); const propias = fotosSku[S] || []; return { r, pi, fotos: propias.length ? propias : imagenesEfectivas(r.ci, pi, r.producto) }; }
+function vsPintar(){
+  const S = (document.getElementById('vs-s').value || '').trim().toUpperCase().split(/\s/)[0], box = document.getElementById('vs-fotos'), btn = document.getElementById('vs-btn');
+  const { r, fotos } = vsFotos(S); btn.disabled = !(r && fotos.length);
+  box.innerHTML = !S ? '' : !r ? '<p class="note">Ese SKU no está en el catálogo.</p>' : !fotos.length ? '<p class="note">Este SKU no tiene fotos cargadas.</p>'
+    : `<p class="note" style="text-align:left;margin:0 0 6px;"><b>${escaparHtml(r.producto.nombre)}</b> · ${escaparHtml(r.variante.desc || '')} · ${fotos.length} foto(s) ${(fotosSku[S] || []).length ? 'de esta medida' : 'del producto'}</p><div style="display:flex;gap:6px;flex-wrap:wrap;">${fotos.map(f => `<img src="${escapeAttr(f)}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;">`).join('')}</div>`;
+  btn.textContent = `🎬 Armar video${fotos.length ? ' (' + fotos.length + ' escenas)' : ''}`;
+}
+async function generarVideoSku(){
+  const S = (document.getElementById('vs-s').value || '').trim().toUpperCase().split(/\s/)[0], { r, pi, fotos } = vsFotos(S); if(!r || !fotos.length) return;
+  const conPrecio = document.getElementById('vc-precio').checked, desc = Math.max(0, Math.min(90, parseFloat(document.getElementById('vc-desc').value) || 0));
+  const opc = { med: document.getElementById('vc-med').checked, gr: document.getElementById('vc-gr').checked, comp: document.getElementById('vc-comp').checked };
+  // la escena base se arma con solo esta medida (para que la medida y el precio sean los de este SKU)
+  const pSolo = { ...r.producto, variantes: [r.variante] }, cat = CATALOGO[r.ci], orig = cat.productos[pi];
+  cat.productos[pi] = pSolo; let base; try{ base = escenaDeProducto(r.ci, pi, conPrecio, desc, opc); } finally { cat.productos[pi] = orig; }
+  const escenas = fotos.map((img, i) => i === 0 ? { ...base, img } : { ...base, img, frase: i === fotos.length - 1 ? base.frase : '', det: i === fotos.length - 1 ? base.det : '', precio: i === fotos.length - 1 ? base.precio : '' });
+  try{ await idbGuardar('video_auto', { escenas, nombre: r.producto.nombre, apertura: r.producto.nombre, prods: r.variante.desc || '', oferta: desc ? `${desc}% OFF` : '', fecha: Date.now(), links: linksDeProductos([r.producto]) });
+    cerrarPublicar(); location.href = 'videos.html?auto=1&v=' + Date.now(); } catch(e){ alert('No se pudo preparar el video: ' + e.message); }
+}
 function videoPorProductos(){
   vpSel = new Set();
   document.getElementById('pub-cont').innerHTML = `
@@ -21161,7 +21191,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v328';
+const APP_VERSION = '2026-10-02-v329';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
