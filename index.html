@@ -1657,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v342</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v343</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -12719,8 +12719,8 @@ function fvManual(tipo){
     <div style="display:flex;gap:8px;"><button class="btn btn-gold" style="flex:1;" onclick="fvGuardar('${tipo}')">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
   fvFila();
 }
-function fvFila(x){ x = x || {}; const d = document.createElement('div'); d.className = 'fv-r'; d.style.cssText = 'display:grid;grid-template-columns:1.2fr .6fr 1fr 32px;gap:6px;margin-bottom:6px;'; if(x.unit) d.dataset.unit = x.unit; if(x.max) d.dataset.max = x.max;
-  d.innerHTML = `<input class="fv-s" list="fv-skus" placeholder="SKU" value="${escapeAttr(x.sku || '')}" style="padding:7px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;"><input class="fv-q" inputmode="decimal" placeholder="Cant." value="${x.cant != null ? x.cant : ''}" oninput="fvCant(this)" style="padding:7px;border:1px solid var(--line);border-radius:8px;"><input class="fv-i" inputmode="decimal" placeholder="Importe $" value="${x.imp ? formatoPesos(Math.round(x.imp * 100) / 100) : ''}" oninput="fvTot()" style="padding:7px;border:1px solid var(--line);border-radius:8px;"><button type="button" title="Quitar renglón" onclick="this.parentNode.remove();fvTot()" style="border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;">✕</button>`;
+function fvFila(x){ x = x || {}; const d = document.createElement('div'); d.className = 'fv-r'; d.style.cssText = 'display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,.6fr) minmax(0,1fr) 34px;gap:6px;margin-bottom:6px;align-items:center;'; if(x.unit) d.dataset.unit = x.unit; if(x.max) d.dataset.max = x.max;
+  d.innerHTML = `<input class="fv-s" list="fv-skus" placeholder="SKU" value="${escapeAttr(x.sku || '')}" style="width:100%;min-width:0;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;"><input class="fv-q" inputmode="decimal" placeholder="Cant." value="${x.cant != null ? x.cant : ''}" oninput="fvCant(this)" style="width:100%;min-width:0;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:8px;"><input class="fv-i" inputmode="decimal" placeholder="Importe $" value="${x.imp ? formatoPesos(Math.round(x.imp * 100) / 100) : ''}" oninput="fvTot()" style="width:100%;min-width:0;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:8px;"><button type="button" title="Quitar renglón" onclick="this.parentNode.remove();fvTot()" style="width:34px;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;">✕</button>`;
   document.getElementById('fv-rows').appendChild(d); fvTot(); }
 // al cambiar la cantidad de un renglon traido de la factura, el importe se recalcula con el precio de esa factura
 function fvCant(e){ const d = e.parentNode, u = +d.dataset.unit, q = numAr(e.value) || 0, mx = +d.dataset.max; if(mx && q > mx){ alert('No puede superar lo facturado (' + mx + ').'); e.value = mx; } if(u) d.querySelector('.fv-i').value = formatoPesos(Math.round(u * (numAr(e.value) || 0) * 100) / 100); fvTot(); }
@@ -21344,7 +21344,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v342';
+const APP_VERSION = '2026-10-02-v343';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
