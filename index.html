@@ -1657,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v343</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v344</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2954,6 +2954,15 @@ function irADatos(){
   mostrarPaso('step-datos');
 }
 
+async function aplicarListaClientePedido(c0){
+  await cargarListasPrecios(); let L = ccClientesDB; if(!L || !L.length){ try{ L = ccClientesDB = (await db.collection('clientes').get()).docs.map(d => d.data()); } catch(e){ L = []; } }
+  const c = clientePorNombre(c0.razonSocial || `${c0.nombre || ''} ${c0.apellido || ''}`.trim()) || c0, f = factorCliente(c);
+  Object.values(cart).forEach(it => { const r = it.sku ? buscarProductoPorSku(it.sku) : null; const base = r ? parsePrice(r.variante.precio) : null; if(base > 0) it.precio = Math.round(base * f.factor * 100) / 100; });
+  const d = document.getElementById('f-descuento'); if(d && f.desc && !+d.value) d.value = f.desc;
+  let nota = document.getElementById('f-notalista'); if(!nota){ nota = document.createElement('p'); nota.id = 'f-notalista'; nota.className = 'note'; nota.style.cssText = 'text-align:left;margin:4px 0;'; const r0 = document.getElementById('resumen-total'); if(r0 && r0.parentNode) r0.parentNode.after(nota); }
+  nota.textContent = `${f.lista.nombre}${f.ajuste ? ' (' + (f.ajuste > 0 ? '+' : '') + f.ajuste + ' %)' : ''}${f.desc ? ' · descuento ' + f.desc + ' %' : ''} · ${c.condicion === 'contado' ? 'contado' : 'cuenta corriente'}`;
+  actualizarCartbar(); actualizarResumenDatos();
+}
 function actualizarResumenDatos(){
   const entries = Object.entries(cart);
   const subtotal = entries.reduce((s,[id,i])=>s+precioLineaItem({...i, descuentoItemPct: descuentosItem[id]||0}),0);
@@ -5994,7 +6003,7 @@ const GRUPOS_INICIO = {
   ] },
   art: { lado: 'int', titulo: '📦 Artículos', titulosColumnas: ['Catálogo', 'Precios', 'Costos', 'Stock', 'Producción'], colorColumnas: { 2: '#2F7A47' }, columnas: [
     [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['🗂️ Ordenar categorías', 'abrirCategorias()'], ['📷 Fotos de productos', 'abrirActualizarFoto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['🌐 Links de la web', 'abrirLinksWeb()']],
-    [['🏷️ Lista de precios', 'abrirListaPrecios()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']],
+    [['🏷️ Lista de precios', 'abrirListaPrecios()'], ['📋 Listas de precios por cliente', 'abrirListasPrecios()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']],
     [['💲 Costos de productos (fabrico y reventa)', 'abrirCostosProductos()'], ['💰 Costos de confección', 'abrirConfeccion()']],
     [['📊 Stock y prioridades', 'abrirStock()'], ['📦 Faltantes de stock', 'abrirFaltantes()']],
     [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['📋 Nueva orden de trabajo', 'abrirAsistenteOT()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['🚚 Ingreso a los talleres', 'abrirEnviosTela()'], ['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🏭 Productos en producción', 'abrirEnProduccion()'], ['📥 Entregas del taller', 'abrirIngresoTaller()'], ['📦 Historial de órdenes', 'abrirHistorialOT()'], ['🗂️ Historial de entregas', 'abrirHistorialEntregas()'], ['🔎 ¿Cuándo hice este SKU?', 'abrirHistorialSku()']],
@@ -12700,15 +12709,40 @@ function plPintar(){
     <div style="display:flex;gap:6px;margin-bottom:8px;"><button type="button" class="btn btn-gold" style="flex:1;" onclick="copiarTexto(window.__plTxt, this)">📋 Copiar todos</button><button type="button" class="btn-mini" onclick="const b=new Blob([window.__plTxt],{type:'text/plain'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='prompts-gemini.txt';a.click();">⬇️ Descargar .txt</button></div>
     <div style="max-height:45vh;overflow:auto;">${L.map((x, i) => `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line);font-size:.86rem;"><span style="flex:1;"><b>${escaparHtml(x.S)}</b> <span class="meta">${escaparHtml(x.n)} · ${escaparHtml(x.d)}</span></span><button type="button" class="btn-mini" onclick="copiarTexto(promptGemini(window.__plItems[${i}].S, '${c}'), this)">📋 Copiar</button></div>`).join('')}</div>`;
 }
+// ===== Listas de precios: % sobre la lista unica; cada cliente tiene su lista, su descuento y su condicion =====
+let listasPrecios = null;
+async function cargarListasPrecios(){ if(listasPrecios) return listasPrecios; try{ const d = await db.collection('config').doc('listas_precios').get(); listasPrecios = d.exists && Array.isArray(d.data().listas) ? d.data().listas : null; } catch(e){} if(!listasPrecios || !listasPrecios.length) listasPrecios = [{ id: 'general', nombre: 'Lista general', ajuste: 0 }]; return listasPrecios; }
+function clientePorNombre(n){ const k = ccClave(n || ''); if(!k) return null; return (ccClientesDB || []).concat(listaClientes || []).find(x => [ccClave(x.razonSocial || ''), ccClave(`${x.apellido || ''} ${x.nombre || ''}`), ccClave(`${x.nombre || ''} ${x.apellido || ''}`)].includes(k)) || null; }
+// factor de precio de un cliente: ajuste de su lista y su descuento habitual
+function factorCliente(c){ const L = listasPrecios || [{ id: 'general', ajuste: 0 }], l = c && L.find(x => x.id === c.lista) || L[0]; return { lista: l, ajuste: +l.ajuste || 0, desc: c ? (+c.descuento || 0) : 0, factor: (1 + (+l.ajuste || 0) / 100) }; }
+async function abrirListasPrecios(){
+  await cargarListasPrecios();
+  pvModal('📋 Listas de precios', `<p class="note" style="text-align:left;">Cada lista es un % sobre su lista de precios. Se actualizan solas cuando cambia un precio. A cada cliente se le asigna una en su ficha.</p>
+    <div id="lp-filas">${listasPrecios.map(l => lpFila(l)).join('')}</div><button type="button" class="btn-mini" onclick="document.getElementById('lp-filas').insertAdjacentHTML('beforeend', lpFila({}))">➕ Lista nueva</button>
+    <button class="btn btn-gold" style="width:100%;margin-top:10px;" onclick="guardarListasPrecios()">Guardar</button>`);
+}
+function lpFila(l){ return `<div class="lp-f" data-id="${escapeAttr(l.id || '')}" style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) 34px;gap:6px;margin-bottom:6px;align-items:center;"><input class="lp-n" value="${escapeAttr(l.nombre || '')}" placeholder="Nombre (ej.: Hoteles)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:8px;"><input class="lp-a" inputmode="decimal" value="${l.ajuste != null ? l.ajuste : ''}" placeholder="% (ej.: 10 o -5)" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:8px;">${l.id === 'general' ? '<span></span>' : `<button type="button" onclick="this.parentNode.remove()" style="width:34px;height:34px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;">✕</button>`}</div>`; }
+async function guardarListasPrecios(){
+  const L = [...document.querySelectorAll('.lp-f')].map(d => ({ id: d.dataset.id || 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), nombre: d.querySelector('.lp-n').value.trim(), ajuste: numAr(d.querySelector('.lp-a').value) || 0 })).filter(l => l.nombre);
+  if(!L.some(l => l.id === 'general')) L.unshift({ id: 'general', nombre: 'Lista general', ajuste: 0 });
+  try{ await db.collection('config').doc('listas_precios').set({ listas: L }); listasPrecios = L; } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  await ccLog('Listas de precios', L.map(l => `${l.nombre} ${l.ajuste}%`).join(', ')); cerrarPublicar();
+}
+// factura a mano: al escribir el SKU (o elegir el cliente) se completa el importe con el precio del cliente
+function fvPrecioFila(d){ const S = (d.querySelector('.fv-s').value || '').trim().toUpperCase(), r = S ? buscarProductoPorSku(S) : null; if(!r) return; const base = parsePrice(r.variante.precio); if(!(base > 0)) return;
+  const c = clientePorNombre((document.getElementById('fv-c') || {}).value), f = factorCliente(c), unit = Math.round(base * f.factor * (1 - f.desc / 100) * 100) / 100;
+  d.dataset.unit = unit; const q = d.querySelector('.fv-q'); if(!q.value) q.value = 1; const imp = d.querySelector('.fv-i'); if(!imp.value || imp.dataset.auto === '1'){ imp.value = formatoPesos(Math.round(unit * (numAr(q.value) || 1) * 100) / 100); imp.dataset.auto = '1'; } fvTot(); fvNotaCliente(); }
+function fvNotaCliente(){ const e = document.getElementById('fv-notacli'); if(!e) return; const c = clientePorNombre((document.getElementById('fv-c') || {}).value); if(!c){ e.textContent = ''; return; } const f = factorCliente(c);
+  e.textContent = `${f.lista.nombre}${f.ajuste ? ' (' + (f.ajuste > 0 ? '+' : '') + f.ajuste + ' %)' : ''}${f.desc ? ' · descuento ' + f.desc + ' %' : ''} · ${c.condicion === 'contado' ? 'contado' : 'cuenta corriente'}`; }
 // ===== Comprobante de venta cargado a mano (factura, NC o ND): pasa por los mismos controles que los subidos =====
-function fvManual(tipo){
+function fvManual(tipo){ cargarListasPrecios(); if(!ccClientesDB || !ccClientesDB.length) db.collection('clientes').get().then(s => { ccClientesDB = s.docs.map(d => d.data()); }).catch(() => {});
   const inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
   const nom = { f: 'Factura de venta', nc: 'Nota de crédito de venta', nd: 'Nota de débito de venta' }[tipo];
   let clientes = []; try{ clientes = (listaClientes || []).map(c => c.razonSocial || `${c.apellido || ''} ${c.nombre || ''}`.trim()).filter(Boolean); } catch(e){}
   const skus = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => skus.push(v.sku))));
   pvModal('➕ ' + nom, `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     <div style="grid-column:1/-1;"><b style="font-size:.85rem;">Razón social</b>${selectorRZ('fv-rz', (document.getElementById('fc-rz') || {}).value || 'propia')}</div>
-    <label style="grid-column:1/-1;">Cliente<input id="fv-c" list="fv-cl" onchange="fvFacturasCliente('${tipo}')" style="${inp}"></label>
+    <label style="grid-column:1/-1;">Cliente<input id="fv-c" list="fv-cl" onchange="fvFacturasCliente('${tipo}');fvNotaCliente();[...document.querySelectorAll('.fv-r')].forEach(fvPrecioFila)" style="${inp}"><small id="fv-notacli" class="note" style="display:block;text-align:left;margin:2px 0 0;"></small></label>
     ${tipo !== 'f' ? `<label style="grid-column:1/-1;">Comprobante relacionado${tipo === 'nc' ? ' (obligatorio)' : ' (opcional)'}<select id="fv-ref" onchange="fvTraerRenglones()" style="${inp}"><option value="">Primero elija el cliente…</option></select></label>` : ''}<datalist id="fv-cl">${[...new Set(clientes)].sort().map(n => `<option value="${escapeAttr(n)}">`).join('')}</datalist>
     <label>Letra<select id="fv-l" style="${inp}"><option>A</option><option>B</option><option>C</option></select></label><label>Número (punto de venta - número)<input id="fv-n" placeholder="00010-00001234" style="${inp}"></label>
     <label>Fecha<input type="date" id="fv-f" value="${ccHoy()}" style="${inp}"></label><span></span>
@@ -12720,7 +12754,7 @@ function fvManual(tipo){
   fvFila();
 }
 function fvFila(x){ x = x || {}; const d = document.createElement('div'); d.className = 'fv-r'; d.style.cssText = 'display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,.6fr) minmax(0,1fr) 34px;gap:6px;margin-bottom:6px;align-items:center;'; if(x.unit) d.dataset.unit = x.unit; if(x.max) d.dataset.max = x.max;
-  d.innerHTML = `<input class="fv-s" list="fv-skus" placeholder="SKU" value="${escapeAttr(x.sku || '')}" style="width:100%;min-width:0;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;"><input class="fv-q" inputmode="decimal" placeholder="Cant." value="${x.cant != null ? x.cant : ''}" oninput="fvCant(this)" style="width:100%;min-width:0;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:8px;"><input class="fv-i" inputmode="decimal" placeholder="Importe $" value="${x.imp ? formatoPesos(Math.round(x.imp * 100) / 100) : ''}" oninput="fvTot()" style="width:100%;min-width:0;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:8px;"><button type="button" title="Quitar renglón" onclick="this.parentNode.remove();fvTot()" style="width:34px;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;">✕</button>`;
+  d.innerHTML = `<input class="fv-s" list="fv-skus" placeholder="SKU" value="${escapeAttr(x.sku || '')}" onchange="fvPrecioFila(this.parentNode)" style="width:100%;min-width:0;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;"><input class="fv-q" inputmode="decimal" placeholder="Cant." value="${x.cant != null ? x.cant : ''}" oninput="fvCant(this)" style="width:100%;min-width:0;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:8px;"><input class="fv-i" inputmode="decimal" placeholder="Importe $" value="${x.imp ? formatoPesos(Math.round(x.imp * 100) / 100) : ''}" oninput="this.dataset.auto='';fvTot()" style="width:100%;min-width:0;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:8px;"><button type="button" title="Quitar renglón" onclick="this.parentNode.remove();fvTot()" style="width:34px;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;">✕</button>`;
   document.getElementById('fv-rows').appendChild(d); fvTot(); }
 // al cambiar la cantidad de un renglon traido de la factura, el importe se recalcula con el precio de esa factura
 function fvCant(e){ const d = e.parentNode, u = +d.dataset.unit, q = numAr(e.value) || 0, mx = +d.dataset.max; if(mx && q > mx){ alert('No puede superar lo facturado (' + mx + ').'); e.value = mx; } if(u) d.querySelector('.fv-i').value = formatoPesos(Math.round(u * (numAr(e.value) || 0) * 100) / 100); fvTot(); }
@@ -13280,7 +13314,8 @@ function agregarItemPresu(){
   const v = document.getElementById('pe-agregar').value.trim(); if(!v) return;
   const sku = v.split(' · ')[0].trim().toUpperCase(), r = buscarProductoPorSku(sku);
   leerItemsPresu();
-  if(r) presu.items.push({ sku: r.variante.sku, desc: r.producto.nombre + ' · ' + (r.variante.desc || ''), cant: 1, precio: parsePrice(r.variante.precio) || 0, descPct: 0 });
+  const cP = clientePorNombre((document.getElementById('pe-nombre') || {}).value), fP = factorCliente(cP);
+  if(r) presu.items.push({ sku: r.variante.sku, desc: r.producto.nombre + ' · ' + (r.variante.desc || ''), cant: 1, precio: Math.round((parsePrice(r.variante.precio) || 0) * fP.factor * 100) / 100, descPct: fP.desc });
   else { const n = skusSinPublicarPresu()[sku]; presu.items.push({ sku, desc: n || '', cant: 1, precio: precioSugeridoPresu(sku) || 0, descPct: 0, sinPublicar: true }); }
   document.getElementById('pe-agregar').value = ''; renderItemsPresu();
 }
@@ -15551,6 +15586,7 @@ function elegirClienteAutocompletado(idx){
   document.getElementById('f-provincia').value = c.provincia || '';
   document.getElementById('f-transporte').value = c.transporte || '';
   cont.style.display = 'none';
+  aplicarListaClientePedido(c);
   { let box = document.getElementById('f-suc'); if(!box){ box = document.createElement('div'); box.id = 'f-suc'; document.getElementById('f-nombre').parentNode.appendChild(box); } sucursalesDe(c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim(), 'f-suc', { loc: 'f-localidad', prov: 'f-provincia', transp: 'f-transporte', tel: 'f-telefono' }); }
 }
 
@@ -15659,7 +15695,8 @@ function mostrarEdicionCliente(id){
 }
 
 // ficha de cliente: alta y edicion (la cuenta corriente toma el plazo de aca)
-function cliForm(id){
+async function cliFormAbrir(id){ await cargarListasPrecios(); cliForm(id); }
+function cliForm(id){ if(!listasPrecios){ cargarListasPrecios().then(() => cliForm(id)); return; }
   setTimeout(() => { const c0 = id ? ((listaClientes || []).find(x => x.id === id) || {}) : {}; (c0.sucursales || []).forEach(s => cliFilaSuc(s)); }, 0);
   const c = id ? ((listaClientes || []).find(x => x.id === id) || {}) : {}, inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
   const f = (k, t, extra) => `<label>${t}<input id="cf2-${k}" value="${escapeAttr(c[k] != null ? c[k] : '')}" ${extra || ''} style="${inp}"></label>`;
@@ -15667,6 +15704,7 @@ function cliForm(id){
     <div style="grid-column:1/-1;">${f('razonSocial', 'Razón social')}</div>${f('nombre', 'Nombre')}${f('apellido', 'Apellido')}
     ${f('cuit', 'CUIT')}<label>Condición frente al IVA<select id="cf2-condicionIva" style="${inp}">${['Responsable inscripto', 'Monotributo', 'Exento', 'Consumidor final'].map(x => `<option ${c.condicionIva === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
     ${f('telefono', 'Teléfono')}${f('email', 'Email')}<div style="grid-column:1/-1;">${f('direccion', 'Dirección')}</div>${f('localidad', 'Localidad')}${f('provincia', 'Provincia')}
+    <label>Lista de precios<select id="cf2-lista" style="${inp}">${(listasPrecios || [{ id: 'general', nombre: 'Lista general', ajuste: 0 }]).map(l => `<option value="${escapeAttr(l.id)}" ${(c.lista || 'general') === l.id ? 'selected' : ''}>${escaparHtml(l.nombre)}${l.ajuste ? ' (' + (l.ajuste > 0 ? '+' : '') + l.ajuste + ' %)' : ''}</option>`).join('')}</select></label>
     <label>Condición de venta por defecto<select id="cf2-condicion" style="${inp}"><option value="ctacte" ${c.condicion !== 'contado' ? 'selected' : ''}>Cuenta corriente</option><option value="contado" ${c.condicion === 'contado' ? 'selected' : ''}>Contado</option></select></label>
     ${f('transporte', 'Transporte habitual')}${f('descuento', 'Descuento habitual (%)', 'inputmode="decimal"')}${f('plazo', 'Plazo de cuenta corriente (días)', 'inputmode="numeric"')}
     <label style="grid-column:1/-1;">Notas<textarea id="cf2-notas" rows="2" style="${inp}">${escaparHtml(c.notas || '')}</textarea></label>
@@ -15682,7 +15720,7 @@ async function cliGuardar(idViejo){
   const g = k => (document.getElementById('cf2-' + k).value || '').trim();
   const sucursales = [...document.querySelectorAll('.cf2-suc')].map(x => { const o = {}; ['nombre', 'comoFactura', 'direccion', 'localidad', 'provincia', 'contacto', 'telefono', 'transporte'].forEach(k => o[k] = (x.querySelector('.sc-' + k).value || '').trim()); return o; }).filter(o => o.nombre || o.comoFactura || o.direccion);
   const grupoNombre = (document.getElementById('cf2-grupo').value || '').trim();
-  const d = { sucursales, grupoNombre, grupo: grupoNombre ? ccClave(grupoNombre) : '', razonSocial: g('razonSocial'), nombre: g('nombre'), apellido: g('apellido'), cuit: g('cuit'), condicionIva: g('condicionIva'), telefono: g('telefono'), email: g('email'), direccion: g('direccion'), localidad: g('localidad'), provincia: g('provincia'), transporte: g('transporte'), condicion: g('condicion') || 'ctacte', descuento: numAr(g('descuento')) || 0, plazo: Math.round(numAr(g('plazo')) || 0), notas: g('notas') };
+  const d = { sucursales, grupoNombre, grupo: grupoNombre ? ccClave(grupoNombre) : '', razonSocial: g('razonSocial'), nombre: g('nombre'), apellido: g('apellido'), cuit: g('cuit'), condicionIva: g('condicionIva'), telefono: g('telefono'), email: g('email'), direccion: g('direccion'), localidad: g('localidad'), provincia: g('provincia'), transporte: g('transporte'), lista: g('lista') || 'general', condicion: g('condicion') || 'ctacte', descuento: numAr(g('descuento')) || 0, plazo: Math.round(numAr(g('plazo')) || 0), notas: g('notas') };
   if(!d.razonSocial && !d.nombre && !d.apellido){ alert('Escriba la razón social o el nombre.'); return; }
   const cuitLimpio = d.cuit.replace(/[\/\s.-]/g, '');
   if(!idViejo && cuitLimpio && (listaClientes || []).some(x => String(x.cuit || '').replace(/[\/\s.-]/g, '') === cuitLimpio)){ alert('Ya existe un cliente con ese CUIT.'); return; }
@@ -21344,7 +21382,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v343';
+const APP_VERSION = '2026-10-02-v344';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
