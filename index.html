@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v356</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v357</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -12900,7 +12900,8 @@ function htmlRecibo(m){
 function imprimirHtml(html){ const w = window.open('', '_blank'); if(!w){ alert('Permita ventanas emergentes para imprimir.'); return; } w.document.write(html); w.document.close(); }
 // ===== Catalogo en laminas (sin IA, sin creditos): plantilla fija 1080x1350 por producto, PDF y JPG =====
 let acState = { cat: '', q: '', sel: new Set(), lista: 'general', precios: true, skus: true, tipo: 'mayorista', pie: 'onlinetextil.com.ar', portada: true, titulo: 'Catálogo' };
-function acProductos(){ const L = []; CATALOGO.forEach((c, ci) => { if(acState.cat && c.categoria !== acState.cat) return; (c.productos || []).forEach((p, pi) => { if(acState.q && !coincideBusqueda(p.nombre + ' ' + (p.variantes || []).map(v => v.sku + ' ' + v.desc).join(' '), acState.q)) return; L.push({ ci, pi, p, key: ci + ':' + pi, cat: c.categoria }); }); }); return L; }
+function acProductos(){ const L = [], qs = String(acState.q || '').split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+  CATALOGO.forEach((c, ci) => { if(acState.cat && c.categoria !== acState.cat) return; (c.productos || []).forEach((p, pi) => { const txt = p.nombre + ' ' + (p.variantes || []).map(v => v.sku + ' ' + v.desc).join(' '); if(qs.length && !qs.some(q => coincideBusqueda(txt, q))) return; L.push({ ci, pi, p, key: ci + ':' + pi, cat: c.categoria }); }); }); return L; }
 async function abrirArmarCatalogo(){
   await cargarListasPrecios();
   const cats = [...new Set(CATALOGO.map(c => c.categoria).filter(Boolean))];
@@ -12908,13 +12909,15 @@ async function abrirArmarCatalogo(){
     <div class="fila" style="grid-template-columns:1fr 1fr 1fr;"><div><span class="fl">Tipo</span><select onchange="acState.tipo=this.value;acState.skus=this.value==='mayorista';document.getElementById('ac-skus').checked=acState.skus"><option value="mayorista">Mayorista</option><option value="minorista">Minorista</option></select></div>
       <div><span class="fl">Lista de precios</span><select onchange="acState.lista=this.value">${(listasPrecios || []).map(l => `<option value="${escapeAttr(l.id)}">${escaparHtml(l.nombre)}</option>`).join('')}</select></div>
       <div><span class="fl">Título de la portada</span><input value="${escapeAttr(acState.titulo)}" oninput="acState.titulo=this.value"></div></div>
-    <div class="fila" style="grid-template-columns:1fr 1fr;"><div><span class="fl">Categoría</span><select onchange="acState.cat=this.value;acPintar()"><option value="">Todas</option>${cats.map(c => `<option>${escaparHtml(c)}</option>`).join('')}</select></div><div><span class="fl">Buscar</span><input placeholder="ej.: century, toallón" oninput="acState.q=this.value;clearTimeout(window.__acT2);window.__acT2=setTimeout(acPintar,250)"></div></div>
+    <div class="fila" style="grid-template-columns:1fr 1fr;"><div><span class="fl">Categoría</span><select onchange="acState.cat=this.value;acPintar(true)"><option value="">Todas</option>${cats.map(c => `<option>${escaparHtml(c)}</option>`).join('')}</select></div><div><span class="fl">Buscar</span><input placeholder="SKU o nombre; varios separados por coma" oninput="acState.q=this.value;clearTimeout(window.__acT2);window.__acT2=setTimeout(()=>acPintar(true),250)"></div></div>
     <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.85rem;margin-bottom:8px;"><label><input type="checkbox" checked onchange="acState.precios=this.checked"> Mostrar precios</label><label><input type="checkbox" id="ac-skus" checked onchange="acState.skus=this.checked"> Mostrar SKU</label><label><input type="checkbox" checked onchange="acState.portada=this.checked"> Portada</label><label style="flex:1;min-width:200px;">Pie de página <input value="${escapeAttr(acState.pie)}" oninput="acState.pie=this.value" style="height:30px !important;"></label></div>
     <div id="ac-lista" style="max-height:38vh;overflow:auto;border-top:1px solid #EEE9E1;"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap;"><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="acGenerar('previa')">👁️ Vista previa</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="acGenerar('jpg')">🖼️ Láminas JPG (zip)</button><button class="btn btn-gold" style="width:auto;padding:10px 22px;" onclick="acGenerar('pdf')">📄 Catálogo PDF</button></div></div>`, 920);
   acState.sel = new Set(acProductos().map(x => x.key)); acPintar();
 }
-function acPintar(){ const L = acProductos(), box = document.getElementById('ac-lista'); if(!box) return;
+function acPintar(nuevoFiltro){ const L = acProductos(), box = document.getElementById('ac-lista'); if(!box) return;
+  if(nuevoFiltro) acState.sel = new Set(L.map(x => x.key));
+  if(!L.length){ box.innerHTML = `<p class="note" style="text-align:left;padding:10px 0;">No hay productos con ese filtro${acState.cat ? ` en la categoría <b>${escaparHtml(acState.cat)}</b> (pruebe con "Todas")` : ''}. Para varios, sepárelos con coma: <i>toa171b, toa141b</i>.</p>`; return; }
   box.innerHTML = `<label style="display:flex;gap:8px;padding:6px 0;font-size:.85rem;font-weight:700;"><input type="checkbox" ${L.every(x => acState.sel.has(x.key)) ? 'checked' : ''} onchange="acProductos().forEach(x=>this.checked?acState.sel.add(x.key):acState.sel.delete(x.key));acPintar()"> Todos (${L.length}) · ${[...acState.sel].length} elegidos</label>`
     + L.map(x => { const im = imagenesEfectivas(x.ci, x.pi, x.p)[0]; return `<label style="display:flex;gap:10px;align-items:center;padding:5px 0;border-top:1px solid #F3EFE8;font-size:.85rem;"><input type="checkbox" ${acState.sel.has(x.key) ? 'checked' : ''} onchange="this.checked?acState.sel.add('${x.key}'):acState.sel.delete('${x.key}');"><span style="width:38px;height:38px;border-radius:6px;background:#F3EFE8 center/cover;${im ? `background-image:url('${String(im).replace(/'/g, '%27')}');` : ''}"></span><span style="flex:1;"><b>${escaparHtml(x.p.nombre)}</b> <span class="meta">${escaparHtml(x.cat)} · ${(x.p.variantes || []).length} medidas</span></span>${im ? '' : '<span class="meta">sin foto</span>'}</label>`; }).join(''); }
 function acCargarImg(src){ return new Promise(res => { if(!src){ res(null); return; } const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = () => res(null); i.src = src; }); }
@@ -21671,7 +21674,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v356';
+const APP_VERSION = '2026-10-02-v357';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
