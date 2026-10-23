@@ -1657,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v329</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v330</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2767,7 +2767,7 @@ function renderCatalogo(filtro){
         variantesHtml += `
           <div class="variante">
             <div class="variante-fila">
-              <div class="desc" style="display:flex;gap:8px;align-items:flex-start;">${miniFotoSku(v.sku, ci, pi)}<div onclick="mostrarFotoSku('${escapeAttr(v.sku)}', ${ci}, ${pi}, this)" ${fotosSku[String(v.sku).toUpperCase()] ? 'style="cursor:pointer;"' : ''}>${descVarianteHtml(v.desc)}<span class="sku">SKU ${v.sku}</span>${rolloNota}</div></div>
+              <div class="desc" style="display:flex;gap:8px;align-items:flex-start;">${miniFotoSku(v.sku, ci, pi)}<div onclick="mostrarFotoSku('${escapeAttr(v.sku)}', ${ci}, ${pi}, this)" ${fotosSku[String(v.sku).toUpperCase()] ? 'style="cursor:pointer;"' : ''}>${descVarianteHtml(v.desc)}<span class="sku">SKU ${v.sku}</span>${rolloNota}${(fotosSku[String(v.sku).toUpperCase()] || imagenesEfectivas(ci, pi, p) || []).length ? ` <a href="#" class="sku" title="Enviar las fotos de esta medida" onclick="event.preventDefault();event.stopPropagation();enviarFotosSku('${escapeAttr(v.sku)}', ${ci}, ${pi})" style="text-decoration:none;">📤 fotos</a>` : ''}</div></div>
               <div class="precio ${precioNum===null?'consultar':''}">${precioNum===null ? 'Consultar' : formatPrice(precioNum) + sufijoPrecioSku(p, v.sku)}</div>
               ${precioNum===null ? '<div></div>' : `
               <div class="qty">
@@ -18171,7 +18171,26 @@ function abrirGaleriaCatalogo(ci, pi, sku){
   overlay.querySelector('#gc-next').onclick = () => { idx = (idx + 1) % fotos.length; actualizar(); };
   overlay.querySelector('#gc-cerrar').onclick = () => overlay.remove();
   overlay.onclick = (e) => { if(e.target === overlay) overlay.remove(); };
+  { const bt = document.createElement('button'); bt.type = 'button'; bt.textContent = '📤 Enviar estas fotos'; bt.style.cssText = 'margin-top:12px;background:#fff;border:none;border-radius:20px;padding:10px 18px;font-weight:700;cursor:pointer;';
+    bt.onclick = (e) => { e.stopPropagation(); enviarFotos(fotos, p.nombre + (sku ? ' · ' + sku : ''), sku ? linkWebDeSku(sku) || linkWebDeProducto(p) : linkWebDeProducto(p)); }; overlay.appendChild(bt); }
 }
+// enviar las fotos de un SKU (o producto): en el celular abre "Compartir" (WhatsApp, mail…); en la computadora las descarga
+async function enviarFotos(fotos, titulo, link){
+  if(!fotos || !fotos.length){ alert('No hay fotos para enviar.'); return; }
+  procesando('Preparando las fotos…');
+  try{
+    const files = []; let i = 0;
+    for(const f of fotos){ i++; const r = await fetch(f); const b = await r.blob(); const ext = (b.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg'); files.push(new File([b], `${String(titulo).replace(/[^A-Za-z0-9 _-]/g, '').trim().replace(/\s+/g, '-').slice(0, 40) || 'foto'}-${i}.${ext}`, { type: b.type || 'image/jpeg' })); }
+    procesando.listo('');
+    const texto = titulo + (link ? '\n' + link : '');
+    if(navigator.canShare && navigator.canShare({ files })){ try{ await navigator.share({ files, text: texto, title: titulo }); } catch(e){ if(e.name !== 'AbortError') throw e; } return; }
+    files.forEach((f, k) => setTimeout(() => { const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }, k * 400));
+    if(link) try{ await navigator.clipboard.writeText(texto); } catch(e){}
+    alert(`Se descargaron ${files.length} foto(s) a la carpeta Descargas.${link ? '\nEl nombre y el link de la web quedaron copiados para pegar en el mensaje.' : ''}`);
+  } catch(e){ procesando.error(e.message); alert('No se pudieron preparar las fotos: ' + e.message); }
+}
+function enviarFotosSku(S, ci, pi){ const p = CATALOGO[ci].productos[pi], propias = fotosSku[String(S).toUpperCase()]; const v = (p.variantes || []).find(x => String(x.sku).toUpperCase() === String(S).toUpperCase()) || {};
+  enviarFotos(propias && propias.length ? propias : imagenesEfectivas(ci, pi, p), `${p.nombre} · ${v.desc || ''} · ${S}`, linkWebDeSku(S) || linkWebDeProducto(p)); }
 
 function abrirActualizarFoto(){
   mostrarPaso('step-foto-sku');
@@ -21191,7 +21210,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v329';
+const APP_VERSION = '2026-10-02-v330';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
