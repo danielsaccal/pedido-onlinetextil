@@ -1657,7 +1657,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v324</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v325</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6175,6 +6175,7 @@ async function dashDatos(forzar){
   try{ const tn = Object.values((stockDatos && stockDatos.telas) || {}).filter(x => (+x.metros || 0) < 0).length; if(tn) P('stock', `🧵 ${tn} telas con metros negativos`, "abrirStock().then(() => { skTab = 'telas'; pintarStockTabs(); skRenderTab(); })"); } catch(e){}
   if(sPed){ const n = sPed.docs.map(d => d.data()).filter(x => ['pendiente', 'parcial'].includes(x.estado || 'pendiente') && x.fecha && new Date(x.fecha) < new Date(Date.now() - 7 * 864e5)).length; if(n) P('stock', `🚚 ${n} pedidos pendientes de entrega con más de 7 días`, 'abrirPendientesEntrega()'); }
   if(sPre){ const n = sPre.docs.map(d => d.data()).filter(x => !x.pedido && x.estado !== 'rechazado' && x.fecha && x.validez && new Date(new Date(x.fecha).getTime() + x.validez * 864e5) < new Date()).length; if(n) P('stock', `🧾 ${n} presupuestos abiertos con la validez vencida`, 'abrirPresupuestos()'); }
+  try{ const sD = await t(db.collection('devoluciones_ml').get().catch(() => null)); if(sD){ const n = sD.docs.map(d => d.data()).filter(x => x.estado === 'pendiente').length; if(n) P('stock', `↩️ ${n} devoluciones de Mercado Libre para revisar (¿volvieron bien?)`, "abrirStock().then(() => { skTab = 'devol'; pintarStockTabs(); skRenderTab(); })", true); } } catch(e){}
   try{ const sR = await t(db.collection('remitos').get().catch(() => null)); if(sR){ const n = sR.docs.map(d => d.data()).filter(r => !r.facturaRef && !r.anulado && r.fecha < hace(7).slice(0, 10)).length; if(n) P('stock', `🚚 ${n} remitos sin facturar con más de 7 días`, 'abrirRemitos()'); } } catch(e){}
   if(dueno){ const dc = diasDesdeCopia(); if(dc == null || dc >= 7) P('stock', `💾 ${dc == null ? 'Nunca descargó' : 'Hace ' + dc + ' días que no descarga'} una copia de seguridad`, 'abrirCopiaSeguridad()'); }
   dashCache = V; dashCacheT = Date.now(); return V;
@@ -9212,12 +9213,18 @@ function pintarStockTabs(){
   const neg = Object.entries(stockDatos.skus || {}).filter(([, x]) => (+x.stock || 0) < 0 || (+x.full || 0) < 0).length;
   document.getElementById('sk-inicio').innerHTML = !ini ? `<div style="background:#FFF8E6;border:1px solid #EBD9A8;border-radius:12px;padding:10px;margin-bottom:10px;font-size:.9rem;">Para que las ventas descuenten stock solas, elija desde qué fecha arranca el control (el día que cuente la mercadería): <input type="date" id="sk-ini" style="padding:6px;border:1px solid var(--line);border-radius:8px;"> <button type="button" class="btn-mini" onclick="skGuardarInicio()">Empezar</button></div>`
     : `<p class="note" style="text-align:left;margin:0 0 8px;">Control de stock desde el ${ini.split('-').reverse().join('/')}.${neg ? ` <b style="color:#A6432F;">⚠️ ${neg} SKU con stock negativo: revise (suele ser una venta sin su ingreso o un conteo pendiente).</b>` : ''}</p>`;
-  document.getElementById('sk-tabs').innerHTML = [['productos', '📦 Productos'], ['telas', '🧵 Telas (metros)'], ['movs', '🕒 Movimientos']].map(([k, t]) => `<button type="button" onclick="skTab='${k}';pintarStockTabs();skRenderTab()" style="padding:7px 12px;border-radius:999px;border:1px solid ${skTab === k ? 'var(--purple)' : 'var(--line)'};background:${skTab === k ? 'var(--purple)' : '#fff'};color:${skTab === k ? '#fff' : 'var(--purple)'};font-weight:700;cursor:pointer;">${t}</button>`).join('');
+  document.getElementById('sk-tabs').innerHTML = [['productos', '📦 Productos'], ['devol', '↩️ Devoluciones ML'], ['telas', '🧵 Telas (metros)'], ['movs', '🕒 Movimientos']].map(([k, t]) => `<button type="button" onclick="skTab='${k}';pintarStockTabs();skRenderTab()" style="padding:7px 12px;border-radius:999px;border:1px solid ${skTab === k ? 'var(--purple)' : 'var(--line)'};background:${skTab === k ? 'var(--purple)' : '#fff'};color:${skTab === k ? '#fff' : 'var(--purple)'};font-weight:700;cursor:pointer;">${t}</button>`).join('');
   document.getElementById('sk-prod').style.display = skTab === 'productos' ? '' : 'none'; document.getElementById('sk-otra').style.display = skTab === 'productos' ? 'none' : '';
 }
 async function skGuardarInicio(){ const v = document.getElementById('sk-ini').value; if(!v){ alert('Elija la fecha.'); return; } stockDatos.inicio = v; try{ await db.collection('config').doc('stock').set(JSON.parse(JSON.stringify(stockDatos))); } catch(e){ delete stockDatos.inicio; alert('No se pudo guardar: ' + e.message); return; } pintarStockTabs(); alert('Listo. Cargue el stock contado de cada SKU (columna Stock) y toque Guardar.'); }
 async function skRenderTab(){
   const box = document.getElementById('sk-otra'); if(skTab === 'productos'){ renderStock(); return; }
+  if(skTab === 'devol'){ box.innerHTML = '<p class="empty-msg">Cargando…</p>'; const s = await db.collection('devoluciones_ml').get(); const L = s.docs.map(d => ({ _id: d.id, ...d.data() })).sort((a, b) => (a.estado === 'pendiente' ? 0 : 1) - (b.estado === 'pendiente' ? 0 : 1) || String(b.fecha).localeCompare(String(a.fecha))); window.__devs = L;
+    const pend = L.filter(x => x.estado === 'pendiente');
+    box.innerHTML = `<p class="note" style="text-align:left;">Devoluciones que trae el reporte de Mercado Libre. Indique cómo volvió cada una: recién ahí se mueve el stock.</p>
+      ${pend.length ? pend.map(x => { const r = buscarProductoPorSku(x.sku); return `<div style="border-top:1px solid var(--line);padding:8px 0;"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;"><b>${escaparHtml(x.sku)}</b><span class="meta">${r ? escaparHtml(r.producto.nombre + ' · ' + (r.variante.desc || '')) : ''}</span><span style="margin-left:auto;">${x.unid} u. · ${escaparHtml(x.cuenta)} · venta ${escaparHtml(x.op)} · ${String(x.fecha).split('-').reverse().join('/')}</span></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;"><button type="button" class="btn-mini" onclick="devResolver('${x._id}','bien','stock')">✓ Volvió bien → depósito</button><button type="button" class="btn-mini" onclick="devResolver('${x._id}','bien','full')">✓ Volvió bien → Full</button><button type="button" class="btn-mini" onclick="devResolver('${x._id}','fallada')">Volvió fallada → segunda</button><button type="button" class="btn-mini" onclick="devResolver('${x._id}','no')">No volvió</button></div></div>`; }).join('') : '<p class="empty-msg">✓ No hay devoluciones para revisar.</p>'}
+      ${L.length > pend.length ? `<details style="margin-top:10px;"><summary style="cursor:pointer;font-size:.85rem;">Ya revisadas (${L.length - pend.length})</summary>${L.filter(x => x.estado !== 'pendiente').map(x => `<div class="meta" style="padding:4px 0;border-top:1px solid var(--line);">${escaparHtml(x.sku)} · ${x.unid} u. · ${escaparHtml(x.cuenta)} · ${{ bien: 'volvió bien', fallada: 'volvió fallada (segunda)', no: 'no volvió' }[x.estado] || x.estado}${x.destino === 'full' ? ' (Full)' : ''}</div>`).join('')}</details>` : ''}`; return; }
   if(skTab === 'movs'){ box.innerHTML = '<p class="empty-msg">Cargando…</p>'; const s = await db.collection('stock_movs').get(); const L = s.docs.map(d => d.data()).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))).slice(0, 300);
     box.innerHTML = L.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.84rem;">${L.map(m => `<tr style="border-top:1px solid var(--line);"><td style="padding:5px;white-space:nowrap;">${new Date(m.fecha).toLocaleString('es-AR')}</td><td style="padding:5px;"><b>${escaparHtml(m.sku || m.tela || '')}</b>${m.ubic === 'full' ? ' ' + chipML('Full') : ''}</td><td style="padding:5px;text-align:right;font-weight:700;color:${m.cantidad < 0 ? '#A6432F' : '#2F7A47'};">${m.cantidad > 0 ? '+' : ''}${m.cantidad}${m.tela ? ' m' : ''}</td><td style="padding:5px;">${escaparHtml(m.tipo || '')} <span class="meta">${escaparHtml(m.ref || '')}</span></td><td style="padding:5px;" class="meta">${escaparHtml(m.usuario || '')}</td></tr>`).join('')}</table></div>` : '<p class="empty-msg">Sin movimientos.</p>'; return; }
   if(skTab === 'telas'){ const T = Object.entries((telasDatos && telasDatos.telas) || {}).sort((a, b) => a[0].localeCompare(b[0])); stockDatos.telas = stockDatos.telas || {};
@@ -9234,12 +9241,22 @@ async function skMovTela(k, tipo){
   db.collection('stock_movs').add({ tela: k, cantidad: delta, tipo: tipo === 'ingreso' ? 'ingreso de tela' : 'ajuste de tela (conteo)', usuario: (firebase.auth().currentUser || {}).email || '', fecha: new Date().toISOString() }).catch(() => {});
   skRenderTab();
 }
+async function devResolver(id, como, destino){
+  const x = (window.__devs || []).find(d => d._id === id); if(!x) return;
+  const txt = { bien: `vuelve al stock (${destino === 'full' ? 'Full' : 'depósito'})`, fallada: `pasa a segunda (${x.sku}-2DA)`, no: 'no se mueve el stock (quedó perdida: conviene reclamar a ML)' }[como];
+  if(!confirm(`${x.sku} · ${x.unid} u.: ${txt}. ¿Confirmar?`)) return;
+  try{ if(como === 'bien') await moverStockVarios([{ sku: x.sku, cantidad: x.unid, ubic: destino, tipo: 'devolución ML (volvió bien)', ref: x.cuenta + ' ' + x.op }]);
+    if(como === 'fallada') await moverStockVarios([{ sku: x.sku + '-2DA', cantidad: x.unid, tipo: 'devolución ML (fallada)', ref: x.cuenta + ' ' + x.op }]);
+    await db.collection('devoluciones_ml').doc(id).set({ estado: como, destino: destino || '', resuelto: new Date().toISOString(), por: (firebase.auth().currentUser || {}).email || '' }, { merge: true }); }
+  catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  dashCache = null; skRenderTab();
+}
 // movimiento manual de productos
 function skFormMov(){
   const inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
   const t = document.getElementById('pub-titulo'); if(t) t.textContent = '➕ Movimiento de stock';
   document.getElementById('pub-cont').innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-    <label style="grid-column:1/-1;">Tipo<select id="sm-t" style="${inp}"><option value="ingreso">Ingreso de mercadería (compra o devolución)</option><option value="full">Envío a Full</option><option value="fullml">Ajustar Full según Mercado Libre</option><option value="segunda">Pasar a segunda calidad (SKU -2DA)</option><option value="salida">Salida (rotura, regalo, muestra…)</option></select></label>
+    <label style="grid-column:1/-1;">Tipo<select id="sm-t" style="${inp}"><option value="ingreso">Ingreso de mercadería (compra o devolución)</option><option value="full">Envío a Full</option><option value="fullml">Ajustar Full según Mercado Libre</option><option value="segunda">Pasar a segunda calidad (SKU -2DA)</option><option value="salida">Salida (rotura, regalo, muestra…)</option><option value="armar">Armar juegos (descuenta las piezas)</option><option value="desarmar">Desarmar juegos (suma las piezas)</option></select></label>
     <label>SKU<input id="sm-s" list="sm-skus" style="${inp}text-transform:uppercase;"></label><label>Cantidad (unidades sueltas)<input id="sm-c" inputmode="decimal" style="${inp}"></label>
     <label style="grid-column:1/-1;">Detalle<input id="sm-d" placeholder="opcional" style="${inp}"></label></div><datalist id="sm-skus">${skusDeStock().map(s => `<option value="${s}">`).join('')}</datalist>
     <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="skGuardarMov()">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`;
@@ -9253,6 +9270,10 @@ async function skGuardarMov(){
   else if(t === 'full') movs = [{ sku: S, cantidad: -n, tipo: 'envío a Full', ref: d }, { sku: S, cantidad: n, ubic: 'full', tipo: 'envío a Full', ref: d }];
   else if(t === 'fullml'){ const dif = n - (+x.full || 0); if(!dif){ alert('Coincide con lo que tiene la app: no hay diferencia.'); return; } if(!confirm(`Full de ${S}: la app tiene ${+x.full || 0} y Mercado Libre dice ${n}. ¿Ajustar ${dif > 0 ? '+' : ''}${dif}?`)) return; movs = [{ sku: S, cantidad: dif, ubic: 'full', tipo: 'ajuste Full (según ML)', ref: d }]; }
   else if(t === 'segunda') movs = [{ sku: S, cantidad: -n, tipo: 'pasa a segunda calidad', ref: d }, { sku: S + '-2DA', cantidad: n, tipo: 'segunda calidad', ref: S }];
+  else if(t === 'armar' || t === 'desarmar'){ if(kitsDatos === null) await cargarKits(); const k = kitsDatos && kitsDatos[S]; if(!k){ alert(`${S} no es un juego: cargue sus piezas en Costos de productos (juego armado), por ejemplo "KA131 + KA131A + KA131F x2".`); return; }
+    const sg = t === 'armar' ? 1 : -1, partes = partesKit(k); const det = partes.map(p => `${p.sku} × ${p.n * n}`).join(', ');
+    if(!confirm(`${t === 'armar' ? 'Armar' : 'Desarmar'} ${n} ${S}:\n${t === 'armar' ? 'se descuentan' : 'se suman'} ${det}.\n¿Confirmar?`)) return;
+    movs = [{ sku: S, cantidad: sg * n, tipo: t === 'armar' ? 'juego armado' : 'juego desarmado', ref: d }].concat(partes.map(p => ({ sku: p.sku, cantidad: -sg * p.n * n, tipo: t === 'armar' ? 'pieza usada en juego' : 'pieza de juego desarmado', ref: S }))); }
   else movs = [{ sku: S, cantidad: -n, tipo: 'salida', ref: d }];
   try{ await moverStockVarios(movs); } catch(e){ alert('No se pudo guardar: ' + e.message); await cargarStock(); return; }
   cerrarPublicar(); pintarStockTabs(); renderStock();
@@ -12830,7 +12851,7 @@ async function guardarPermiso(mail, perm, val){
 const COLECCIONES_COPIA = ['config', 'productos_nuevos', 'productos_editados', 'productos_eliminados', 'historial_precios', 'clientes', 'pedidos',
   'ordenes_trabajo', 'envios_tela', 'ingresos_taller', 'stock_movs', 'historial_costos', 'calculadora_costos', 'gastos', 'gastos_periodicos_ml',
   'ventas_facturadas', 'movimientos_ml', 'usuarios', 'mlMeses', 'fotos',
-  'cc_movimientos', 'cc_log', 'proveedores', 'compras', 'pagos', 'remitos', 'teso_movs', 'teso_extractos', 'ml_detalle', 'ml_stock_aplicado', 'presupuestos', 'agente_chats'];
+  'cc_movimientos', 'cc_log', 'proveedores', 'compras', 'pagos', 'remitos', 'devoluciones_ml', 'teso_movs', 'teso_extractos', 'ml_detalle', 'ml_stock_aplicado', 'presupuestos', 'agente_chats'];
 function cargarJSZip(){
   if(window.JSZip) return Promise.resolve();
   return new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload = res; s.onerror = () => rej(new Error('No se pudo cargar el compresor')); document.head.appendChild(s); });
@@ -21074,7 +21095,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v324';
+const APP_VERSION = '2026-10-02-v325';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
