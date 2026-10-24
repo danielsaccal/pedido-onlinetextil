@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v364</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v365</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -8357,7 +8357,7 @@ function pvImprimirOP(id){
   const efectivo = (x.medios || []).some(m => /Efectivo|Cheque/.test(m.medio)) || !x.comprobante;
   const w = window.open('', '_blank'); if(!w){ alert('Permita ventanas emergentes para imprimir.'); return; }
   w.document.write(`<html><head><title>Orden de pago ${String(x.numero).padStart(5, '0')}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#222}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}td,th{padding:6px;border-bottom:1px solid #ddd;text-align:left}.r{text-align:right}h1{font-size:20px;margin:0}.firma{margin-top:60px;display:flex;gap:40px}.firma div{flex:1;border-top:1px solid #444;padding-top:6px;font-size:12px;text-align:center}img{max-width:100%;margin-top:14px;border:1px solid #ddd}</style></head><body>
-    <div style="display:flex;justify-content:space-between;gap:10px;"><div>${encabezadoRZ(x.razon || 'propia')}</div><h1 style="font-size:18px;">Orden de pago N.º ${String(x.numero).padStart(5, '0')}</h1></div><p>Fecha: ${String(x.fecha).split('-').reverse().join('/')}<br>Paga: <b>${escaparHtml((PV_RAZONES.find(y => y[0] === (x.razon || 'propia')) || [, ''])[1])}</b><br>Proveedor: <b>${escaparHtml(p.nombre || '')}</b>${p.cuit ? ' · CUIT ' + escaparHtml(p.cuit) : ''}</p>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2px solid #3D2B4E;padding-bottom:10px;margin-bottom:10px;"><div>${encabezadoRZ(x.razon || 'propia')}</div><div style="text-align:right;"><div style="font:700 18px Arial;">ORDEN DE PAGO</div><div>N.º ${String(x.numero).padStart(5, '0')}</div></div></div><p>Fecha: ${String(x.fecha).split('-').reverse().join('/')}<br>Paga: <b>${escaparHtml((PV_RAZONES.find(y => y[0] === (x.razon || 'propia')) || [, ''])[1])}</b><br>Proveedor: <b>${escaparHtml(p.nombre || '')}</b>${p.cuit ? ' · CUIT ' + escaparHtml(p.cuit) : ''}</p>
     <table><tr><th>Medio</th><th class="r">Importe</th></tr>${(x.medios || []).map(m => `<tr><td>${escaparHtml(m.medio)}</td><td class="r">${formatPrice(m.importe)}</td></tr>`).join('')}
     ${Object.entries(x.retenciones || {}).map(([k, v]) => `<tr><td>Retención ${k.toUpperCase()}</td><td class="r">${formatPrice(v)}</td></tr>`).join('')}
     <tr><td><b>Total</b></td><td class="r"><b>${formatPrice((x.totalARS || 0) + Object.values(x.retenciones || {}).reduce((a, v) => a + v, 0))}</b>${x.tc ? `<br>US$ ${x.aplicadoMon} (TC ${x.tc})` : ''}</td></tr></table>
@@ -12722,7 +12722,7 @@ async function remitoDesdePedido(numero){
 function rmImprimir(id){
   const r = remitos.find(x => x._id === id); if(!r) return; const w = window.open('', '_blank'); if(!w){ alert('Permita ventanas emergentes para imprimir.'); return; }
   w.document.write(`<html><head><title>Remito R ${String(r.numero).padStart(6, '0')}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#222}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}td,th{padding:6px;border-bottom:1px solid #ddd;text-align:left}.r{text-align:right}h1{font-size:20px;margin:0}.firma{margin-top:70px;display:flex;gap:30px}.firma div{flex:1;border-top:1px solid #444;padding-top:6px;font-size:12px;text-align:center}.x{font-size:11px;color:#666}</style></head><body>
-    <div style="display:flex;justify-content:space-between;gap:10px;"><div>${encabezadoRZ('propia')}</div><h1 style="font-size:18px;">Remito N.º R ${String(r.numero).padStart(6, '0')}</h1></div><p class="x">Remito interno · documento no válido como factura</p>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2px solid #3D2B4E;padding-bottom:10px;margin-bottom:10px;"><div>${encabezadoRZ('propia')}</div><div style="text-align:right;"><div style="font:700 18px Arial;">REMITO</div><div>N.º R ${String(r.numero).padStart(6, '0')}</div></div></div><p class="x">Remito interno · documento no válido como factura</p>
     <table style="margin-top:6px;font-size:13px;"><tr><td style="width:50%;vertical-align:top;border:none;">Fecha: ${String(r.fecha).split('-').reverse().join('/')}<br>Señor(es): <b>${escaparHtml(r.cliente)}</b>${r.sucursal ? ' · ' + escaparHtml(r.sucursal) : ''}${r.cuit ? '<br>CUIT: ' + escaparHtml(r.cuit) : ''}${r.condicionIva ? '<br>IVA: ' + escaparHtml(r.condicionIva) : ''}${r.tel ? '<br>Contacto: ' + escaparHtml(r.tel) : ''}</td>
       <td style="vertical-align:top;border:none;">${r.direccion ? 'Lugar de entrega: ' + escaparHtml(r.direccion) + '<br>' : ''}${r.transporte ? 'Transporte: ' + escaparHtml(r.transporte) + '<br>' : ''}Bultos: ${r.bultos || 1}${r.valor ? '<br>Valor declarado: ' + formatPrice(r.valor) : ''}${r.pedido ? '<br>Nuestro pedido: ' + escaparHtml(r.pedido) : ''}${r.oc ? '<br>Su orden de compra: ' + escaparHtml(r.oc) : ''}</td></tr></table>
     <table><tr><th>SKU</th><th>Descripción</th><th class="r">Cantidad</th></tr>${(r.items || []).map(x => `<tr><td>${escaparHtml(x.sku || '')}</td><td>${escaparHtml(x.desc || '')}</td><td class="r">${x.cant}</td></tr>`).join('')}</table>
@@ -12834,7 +12834,8 @@ function fvNotaCliente(){ const e = document.getElementById('fv-notacli'); if(!e
 let datosRZ = {};
 async function cargarDatosRZ(){ try{ const d = await db.collection('config').doc('razones').get(); datosRZ = d.exists ? (d.data().r || {}) : {}; } catch(e){} return datosRZ; }
 function encabezadoRZ(k){ const d = datosRZ[k || 'propia'] || {}, nom = d.nombre || (PV_RAZONES.find(x => x[0] === (k || 'propia')) || [, 'OnLineTextil'])[1];
-  return `<h1>${escaparHtml(nom)}</h1><span class="x">${[d.domicilio, d.cuit ? 'CUIT ' + d.cuit : '', d.iibb ? 'IIBB ' + d.iibb : '', d.inicio ? 'Inicio de actividades ' + d.inicio : '', d.iva || 'Responsable inscripto'].filter(Boolean).map(escaparHtml).join(' · ')}</span>`; }
+  // membrete: nombre y, debajo, un dato por linea
+  return `<div style="line-height:1.45;"><div style="font:700 20px Arial,sans-serif;color:#3D2B4E;letter-spacing:.01em;margin-bottom:4px;">${escaparHtml(nom)}</div><div style="font-size:11.5px;color:#555;">${[d.domicilio, d.cuit ? 'CUIT: ' + d.cuit : '', d.iibb ? 'Ingresos Brutos: ' + d.iibb : '', d.inicio ? 'Inicio de actividades: ' + d.inicio : '', 'IVA ' + (d.iva || 'Responsable inscripto')].filter(Boolean).map(escaparHtml).join('<br>')}</div></div>`; }
 async function abrirDatosRazones(){
   if(!esDueno()){ alert('Solo el dueño.'); return; } await cargarDatosRZ();
   const f = (k, c, t, ph) => `<label style="display:block;margin:4px 0;"><span class="fl">${t}</span><input id="dr-${k}-${c}" value="${escapeAttr((datosRZ[k] || {})[c] || '')}" placeholder="${ph || ''}"></label>`;
@@ -12914,13 +12915,13 @@ async function vistaPrevia(tipoComp, arg1, arg2){ await cargarDatosRZ(); await c
   mostrarVistaPrevia(html, () => vistaPreviaConfirmar(tipoComp, arg1, arg2));
 }
 function vistaPreviaConfirmar(t, a, b){ if(t === 'factura') fvGuardar(a); else if(t === 'remito') rmGuardar(a); else if(t === 'recibo') ccGuardarCobro(a, b); else if(t === 'op') pvGuardarPago(a); }
-const estiloDoc = `body{font-family:Arial,sans-serif;padding:28px;color:#222;font-size:13px}table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #ddd;text-align:left}.r{text-align:right}h1{font-size:19px;margin:0}.box{border:1px solid #333;border-radius:6px;padding:10px 12px}.letra{border:2px solid #222;width:46px;height:46px;font:800 28px Arial;display:flex;align-items:center;justify-content:center;margin:0 auto}.x{font-size:11px;color:#666}`;
+const estiloDoc = `body{font-family:Arial,sans-serif;padding:28px;color:#222;font-size:13px;max-width:900px;margin:0 auto;word-wrap:break-word}table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #ddd;text-align:left}.r{text-align:right}h1{font-size:19px;margin:0}.box{border:1px solid #333;border-radius:6px;padding:10px 12px}.letra{border:2px solid #222;width:46px;height:46px;font:800 28px Arial;display:flex;align-items:center;justify-content:center;margin:0 auto}.x{font-size:11px;color:#666}`;
 function htmlFactura(fa){
   const c = clientePorNombre(fa.cliente) || {}, rz = (PV_RAZONES.find(x => x[0] === (fa.razon || 'propia')) || [, 'OnLineTextil'])[1], A = /^A$/i.test(fa.tipo) && fa.fiscal !== false;
   const nom = fa.esNC ? 'NOTA DE CRÉDITO' : fa.esND ? 'NOTA DE DÉBITO' : 'FACTURA', tot = fa.total || 0;
   const filas = (fa.items || []).map(it => { const conIva = it.neto * 1.21, base = A ? it.neto : conIva, b = Math.min(99.99, +it.bonif || 0), unit = base / (1 - b / 100) / (it.cant || 1); /* precio de lista, antes de la bonificacion */ return `<tr><td>${escaparHtml(it.codigo || '')}</td><td>${escaparHtml(it.desc || '')}</td><td class="r">${(+it.cant || 0).toLocaleString('es-AR')}</td><td class="r">${formatPrice(unit)}</td><td class="r">${it.bonif ? it.bonif + ' %' : ''}</td><td class="r">${formatPrice(base)}</td></tr>`; }).join('');
   return `<html><head><title>${nom} ${escaparHtml(fa.tipo || '')} ${escaparHtml(fa.numero || '')}</title><style>${estiloDoc}</style></head><body>
-    <table style="margin-bottom:10px;"><tr><td style="width:42%;border:none;vertical-align:top;">${encabezadoRZ(fa.razon)}</td><td style="width:16%;border:none;text-align:center;"><div class="letra">${escaparHtml(fa.tipo || 'X')}</div><div class="x">${fa.fiscal === false ? 'no válido como factura' : ''}</div></td>
+    <table style="margin-bottom:12px;border-bottom:2px solid #3D2B4E;"><tr><td style="width:42%;border:none;vertical-align:top;">${encabezadoRZ(fa.razon)}</td><td style="width:16%;border:none;text-align:center;"><div class="letra">${escaparHtml(fa.tipo || 'X')}</div><div class="x">${fa.fiscal === false ? 'no válido como factura' : ''}</div></td>
       <td style="border:none;vertical-align:top;text-align:right;"><b>${nom}</b><br>N.º ${escaparHtml(fa.numero || '')}<br>Fecha: ${escaparHtml(fa.fecha || '')}${fa.facturaRef ? '<br>Comprobante asociado: ' + escaparHtml(fa.facturaRef.numero) : ''}</td></tr></table>
     <div class="box" style="margin-bottom:12px;">Señor(es): <b>${escaparHtml(fa.cliente || '')}</b>${c.cuit ? ' · CUIT ' + escaparHtml(c.cuit) : ''}<br>IVA: ${escaparHtml(c.condicionIva || '—')} · Condición de venta: ${fa.condicion === 'contado' ? 'Contado' : 'Cuenta corriente'}${c.direccion || c.localidad ? '<br>Domicilio: ' + escaparHtml([c.direccion, c.localidad, c.provincia].filter(Boolean).join(', ')) : ''}</div>
     <table><tr><th>Código</th><th>Descripción</th><th class="r">Cant.</th><th class="r">Precio unit.${A ? ' (neto)' : ''}</th><th class="r">Bonif.</th><th class="r">Importe${A ? ' (neto)' : ''}</th></tr>${filas}</table>
@@ -12931,7 +12932,7 @@ function htmlFactura(fa){
 function htmlRecibo(m){
   const c = clientePorNombre(m.nombre) || {}, ret = Object.entries(m.retenciones || {}).filter(([, v]) => +v), rt = ret.reduce((a, [, v]) => a + +v, 0), nomR = { iva: 'Retención IVA', iibb: 'Retención IIBB', gan: 'Retención Ganancias', otras: 'Otras retenciones' };
   return `<html><head><title>Recibo ${escaparHtml(m.numero || '')}</title><style>${estiloDoc}</style></head><body>
-    <table style="margin-bottom:10px;"><tr><td style="border:none;">${encabezadoRZ('propia')}</td><td style="border:none;text-align:right;"><b>${m.tipo === 'sena' ? 'RECIBO DE SEÑA' : 'RECIBO'}</b>${m.numero ? '<br>N.º ' + escaparHtml(m.numero) : ''}<br>Fecha: ${String(m.fecha).split('-').reverse().join('/')}</td></tr></table>
+    <table style="margin-bottom:12px;border-bottom:2px solid #3D2B4E;"><tr><td style="border:none;vertical-align:top;">${encabezadoRZ('propia')}</td><td style="border:none;text-align:right;"><b>${m.tipo === 'sena' ? 'RECIBO DE SEÑA' : 'RECIBO'}</b>${m.numero ? '<br>N.º ' + escaparHtml(m.numero) : ''}<br>Fecha: ${String(m.fecha).split('-').reverse().join('/')}</td></tr></table>
     <div class="box" style="margin-bottom:12px;">Recibimos de: <b>${escaparHtml(m.nombre || '')}</b>${c.cuit ? ' · CUIT ' + escaparHtml(c.cuit) : ''}</div>
     <table><tr><th>Concepto</th><th class="r">Importe</th></tr><tr><td>${escaparHtml(m.medio || '')}${m.cheque ? ` · ${m.cheque.electronico ? 'E-cheq' : 'Cheque'} ${escaparHtml(m.cheque.banco || '')} N.º ${escaparHtml(m.cheque.numero || '')}${m.cheque.fechaCobro ? ' · cobro ' + m.cheque.fechaCobro.split('-').reverse().join('/') : ''}` : ''}</td><td class="r">${formatPrice(m.importe)}</td></tr>
       ${ret.map(([k, v]) => `<tr><td>${nomR[k] || k}${(m.retCert || {})[k] ? ' · certificado ' + escaparHtml(m.retCert[k]) : ''}</td><td class="r">${formatPrice(+v)}</td></tr>`).join('')}
@@ -21738,7 +21739,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v364';
+const APP_VERSION = '2026-10-02-v365';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
