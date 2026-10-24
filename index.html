@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v363</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v364</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6078,7 +6078,7 @@ const GRUPOS_INICIO = {
     [['🧮 Calculadora de costos', 'abrirCalculadoraCostos()']]
   ] },
   i: { lado: 'int', titulo: 'Configuración', titulosColumnas: ['1 · Cuenta', '2 · Datos de la app', '3 · Pantallas anteriores'], columnas: [
-    [['👥 Usuarios', 'abrirUsuarios()'], ['🏢 Datos de las razones sociales', 'abrirDatosRazones()'], ['💾 Copia de seguridad', 'abrirCopiaSeguridad()'], ['🔔 Avisos push', 'abrirConfigPush()']],
+    [['👥 Usuarios', 'abrirUsuarios()'], ['🏢 Datos de las razones sociales', 'abrirDatosRazones()'], ['✍️ Mi firma (recibos)', 'abrirMiFirma()'], ['💾 Copia de seguridad', 'abrirCopiaSeguridad()'], ['🔔 Avisos push', 'abrirConfigPush()']],
     [['📝 Listas y opciones', 'abrirListas()'], ['🏦 Datos bancarios', 'abrirDatosBancarios()'], ['📖 Palabras de la app', 'abrirGlosario()']],
     [['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']]
   ] },
@@ -8208,7 +8208,7 @@ function pvRenderProveedor(r){
     ${pend.length ? `<b style="color:var(--purple);">Facturas pendientes</b>${pend.map(f => `<div style="display:flex;gap:8px;flex-wrap:wrap;padding:5px 0;border-top:1px solid var(--line);font-size:.86rem;">${chipRZ(f.razon)}<span>${String(f.fecha).split('-').reverse().join('/')}</span><span>${escaparHtml((f.tipo || '') + ' ' + (f.numero || ''))}</span>${f.diasVto < 0 ? `<span style="color:#A6432F;font-weight:700;">vencida hace ${-f.diasVto} días</span>` : `<span class="meta">vence en ${f.diasVto} días</span>`}<span style="margin-left:auto;">pendiente <b>${fmtMon(f.pendiente, m)}</b> de ${fmtMon(f.importe, m)}</span></div>`).join('')}` : ''}
     <div style="font-weight:700;color:var(--purple);margin:12px 0 6px;">Movimientos${rzv ? ' · ' + chipRZ(rzv) : ''}</div>
     <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.85rem;"><tr style="color:#8A8072;font-size:.7rem;text-transform:uppercase;"><td style="padding:5px;">Fecha</td><td style="padding:5px;">Concepto</td><td style="padding:5px;text-align:right;">Debe</td><td style="padding:5px;text-align:right;">Haber</td><td style="padding:5px;text-align:right;">Saldo</td><td></td></tr>
-      ${filas.map(f => `<tr style="border-top:1px solid var(--line);"><td style="padding:5px;white-space:nowrap;">${String(f.fecha).split('-').reverse().join('/')}</td><td style="padding:5px;">${chipRZ(f.rz)} <b>${f.t}</b> <span class="meta">${escaparHtml(f.det || '')}</span></td><td style="padding:5px;text-align:right;">${f.debe ? fmtMon(f.debe, m) : ''}</td><td style="padding:5px;text-align:right;color:#2F7A47;">${f.haber ? fmtMon(f.haber, m) : ''}</td><td style="padding:5px;text-align:right;font-weight:700;">${fmtMon(f.saldo, m)}</td><td style="padding:5px;white-space:nowrap;">${f.x ? `<a href="#" title="Imprimir" onclick="event.preventDefault();pvImprimirOP('${f.x._id}')">🖨️</a> ` : ''}<a href="#" title="Borrar" onclick="event.preventDefault();pvBorrar('${f.f ? 'compras' : 'pagos'}','${(f.f || f.x)._id}')">🗑️</a></td></tr>`).join('') || '<tr><td colspan="6" class="note">Sin movimientos.</td></tr>'}</table></div>`;
+      ${filas.map(f => `<tr style="border-top:1px solid var(--line);"><td style="padding:5px;white-space:nowrap;">${String(f.fecha).split('-').reverse().join('/')}</td><td style="padding:5px;">${chipRZ(f.rz)} <b>${f.t}</b> <span class="meta">${escaparHtml(f.det || '')}</span></td><td style="padding:5px;text-align:right;">${f.debe ? fmtMon(f.debe, m) : ''}</td><td style="padding:5px;text-align:right;color:#2F7A47;">${f.haber ? fmtMon(f.haber, m) : ''}</td><td style="padding:5px;text-align:right;font-weight:700;">${fmtMon(f.saldo, m)}</td><td style="padding:5px;white-space:nowrap;">${f.x ? `<a href="#" title="${f.x.firma ? 'Firmada por ' + escapeAttr(f.x.firma.aclaracion || '') : 'Firmar en pantalla'}" onclick="event.preventDefault();firmarOP('${f.x._id}')">✍️${f.x.firma ? '✓' : ''}</a> <a href="#" title="Imprimir" onclick="event.preventDefault();pvImprimirOP('${f.x._id}')">🖨️</a> ` : ''}<a href="#" title="Borrar" onclick="event.preventDefault();pvBorrar('${f.f ? 'compras' : 'pagos'}','${(f.f || f.x)._id}')">🗑️</a></td></tr>`).join('') || '<tr><td colspan="6" class="note">Sin movimientos.</td></tr>'}</table></div>`;
 }
 // estado de cuenta imprimible (todas las razones o la elegida en la ficha)
 function pvEstadoCuenta(pid){
@@ -8348,7 +8348,8 @@ async function pvGuardarPago(pid){ dashCache = null; if(!__previa && await mesBl
     const r = await db.collection('pagos').add(comp ? { ...pago, comprobante: comp } : pago); pvPagos.push({ _id: r.id, ...pago, comprobante: comp });
     for(const x of o.medios.filter(x => x.chequeId)){ const c = (window.__pvCheques || []).find(y => y._id === x.chequeId); if(c) await db.collection('cc_movimientos').doc(c._id).set({ cheque: { ...c.cheque, estado: 'entregado', entregadoA: p.nombre, op: numero } }, { merge: true }); }
     await ccLog('Orden de pago', `OP ${numero} · ${p.nombre} · ${formatPrice(o.totalARS)}`);
-    cerrarPublicar(); pvSel = pid; renderCompras(); pintarAvisoCompras(); pvImprimirOP(r.id);
+    cerrarPublicar(); pvSel = pid; renderCompras(); pintarAvisoCompras();
+    if(confirm('¿Que el proveedor firme ahora en la pantalla?\nCancelar = imprimir para firmar con birome.')) firmarOP(r.id); else pvImprimirOP(r.id);
   } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 function pvImprimirOP(id){
@@ -8362,7 +8363,7 @@ function pvImprimirOP(id){
     <tr><td><b>Total</b></td><td class="r"><b>${formatPrice((x.totalARS || 0) + Object.values(x.retenciones || {}).reduce((a, v) => a + v, 0))}</b>${x.tc ? `<br>US$ ${x.aplicadoMon} (TC ${x.tc})` : ''}</td></tr></table>
     ${x.detalle ? `<p>${escaparHtml(x.detalle)}</p>` : ''}
     ${x.comprobante && /^data:image/.test(x.comprobante) ? `<p><b>Comprobante de transferencia:</b></p><img src="${x.comprobante}">` : x.comprobante ? '<p>Comprobante adjunto (PDF) guardado en el sistema.</p>' : ''}
-    ${efectivo ? '<div class="firma"><div>Recibí conforme · Firma</div><div>Aclaración y DNI</div></div>' : ''}<script>setTimeout(()=>print(),400)<\/script></body></html>`); w.document.close();
+    ${efectivo || x.firma ? `<div style="display:flex;gap:40px;margin-top:50px;">${bloqueFirma(x.firma, 'Recibí el pago')}<div style="flex:1;"></div></div>` : ''}<script>setTimeout(()=>print(),400)<\/script></body></html>`); w.document.close();
 }
 async function pvBorrar(col, id){
   const x = (col === 'compras' ? pvCompras : pvPagos).find(y => y._id === id); if(!x) return; if(await mesBloqueado(x.fecha)) return;
@@ -8560,7 +8561,7 @@ async function ccMarcarContado(id){
 }
 // abrir un comprobante adjunto (imagen o PDF guardado como data:)
 function verAdjunto(data, nombre){ try{ const [cab, b64] = String(data).split(','), tipo = (cab.match(/data:([^;]+)/) || [])[1] || 'application/octet-stream'; const bin = atob(b64), u = new Uint8Array(bin.length); for(let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); const url = URL.createObjectURL(new Blob([u], { type: tipo })); const w = window.open(url, '_blank'); if(!w){ const a = document.createElement('a'); a.href = url; a.download = nombre || 'comprobante'; a.click(); } setTimeout(() => URL.revokeObjectURL(url), 60000); } catch(e){ alert('No se pudo abrir el comprobante.'); } }
-function ccImprimirRecibo(id){ const m = (ccMovs || []).find(x => x._id === id); if(m) imprimirHtml(htmlRecibo(m)); }
+async function ccImprimirRecibo(id){ await cargarDatosRZ(); await cargarFirmaEmisor(); const m = (ccMovs || []).find(x => x._id === id); if(m) imprimirHtml(htmlRecibo(m)); }
 async function imprimirFacturaGuardadaAsync(id){ await cargarDatosRZ(); imprimirFacturaGuardada(id); }
 function imprimirFacturaGuardada(id){ const f = (facturas || []).find(x => (x._id || String(x.numero).replace(/\//g, '-')) === id); if(f) imprimirHtml(htmlFactura(f)); }
 function verAdjuntoMov(id, i){ const m = (ccMovs || []).find(x => x._id === id); const a = m && (m.retAdj || [])[i]; if(a) verAdjunto(a.data, a.nombre); }
@@ -12656,7 +12657,7 @@ function renderRemitos(){
       <span class="note" style="margin:0 0 0 auto;">El stock baja con: <b>${conRem ? 'el remito' : 'la factura'}</b> <a href="#" onclick="event.preventDefault();rmCambiarBaja()">cambiar</a></span></div>
     ${L.length ? `<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.87rem;">${L.map(r => `<tr style="border-top:1px solid var(--line);${r.anulado ? 'opacity:.5;' : ''}"><td style="padding:6px;">R ${String(r.numero).padStart(6, '0')}</td><td style="padding:6px;white-space:nowrap;">${String(r.fecha).split('-').reverse().join('/')}</td><td style="padding:6px;"><b>${escaparHtml(r.cliente || '')}</b>${r.pedido ? ` <span class="meta">pedido ${escaparHtml(r.pedido)}</span>` : ''}</td><td style="padding:6px;" class="meta">${(r.items || []).reduce((a, x) => a + (+x.cant || 0), 0)} u. · ${r.bultos || 1} bulto(s)</td>
       <td style="padding:6px;">${r.anulado ? 'anulado' : r.facturaRef ? `<span class="meta">facturado ${escaparHtml(r.facturaRef.numero || '')}</span>` : `<button type="button" class="btn-mini" onclick="rmFacturar('${r._id}')">🧾 Facturar</button>`}</td>
-      <td style="padding:6px;white-space:nowrap;"><button type="button" class="btn-mini" onclick="rmImprimir('${r._id}')">🖨️</button>${!r.anulado && !r.facturaRef ? ` <button type="button" class="btn-mini" onclick="rmAnular('${r._id}')">Anular</button>` : ''}</td></tr>`).join('')}</table></div>` : '<p class="empty-msg">No hay remitos en esta vista.</p>'}`;
+      <td style="padding:6px;white-space:nowrap;"><button type="button" class="btn-mini" title="Firma del transporte (retira)" onclick="firmarRemito('${r._id}','transporte')">✍️ Transp.${r.firmaTransporte ? ' ✓' : ''}</button> <button type="button" class="btn-mini" title="Firma del cliente (recibe)" onclick="firmarRemito('${r._id}','cliente')">✍️ Cliente${r.firmaCliente ? ' ✓' : ''}</button> <button type="button" class="btn-mini" onclick="rmImprimir('${r._id}')">🖨️</button>${!r.anulado && !r.facturaRef ? ` <button type="button" class="btn-mini" onclick="rmAnular('${r._id}')">Anular</button>` : ''}</td></tr>`).join('')}</table></div>` : '<p class="empty-msg">No hay remitos en esta vista.</p>'}`;
 }
 async function rmCambiarBaja(){ const nuevo = stockDatos.bajaCon === 'remito' ? 'factura' : 'remito';
   if(!confirm(`¿Que el stock baje con ${nuevo === 'remito' ? 'el REMITO (cuando sale la mercadería)' : 'la FACTURA'}?\nAplica a lo que se cargue desde ahora.`)) return;
@@ -12725,7 +12726,7 @@ function rmImprimir(id){
     <table style="margin-top:6px;font-size:13px;"><tr><td style="width:50%;vertical-align:top;border:none;">Fecha: ${String(r.fecha).split('-').reverse().join('/')}<br>Señor(es): <b>${escaparHtml(r.cliente)}</b>${r.sucursal ? ' · ' + escaparHtml(r.sucursal) : ''}${r.cuit ? '<br>CUIT: ' + escaparHtml(r.cuit) : ''}${r.condicionIva ? '<br>IVA: ' + escaparHtml(r.condicionIva) : ''}${r.tel ? '<br>Contacto: ' + escaparHtml(r.tel) : ''}</td>
       <td style="vertical-align:top;border:none;">${r.direccion ? 'Lugar de entrega: ' + escaparHtml(r.direccion) + '<br>' : ''}${r.transporte ? 'Transporte: ' + escaparHtml(r.transporte) + '<br>' : ''}Bultos: ${r.bultos || 1}${r.valor ? '<br>Valor declarado: ' + formatPrice(r.valor) : ''}${r.pedido ? '<br>Nuestro pedido: ' + escaparHtml(r.pedido) : ''}${r.oc ? '<br>Su orden de compra: ' + escaparHtml(r.oc) : ''}</td></tr></table>
     <table><tr><th>SKU</th><th>Descripción</th><th class="r">Cantidad</th></tr>${(r.items || []).map(x => `<tr><td>${escaparHtml(x.sku || '')}</td><td>${escaparHtml(x.desc || '')}</td><td class="r">${x.cant}</td></tr>`).join('')}</table>
-    ${r.obs ? `<p>${escaparHtml(r.obs)}</p>` : ''}<div class="firma"><div>Recibí conforme · Firma</div><div>Aclaración</div><div>DNI · Fecha</div></div><script>setTimeout(()=>print(),400)<\/script></body></html>`); w.document.close();
+    ${r.obs ? `<p>${escaparHtml(r.obs)}</p>` : ''}<div style="display:flex;gap:40px;margin-top:50px;">${bloqueFirma(r.firmaTransporte, 'Retiró (transporte)')}${bloqueFirma(r.firmaCliente, 'Recibí conforme (cliente)')}</div><script>setTimeout(()=>print(),400)<\/script></body></html>`); w.document.close();
 }
 async function rmAnular(id){ const r = remitos.find(x => x._id === id); if(!r || !confirm(`¿Anular el remito R ${r.numero}?${r.stockAplicado ? ' La mercadería vuelve al stock.' : ''}`)) return; if(await mesBloqueado(r.fecha)) return;
   try{ if(r.stockAplicado) await moverStockVarios(r.items.filter(x => x.sku && skuControlado(x.sku)).map(x => ({ sku: x.sku, cantidad: x.cant * divisorVenta(x.sku) })), 'remito anulado', 'R ' + r.numero);
@@ -12849,6 +12850,45 @@ function fvPvSegunTipo(){ const e = document.getElementById('fv-n-pv'); if(!e ||
 function campoNumComp(id, pvDef, ancho){ return `<div style="display:flex;gap:6px;align-items:center;"><input id="${id}-pv" inputmode="numeric" maxlength="5" placeholder="P. vta." value="${escapeAttr(pvDef || '')}" oninput="this.dataset.tocado='1';numCompUnir('${id}')" onblur="this.value=this.value.replace(/\\D/g,'')?this.value.replace(/\\D/g,'').padStart(5,'0'):'';numCompUnir('${id}')" style="flex:0 0 ${ancho || 90}px;width:${ancho || 90}px;text-align:center;"><span style="color:#8A8072;">–</span><input id="${id}-nro" inputmode="numeric" maxlength="8" placeholder="Número" oninput="numCompUnir('${id}')" onblur="this.value=this.value.replace(/\\D/g,'')?this.value.replace(/\\D/g,'').padStart(8,'0'):'';numCompUnir('${id}')" style="flex:1;min-width:0;"><input type="hidden" id="${id}"></div>`; }
 function numCompUnir(id){ const pv = (document.getElementById(id + '-pv').value || '').replace(/\D/g, ''), n = (document.getElementById(id + '-nro').value || '').replace(/\D/g, ''); document.getElementById(id).value = pv && n ? pv.padStart(5, '0') + '-' + n.padStart(8, '0') : ''; }
 function numCompPoner(id, valor){ const m = String(valor || '').match(/(\d{1,5})\D+(\d{1,8})/); if(!m) return; const a = document.getElementById(id + '-pv'), b = document.getElementById(id + '-nro'); if(a) a.value = m[1].padStart(5, '0'); if(b) b.value = m[2].padStart(8, '0'); numCompUnir(id); }
+// ===== Firma en pantalla (dedo o lapiz) con aclaracion, DNI, fecha y hora =====
+function firmaPad(titulo, conDni, alListo){
+  let ov = document.getElementById('fp-ov'); if(ov) ov.remove();
+  ov = document.createElement('div'); ov.id = 'fp-ov'; ov.style.cssText = 'position:fixed;inset:0;z-index:10090;background:rgba(30,20,40,.6);display:flex;align-items:center;justify-content:center;padding:12px;';
+  ov.innerHTML = `<div style="background:#fff;border-radius:14px;padding:14px;width:min(760px,100%);" class="fx"><b style="color:#3D2B4E;">✍️ ${escaparHtml(titulo)}</b>
+    <canvas id="fp-c" width="1400" height="520" style="display:block;width:100%;height:auto;aspect-ratio:1400/520;border:1px dashed #C9BFD6;border-radius:10px;margin:10px 0;touch-action:none;background:#FCFBF8;"></canvas>
+    <div class="fila" style="grid-template-columns:${conDni ? '2fr 1fr' : '1fr'};"><div><span class="fl">Aclaración</span><input id="fp-a" placeholder="Nombre y apellido"></div>${conDni ? '<div><span class="fl">DNI</span><input id="fp-d" inputmode="numeric"></div>' : ''}</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;"><button type="button" class="btn btn-ghost" style="width:auto;padding:9px 14px;" id="fp-borrar">Borrar</button><button type="button" class="btn btn-ghost" style="width:auto;padding:9px 14px;" onclick="document.getElementById('fp-ov').remove()">Cancelar</button><button type="button" class="btn btn-gold" style="width:auto;padding:9px 20px;" id="fp-ok">Guardar firma</button></div></div>`;
+  document.body.appendChild(ov);
+  const cv = document.getElementById('fp-c'), c = cv.getContext('2d'); let dib = false, hay = false; c.lineWidth = 4.5; c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = '#1F1A2E';
+  const pos = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; };
+  cv.onpointerdown = e => { dib = true; hay = true; cv.setPointerCapture(e.pointerId); const [x, y] = pos(e); c.beginPath(); c.moveTo(x, y); };
+  cv.onpointermove = e => { if(!dib) return; const [x, y] = pos(e); c.lineTo(x, y); c.stroke(); };
+  cv.onpointerup = cv.onpointercancel = () => { dib = false; };
+  document.getElementById('fp-borrar').onclick = () => { c.clearRect(0, 0, cv.width, cv.height); hay = false; };
+  document.getElementById('fp-ok').onclick = () => { if(!hay){ alert('Falta la firma.'); return; } const a = document.getElementById('fp-a').value.trim(); if(!a){ alert('Escriba la aclaración.'); return; }
+    // recorta el blanco sobrante para que pese poco
+    const d = c.getImageData(0, 0, cv.width, cv.height).data; let x0 = cv.width, y0 = cv.height, x1 = 0, y1 = 0; for(let y = 0; y < cv.height; y += 2) for(let x = 0; x < cv.width; x += 2){ if(d[(y * cv.width + x) * 4 + 3] > 20){ if(x < x0) x0 = x; if(y < y0) y0 = y; if(x > x1) x1 = x; if(y > y1) y1 = y; } }
+    const m = 10, w = Math.min(cv.width, x1 - x0 + 2 * m), hh = Math.min(cv.height, y1 - y0 + 2 * m), o = document.createElement('canvas'); o.width = w; o.height = hh; o.getContext('2d').drawImage(cv, Math.max(0, x0 - m), Math.max(0, y0 - m), w, hh, 0, 0, w, hh);
+    const res = { img: o.toDataURL('image/png'), aclaracion: a, dni: conDni ? (document.getElementById('fp-d').value || '').trim() : '', fecha: new Date().toISOString(), por: (firebase.auth().currentUser || {}).email || '' };
+    ov.remove(); alListo(res); };
+}
+// bloque impreso: la firma de pantalla si existe; si no, la linea para firmar con birome
+function bloqueFirma(f, leyenda){ const fh = f && f.fecha ? new Date(f.fecha).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '';
+  return f && f.img ? `<div style="flex:1;text-align:center;font-size:12px;"><img src="${f.img}" style="max-height:70px;max-width:100%;border:none;margin:0;"><div style="border-top:1px solid #444;padding-top:4px;">${escaparHtml(leyenda)}<br><b>${escaparHtml(f.aclaracion || '')}</b>${f.dni ? ' · DNI ' + escaparHtml(f.dni) : ''}<br><span style="color:#666;">firmado en pantalla el ${fh}</span></div></div>`
+    : `<div style="flex:1;text-align:center;font-size:12px;"><div style="height:70px;"></div><div style="border-top:1px solid #444;padding-top:4px;">${escaparHtml(leyenda)}<br>Aclaración · DNI · Fecha</div></div>`; }
+async function firmarRemito(id, quien){ const r = remitos.find(x => x._id === id); if(!r) return;
+  firmaPad(quien === 'transporte' ? `Retiró la mercadería (transporte) · Remito R ${r.numero}` : `Recibí conforme (cliente) · Remito R ${r.numero}`, true, async f => {
+    const k = quien === 'transporte' ? 'firmaTransporte' : 'firmaCliente'; try{ await db.collection('remitos').doc(id).set({ [k]: f }, { merge: true }); r[k] = f; await ccLog('Firma en pantalla', `Remito R ${r.numero} · ${quien} · ${f.aclaracion}`); } catch(e){ alert('No se pudo guardar la firma: ' + e.message); return; }
+    renderRemitos(); if(confirm('Firma guardada. ¿Imprimir el remito firmado?')) rmImprimir(id); }); }
+async function firmarOP(id){ const x = pvPagos.find(y => y._id === id); if(!x) return; const p = pvProv.find(y => y._id === x.proveedorId) || {};
+  firmaPad(`Recibí el pago · Orden de pago ${String(x.numero).padStart(5, '0')} · ${p.nombre || ''}`, true, async f => {
+    try{ await db.collection('pagos').doc(id).set({ firma: f }, { merge: true }); x.firma = f; await ccLog('Firma en pantalla', `OP ${x.numero} · ${f.aclaracion}`); } catch(e){ alert('No se pudo guardar la firma: ' + e.message); return; }
+    renderCompras(); if(confirm('Firma guardada. ¿Imprimir la orden de pago firmada?')) pvImprimirOP(id); }); }
+// firma del emisor (usted) para los recibos: se carga una sola vez
+let firmaEmisor = null;
+async function cargarFirmaEmisor(){ if(firmaEmisor !== null) return firmaEmisor; try{ const d = await db.collection('config').doc('firma_emisor').get(); firmaEmisor = d.exists ? d.data() : false; } catch(e){ firmaEmisor = false; } return firmaEmisor; }
+function abrirMiFirma(){ if(!esDueno()){ alert('Solo el dueño.'); return; }
+  firmaPad('Mi firma para los recibos (se usa en todos)', false, async f => { try{ await db.collection('config').doc('firma_emisor').set(f); firmaEmisor = f; alert('✓ Firma guardada. Saldrá en los recibos.'); } catch(e){ alert('No se pudo guardar: ' + e.message); } }); }
 // ===== Vista previa de comprobantes (antes de confirmar) =====
 let __previa = null; // si esta activa, las funciones de guardar arman el comprobante y lo devuelven sin guardar
 function capturarImpresion(fn){ const orig = window.open; let html = ''; window.open = () => ({ document: { write(x){ html += x; }, close(){} }, focus(){}, print(){} }); try{ fn(); } finally { window.open = orig; } return html; }
@@ -12861,7 +12901,7 @@ function mostrarVistaPrevia(html, alConfirmar){
   document.getElementById('vp-ok').onclick = () => { ov.remove(); alConfirmar(); };
 }
 // arma el comprobante con la misma funcion de guardar (sin guardar nada) y lo muestra
-async function vistaPrevia(tipoComp, arg1, arg2){ await cargarDatosRZ();
+async function vistaPrevia(tipoComp, arg1, arg2){ await cargarDatosRZ(); await cargarFirmaEmisor();
   let obj = null; __previa = o => { obj = o; };
   try{ if(tipoComp === 'factura') await fvGuardar(arg1); else if(tipoComp === 'remito') await rmGuardar(arg1); else if(tipoComp === 'recibo') await ccGuardarCobro(arg1, arg2); else if(tipoComp === 'op') await pvGuardarPago(arg1); }
   finally { __previa = null; }
@@ -12897,7 +12937,7 @@ function htmlRecibo(m){
       ${ret.map(([k, v]) => `<tr><td>${nomR[k] || k}${(m.retCert || {})[k] ? ' · certificado ' + escaparHtml(m.retCert[k]) : ''}</td><td class="r">${formatPrice(+v)}</td></tr>`).join('')}
       <tr><td><b>Total cancelado</b></td><td class="r"><b>${formatPrice(m.importe + rt)}</b></td></tr></table>
     ${m.detalle ? `<p>${escaparHtml(m.detalle)}</p>` : ''}${m.aGrupo ? '<p class="x">Aplicado a las facturas del grupo de empresas.</p>' : ''}
-    <div style="margin-top:70px;display:flex;justify-content:flex-end;"><div style="width:240px;border-top:1px solid #444;text-align:center;padding-top:6px;font-size:12px;">Firma y aclaración</div></div>
+    <div style="margin-top:50px;display:flex;justify-content:flex-end;"><div style="width:280px;">${firmaEmisor && firmaEmisor.img ? `<div style="text-align:center;font-size:12px;"><img src="${firmaEmisor.img}" style="max-height:70px;max-width:100%;"><div style="border-top:1px solid #444;padding-top:4px;"><b>${escaparHtml(firmaEmisor.aclaracion || '')}</b><br>por ${escaparHtml(((datosRZ.propia || {}).nombre) || 'OnLineTextil')}</div></div>` : '<div style="height:70px;"></div><div style="border-top:1px solid #444;text-align:center;padding-top:6px;font-size:12px;">Firma y aclaración</div>'}</div></div>
     <script>setTimeout(()=>print(),400)<\/script></body></html>`;
 }
 function imprimirHtml(html){ const w = window.open('', '_blank'); if(!w){ alert('Permita ventanas emergentes para imprimir.'); return; } w.document.write(html); w.document.close(); }
@@ -21698,7 +21738,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v363';
+const APP_VERSION = '2026-10-02-v364';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
