@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v365</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v366</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -12763,10 +12763,13 @@ function promptGemini(S, canal){
     otro: `The same product in use in a simple, realistic setting that shows its real size.`
   }[t];
   const color = blanco ? ` The product is WHITE: keep it a natural, clean white; never make it grey, blue, yellow or cream.` : '';
-  const forma = t === 'sabanas' ? ' The set is folded as a compact package, with the pillowcase(s) lying flat on top.' : '';
+  const forma = '';
+  // juegos de sabanas: 1 1/2 plaza = 1 funda (3 piezas); 2 1/2, queen y king = 2 fundas (4 piezas)
+  const md = normBusqueda(medida + ' ' + nombre), dosFundas = /2\s*½|2 1\/2|2,5|dos plazas|2 plazas|queen|king|matrimonial/.test(md), nf = dosFundas ? 2 : 1;
+  const pila = `exactly ${nf === 1 ? 'THREE' : 'FOUR'} pieces, each folded into a long, low rectangle with soft rounded edges and no sharp creases, stacked from largest to smallest in a stepped pyramid, all centered: bottom, the plain sheet (widest); then the printed or second sheet (slightly shorter); on top, ${nf === 1 ? 'ONE pillowcase (the shortest). Exactly one pillowcase, no more' : 'TWO identical pillowcases stacked one on the other, the upper one slightly shifted back so both are visible (the shortest pieces). Exactly two pillowcases'}. Each piece keeps the exact color and print it has in the photo (which one is plain and which one is printed). Hems and stitching only where they exist in the photo. Straight front view at the height of the stack`;
   return `Using the attached photo of the real product, generate these 3 images, one after another, in this order. The print, colors, motif size, fabric and finishing must stay EXACTLY as in the photo in all 3 images.${color} Product: ${nombre} — ${medida}${comp ? ' — ' + comp : ''}.
 
-IMAGE 1 – MAIN: Edit this photo. Do NOT redraw, regenerate or reinterpret the product. Keep the ${prod} exactly as it is: same print, same motifs or stripes with the same widths, size and position, same shape and folds; hems and stitching ONLY where they are visible in the photo.${forma} Remove any shadows or darker areas caused by the room light (they are not part of the fabric) so the whole product has even, uniform brightness, keeping its real colors exactly, without saturating or shifting them. Straighten the outline and smooth small wrinkles without changing the print. ${fondo}, soft contact shadow under the product, centered, filling 85-95% of the frame. Square 1:1, ${px}.
+${t === 'sabanas' ? `IMAGE 1 – MAIN: Use the photo only as an exact reference for colors, prints and fabric of each piece. Show the sheet set in the standard fold: ${pila}. ${fondo}, soft contact shadow, product centered filling 85-95% of the frame. Square 1:1, ${px}.` : `IMAGE 1 – MAIN: Edit this photo. Do NOT redraw, regenerate or reinterpret the product. Keep the ${prod} exactly as it is: same print, same motifs or stripes with the same widths, size and position, same shape and folds; hems and stitching ONLY where they are visible in the photo.${forma} Remove any shadows or darker areas caused by the room light (they are not part of the fabric) so the whole product has even, uniform brightness, keeping its real colors exactly, without saturating or shifting them. Straighten the outline and smooth small wrinkles without changing the print. ${fondo}, soft contact shadow under the product, centered, filling 85-95% of the frame. Square 1:1, ${px}.`}
 
 IMAGE 2 – IN USE: Use the photo only as an exact texture reference for the print, color and fabric. ${escena} Copy the print exactly at the same scale as in the photo: motifs keep their real size, never shrink or enlarge them. Do not invent seams, center lines, borders, trims, embroidery or piping that are not in the photo. Simple bright room, neutral colors, soft daylight, no brand names. Square 1:1, ${px}.
 
@@ -21739,7 +21742,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v365';
+const APP_VERSION = '2026-10-02-v366';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
