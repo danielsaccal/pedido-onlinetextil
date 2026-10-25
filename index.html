@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v367</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v368</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -12893,6 +12893,77 @@ let firmaEmisor = null;
 async function cargarFirmaEmisor(){ if(firmaEmisor !== null) return firmaEmisor; try{ const d = await db.collection('config').doc('firma_emisor').get(); firmaEmisor = d.exists ? d.data() : false; } catch(e){ firmaEmisor = false; } return firmaEmisor; }
 function abrirMiFirma(){ if(!esDueno()){ alert('Solo el dueño.'); return; }
   firmaPad('Mi firma para los recibos (se usa en todos)', false, async f => { try{ await db.collection('config').doc('firma_emisor').set(f); firmaEmisor = f; alert('✓ Firma guardada. Saldrá en los recibos.'); } catch(e){ alert('No se pudo guardar: ' + e.message); } }); }
+// ===== Bosquejo de medidas por SKU (lo dibuja la app, sin IA): ultima imagen de cada SKU =====
+// Los productos de fabricacion propia tienen la medida de CORTE: se muestra la TERMINADA (corte - confeccion).
+const CONFECCION = { cortina: { ancho: 5, alto: 15 }, funda: { ancho: 2, largo: 7 }, plana: { ancho: 2, largo: 10 }, mantel: { ancho: 2, largo: 2 }, otro: { ancho: 2, largo: 2 } };
+const CAIDA_MANTEL = 25, FRUNCE_CORTINA = 0.85;
+const bosqCache = {};
+function numsMedida(t){ return [...String(t || '').replace(/,/g, '.').matchAll(/(\d+(?:\.\d+)?)\s*(?:cm)?\s*[x×]\s*(\d+(?:\.\d+)?)(?:\s*(?:cm)?\s*[x×]\s*(\d+(?:\.\d+)?))?/gi)].map(m => [+m[1], +m[2], m[3] ? +m[3] : null]); }
+function datosBosquejo(S){
+  const r = buscarProductoPorSku(S); if(!r) return null;
+  const p = r.producto, v = r.variante, cat = normBusqueda((CATALOGO[r.ci] || {}).categoria || ''), txt = (v.desc || '') + ' ' + p.nombre, n = normBusqueda(txt + ' ' + cat);
+  const fab = !!(fabricacion && fabricacion.propios && fabricacion.propios[p.nombre]), med = numsMedida(v.desc || '').concat(numsMedida(p.nombre)), tipoPG = (tipoProductoPG(S) || {}).t;
+  const d = { S, nombre: p.nombre, desc: v.desc || '', fab, filas: [], nota: '' };
+  const terminar = (a, b, k) => fab ? [Math.round((a - (CONFECCION[k] || CONFECCION.otro).ancho) * 10) / 10, Math.round((b - (CONFECCION[k] || CONFECCION.otro)[k === 'cortina' ? 'alto' : 'largo']) * 10) / 10] : [a, b];
+  if(/cortina/.test(n) && med[0]){ const [a, b] = terminar(med[0][0], med[0][1], 'cortina'), pan = +((String(v.desc).match(/(\d+)\s*pa[ñn]os?/i) || [])[1] || 1);
+    Object.assign(d, { tipo: 'cortina', titulo: pan > 1 ? `Cortina de ${pan} paños${fab ? ' terminados' : ''} de` : (fab ? 'Cortina terminada de' : 'Cortina de'), medida: `${a} × ${b} cm${pan > 1 ? ' c/u' : ''}`, a, b, pan, nota: `Cubre una ventana de hasta ${(a * pan * FRUNCE_CORTINA / 100).toFixed(2).replace('.', ',')} m de ancho (con frunce)` }); d.filas.push([pan > 1 ? 'Paño de cortina' : 'Cortina', `${a} × ${b} cm`, pan]); return d; }
+  if(/mantel|manteleria/.test(n) && !/individual/.test(n) && med[0]){ const [l0, a0] = med[0][0] >= med[0][1] ? med[0] : [med[0][1], med[0][0]], [l, a] = terminar(l0, a0, 'mantel');
+    Object.assign(d, { tipo: 'mantel', titulo: fab ? 'Mantel terminado de' : 'Mantel de', medida: `${l} × ${a} cm`, l, a, mesa: [l - 2 * CAIDA_MANTEL, a - 2 * CAIDA_MANTEL], nota: `Ideal para mesas de hasta ${l - 2 * CAIDA_MANTEL} × ${a - 2 * CAIDA_MANTEL} cm (caída de ${CAIDA_MANTEL} cm por lado)` }); d.filas.push(['Mantel', `${l} × ${a} cm`, 1]); return d; }
+  if(/funda/.test(n) && /almohad/.test(n) && !/juego/.test(n) && med[0]){ const [a0, l0] = med[0][0] <= med[0][1] ? med[0] : [med[0][1], med[0][0]], [a, l] = terminar(a0, l0, 'funda');
+    Object.assign(d, { tipo: 'funda', titulo: fab ? 'Funda de almohada terminada de' : 'Funda de almohada de', medida: `${l} × ${a} cm`, l, a, nota: `Apta para almohadas de ${Math.round(l - 8)} × ${Math.round(a - 3)} cm` }); d.filas.push(['Funda', `${l} × ${a} cm`, 1]); return d; }
+  const triple = med.find(m => m[2]);
+  if(triple && (tipoPG === 'sabanas' || /ajustable|colch[oó]n|protector/.test(n))){ const [a, l, h3] = triple;
+    Object.assign(d, { tipo: 'colchon', titulo: 'Apto para colchón de', medida: `${a} × ${l} × ${h3} cm`, a, l, h: h3, nota: /ajustable|juego|sabana/.test(n) ? `Ajustable con elástico · cubre colchones de hasta ${h3} cm de alto` : '' });
+    if(/juego/.test(n) || tipoPG === 'sabanas'){ d.filas.push(['Sábana ajustable', `${a} × ${l} × ${h3} cm`, 1]);
+      const pl = (String(v.desc).match(/plana\D{0,12}(\d+)\s*[x×]\s*(\d+)/i)); if(pl){ const [x, y] = terminar(+pl[1], +pl[2], 'plana'); d.filas.push(['Sábana plana', `${x} × ${y} cm`, 1]); }
+      const fu = String(v.desc).match(/(\d)\s*fundas?\D{0,6}(\d+)\s*[x×]\s*(\d+)/i); if(fu){ const [x, y] = terminar(Math.min(+fu[2], +fu[3]), Math.max(+fu[2], +fu[3]), 'funda'); d.filas.push(['Fundas', `${y} × ${x} cm`, +fu[1]]); } }
+    else d.filas.push([p.nombre.split(' ').slice(0, 3).join(' '), `${a} × ${l} × ${h3} cm`, 1]);
+    if(tipoPG === 'sabanas' && d.filas.length === 1) d.incompleto = 'Si es un juego, agregue en la descripción de esta medida la plana y las fundas (ej.: "Plana 240 × 260 cm · 2 fundas 50 × 85 cm") para que figuren en la tabla.';
+    return d; }
+  if(med[0]){ const [x0, y0] = med[0], [x, y] = terminar(x0, y0, 'otro');
+    Object.assign(d, { tipo: 'rect', titulo: fab ? 'Medida terminada' : 'Medida', medida: `${x} × ${y} cm${med[0][2] ? ' × ' + med[0][2] + ' cm' : ''}`, x, y }); d.filas.push([p.nombre.split(' ').slice(0, 3).join(' '), `${x} × ${y} cm`, 1]); return d; }
+  return null;
+}
+function dibujarBosquejo(d){
+  const W = 2000, VIO = '#3D2B4E', GR = '#5F574E', ORO = '#F4C430', cv = document.createElement('canvas'); cv.width = W; cv.height = W; const c = cv.getContext('2d');
+  c.fillStyle = '#fff'; c.fillRect(0, 0, W, W); c.fillStyle = VIO; c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.font = '700 70px Arial'; c.fillText(d.titulo, W / 2, 190); c.font = '800 112px Arial'; c.fillText(d.medida, W / 2, 330);
+  const cota = (p, q, txt, off, ang) => { const dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy), nx = -dy / L * off, ny = dx / L * off, a = [p[0] + nx, p[1] + ny], b = [q[0] + nx, q[1] + ny];
+    c.strokeStyle = VIO; c.fillStyle = VIO; c.lineWidth = 6; c.beginPath(); c.moveTo(...a); c.lineTo(...b); c.stroke();
+    [[a, b], [b, a]].forEach(([s, e]) => { const an = Math.atan2(e[1] - s[1], e[0] - s[0]); c.beginPath(); c.moveTo(...s); c.lineTo(s[0] + 38 * Math.cos(an + .4), s[1] + 38 * Math.sin(an + .4)); c.lineTo(s[0] + 38 * Math.cos(an - .4), s[1] + 38 * Math.sin(an - .4)); c.closePath(); c.fill(); });
+    c.lineWidth = 3; c.setLineDash([10, 10]); c.strokeStyle = '#9C8FB0'; c.beginPath(); c.moveTo(...p); c.lineTo(...a); c.moveTo(...q); c.lineTo(...b); c.stroke(); c.setLineDash([]);
+    const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; c.save(); c.translate(m[0], m[1]); c.rotate(ang !== undefined ? ang : Math.atan2(dy, dx)); c.font = '800 66px Arial'; c.textAlign = 'center'; const w = c.measureText(txt).width + 40; c.fillStyle = '#fff'; c.fillRect(-w / 2, -50, w, 72); c.fillStyle = VIO; c.fillText(txt, 0, 8); c.restore(); };
+  const caja = (x, y, w, hh, r) => { c.fillStyle = '#F7F5F1'; c.strokeStyle = GR; c.lineWidth = 7; c.beginPath(); if(c.roundRect) c.roundRect(x, y, w, hh, r || 0); else c.rect(x, y, w, hh); c.fill(); c.stroke(); };
+  const fmt = n => String(n).replace('.', ',');
+  // area de dibujo: y 420..1300; se escala segun las medidas
+  if(d.tipo === 'colchon'){ const k = Math.min(900 / d.a, 520 / d.l * 1.6), ancho = d.a * k, prof = [d.l * k * .48, -d.l * k * .29], alto = Math.max(110, Math.min(260, d.h * k * 1.2)), ox = W / 2 - (ancho + prof[0]) / 2 - 20, oy = 1180;
+    const P = (x, y) => [ox + x, oy + y], A = P(0, 0), B = P(ancho, 0), C = P(ancho + prof[0], prof[1]), D = P(prof[0], prof[1]), up = q => [q[0], q[1] - alto];
+    const poly = (pts, f) => { c.beginPath(); c.moveTo(...pts[0]); pts.slice(1).forEach(q => c.lineTo(...q)); c.closePath(); c.fillStyle = f; c.fill(); c.lineWidth = 7; c.strokeStyle = GR; c.stroke(); };
+    poly([up(A), up(B), up(C), up(D)], '#F7F5F1'); poly([A, B, up(B), up(A)], '#EFEBE4'); poly([B, C, up(C), up(B)], '#E7E2DA');
+    cota(A, B, fmt(d.a) + ' cm', 100); cota(B, C, fmt(d.l) + ' cm', 100); cota(A, up(A), fmt(d.h) + ' cm', -110, -Math.PI / 2); }
+  else if(d.tipo === 'mantel'){ const k = Math.min(1300 / d.l, 760 / d.a), mw = d.l * k, mh = d.a * k, mx = W / 2 - mw / 2, my = 860 - mh / 2; caja(mx, my, mw, mh, 18);
+    const tw = d.mesa[0] * k, th = d.mesa[1] * k; if(tw > 0 && th > 0){ c.setLineDash([18, 14]); c.strokeStyle = '#9C8FB0'; c.lineWidth = 5; c.strokeRect(mx + (mw - tw) / 2, my + (mh - th) / 2, tw, th); c.setLineDash([]); c.fillStyle = '#9C8FB0'; c.font = '600 44px Arial'; c.textAlign = 'center'; c.fillText(`mesa de hasta ${d.mesa[0]} × ${d.mesa[1]} cm`, W / 2, my + mh / 2 + 16); }
+    cota([mx, my + mh], [mx + mw, my + mh], fmt(d.l) + ' cm', 90); cota([mx, my + mh], [mx, my], fmt(d.a) + ' cm', -100, -Math.PI / 2); }
+  else if(d.tipo === 'cortina'){ const pan = Math.min(4, d.pan), gap = 40, k = Math.min((1300 - gap * (pan - 1)) / (d.a * pan), 800 / d.b), pw = d.a * k, ph = d.b * k, tot = pw * pan + gap * (pan - 1), x0 = W / 2 - tot / 2, yT = 470;
+    c.strokeStyle = GR; c.lineWidth = 12; c.beginPath(); c.moveTo(x0 - 80, yT); c.lineTo(x0 + tot + 80, yT); c.stroke(); c.fillStyle = GR; [x0 - 80, x0 + tot + 80].forEach(x => { c.beginPath(); c.arc(x, yT, 16, 0, Math.PI * 2); c.fill(); });
+    for(let i = 0; i < pan; i++){ const x = x0 + i * (pw + gap); caja(x, yT + 14, pw, ph); c.strokeStyle = '#D9D2C7'; c.lineWidth = 4; for(let j = 1; j < 6; j++){ const xx = x + j * pw / 6; c.beginPath(); c.moveTo(xx, yT + 20); c.lineTo(xx, yT + ph + 10); c.stroke(); } c.fillStyle = GR; for(let j = 0; j < 7; j++){ c.beginPath(); c.arc(x + 20 + j * (pw - 40) / 6, yT + 2, 11, 0, Math.PI * 2); c.fill(); } }
+    cota([x0, yT + ph + 14], [x0 + pw, yT + ph + 14], fmt(d.a) + ' cm', 85); cota([x0 + tot, yT + 14], [x0 + tot, yT + ph + 14], fmt(d.b) + ' cm', -110, -Math.PI / 2); }
+  else if(d.tipo === 'funda'){ const k = Math.min(1280 / d.l, 760 / d.a), fw = d.l * k, fh = d.a * k, fx = W / 2 - fw / 2, fy = 860 - fh / 2; caja(fx, fy, fw, fh);
+    const boca = fw * 6 / d.l; c.setLineDash([16, 12]); c.strokeStyle = '#9C8FB0'; c.lineWidth = 5; c.beginPath(); c.moveTo(fx + fw - boca, fy); c.lineTo(fx + fw - boca, fy + fh); c.stroke(); c.setLineDash([]);
+    c.save(); c.translate(fx + fw - boca / 2, fy + fh / 2); c.rotate(-Math.PI / 2); c.fillStyle = '#9C8FB0'; c.font = '600 40px Arial'; c.textAlign = 'center'; c.fillText('boca', 0, 14); c.restore();
+    cota([fx, fy + fh], [fx + fw, fy + fh], fmt(d.l) + ' cm', 90); cota([fx, fy + fh], [fx, fy], fmt(d.a) + ' cm', -100, -Math.PI / 2); }
+  else { const lx = Math.max(d.x, d.y), ly = Math.min(d.x, d.y), k = Math.min(1300 / lx, 760 / ly), w = lx * k, hh = ly * k, x = W / 2 - w / 2, y = 860 - hh / 2; caja(x, y, w, hh, 12);
+    cota([x, y + hh], [x + w, y + hh], fmt(lx) + ' cm', 90); cota([x, y + hh], [x, y], fmt(ly) + ' cm', -100, -Math.PI / 2); }
+  // tabla y pie
+  const tx = 260, tw = W - 520, ty = 1440 - Math.max(0, d.filas.length - 2) * 60, fh = 96; c.fillStyle = VIO; c.fillRect(tx, ty, tw, fh); c.fillStyle = '#fff'; c.font = '700 44px Arial'; c.textAlign = 'left'; c.fillText(d.filas.length > 1 ? 'EL JUEGO INCLUYE' : 'EL PRODUCTO INCLUYE', tx + 36, ty + 63); c.textAlign = 'right'; c.fillText('CANT.', tx + tw - 36, ty + 63);
+  d.filas.forEach((f, i) => { const y = ty + fh * (i + 1); c.fillStyle = i % 2 ? '#fff' : '#F7F5F1'; c.fillRect(tx, y, tw, fh); c.strokeStyle = '#E4DED4'; c.lineWidth = 2; c.strokeRect(tx, y, tw, fh); c.fillStyle = '#3B3530'; c.font = '600 46px Arial'; c.textAlign = 'left'; c.fillText(String(f[0]).slice(0, 26), tx + 36, y + 63); c.fillStyle = GR; c.font = '46px Arial'; c.fillText(f[1], tx + 640, y + 63); c.fillStyle = VIO; c.font = '800 48px Arial'; c.textAlign = 'right'; c.fillText(String(f[2]), tx + tw - 36, y + 63); });
+  if(d.nota){ c.fillStyle = GR; c.font = '500 44px Arial'; c.textAlign = 'center'; c.fillText(d.nota, W / 2, ty + fh * (d.filas.length + 1) + 86); }
+  c.fillStyle = VIO; c.fillRect(0, W - 120, W, 120); c.fillStyle = ORO; c.font = '700 54px Arial'; c.textAlign = 'center'; c.fillText(`${d.nombre} · ${d.S}`.slice(0, 60), W / 2, W - 42);
+  return cv.toDataURL('image/jpeg', .9);
+}
+function bosquejoSku(S){ S = String(S || '').toUpperCase(); if(bosqCache[S]) return bosqCache[S]; const d = datosBosquejo(S); if(!d) return null; try{ return bosqCache[S] = dibujarBosquejo(d); } catch(e){ console.error(e); return null; } }
+// fotos de un SKU para mostrar o enviar: las propias (o del producto) + el bosquejo de medidas al final
+function fotosConBosquejo(fotos, S){ const b = S ? bosquejoSku(S) : null; return b ? [...(fotos || []), b] : (fotos || []); }
+function descargarBosquejo(S){ const b = bosquejoSku(S); if(!b){ alert('Este SKU no tiene medidas en su descripción.'); return; } const a = document.createElement('a'); a.href = b; a.download = `${String(S).toUpperCase()}-medidas.jpg`; a.click(); }
 // ===== Vista previa de comprobantes (antes de confirmar) =====
 let __previa = null; // si esta activa, las funciones de guardar arman el comprobante y lo devuelven sin guardar
 function capturarImpresion(fn){ const orig = window.open; let html = ''; window.open = () => ({ document: { write(x){ html += x; }, close(){} }, focus(){}, print(){} }); try{ fn(); } finally { window.open = orig; } return html; }
@@ -18656,7 +18727,9 @@ function editarFotosSku(S){
   renderEditarFotosSku(); document.getElementById('pub-modal').style.display = 'block';
 }
 function renderEditarFotosSku(){
+  const bq = bosquejoSku(efsSku);
   document.getElementById('pub-cont').innerHTML = `<p class="note" style="text-align:left;margin:0 0 8px;">Fotos solo de esta medida. Si no tiene, se muestran las del producto. La primera es la principal.</p>
+    ${bq ? `<div style="display:flex;gap:10px;align-items:center;margin:0 0 10px;padding:8px;border:1px dashed var(--line);border-radius:10px;"><img src="${bq}" style="width:70px;height:70px;border-radius:6px;border:1px solid var(--line);"><span class="note" style="text-align:left;margin:0;flex:1;">📐 <b>Bosquejo de medidas</b>: va solo al final, en la galería y al enviar las fotos.${(datosBosquejo(efsSku) || {}).incompleto ? '<br><span style="color:#A6432F;">' + escaparHtml(datosBosquejo(efsSku).incompleto) + '</span>' : ''}</span><button type="button" class="btn-mini" onclick="descargarBosquejo('${efsSku}')">⬇️ Descargar</button></div>` : `<p class="note" style="text-align:left;margin:0 0 10px;">📐 Sin bosquejo de medidas: la descripción de esta medida no tiene medidas (ej.: 240 × 150 cm).</p>`}
     <div style="display:flex;gap:8px;flex-wrap:wrap;">${efsFotos.map((f, i) => `<div style="width:118px;" draggable="true" ondragstart="window.__efsDrag=${i}" ondragover="event.preventDefault()" ondrop="event.preventDefault();efsMover(window.__efsDrag,${i})"><img src="${f}" style="width:118px;height:118px;object-fit:cover;border-radius:8px;border:${i === 0 ? '3px solid var(--gold)' : '1px solid var(--line)'};">
       <div style="display:flex;justify-content:space-between;margin-top:2px;"><button type="button" class="btn-mini" style="padding:1px 6px;" onclick="efsMover(${i},${i - 1})">◀</button><button type="button" class="btn-mini" style="padding:1px 6px;" onclick="efsMover(${i},0)">⭐</button><button type="button" class="btn-mini" style="padding:1px 6px;" onclick="efsMover(${i},${i + 1})">▶</button><button type="button" class="btn-mini" style="padding:1px 6px;color:#A6432F;" onclick="efsFotos.splice(${i},1);renderEditarFotosSku()">✕</button></div></div>`).join('') || '<span class="note" style="margin:0;">Sin fotos propias.</span>'}</div>
     <label class="btn-mini" style="display:inline-block;margin-top:10px;cursor:pointer;">➕ Agregar fotos<input type="file" accept="image/*" multiple style="display:none;" onchange="efsAgregar(this)"></label>
@@ -18681,7 +18754,8 @@ function mostrarFotoSku(sku, ci, pi, el){
 }
 function abrirGaleriaCatalogo(ci, pi, sku){
   const p = CATALOGO[ci].productos[pi];
-  const fotos = sku && fotosSku[String(sku).toUpperCase()] ? fotosSku[String(sku).toUpperCase()] : imagenesEfectivas(ci, pi, p);
+  const skuB = sku || ((p.variantes || []).length === 1 ? p.variantes[0].sku : null);
+  const fotos = fotosConBosquejo(sku && fotosSku[String(sku).toUpperCase()] ? fotosSku[String(sku).toUpperCase()] : imagenesEfectivas(ci, pi, p), skuB);
   let idx = 0;
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:200;display:flex;align-items:center;justify-content:center;flex-direction:column;';
@@ -18722,7 +18796,7 @@ async function enviarFotos(fotos, titulo, link){
   } catch(e){ procesando.error(e.message); alert('No se pudieron preparar las fotos: ' + e.message); }
 }
 function enviarFotosSku(S, ci, pi){ const p = CATALOGO[ci].productos[pi], propias = fotosSku[String(S).toUpperCase()]; const v = (p.variantes || []).find(x => String(x.sku).toUpperCase() === String(S).toUpperCase()) || {};
-  enviarFotos(propias && propias.length ? propias : imagenesEfectivas(ci, pi, p), `${p.nombre} · ${v.desc || ''} · ${S}`, linkWebDeSku(S) || linkWebDeProducto(p)); }
+  enviarFotos(fotosConBosquejo(propias && propias.length ? propias : imagenesEfectivas(ci, pi, p), S), `${p.nombre} · ${v.desc || ''} · ${S}`, linkWebDeSku(S) || linkWebDeProducto(p)); }
 
 function abrirActualizarFoto(){
   mostrarPaso('step-foto-sku');
@@ -21712,6 +21786,7 @@ async function pintarLinksNI(modo){
 <script>
 etiquetarProductosEstaticos();
 revisarRegresoDeInstagram();
+sesionLista.then(() => { try{ if(fabricacion === null) cargarFabricacion().then(() => { for(const k in bosqCache) delete bosqCache[k]; }).catch(() => {}); } catch(e){} }).catch(() => {});
 sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancarios(), cargarPerfilIG()])).then(() => {
   return cargarProductosEliminados();
 }).then(() => {
@@ -21742,7 +21817,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v367';
+const APP_VERSION = '2026-10-02-v368';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
