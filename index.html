@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v378</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v379</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -8461,7 +8461,7 @@ async function abrirCtaCte(tab){ if(typeof tab === 'string'){ ccTab = tab; ccCli
   ccMovs = sm.docs.map(d => ({ _id: d.id, ...d.data() }));
   ccClientesDB = sc.docs.map(d => d.data());
   ccFacts = sf.docs.map(d => ({ _id: d.id, ...d.data() })).filter(f => !f.razon || f.razon === 'propia').map(f => { const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0); const tot = Math.round((f.total || n0 * 1.21) * 100) / 100;
-    return { id: f._id, numero: (f.esNC ? 'NC ' : f.esND ? 'ND ' : '') + (f.tipo || '') + ' ' + f.numero + (f.facturaRef ? ' (s/ ' + f.facturaRef.numero + ')' : ''), fecha: ccFechaISO(f.fecha), cliente: f.cliente || 'Sin nombre', importe: f.esNC ? -tot : tot, esNC: !!f.esNC, ref: f.facturaRef ? f.facturaRef.id : null, condicion: f.condicion || '' }; })
+    return { id: f._id, numero: (f.esNC ? 'NC ' : f.esND ? 'ND ' : '') + (f.tipo || '') + ' ' + f.numero + (f.facturaRef ? ' (s/ ' + f.facturaRef.numero + ')' : ''), fecha: ccFechaISO(f.fecha), cliente: String(f.cliente || 'Sin nombre').replace(/^\s*\d+\s*-\s*/, ''), importe: f.esNC ? -tot : tot, esNC: !!f.esNC, ref: f.facturaRef ? f.facturaRef.id : null, condicion: f.condicion || '' }; })
     .filter(f => !ccCfg.inicio || f.fecha >= ccCfg.inicio);
   if(!ccCfg.inicio){ ccTab = 'config'; }
   renderCtaCte();
@@ -8472,11 +8472,12 @@ function ccAlias(){ const A = {}; ccClientesDB.forEach(x => { const main = ccCla
   [x.razonSocial, `${x.apellido || ''} ${x.nombre || ''}`, `${x.nombre || ''} ${x.apellido || ''}`].forEach(n => { const k = ccClave(n || ''); if(k) A[k] = { main, suc: '' }; });
   (x.sucursales || []).forEach(s => [s.comoFactura, s.nombre ? (x.razonSocial || '') + ' ' + s.nombre : ''].forEach(n => { const k = ccClave(n || ''); if(k) A[k] = { main, suc: s.nombre || s.comoFactura }; })); }); return A; }
 function ccCalcular(){
-  const C = {}, AL = ccAlias(), mainDe = n => (AL[ccClave(n)] || {}).main || ccClave(n);
+  const C = {}, AL = ccAlias(), VIN = ccCfg.vinculos || {}; Object.entries(VIN).forEach(([n, k]) => { if(!AL[n]) AL[n] = { main: k, suc: '' }; });
+  const sinCod = n => String(n || '').replace(/^\s*\d+\s*-\s*/, ''), mainDe = n => (AL[ccClave(sinCod(n))] || {}).main || ccClave(sinCod(n));
   const cli = k => C[k] = C[k] || { k, nombre: k, facts: [], movs: [], saldo: 0 };
   const contadoCli = new Set(ccClientesDB.filter(x => x.condicion === 'contado').flatMap(x => [ccClave(x.razonSocial || ''), ccClave(`${x.apellido || ''} ${x.nombre || ''}`), ccClave(`${x.nombre || ''} ${x.apellido || ''}`)]).filter(Boolean));
   ccFacts.forEach(f => { if(/consumidor final/i.test(f.cliente)) return; /* mostrador: siempre contado */ if(f.condicion === 'contado') return; /* comprobante de contado */ if(f.condicion !== 'ctacte' && contadoCli.has(ccClave(f.cliente))) return; /* cliente de contado (salvo que el comprobante diga cuenta corriente) */ const al = AL[ccClave(f.cliente)], c = cli(al ? al.main : ccClave(f.cliente)); if(!c._nom) c.nombre = al ? ((ccClientesDB.find(x => ccClave(x.razonSocial || `${x.apellido || ''} ${x.nombre || ''}`.trim()) === al.main) || {}).razonSocial || f.cliente) : f.cliente; if(ccCfg.contado && ccCfg.contado[f.id]) return; c.facts.push({ ...f, pendiente: f.importe, sucursal: al ? al.suc : '' }); });
-  ccMovs.forEach(m => { const c = cli(mainDe(m.nombre || m.cliente) || m.cliente); if(m.nombre){ c.nombre = m.nombre; c._nom = true; } c.movs.push(m); });
+  ccMovs.forEach(m => { const c = cli(mainDe(m.nombre || m.cliente) || m.cliente); if(m.nombre) m.nombre = sinCod(m.nombre); if(m.nombre){ c.nombre = m.nombre; c._nom = true; } c.movs.push(m); });
   Object.values(C).forEach(c => {
     c.facts.sort((a, b) => a.fecha.localeCompare(b.fecha));
     const debe = c.facts.reduce((a, f) => a + f.importe, 0) + c.movs.filter(m => m.tipo === 'ajuste' || m.tipo === 'inicial').reduce((a, m) => a + m.importe, 0);
@@ -8622,7 +8623,7 @@ function ccFormAjuste(k, nombre, inicial){
   ccGuardarMov({ cliente: k, nombre: nombre || (ccCalcular()[k] || {}).nombre || k, tipo: inicial ? 'inicial' : 'ajuste', fecha: inicial && ccCfg.inicio ? ccCfg.inicio : ccHoy(), importe: n, detalle: det });
 }
 function ccFormCobro(k, tipo){
-  tipo = tipo || 'cobro';
+  tipo = tipo || 'cobro'; window.__cbTipo = tipo;
   const c = ccCalcular()[k] || { nombre: (document.getElementById('rc-c') || {}).value || k }; window.__ccNombreNuevo = c.nombre;
   const inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
   const t = document.getElementById('pub-titulo'); if(t) t.textContent = (tipo === 'sena' ? '💵 Seña de ' : '💵 Cobro de ') + c.nombre; { const caja = document.getElementById('pub-caja'); if(caja) caja.style.maxWidth = '920px'; }
@@ -8633,12 +8634,28 @@ function ccFormCobro(k, tipo){
       <details style="grid-column:1/-1;"><summary style="cursor:pointer;font-size:.88rem;">Retenciones que le hizo el cliente (opcional)</summary><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px;">${[['iva', 'IVA'], ['iibb', 'IIBB'], ['gan', 'Ganancias'], ['otras', 'Otras']].map(([k2, t2]) => `<label style="font-size:.8rem;">${t2}<input id="cb-r-${k2}" inputmode="decimal" placeholder="$" style="${inp}"><input id="cb-c-${k2}" placeholder="N.º certificado" style="${inp}margin-top:4px;font-size:.78rem;"></label>`).join('')}<label style="font-size:.8rem;grid-column:1/-1;">Provincia de la retención de IIBB<input id="cb-rprov" placeholder="ej.: Buenos Aires" style="${inp}"></label><label style="font-size:.8rem;grid-column:1/-1;">📎 Comprobantes de las retenciones (foto o PDF, uno o varios)<input type="file" id="cb-adj" accept="image/*,application/pdf" multiple style="${inp}"></label></div></details>
       <label style="grid-column:1/-1;">Detalle (opcional)<input id="cb-d" placeholder="Recibo N.º, observación…" style="${inp}"></label>
       ${(() => { const pend = (c.facts || []).filter(f => f.importe > 0 && f.pendiente > 0.5); return pend.length ? `<details style="grid-column:1/-1;" open><summary style="cursor:pointer;font-size:.88rem;"><b>Facturas que cancela</b> <span class="meta">(opcional: si no tilda ninguna, se aplica a las más viejas)</span></summary>
-        <div style="margin-top:6px;">${pend.map(f => `<label class="cb-fa" data-id="${escapeAttr(f.id)}" data-num="${escapeAttr(f.numero)}" style="display:grid;grid-template-columns:22px 1fr 120px 130px;gap:8px;align-items:center;padding:4px 0;border-top:1px solid #F3EFE8;font-size:.86rem;"><input type="checkbox" onchange="const i=this.parentNode.querySelector('.cb-fai');if(this.checked&&!i.value)i.value=formatoPesos(${f.pendiente});if(!this.checked)i.value='';cbTotAplica()"><span>${escaparHtml(f.numero)} <span class="meta">${f.fecha.split('-').reverse().join('/')}${f.vencida ? ' · vencida' : ''}</span></span><span class="meta" style="text-align:right;">pend. ${formatPrice(f.pendiente)}</span><input class="cb-fai" inputmode="decimal" placeholder="importe" oninput="this.parentNode.querySelector('input[type=checkbox]').checked=!!this.value;cbTotAplica()" style="${inp}"></label>`).join('')}
+        <div style="margin-top:6px;">${pend.map(f => `<label class="cb-fa" data-id="${escapeAttr(f.id)}" data-num="${escapeAttr(f.numero)}" style="display:grid;grid-template-columns:22px 1fr 120px 130px;gap:8px;align-items:center;padding:4px 0;border-top:1px solid #F3EFE8;font-size:.86rem;"><input type="checkbox" onchange="const i=this.parentNode.querySelector('.cb-fai');if(this.checked&&!i.value)i.value=formatoPesos(cbSugerido(${f.pendiente}));if(!this.checked)i.value='';cbTotAplica()"><span>${escaparHtml(f.numero)} <span class="meta">${f.fecha.split('-').reverse().join('/')}${f.vencida ? ' · vencida' : ''}</span></span><span class="meta" style="text-align:right;">pend. ${formatPrice(f.pendiente)}</span><input class="cb-fai" inputmode="decimal" placeholder="importe" oninput="this.parentNode.querySelector('input[type=checkbox]').checked=!!this.value;cbTotAplica()" style="${inp}"></label>`).join('')}
         <p id="cb-apl" class="note" style="text-align:left;margin:4px 0 0;"></p></div></details>` : ''; })()}
+      <div style="grid-column:1/-1;"><input id="cb-busf" placeholder="🔎 Buscar otra factura pendiente (número o cliente) para traerla y cancelarla" autocomplete="off" oninput="cbBuscarFactura('${escapeAttr(k)}')" style="${inp}"><div id="cb-busr"></div>${(c.facts || []).some(f => f.importe > 0 && f.pendiente > 0.5) ? '' : '<div id="cb-fa-vacias"></div><p class="note" style="text-align:left;margin:4px 0 0;">Este cliente no tiene facturas pendientes con este nombre. Búsquela arriba: al traerla, queda vinculada a este cliente para siempre.</p><p id="cb-apl" class="note" style="text-align:left;margin:4px 0 0;"></p>'}</div>
       ${c.miembros ? `<label style="grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:.88rem;"><input type="checkbox" id="cb-grupo" checked style="width:18px;height:18px;"> Aplicar a todo el grupo (${c.miembros.length + 1} empresas): cancela las facturas más viejas de cualquiera</label>` : ''}</div>
     <p class="note" style="text-align:left;">Se aplica a las facturas más viejas. Saldo actual: <b>${formatPrice(c.saldo || 0)}</b>.</p>
     <div style="display:flex;gap:8px;"><button class="btn btn-gold" style="flex:1;" onclick="ccGuardarCobro('${escapeAttr(k)}','${tipo}')">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="vistaPrevia('recibo','${escapeAttr(k)}','${tipo}')">👁️ Vista previa</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`;
   document.getElementById('pub-modal').style.display = 'block';
+}
+// lo que se propone aplicar a una factura: su pendiente, sin pasarse de lo que queda del cobro
+function cbSugerido(pend){ const imp = numAr((document.getElementById('cb-i') || {}).value) || 0; if(!imp) return pend; const usado = [...document.querySelectorAll('.cb-fai')].reduce((x, i) => x + (numAr(i.value) || 0), 0); return Math.max(0, Math.min(pend, Math.round((imp - usado) * 100) / 100)); }
+function cbBuscarFactura(k){ const q = (document.getElementById('cb-busf').value || '').trim(), box = document.getElementById('cb-busr'); if(q.length < 2){ box.innerHTML = ''; return; }
+  const C = ccCalcular(), L = []; Object.values(C).forEach(c => { if(c.k === k) return; c.facts.filter(f => f.importe > 0 && f.pendiente > 0.5 && coincideBusqueda(f.numero + ' ' + c.nombre + ' ' + f.cliente, q)).forEach(f => L.push({ f, c })); });
+  box.innerHTML = L.slice(0, 12).map(({ f, c }, i) => `<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-top:1px solid #F3EFE8;font-size:.85rem;"><span style="flex:1;"><b>${escaparHtml(f.numero)}</b> <span class="meta">${escaparHtml(c.nombre)} · ${f.fecha.split('-').reverse().join('/')} · pend. ${formatPrice(f.pendiente)}</span></span><button type="button" class="btn-mini" onclick="cbTraerFactura('${escapeAttr(k)}','${escapeAttr(f.id)}')">Traer</button></div>`).join('') || '<p class="note" style="text-align:left;">No encontré facturas pendientes con eso.</p>'; }
+async function cbTraerFactura(k, fid){
+  const C = ccCalcular(); let f = null, origen = null; Object.values(C).forEach(c => { const x = c.facts.find(y => y.id === fid); if(x){ f = x; origen = c; } }); if(!f) return;
+  if(!confirm(`¿Vincular las facturas de "${f.cliente}" a este cliente?\nDesde ahora, sus facturas y saldo quedan en esta cuenta corriente.`)) return;
+  ccCfg.vinculos = ccCfg.vinculos || {}; ccCfg.vinculos[ccClave(f.cliente)] = k;
+  try{ await db.collection('config').doc('ctacte').set({ ...ccCfg }); await ccLog('Vínculo de cliente', `"${f.cliente}" → ${(C[k] || {}).nombre || k}`); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  // reabre el cobro con lo ya cargado
+  const imp = (document.getElementById('cb-i') || {}).value, med = (document.getElementById('cb-m') || {}).value, tipo = window.__cbTipo || 'cobro';
+  ccFormCobro(k, tipo); setTimeout(() => { const i = document.getElementById('cb-i'); if(i && imp) i.value = imp; const m = document.getElementById('cb-m'); if(m && med) m.value = med;
+    const l = [...document.querySelectorAll('.cb-fa')].find(x => x.dataset.id === fid); if(l){ l.querySelector('input[type=checkbox]').click(); } cbTotAplica(); }, 50);
 }
 function cbTotAplica(){ const e = document.getElementById('cb-apl'); if(!e) return; const s = [...document.querySelectorAll('.cb-fai')].reduce((x, i) => x + (numAr(i.value) || 0), 0), imp = numAr((document.getElementById('cb-i') || {}).value) || 0;
   e.innerHTML = s ? `Aplicado a facturas: <b>${formatPrice(s)}</b>${imp ? (imp - s > 0.5 ? ` · a cuenta (facturas más viejas): ${formatPrice(imp - s)}` : imp - s < -0.5 ? ' · <span style="color:#A6432F;">supera el importe recibido</span>' : '') : ''}` : ''; }
@@ -8726,7 +8743,7 @@ async function pintarAvisoCtaCte(){
 async function abrirCtaCteDatos(){
   const [cf, sf, sm] = await Promise.all([db.collection('config').doc('ctacte').get(), db.collection('ventas_facturadas').get(), db.collection('cc_movimientos').get()]);
   ccCfg = { inicio: '', plazo: 30, contado: {}, ...(cf.exists ? cf.data() : {}) }; ccMovs = sm.docs.map(d => ({ _id: d.id, ...d.data() }));
-  ccFacts = sf.docs.map(d => ({ _id: d.id, ...d.data() })).filter(f => !f.razon || f.razon === 'propia').map(f => { const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0); const tot = Math.round((f.total || n0 * 1.21) * 100) / 100; return { id: f._id, numero: (f.esNC ? 'NC ' : '') + (f.tipo || '') + ' ' + f.numero, fecha: ccFechaISO(f.fecha), cliente: f.cliente || 'Sin nombre', importe: f.esNC ? -tot : tot, esNC: !!f.esNC, condicion: f.condicion || '' }; }).filter(f => !ccCfg.inicio || f.fecha >= ccCfg.inicio);
+  ccFacts = sf.docs.map(d => ({ _id: d.id, ...d.data() })).filter(f => !f.razon || f.razon === 'propia').map(f => { const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0); const tot = Math.round((f.total || n0 * 1.21) * 100) / 100; return { id: f._id, numero: (f.esNC ? 'NC ' : '') + (f.tipo || '') + ' ' + f.numero, fecha: ccFechaISO(f.fecha), cliente: String(f.cliente || 'Sin nombre').replace(/^\s*\d+\s*-\s*/, ''), importe: f.esNC ? -tot : tot, esNC: !!f.esNC, condicion: f.condicion || '' }; }).filter(f => !ccCfg.inicio || f.fecha >= ccCfg.inicio);
 }
 // ===== Rankings de ventas: facturadas, Mercado Libre o ambos (con IVA) =====
 let rkFilas = [], rkTab = 'productos', rkOrden = 'gan', rkBuscar = '';
@@ -21939,7 +21956,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v378';
+const APP_VERSION = '2026-10-02-v379';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
