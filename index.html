@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v374</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v375</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -12743,11 +12743,39 @@ async function rmFacturar(id){
 // ===== Prompt para Gemini con plantilla fija (sin IA, sin creditos): 3 imagenes por SKU =====
 function tipoProductoPG(S){
   const r = buscarProductoPorSku(S); if(!r) return null; const cat = normBusqueda((CATALOGO[r.ci] || {}).categoria || ''), n = normBusqueda(r.producto.nombre + ' ' + cat);
-  const t = /ajustable/.test(n) && !/juego/.test(n) ? 'ajustable' : /mantel|manteleria|camino de mesa/.test(n) ? 'mantel' : /cubrecama|acolchado|frazada|edredon|quilt|cobertor|plaid/.test(n) ? 'cubrecama' : /sabana|juego/.test(n) ? 'sabanas' : /toalla|toallon|bano|alfombra de bano/.test(n) ? 'toalla' : /repasador|secaplatos|pano de cocina/.test(n) ? 'repasador' : /bata/.test(n) ? 'bata' : /almohad/.test(n) ? 'almohada' : /cortina/.test(n) ? 'cortina' : 'otro';
+  const t = (/\btelas?\b/.test(cat) || r.producto.metros) && !/mantel|cortina/.test(normBusqueda(r.producto.nombre)) ? 'tela' : /ajustable/.test(n) && !/juego/.test(n) ? 'ajustable' : /mantel|manteleria|camino de mesa/.test(n) ? 'mantel' : /cubrecama|acolchado|frazada|edredon|quilt|cobertor|plaid/.test(n) ? 'cubrecama' : /sabana|juego/.test(n) ? 'sabanas' : /toalla|toallon|bano|alfombra de bano/.test(n) ? 'toalla' : /repasador|secaplatos|pano de cocina/.test(n) ? 'repasador' : /bata/.test(n) ? 'bata' : /almohad/.test(n) ? 'almohada' : /cortina/.test(n) ? 'cortina' : 'otro';
   return { r, t, blanco: /blanc/.test(n) };
+}
+function promptTela(S, canal, x){
+  const { r } = x, p = r.producto, v = r.variante, comp = p.composicion || '', nombre = p.nombre, px = canal === 'tn' ? '1024x1024' : '2000x2000';
+  const n = normBusqueda(nombre + ' ' + comp + ' ' + (v.desc || '')), ancho = (comp.match(/ancho\s*(\d+(?:[.,]\d+)?)/i) || [])[1];
+  const uso = /percal|sabana|algodon|batista|microfibra/.test(n) ? 'a made bed with fitted sheet, flat sheet and pillowcase sewn from this fabric'
+    : /ambo|arciel|gabardina|sarga|tropical|hospital|uniforme|medic/.test(n) ? 'two medical scrubs (top and trousers) sewn from this fabric, hanging neatly on wooden hangers against a clean white wall'
+    : /antimancha|mantel|tusor|cuerina|hule|pvc|cristal/.test(n) ? 'a rectangular dining table fully covered with this fabric as a tablecloth, hanging about 25 cm on every side'
+    : /voile|blackout|lienzo|cortina|gasa/.test(n) ? 'curtains sewn from this fabric hanging from a rod at both sides of a bright window'
+    : /toalla|rizo|felpa|toallon/.test(n) ? 'towels sewn from this fabric folded on a bathroom shelf'
+    : 'a simple home textile sewn from this fabric (cushion covers and a table runner) in a bright, neutral room';
+  return `Using the attached photo of the real fabric, generate these 7 images, one after another, in this order. The color, print, weave, thickness, sheen and texture must stay EXACTLY as in the photo in all images. Fabric: ${nombre}${v.desc ? ' — ' + v.desc : ''}${comp ? ' — ' + comp : ''}. Never saturate or shift the color; never invent prints, stripes or textures that are not in the photo.
+
+IMAGE 1 – MAIN: The fabric laid in two or three soft overlapping layers with gentle waves, the cut edge finished with a PINKED (zigzag) edge clearly visible in the foreground, showing color, body and drape. Pure white seamless background #FFFFFF, soft diffused studio light, no hard shadows, soft contact shadow, filling 85-95% of the frame. Square 1:1, ${px}.
+
+IMAGE 2 – ROLL: The same fabric rolled on a cardboard tube (bolt), standing or lying, with one end unrolled about 40 cm toward the camera so the face of the fabric is visible. Pure white background #FFFFFF, soft studio light. Square 1:1, ${px}.
+
+IMAGE 3 – WEAVE: Edit this photo. Do NOT redraw the fabric. Extreme close-up of the center of the fabric showing the weave and the yarns sharply (macro), even neutral white light, same color. No edges. Square 1:1, ${px}.
+
+IMAGE 4 – IN USE: Use the photo only as an exact texture and color reference. Show ${uso}. Realistic proportions, simple bright space, neutral colors, soft daylight, no brand names. Square 1:1, ${px}.
+
+IMAGE 5 – DRAPE: A length of the same fabric hanging over a horizontal wooden rod, falling freely in natural folds to show its real body (stiff or fluid exactly as the real fabric), white background, soft studio light. Square 1:1, ${px}.
+
+IMAGE 6 – OPACITY: The same fabric held flat in front of a soft backlight (a bright window or light panel), showing honestly how much light passes through it, exactly as the real fabric would (opaque, semi-opaque or sheer); a hand partially behind the fabric to show the effect. Square 1:1, ${px}.
+
+IMAGE 7 – COLORS: Square swatches of this same fabric in ALL the colors shown in the attached photos, arranged in a neat grid with equal spacing on a pure white background #FFFFFF, soft diffused light, texture visible, no text, no numbers. If the photos show only one color, show a single large swatch. Square 1:1, ${px}.
+
+For all images: no text, no logos, no watermark, no props over the fabric.${ancho ? ` Real width of the fabric: ${ancho} cm (keep realistic proportions).` : ''}`;
 }
 function promptGemini(S, canal){
   const x = tipoProductoPG(S); if(!x) return '';
+  if(x.t === 'tela') return promptTela(S, canal, x);
   const { r, t, blanco } = x, nombre = r.producto.nombre, medida = r.variante.desc || '', comp = r.producto.composicion || '';
   const tn = canal === 'tn', px = tn ? '1024x1024' : '2000x2000', fondo = tn ? 'pure white #FFFFFF (or light cream #F5F3EF)' : 'pure white seamless background #FFFFFF';
   const prod = { ajustable: 'fitted sheet', mantel: 'tablecloth', cubrecama: 'bedspread', sabanas: 'sheet set', toalla: 'towel', repasador: 'kitchen towel', bata: 'bathrobe', almohada: 'pillow', cortina: 'curtain', otro: 'textile product' }[t];
@@ -12927,6 +12955,9 @@ function datosBosquejo(S){
     Object.assign(d, { tipo: 'mantel', titulo: fab ? 'Mantel terminado de' : 'Mantel de', medida: `${l} × ${a} cm`, l, a, mesa: [l - 2 * CAIDA_MANTEL, a - 2 * CAIDA_MANTEL], nota: `Ideal para mesas de hasta ${l - 2 * CAIDA_MANTEL} × ${a - 2 * CAIDA_MANTEL} cm (caída de ${CAIDA_MANTEL} cm por lado)` }); d.filas.push(['Mantel', `${l} × ${a} cm`, 1]); return d; }
   if(/funda/.test(n) && /almohad/.test(n) && !/juego/.test(n) && med[0]){ const [a0, l0] = med[0][0] <= med[0][1] ? med[0] : [med[0][1], med[0][0]], [a, l] = terminar(a0, l0, 'funda');
     Object.assign(d, { tipo: 'funda', titulo: fab ? 'Funda de almohada terminada de' : 'Funda de almohada de', medida: `${l} × ${a} cm`, l, a, nota: `Apta para almohadas de ${Math.round(l - 8)} × ${Math.round(a - 3)} cm` }); d.filas.push(['Funda', `${l} × ${a} cm`, 1]); return d; }
+  if(tipoPG === 'tela'){ const comp = p.composicion || '', an = +(((comp + ' ' + (v.desc || '')).match(/ancho\s*(\d+(?:[.,]\d+)?)/i) || [])[1] || '').replace(',', '.'), mr = p.metros || +((comp.match(/(\d+)\s*metros/i) || [])[1] || 0);
+    if(an){ Object.assign(d, { tipo: 'tela', titulo: 'Ancho de la tela', medida: `${String(an).replace('.', ',')} cm`, an, mr, nota: mr ? `Venta por metro · rollos de ${mr} m` : 'Venta por metro' });
+      d.filas.push(['Ancho', `${String(an).replace('.', ',')} cm`, '']); if(mr) d.filas.push(['Rollo', `${mr} metros`, '']); const cp = comp.split('—')[0].trim(); if(cp && !/ancho|metro|pieza|rollo/i.test(cp)) d.filas.push(['Composición', cp.slice(0, 26), '']); return d; } }
   const triple = med.find(m => m[2]);
   if(triple && (tipoPG === 'sabanas' || /ajustable|colch[oó]n|protector/.test(n))){ const [a, l, h3] = triple;
     Object.assign(d, { tipo: 'colchon', titulo: 'Apto para colchón de', medida: `${a} × ${l} × ${h3} cm`, a, l, h: h3, nota: /ajustable|juego|sabana/.test(n) ? `Ajustable con elástico · cubre colchones de hasta ${h3} cm de alto` : '' });
@@ -12963,6 +12994,12 @@ function dibujarBosquejo(d){
     c.strokeStyle = GR; c.lineWidth = 12; c.beginPath(); c.moveTo(x0 - 80, yT); c.lineTo(x0 + tot + 80, yT); c.stroke(); c.fillStyle = GR; [x0 - 80, x0 + tot + 80].forEach(x => { c.beginPath(); c.arc(x, yT, 16, 0, Math.PI * 2); c.fill(); });
     for(let i = 0; i < pan; i++){ const x = x0 + i * (pw + gap); caja(x, yT + 14, pw, ph); c.strokeStyle = '#D9D2C7'; c.lineWidth = 4; for(let j = 1; j < 6; j++){ const xx = x + j * pw / 6; c.beginPath(); c.moveTo(xx, yT + 20); c.lineTo(xx, yT + ph + 10); c.stroke(); } c.fillStyle = GR; for(let j = 0; j < 7; j++){ c.beginPath(); c.arc(x + 20 + j * (pw - 40) / 6, yT + 2, 11, 0, Math.PI * 2); c.fill(); } }
     cota([x0, yT + ph + 14], [x0 + pw, yT + ph + 14], fmt(d.a) + ' cm', 85); cota([x0 + tot, yT + 14], [x0 + tot, yT + ph + 14], fmt(d.b) + ' cm', -110, -Math.PI / 2); }
+  else if(d.tipo === 'tela'){ // rollo con un tramo desplegado y la cota del ancho
+    const x0 = 360, w = 1280, yR = 520, rh = 150; c.fillStyle = '#EFEBE4'; c.strokeStyle = GR; c.lineWidth = 7; c.beginPath(); c.roundRect ? c.roundRect(x0, yR, w, rh, 70) : c.rect(x0, yR, w, rh); c.fill(); c.stroke();
+    c.fillStyle = '#D9D2C7'; [x0 + 30, x0 + w - 30].forEach(x => { c.beginPath(); c.ellipse(x, yR + rh / 2, 22, rh / 2 - 10, 0, 0, Math.PI * 2); c.fill(); });
+    c.fillStyle = '#F7F5F1'; c.beginPath(); c.moveTo(x0 + 20, yR + rh - 10); c.lineTo(x0 + w - 20, yR + rh - 10); c.lineTo(x0 + w - 60, 1180); c.lineTo(x0 + 60, 1180); c.closePath(); c.fill(); c.stroke();
+    c.strokeStyle = GR; c.lineWidth = 5; c.beginPath(); for(let x = x0 + 60; x <= x0 + w - 60; x += 40){ c.lineTo(x, 1180); c.lineTo(x + 20, 1205); } c.stroke();
+    cota([x0 + 60, 1210], [x0 + w - 60, 1210], 'ancho ' + fmt(d.an) + ' cm', 70); }
   else if(d.tipo === 'funda'){ const k = Math.min(1280 / d.l, 760 / d.a), fw = d.l * k, fh = d.a * k, fx = W / 2 - fw / 2, fy = 860 - fh / 2; caja(fx, fy, fw, fh);
     const boca = fw * 6 / d.l; c.setLineDash([16, 12]); c.strokeStyle = '#9C8FB0'; c.lineWidth = 5; c.beginPath(); c.moveTo(fx + fw - boca, fy); c.lineTo(fx + fw - boca, fy + fh); c.stroke(); c.setLineDash([]);
     c.save(); c.translate(fx + fw - boca / 2, fy + fh / 2); c.rotate(-Math.PI / 2); c.fillStyle = '#9C8FB0'; c.font = '600 40px Arial'; c.textAlign = 'center'; c.fillText('boca', 0, 14); c.restore();
@@ -12970,7 +13007,7 @@ function dibujarBosquejo(d){
   else { const lx = Math.max(d.x, d.y), ly = Math.min(d.x, d.y), k = Math.min(1300 / lx, 760 / ly), w = lx * k, hh = ly * k, x = W / 2 - w / 2, y = 860 - hh / 2; caja(x, y, w, hh, 12);
     cota([x, y + hh], [x + w, y + hh], fmt(lx) + ' cm', 90); cota([x, y + hh], [x, y], fmt(ly) + ' cm', -100, -Math.PI / 2); }
   // tabla y pie
-  const tx = 260, tw = W - 520, ty = 1440 - Math.max(0, d.filas.length - 2) * 60, fh = 96; c.fillStyle = VIO; c.fillRect(tx, ty, tw, fh); c.fillStyle = '#fff'; c.font = '700 44px Arial'; c.textAlign = 'left'; c.fillText(d.filas.length > 1 ? 'EL JUEGO INCLUYE' : 'EL PRODUCTO INCLUYE', tx + 36, ty + 63); c.textAlign = 'right'; c.fillText('CANT.', tx + tw - 36, ty + 63);
+  const tx = 260, tw = W - 520, ty = 1440 - Math.max(0, d.filas.length - 2) * 80, fh = 96; c.fillStyle = VIO; c.fillRect(tx, ty, tw, fh); c.fillStyle = '#fff'; c.font = '700 44px Arial'; c.textAlign = 'left'; c.fillText(d.tipo === 'tela' ? 'FICHA DE LA TELA' : d.filas.length > 1 ? 'EL JUEGO INCLUYE' : 'EL PRODUCTO INCLUYE', tx + 36, ty + 63); c.textAlign = 'right'; if(d.tipo !== 'tela') c.fillText('CANT.', tx + tw - 36, ty + 63);
   d.filas.forEach((f, i) => { const y = ty + fh * (i + 1); c.fillStyle = i % 2 ? '#fff' : '#F7F5F1'; c.fillRect(tx, y, tw, fh); c.strokeStyle = '#E4DED4'; c.lineWidth = 2; c.strokeRect(tx, y, tw, fh); c.fillStyle = '#3B3530'; c.font = '600 46px Arial'; c.textAlign = 'left'; c.fillText(String(f[0]).slice(0, 26), tx + 36, y + 63); c.fillStyle = GR; c.font = '46px Arial'; c.fillText(f[1], tx + 640, y + 63); c.fillStyle = VIO; c.font = '800 48px Arial'; c.textAlign = 'right'; c.fillText(String(f[2]), tx + tw - 36, y + 63); });
   if(d.nota){ c.fillStyle = GR; c.font = '500 44px Arial'; c.textAlign = 'center'; c.fillText(d.nota, W / 2, ty + fh * (d.filas.length + 1) + 86); }
   c.fillStyle = VIO; c.fillRect(0, W - 120, W, 120); c.fillStyle = ORO; c.font = '700 54px Arial'; c.textAlign = 'center'; c.fillText(`${d.nombre} · ${d.S}`.slice(0, 60), W / 2, W - 42);
@@ -21833,7 +21870,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v374';
+const APP_VERSION = '2026-10-02-v375';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
