@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v381</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v382</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -7909,10 +7909,11 @@ async function renderRetenciones(){
   const [mv, cp, ex] = await Promise.all([db.collection('cc_movimientos').get(), db.collection('compras').get(), db.collection('teso_extractos').get().catch(() => ({ docs: [] }))]);
   const F = [];
   window.__rtAdj = {}; mv.docs.map(x => ({ _id: x.id, ...x.data() })).filter(m => (m.tipo === 'cobro' || m.tipo === 'sena') && String(m.fecha).slice(0, 7) === mes).forEach(m => { if((m.retAdj || []).length) window.__rtAdj[m._id] = m.retAdj; Object.entries(m.retenciones || {}).forEach(([k, v]) => { if(+v) F.push({ adj: (m.retAdj || []).length ? m._id : '', origen: 'Recibo de ' + (m.nombre || m.cliente), tipo: { iva: 'Retención IVA', iibb: 'Retención IIBB', gan: 'Retención Ganancias', otras: 'Otras retenciones' }[k] || k, prov: k === 'iibb' ? (m.retProv || '') : '', cert: (m.retCert || {})[k] || '', imp: +v, rz: 'propia' }); }); });
-  cp.docs.map(x => x.data()).filter(c => String(c.fecha).slice(0, 7) === mes && esFiscalCompra(c)).forEach(c => { const sg = c.nc ? -1 : 1; if(+c.percIva) F.push({ origen: 'Compra ' + (c.tipo || '') + ' ' + (c.numero || ''), tipo: 'Percepción IVA', prov: '', cert: '', imp: sg * c.percIva, rz: c.razon }); if(+c.percIibb) F.push({ origen: 'Compra ' + (c.tipo || '') + ' ' + (c.numero || ''), tipo: 'Percepción IIBB', prov: c.provIibb || '', cert: '', imp: sg * c.percIibb, rz: c.razon }); });
+  cp.docs.map(x => x.data()).filter(c => String(c.fecha).slice(0, 7) === mes && esFiscalCompra(c)).forEach(c => { const sg = c.nc ? -1 : 1; if(+c.percIva && /^[AM]$/i.test(c.tipo || 'A')) F.push({ origen: 'Compra ' + (c.tipo || '') + ' ' + (c.numero || ''), tipo: 'Percepción IVA', prov: '', cert: '', imp: sg * c.percIva, rz: c.razon }); if(+c.percIibb) F.push({ origen: 'Compra ' + (c.tipo || '') + ' ' + (c.numero || ''), tipo: 'Percepción IIBB', prov: c.provIibb || '', cert: '', imp: sg * c.percIibb, rz: c.razon }); });
   ex.docs.map(x => x.data()).filter(x => x.cat === 'impuesto' && String(x.fecha).slice(0, 7) === mes).forEach(x => F.push({ origen: 'Banco Santander', tipo: x.tipo, prov: x.provincia || '', cert: '', imp: -x.importe, rz: 'propia' }));
   const G = {}; F.forEach(f => { const k = f.tipo + (f.prov ? ' · ' + f.prov : ''); G[k] = (G[k] || 0) + f.imp; });
   box.innerHTML = F.length ? `<b style="font-size:.85rem;">Por tipo</b><div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.86rem;margin-bottom:10px;">${Object.entries(G).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr style="border-top:1px solid var(--line);"><td style="padding:5px;">${escaparHtml(k)}</td><td style="padding:5px;text-align:right;font-weight:700;">${formatPrice(v)}</td></tr>`).join('')}<tr style="border-top:2px solid var(--purple);"><td style="padding:5px;"><b>Total</b></td><td style="padding:5px;text-align:right;"><b>${formatPrice(Object.values(G).reduce((a, x) => a + x, 0))}</b></td></tr></table></div>
+    ${(() => { const ch = Object.entries(G).filter(([k]) => /d[ée]bitos y cr[ée]ditos/i.test(k)).reduce((a, [, v]) => a + v, 0); return ch ? `<div style="background:#F2EEF7;border-radius:10px;padding:8px 12px;font-size:.86rem;margin-bottom:10px;"><b>Impuesto a los débitos y créditos (Ley 25.413):</b> ${formatPrice(ch)} · <b>33 % computable a cuenta de Ganancias: ${formatPrice(ch * 0.33)}</b><div class="note" style="text-align:left;margin:2px 0 0;">Orientativo (alícuota general 0,6 %): su contador lo confirma al liquidar Ganancias.</div></div>` : ''; })()}
     <details><summary style="cursor:pointer;font-size:.85rem;">Detalle (${F.length})</summary><div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.82rem;">${F.map(f => `<tr style="border-top:1px solid var(--line);"><td style="padding:4px;">${chipRZ(f.rz)}</td><td style="padding:4px;">${escaparHtml(f.origen)}</td><td style="padding:4px;">${escaparHtml(f.tipo)}${f.prov ? ' · ' + escaparHtml(f.prov) : ''}${f.cert ? ' <span class="meta">cert. ' + escaparHtml(f.cert) + '</span>' : ''}${f.adj ? (window.__rtAdj[f.adj] || []).map((a, i) => ` <a href="#" title="${escapeAttr(a.nombre)}" onclick="event.preventDefault();const x=window.__rtAdj['${f.adj}'][${i}];verAdjunto(x.data,x.nombre)">📎</a>`).join('') : ''}</td><td style="padding:4px;text-align:right;">${formatPrice(f.imp)}</td></tr>`).join('')}</table></div></details>` : '<p class="note">Sin retenciones ni percepciones en este mes.</p>';
 }
 // ===== Fiscal (con CAE/CAI) o no fiscal: solo los fiscales cuentan para IVA y demas impuestos =====
@@ -21966,7 +21967,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v381';
+const APP_VERSION = '2026-10-02-v382';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
