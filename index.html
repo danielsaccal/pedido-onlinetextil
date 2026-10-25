@@ -433,6 +433,13 @@ body.con-sb header.top p{display:none!important;}
 body.con-sb header.top .menu-herramientas{margin:0 0 0 auto!important;}
 body.con-sb header.top .menu-toggle{height:32px;padding:0 12px!important;border-radius:8px!important;font-size:.8rem!important;background:rgba(255,255,255,.1)!important;border:1px solid rgba(255,255,255,.18)!important;}
 
+
+/* buscador universal */
+#gb-modal .gb-item{display:flex;gap:12px;align-items:center;padding:9px 12px;border-radius:9px;cursor:pointer;}
+#gb-modal .gb-item.on,#gb-modal .gb-item:hover{background:#F2EEF7;}
+#gb-modal .gb-item b{font-size:.88rem;font-weight:600;color:#2B2622;}#gb-modal .gb-item small{display:block;color:#A89E90;font-size:.74rem;}
+#gb-modal .gb-ic{width:26px;height:26px;border-radius:7px;background:#F5F1EB;color:#3D2B4E;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;flex:0 0 26px;}
+#gb-modal .gb-sec{font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:#A89E90;font-weight:700;margin:12px 12px 4px;}
 /* ===== Inicio (etapa 2) ===== */
 body.con-sb .app{max-width:1120px;}
 .dh-top{display:flex;align-items:center;gap:12px;margin:4px 0 16px;}.dh-hola{font-size:.95rem;color:#6B6258;}.dh-top .pv-menu{margin-left:auto;}
@@ -1754,7 +1761,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v397</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v398</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2101,7 +2108,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
   </div>
   <div id="gb-modal" style="display:none;position:fixed;inset:0;background:rgba(30,20,40,.45);z-index:9999;padding:60px 12px 12px;">
     <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:16px;padding:12px;box-shadow:0 10px 40px rgba(0,0,0,.25);">
-      <div style="display:flex;gap:8px;"><input id="gb-input" placeholder="🔍 Buscar SKU, producto, artículo, tela u orden" oninput="buscarGeneral(this.value)" style="flex:1;padding:12px;border:1px solid var(--line);border-radius:12px;font-size:16px;"><button type="button" onclick="cerrarBuscador()" style="border:none;background:none;font-size:1.3rem;cursor:pointer;color:#8A8072;">✕</button></div>
+      <div style="display:flex;gap:8px;"><input id="gb-input" placeholder="Buscar o escribir qué hacer: “factura sarali”, “pagar feltex”, “stock IA6041”…" autocomplete="off" oninput="buscarGeneral(this.value)" onkeydown="gbTecla(event)" style="flex:1;padding:12px;border:1px solid var(--line);border-radius:12px;font-size:16px;"><button type="button" onclick="cerrarBuscador()" style="border:none;background:none;font-size:1.3rem;cursor:pointer;color:#8A8072;">✕</button></div>
       <div id="gb-res" style="max-height:65vh;overflow-y:auto;margin-top:8px;"></div>
     </div>
   </div>
@@ -11237,13 +11244,40 @@ async function abrirBuscador(){
     if(fabricacion === null) await cargarFabricacion();
     if(typeof historialOT !== 'undefined' && !historialOT) await cargarHistorialOT();
   } catch(e){}
+  try{ if(!window.__gbDatos || Date.now() - window.__gbDatos.t > 120000){ const D = { t: Date.now(), cli: [], prov: [], fac: [] };
+      const [c, pv, fv] = await Promise.all([puede('ctacte') || puede('clientes') ? db.collection('clientes').get().catch(() => null) : null, puede('compras') ? db.collection('proveedores').get().catch(() => null) : null, esDueno() || puede('ventas') ? db.collection('ventas_facturadas').get().catch(() => null) : null]);
+      if(c) D.cli = c.docs.map(d => d.data()).map(x => x.razonSocial || [x.nombre, x.apellido].filter(Boolean).join(' ')).filter(Boolean);
+      if(pv) D.prov = pv.docs.map(d => ({ _id: d.id, ...d.data() }));
+      if(fv) D.fac = fv.docs.map(d => d.data()).map(f => ({ n: `${f.esNC ? 'NC ' : f.esND ? 'ND ' : ''}${f.tipo || ''} ${f.numero || ''}`, c: String(f.cliente || '').replace(/^\s*\d+\s*-\s*/, ''), f: f.fecha, t: +f.total || 0 }));
+      window.__gbDatos = D; const i2 = document.getElementById('gb-input'); if(i2 && i2.value) buscarGeneral(i2.value); } } catch(e){ console.error(e); }
 }
 function cerrarBuscador(){ document.getElementById('gb-modal').style.display = 'none'; }
 function buscarGeneral(v){
   const q = normBusqueda(v), cont = document.getElementById('gb-res');
   if(q.length < 2){ cont.innerHTML = '<p class="note">Escriba al menos 2 letras.</p>'; return; }
   const ok = t => q.split(/\s+/).every(w => normBusqueda(t).includes(w));
-  const sec = [];
+  const sec = []; window.__gbAcc = []; const ac = fn => { window.__gbAcc.push(fn); return `gbAccion(${window.__gbAcc.length - 1})`; };
+  const D = window.__gbDatos || { cli: [], prov: [], fac: [] }, js = s => JSON.stringify(String(s)); // codigo guardado en memoria (no va dentro del HTML)
+  // 1. lo que quiere hacer: verbo + cliente o proveedor ("factura sarali", "cobrar hotel", "pagar feltex")
+  const W = q.split(/\s+/), verbo = W[0], resto = W.slice(1).join(' ');
+  const okR = t => !resto || resto.split(/\s+/).every(w => normBusqueda(t).includes(w));
+  const hacer = [];
+  if(/^(factura|facturar|nc|nd|nota)$/.test(verbo)){ const tipo = /^nc$|^nota$/.test(verbo) ? 'nc' : verbo === 'nd' ? 'nd' : 'f';
+    D.cli.filter(okR).slice(0, 4).forEach(n => hacer.push(['+', `${tipo === 'nc' ? 'Nota de crédito' : tipo === 'nd' ? 'Nota de débito' : 'Factura de venta'} a ${n}`, 'Comprobantes', ac(`abrirFacturas().then(() => { fvManual('${tipo}'); setTimeout(() => { const c = document.getElementById('fv-c'); if(c){ c.value = ${js(n)}; c.dispatchEvent(new Event('change', { bubbles: true })); } }, 200); })`)]));
+    if(!resto) hacer.push(['+', tipo === 'nc' ? 'Nota de crédito de venta' : tipo === 'nd' ? 'Nota de débito de venta' : 'Factura de venta', 'Comprobantes', ac(`abrirFacturas().then(() => fvManual('${tipo}'))`)]); }
+  if(/^(cobrar|cobro|recibo)$/.test(verbo)) D.cli.filter(okR).slice(0, 4).forEach(n => hacer.push(['$', `Cobrar a ${n}`, 'Recibo', ac(`abrirCtaCte().then(() => ccFormCobro(ccClave(${js(n)}), 'cobro'))`)]));
+  if(/^(pagar|pago|op)$/.test(verbo)) D.prov.filter(x => okR(x.nombre)).slice(0, 4).forEach(x => hacer.push(['$', `Pagar a ${x.nombre}`, 'Orden de pago', ac(`abrirCompras().then(() => pvFormPago('${x._id}'))`)]));
+  if(/^(compra|comprar)$/.test(verbo)) D.prov.filter(x => okR(x.nombre)).slice(0, 4).forEach(x => hacer.push(['+', `Factura de compra de ${x.nombre}`, 'Compras', ac(`abrirCompras().then(() => pvFormCompra('${x._id}'))`)]));
+  if(/^(stock)$/.test(verbo) && resto) hacer.push(['▦', `Stock de ${resto.toUpperCase()}`, 'Stock', ac(`abrirStock().then(() => { const b = document.getElementById('sk-buscar') || document.querySelector('#step-stock input'); if(b){ b.value = ${js(resto)}; b.dispatchEvent(new Event('input', { bubbles: true })); } })`)]);
+  // 2. pantallas y acciones de la app (las mismas del menu, con sus permisos)
+  const pant = []; Object.keys(GRUPOS_INICIO).forEach(k => { try{ (sbItems(k) || []).forEach(c => c.items.forEach(([t, f]) => { const tt = sinEmoji(t); if(ok(tt + ' ' + (c.titulo || '') + ' ' + (GRUPOS_INICIO[k].titulo || ''))) pant.push(['›', tt.replace(/^\+\s*/, ''), sinEmoji(GRUPOS_INICIO[k].titulo || '') + (c.titulo ? ' · ' + c.titulo.replace(/^\d+ · /, '') : ''), ac(f)]); })); } catch(e){} });
+  if(hacer.length) sec.push(['Hacer', hacer]);
+  const pz = x => W.every(w => normBusqueda(x[1] + ' ' + x[2]).split(/[\s·]+/).some(p => p.startsWith(w))) ? 0 : 1; // primero las que empiezan con lo escrito
+  if(pant.length) sec.push(['Ir a', pant.filter((x, i, a) => a.findIndex(y => y[1] === x[1]) === i).sort((a, b) => pz(a) - pz(b)).slice(0, 6)]);
+  // 3. clientes, proveedores y comprobantes
+  const cl = D.cli.filter(ok).slice(0, 5); if(cl.length) sec.push(['Clientes', cl.map(n => ['●', n, 'Cuenta corriente', ac(`abrirCtaCte().then(() => { ccCli = ccClave(${js(n)}); renderCtaCte(); })`)])]);
+  const pr = D.prov.filter(x => ok(x.nombre + ' ' + (x.cuit || '') + ' ' + (x.rubro || ''))).slice(0, 5); if(pr.length) sec.push(['Proveedores', pr.map(x => ['●', x.nombre, [x.rubro, x.cuit].filter(Boolean).join(' · ') || 'Cuenta corriente', ac(`abrirCompras().then(() => { pvSel = '${x._id}'; renderCompras(); })`)])]);
+  const fa = /\d{3,}/.test(q) ? D.fac.filter(x => ok(x.n + ' ' + x.c)).slice(0, 5) : []; if(fa.length) sec.push(['Comprobantes', fa.map(x => ['▤', x.n.trim(), `${x.c} · ${x.f || ''} · ${formatPrice(x.t)}`, ac(`abrirFacturas().then(() => { const b = document.getElementById('fc-q'); if(b){ b.value = ${js(x.n.trim().split(' ').pop())}; renderFacturas(); } })`)])]);
   const prods = [];
   CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(vv => { if(ok(`${vv.sku} ${p.nombre} ${vv.desc}`)) prods.push({ p, v: vv }); })));
   if(prods.length) sec.push(['Catálogo', prods.slice(0, 8).map(x => [`🏷️`, `${x.v.sku} · ${x.p.nombre}`, x.v.desc, `gbIr('sku', ${JSON.stringify(String(x.v.sku)).replace(/"/g, '&quot;')})`])]);
@@ -11253,8 +11287,12 @@ function buscarGeneral(v){
   if(telas.length) sec.push(['Telas', telas.slice(0, 8).map(([c, t]) => ['🧵', `${c} · ${t.nombre || ''}`, [t.color, t.ancho ? t.ancho + ' cm' : '', t.proveedor].filter(Boolean).join(' · '), `gbIr('tela', ${JSON.stringify(c).replace(/"/g, '&quot;')})`])]);
   const ots = (typeof historialOT !== 'undefined' && historialOT ? historialOT : []).filter(o => ok(`${o.numero} ${o.taller} ${(o.renglones || []).map(r => r.articulo + ' ' + (r.sku || '')).join(' ')}`));
   if(ots.length) sec.push(['Órdenes de trabajo', ots.slice(0, 6).map(o => ['📋', `${o.numero} · ${o.taller}`, new Date(o.fecha).toLocaleDateString('es-AR'), `gbIr('ot', ${JSON.stringify(o.numero).replace(/"/g, '&quot;')})`])]);
-  cont.innerHTML = sec.length ? sec.map(([t, items]) => `<div class="gb-sec">${t}</div>` + items.map(([ic, a, b, fn]) => `<div class="gb-item" onclick="${fn}"><span style="font-size:1.1rem;">${ic}</span><div><b>${escaparHtml(a)}</b><small>${escaparHtml(b || '')}</small></div></div>`).join('')).join('') : '<p class="note">No se encontró nada.</p>';
+  cont.innerHTML = sec.length ? sec.map(([t, items]) => `<div class="gb-sec">${t}</div>` + items.map(([ic, a, b, fn]) => `<div class="gb-item" onclick="${/^gbAccion/.test(fn) ? fn : fn}"><span class="gb-ic">${/\p{Extended_Pictographic}/u.test(ic) ? '•' : escaparHtml(ic)}</span><div><b>${escaparHtml(a)}</b><small>${escaparHtml(b || '')}</small></div></div>`).join('')).join('') : '<p class="note">No se encontró nada. Pruebe con “factura”, “cobrar”, “pagar”, “compra” o “stock” y un nombre.</p>';
+  window.__gbSel = 0; gbMarcar();
 }
+function gbAccion(i){ const f = (window.__gbAcc || [])[i]; cerrarBuscador(); if(!f) return; try{ (0, eval)(f); } catch(e){ console.error(e); } }
+function gbMarcar(){ const L = [...document.querySelectorAll('#gb-res .gb-item')]; L.forEach((d, i) => d.classList.toggle('on', i === window.__gbSel)); const e = L[window.__gbSel]; if(e) e.scrollIntoView({ block: 'nearest' }); }
+function gbTecla(e){ const L = document.querySelectorAll('#gb-res .gb-item'); if(!L.length) return; if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); window.__gbSel = Math.max(0, Math.min(L.length - 1, (window.__gbSel || 0) + (e.key === 'ArrowDown' ? 1 : -1))); gbMarcar(); } else if(e.key === 'Enter'){ e.preventDefault(); const el = L[window.__gbSel || 0]; if(el) el.click(); } }
 async function gbIr(tipo, valor){
   cerrarBuscador();
   if(tipo === 'sku'){ irACatalogoDesdeInicio(); const b = document.getElementById('buscador'); if(b){ b.value = valor; renderCatalogo(valor); } }
@@ -22200,7 +22238,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v397';
+const APP_VERSION = '2026-10-02-v398';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
