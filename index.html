@@ -432,6 +432,26 @@ body.con-sb header.top h1{font-size:1.05rem!important;margin:0!important;}
 body.con-sb header.top p{display:none!important;}
 body.con-sb header.top .menu-herramientas{margin:0 0 0 auto!important;}
 body.con-sb header.top .menu-toggle{height:32px;padding:0 12px!important;border-radius:8px!important;font-size:.8rem!important;background:rgba(255,255,255,.1)!important;border:1px solid rgba(255,255,255,.18)!important;}
+
+/* ===== Inicio (etapa 2) ===== */
+body.con-sb .app{max-width:1120px;}
+.dh-top{display:flex;align-items:center;gap:12px;margin:4px 0 16px;}.dh-hola{font-size:.95rem;color:#6B6258;}.dh-top .pv-menu{margin-left:auto;}
+.dh-hero{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:14px;margin-bottom:22px;}
+.dh-card{background:#fff;border:1px solid #ECE6DD;border-radius:14px;padding:16px 18px;cursor:pointer;}.dh-card:hover{border-color:#DCD3C6;}
+.dh-big{padding:0;}.dh-big .dh-t{padding:14px 20px 12px;border-bottom:1px solid #ECE6DD;margin:0 0 14px;}.dh-big>div:nth-child(2){padding:0 20px;}
+.dh-t{font-size:.8rem;color:#6B6258;font-weight:600;}.dh-amt{font:700 2rem Arial;letter-spacing:-.5px;color:#2B2622;}.dh-v{font:700 1.35rem Arial;margin-top:6px;color:#2B2622;}
+.dh-sub{display:flex;justify-content:space-between;gap:10px;font-size:.75rem;color:#A89E90;border-top:1px solid #ECE6DD;margin-top:12px;padding:10px 20px;}
+.dh-mut{color:#A89E90;font-size:.76rem;}.dh-bar{height:6px;background:#F1ECE4;border-radius:3px;margin-top:4px;}.dh-bar i{display:block;height:6px;border-radius:3px;}
+.dh-det{margin-top:10px;font-size:.78rem;}.dh-det>summary{color:#A89E90;list-style:none;}.dh-det>summary::-webkit-details-marker{display:none}
+.dh-cols{display:grid;grid-template-columns:1fr 1fr;gap:22px;}.dh-cols.uno{grid-template-columns:1fr;max-width:720px;}
+.dh-h{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;}.dh-h h3{font:700 1.02rem Arial;margin:0;color:#2B2622;}.dh-h a{font-size:.8rem;font-weight:600;color:#3D2B4E;text-decoration:none;}
+.dh-list{background:#fff;border:1px solid #ECE6DD;border-radius:14px;overflow:hidden;}
+.dh-task{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid #F3EFE8;}.dh-task:last-child{border:none;}
+.dh-ic{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex:0 0 36px;}.dh-ic svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8;}
+.dh-tx{font-size:.86rem;font-weight:600;color:#2B2622;}
+.dh-act{display:grid;grid-template-columns:44px 36px 1fr auto auto;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid #F3EFE8;cursor:pointer;}.dh-act:last-child{border:none;}.dh-act:hover{background:#FBF9F6;}
+.dh-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 .72rem Arial;color:#fff;}
+@media(max-width:900px){.dh-hero{grid-template-columns:1fr;}.dh-cols{grid-template-columns:1fr;}}
 /* ===== Etapa 1 · diseño unico (tokens y componentes comunes) ===== */
 :root{--ds-tx:#2B2622;--ds-tx2:#6B6258;--ds-tx3:#A89E90;--ds-ln:#ECE6DD;--ds-h:36px;--ds-r:10px;}
 .btn{height:var(--ds-h);padding:0 16px!important;border-radius:var(--ds-r)!important;font-size:.84rem!important;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:6px;box-shadow:none!important;}
@@ -1734,7 +1754,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v396</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v397</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6302,6 +6322,28 @@ async function dashDatos(forzar){
   try{ const sD = await t(db.collection('devoluciones_ml').get().catch(() => null)); if(sD){ const n = sD.docs.map(d => d.data()).filter(x => x.estado === 'pendiente').length; if(n) P('stock', `↩️ ${n} devoluciones de Mercado Libre para revisar (¿volvieron bien?)`, "abrirStock().then(() => { skTab = 'devol'; pintarStockTabs(); skRenderTab(); })", true); } } catch(e){}
   try{ const sR = await t(db.collection('remitos').get().catch(() => null)); if(sR){ const n = sR.docs.map(d => d.data()).filter(r => !r.facturaRef && !r.anulado && r.fecha < hace(7).slice(0, 10)).length; if(n) P('stock', `🚚 ${n} remitos sin facturar con más de 7 días`, 'abrirRemitos()'); } } catch(e){}
   if(dueno){ const dc = diasDesdeCopia(); if(dc == null || dc >= 7) P('stock', `💾 ${dc == null ? 'Nunca descargó' : 'Hace ' + dc + ' días que no descarga'} una copia de seguridad`, 'abrirCopiaSeguridad()'); }
+  if(dueno){ try{
+    // facturacion de los ultimos 12 meses: facturas de la razon propia + ventas de ML de Alberto y Rita
+    const meses = []; { const d = new Date(); d.setDate(1); for(let k = 11; k >= 0; k--){ const x = new Date(d.getFullYear(), d.getMonth() - k, 1); meses.push(x.toISOString().slice(0, 7)); } }
+    const F = {}; meses.forEach(m => F[m] = { propia: 0, alberto: 0, rita: 0 });
+    let vM = 0, cM = 0; const act = [];
+    if(vf) vf.docs.forEach(d => { const f = normFactura(d.data()), iso = ccFechaISO(f.fecha), m = iso.slice(0, 7), rz = f.razon || 'propia'; if(F[m] && rz === 'propia') F[m].propia += (f.esNC ? -1 : 1) * (+f.total || 0);
+      if(m === mes && rz === 'propia') (f.items || []).forEach(it => { try{ const c = costoItemFactura(it, f); if(c == null) return; vM += (it.neto || 0) * factorIvaFactura(f) * signoFact(f); cM += c; } catch(e){} });
+      act.push({ f: iso, t: f.creado || '', fam: f.esNC ? 'ncv' : f.esND ? 'ndv' : 'venta', l: f.tipo || '', fis: esFiscalVenta(f), tit: f.esNC ? 'Nota de crédito' : f.esND ? 'Nota de débito' : 'Factura de venta', quien: String(f.cliente || '').replace(/^\s*\d+\s*-\s*/, ''), num: f.numero || '', imp: (f.esNC ? -1 : 1) * (+f.total || 0), go: 'abrirFacturas()' }); });
+    Object.values(res).forEach(x => { const k = String(x.cuenta || '').toLowerCase(); if(F[x.periodo] && (k === 'alberto' || k === 'rita')) F[x.periodo][k] += (x.vendido || 0) + (x.envios || 0); if(x.periodo === mes && (k === 'alberto' || k === 'rita') && x.vendido){ vM += x.vendido - (x.vendSinCosto || 0); cM += x.costo || 0; } });
+    V.fact12 = meses.map(m => ({ m, ...F[m], tot: F[m].propia + F[m].alberto + F[m].rita }));
+    V.margen = vM > 0 ? (vM - cM) / vM * 100 : null;
+    // posicion de IVA del mes, por razon social
+    try{ const [md, cfI, mv, bx] = await Promise.all([t(db.collection('ml_detalle').get().catch(() => null)), t(db.collection('config').doc('iva').get().catch(() => null)), t(db.collection('cc_movimientos').get().catch(() => null)), sExt ? Promise.resolve(sExt) : null]);
+      ivDatos = { fact: vf ? vf.docs.map(d => d.data()) : [], compras: (pvCompras || []).map(x => x), det: md ? md.docs.map(d => d.data()) : [], res, cfg: cfI && cfI.exists ? cfI.data() : {}, movs: mv ? mv.docs.map(d => d.data()) : (ccMovs || []), banco: bx ? bx.docs.map(d => d.data()) : [] };
+      if(typeof cargarCfgFiscal === 'function') await cargarCfgFiscal(); V.iva = calcIVA(new Date().toISOString().slice(0, 10)); } catch(e){ console.error(e); }
+    // ultimas actividades
+    (ccMovs || []).filter(m => m.tipo === 'cobro' || m.tipo === 'sena').forEach(m => act.push({ f: m.fecha, t: m.creado || '', fam: 'recibo', l: '', tit: m.tipo === 'sena' ? 'Seña' : 'Cobro', quien: (m.nombre || m.cliente || '') + (m.medio ? ' · ' + m.medio : ''), num: '', imp: +m.importe || 0, go: "abrirCtaCte('recibos')" }));
+    const pn = id => ((pvProv || []).find(x => x._id === id) || {}).nombre || '';
+    (pvCompras || []).filter(c => !c.liquidacion).forEach(c => act.push({ f: c.fecha, t: c.creado || '', fam: c.nc ? 'ncc' : c.nd ? 'ndc' : 'compra', l: c.tipo || '', fis: esFiscalCompra(c), tit: c.nc ? 'NC de compra' : c.nd ? 'ND de compra' : 'Factura de compra', quien: pn(c.proveedorId), num: c.numero || '', imp: null, monto: +c.importe || 0, go: "abrirCompras('compras')" }));
+    (pvPagos || []).forEach(x => act.push({ f: x.fecha, t: x.creado || '', fam: 'pago', l: '', tit: 'Orden de pago', quien: pn(x.proveedorId), num: 'OP ' + String(x.numero || '').padStart(5, '0'), imp: -(+x.totalARS || 0), go: "abrirCompras('pagos')" }));
+    V.act = act.filter(a => a.f).sort((a, b) => String(b.f).localeCompare(String(a.f)) || String(b.t).localeCompare(String(a.t))).slice(0, 6);
+  } catch(e){ console.error(e); } }
   dashCache = V; dashCacheT = Date.now(); return V;
 }
 const dashM = x => x >= 1e6 ? '$ ' + (x / 1e6).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' M' : formatPrice(x || 0);
@@ -6312,13 +6354,31 @@ async function pintarDash(){
   window.__dashItems = acc.map(([t, f]) => [t, f]);
   const hora = new Date().getHours(), saludo = hora < 12 ? 'Buenos días' : hora < 20 ? 'Buenas tardes' : 'Buenas noches', nombre = ((firebase.auth().currentUser || {}).displayName || '').split(' ')[0];
   const pintar = V => { if(run !== dashRun) return;
-    const G = V ? [['plata', 'Plata'], ['costos', 'Costos y precios'], ['stock', 'Stock y operación']].map(([g, tg]) => [tg, V.hoy.map((x, i) => [x, i]).filter(([x]) => (x[3] || 'stock') === g)]).filter(([, L]) => L.length) : [];
-    const num = (t, v, f) => `<span onclick="${f}">${t} <b>${v}</b></span>`;
-    box.innerHTML = `<h2 style="font-family:Georgia,serif;color:var(--purple);margin:6px 0 10px;font-weight:600;">${saludo}${nombre ? ', ' + escaparHtml(nombre) : ''}</h2>
-      <div class="d-acc">${acc.map(([t, , c], i) => `<button type="button" class="${c || ''}" onclick="dashUsar(${i})">${t}</button>`).join('')}</div>
-      ${esDueno() && V ? `<div class="d-num">${num('Disponible', V.disp != null ? formatPrice(V.disp) : '—', 'abrirTesoreria()')}${num('A cobrar', V.cobrar != null ? formatPrice(V.cobrar) : '—', 'abrirCtaCte()')}${num('A pagar', V.pagar != null ? formatPrice(V.pagar) : '—', 'abrirCompras()')}${num('Vendido en el mes', dashM(V.tot), 'abrirResultadoNegocio()')}</div>` : ''}
-      ${V ? (G.length ? `<details class="d-pl"><summary>Para atender <span class="cnt">${V.hoy.length}</span></summary><div>${G.map(([tg, L]) => `<details class="d-pl" style="border:none;margin:0;"><summary style="padding:8px 0;font-size:.9rem;">${tg} <span class="cnt">${L.length}</span></summary><div style="padding:0 0 6px;">${L.map(([[t, , ml], i]) => `<div class="d-li" onclick="dashHoy(${i})"><span>${t.replace(/^\S+\s/, '')}</span><span style="color:${ml ? '#2D3277' : '#8A8072'};${ml ? 'background:#FFE600;padding:0 8px;border-radius:6px;font-weight:700;' : ''}">Ver</span></div>`).join('')}</div></details>`).join('')}</div></details>` : '<p class="note" style="text-align:left;margin:4px 0;">✓ Nada pendiente.</p>') : '<p class="note" style="text-align:left;margin:4px 0;">Revisando…</p>'}
-      ${esDueno() && V ? `<details class="d-pl"><summary>Ventas del mes por canal <span class="cnt">${dashM(V.tot)}</span></summary><div>${[['Propia (facturado)', V.vPropia], ['Mercado Libre · Alberto', V.vA], ['Mercado Libre · Rita', V.vR]].map(([t, v]) => `<div class="d-li" style="cursor:default;"><span>${t}</span><b>${dashM(v)}</b></div>`).join('')}</div></details>` : ''}`;
+    const dueno = esDueno(), H = V ? V.hoy : [];
+    const icoT = g => ({ plata: ['#FBEDEA', '#A6432F', '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'], costos: ['#FFF8E1', '#9A7B12', '<path d="M4 4h10l6 6-10 10-6-6z"/><circle cx="9" cy="9" r="1.5"/>'], stock: ['#EEF3FA', '#2E5A8C', '<path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/>'] }[g || 'stock']);
+    const tareas = H.length ? H.map((x, i) => { const [bg, col, ic] = icoT(x[3]), t = sinEmoji(x[0]); return `<div class="dh-task"><span class="dh-ic" style="background:${bg};color:${col};"><svg viewBox="0 0 24 24">${ic}</svg></span><div class="dh-tx">${escaparHtml(t)}</div><button type="button" class="btn btn-ghost" style="width:auto;margin-left:auto;${x[2] ? 'background:#FFE600!important;border-color:#E6CF00!important;color:#2D3277!important;' : ''}" onclick="dashHoy(${i})">${/pago/i.test(t) ? 'Pagar' : /cobro|vencid/i.test(t) ? 'Cobrar' : /pedido/i.test(t) ? 'Entregar' : /devoluc|revisar/i.test(t) ? 'Revisar' : 'Ver'}</button></div>`; }).join('') : `<div class="dh-task" style="justify-content:center;color:#2F7A47;font-weight:600;">✓ Todo al día</div>`;
+    const fM = x => x >= 1e6 ? '$ ' + (x / 1e6).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' M' : formatPrice(x || 0);
+    let hero = '';
+    if(dueno && V && V.fact12){ const L = V.fact12, act = L[L.length - 1], ant = L[L.length - 2] || { tot: 0 }, mx = Math.max(1, ...L.map(x => x.tot)), dv = ant.tot ? (act.tot - ant.tot) / ant.tot * 100 : null, tot = act.tot || 0;
+      const nm = new Date(act.m + '-15').toLocaleDateString('es-AR', { month: 'long' }), nma = new Date(ant.m + '-15').toLocaleDateString('es-AR', { month: 'long' });
+      const barras = L.map((x, k) => { const hh = Math.max(2, x.tot / mx * 90); return `<rect x="${k * 22}" y="${96 - hh}" width="14" height="${hh}" rx="3" fill="${k === L.length - 1 ? '#3D2B4E' : '#DDD5E6'}"><title>${new Date(x.m + '-15').toLocaleDateString('es-AR', { month: 'short', year: '2-digit' })}: ${formatPrice(x.tot)}</title></rect>`; }).join('');
+      const pc = k => tot > 0 ? Math.round(act[k] / tot * 100) : 0;
+      const R = V.iva || {}, Z = ['propia', 'alberto', 'rita'].filter(k => R[k]), sIva = Z.reduce((a, k) => a + (R[k].saldo || 0), 0), deb = Z.reduce((a, k) => a + (R[k].deb || 0), 0), cred = Z.reduce((a, k) => a + (R[k].cred || 0) + (R[k].credML || 0) + (R[k].perc || 0) + (R[k].ret || 0) + (R[k].ant || 0), 0), mxI = Math.max(1, deb, cred);
+      const filaRZ = k => { const r = R[k], s = r.saldo || 0; return `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:.8rem;"><span><span style="color:${RZ_COLOR[k]};">●</span> ${k[0].toUpperCase() + k.slice(1)}</span><b style="color:${s > 0 ? '#A6432F' : '#2F7A47'};">${formatPrice(Math.abs(s))} ${s > 0 ? 'a pagar' : 'a favor'}</b></div>`; };
+      const mg = V.margen, C = 2 * Math.PI * 46;
+      hero = `<div class="dh-hero">
+        <div class="dh-card dh-big" onclick="abrirResultadoNegocio()"><div class="dh-t">Facturado en ${nm}</div><div style="display:flex;align-items:flex-end;gap:18px;"><div><div class="dh-amt">${formatPrice(tot)}</div>${dv != null ? `<div style="font-size:.82rem;font-weight:600;margin-top:4px;color:${dv >= 0 ? '#2F7A47' : '#A6432F'};">${dv >= 0 ? '▲' : '▼'} ${Math.abs(Math.round(dv))} % vs. ${nma}</div>` : ''}<div class="dh-mut" style="margin-top:2px;">${V.nFact || 0} comprobantes propios${V.nFact ? ' · ticket prom. ' + formatPrice(Math.round((V.vPropia || 0) / V.nFact)) : ''}</div></div>
+          <svg viewBox="0 0 260 100" style="width:230px;height:86px;margin-left:auto;">${barras}</svg></div>
+          <div class="dh-sub"><span>Últimos 12 meses</span><span>Propia ${pc('propia')} % · Alberto ${pc('alberto')} % · Rita ${pc('rita')} %</span></div></div>
+        <div class="dh-card"><div class="dh-t">Posición de IVA · ${nm}</div>${Z.length ? `<div class="dh-v" style="color:${sIva > 0 ? '#A6432F' : '#2F7A47'};">${formatPrice(Math.abs(sIva))} <span style="font-size:.75rem;font-weight:600;">${sIva > 0 ? 'a pagar' : 'a favor'}</span></div>
+          <div style="margin-top:12px;font-size:.76rem;color:#6B6258;"><div style="display:flex;justify-content:space-between;"><span>Débito</span><b>${fM(deb)}</b></div><div class="dh-bar"><i style="width:${deb / mxI * 100}%;background:#2F7A47;"></i></div><div style="display:flex;justify-content:space-between;margin-top:8px;"><span>Crédito + percepciones</span><b>${fM(cred)}</b></div><div class="dh-bar"><i style="width:${cred / mxI * 100}%;background:#2E5A8C;"></i></div></div>
+          <details class="dh-det" onclick="event.stopPropagation()"><summary>▸ Por razón social</summary>${Z.map(filaRZ).join('')}<a href="#" onclick="event.preventDefault();abrirIVA()" style="font-size:.76rem;">Ver posición completa →</a></details>` : '<div class="dh-mut" style="margin-top:8px;">Sin datos del mes.</div>'}</div>
+        <div class="dh-card" onclick="abrirResultadoNegocio()"><div class="dh-t">Margen bruto del mes</div>${mg != null ? `<div class="dh-v">${mg.toLocaleString('es-AR', { maximumFractionDigits: 1 })} %</div><svg viewBox="0 0 120 120" style="width:92px;height:92px;display:block;margin:8px auto 0;"><circle cx="60" cy="60" r="46" fill="none" stroke="#F1ECE4" stroke-width="14"/><circle cx="60" cy="60" r="46" fill="none" stroke="#3D2B4E" stroke-width="14" stroke-linecap="round" stroke-dasharray="${Math.max(0, Math.min(1, mg / 100)) * C} 999" transform="rotate(-90 60 60)"/><text x="60" y="66" text-anchor="middle" font-family="Arial" font-weight="700" font-size="18" fill="#3D2B4E">${Math.round(mg)} %</text></svg><div class="dh-mut" style="text-align:center;">ventas − costo de mercadería</div>` : '<div class="dh-mut" style="margin-top:8px;">Falta costo cargado en las ventas del mes.</div>'}</div></div>`; }
+    const actv = dueno && V && (V.act || []).length ? `<div><div class="dh-h"><h3>Últimas actividades</h3><a href="#" onclick="event.preventDefault();abrirFacturas()">Ver todas →</a></div><div class="dh-list">${V.act.map(a => { const col = (COMP_COLOR[a.fam] || [, '#8A8072'])[1], nf = a.fis === false;
+        return `<div class="dh-act" onclick="${a.go}"><span class="dh-mut">${String(a.f).slice(8, 10)}/${String(a.f).slice(5, 7)}</span><span class="dh-av" style="${nf ? `border:1.5px dashed ${col};color:${col};background:#fff;` : `background:${col};`}">${escaparHtml(a.l || '$')}</span><div style="min-width:0;"><b style="font-size:.84rem;">${escaparHtml(a.tit)}</b><div class="dh-mut" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escaparHtml(a.quien || '')}</div></div><span class="dh-mut" style="white-space:nowrap;">${escaparHtml(a.num || '')}</span><b style="white-space:nowrap;${a.imp == null ? '' : a.imp >= 0 ? 'color:#2F7A47;' : 'color:#A6432F;'}">${a.imp == null ? formatPrice(a.monto) : (a.imp >= 0 ? '+ ' : '− ') + formatPrice(Math.abs(a.imp))}</b></div>`; }).join('')}</div></div>` : '';
+    box.innerHTML = `<div class="dh-top"><span class="dh-hola">${saludo}${nombre ? ', ' + escaparHtml(nombre) : ''}</span>${acc.length ? menuMini('+ Nuevo', acc.map(([t], i) => [sinEmoji(t).replace(/^\+\s*/, ''), `dashUsar(${i})`])).replace('class="btn-mini"', 'class="btn btn-gold"') : ''}</div>
+      ${hero}
+      <div class="dh-cols${actv ? '' : ' uno'}"><div><div class="dh-h"><h3>Para hacer hoy</h3><span class="dh-mut">${V ? (H.length ? H.length + ' tarea' + (H.length > 1 ? 's' : '') : '') : 'revisando…'}</span></div><div class="dh-list">${V ? tareas : '<div class="dh-task dh-mut">Revisando…</div>'}</div></div>${actv}</div>`;
     window.__dashHoy = V ? V.hoy : []; };
   pintar(dashCache); // lo ultimo calculado al instante
   try{ pintar(await dashDatos()); } catch(e){ console.error(e); pintar({ hoy: [] }); }
@@ -22140,7 +22200,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v396';
+const APP_VERSION = '2026-10-02-v397';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
