@@ -1681,7 +1681,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v388</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v389</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -8297,8 +8297,8 @@ function pvFormCompra(pid, nc){ setTimeout(() => { try{ cfEtiqueta(); } catch(e)
     <div id="cf-etq" style="grid-column:1/-1;"></div>
     <label style="grid-column:1/-1;font-size:.85rem;">📄 Leer del PDF de la factura (opcional)<input type="file" id="cf-pdf" accept="application/pdf" onchange="pvLeerPDF(this)" style="${pvInp}"></label>
     <div style="grid-column:1/-1;"><b style="font-size:.85rem;">A nombre de (razón social)</b>${selectorRZ('cf-rz', 'propia')}</div>
-    <label>Tipo<select id="cf-t" onchange="cfDesglose()" style="${pvInp}">${['A', 'B', 'C', 'X'].map(x => `<option>${x}</option>`).join('')}</select></label>
-    <label style="grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:.88rem;"><input type="checkbox" id="cf-fis" checked onchange="cfEtiqueta()" style="width:18px;height:18px;"> Comprobante fiscal (con CAE o CAI). Destildar si es un comprobante X o no fiscal: no cuenta para el IVA.</label>
+    <label>Tipo<select id="cf-t" onchange="if(this.value==='X'){if(document.getElementById('cf-fis').checked)cfFiscal(false);}else if(!document.getElementById('cf-fis').checked){cfFiscal(true);}cfDesglose()" style="${pvInp}">${['A', 'B', 'C', 'X'].map(x => `<option>${x}</option>`).join('')}</select></label>
+    <div style="display:flex;flex-direction:column;justify-content:flex-end;"><span style="font-size:.85rem;">Comprobante</span><div id="cf-fis-seg" style="display:inline-flex;border:1px solid #E4DED4;border-radius:10px;overflow:hidden;margin-top:4px;width:max-content;"><button type="button" data-v="si" onclick="cfFiscal(true)" style="padding:9px 16px;border:none;font-weight:600;cursor:pointer;background:#3D2B4E;color:#fff;">Fiscal</button><button type="button" data-v="no" onclick="cfFiscal(false)" style="padding:9px 16px;border:none;font-weight:600;cursor:pointer;background:#fff;color:#6B6258;">No fiscal</button></div><input type="checkbox" id="cf-fis" checked style="display:none;"></div>
     <label>Punto de venta – Número${campoNumComp('cf-n', '')}</label><label>Fecha<input type="date" id="cf-f" value="${hoy}" style="${pvInp}"></label>
     <details style="grid-column:1/-1;border-top:1px solid #EEE9E1;padding-top:8px;" open><summary style="cursor:pointer;font-size:.88rem;"><b>Productos comprados</b> <span class="meta">(opcional: si los carga, el total y el IVA se calculan solos)</span></summary>
       <div style="display:flex;gap:10px;align-items:center;font-size:.8rem;margin:8px 0 4px;"><span>Precios:</span><label><input type="radio" name="cfr-iva" value="neto" checked onchange="cfrTot()"> sin IVA (neto)</label><label><input type="radio" name="cfr-iva" value="con" onchange="cfrTot()"> con IVA</label></div>
@@ -8343,6 +8343,7 @@ function cfrTot(){ const L = cfrLeer(), base = L.reduce((a, x) => a + x.importe,
   document.getElementById('cf-i').value = formatoPesos(Math.round(tot * 100) / 100); const iv = document.getElementById('cf-iva'); if(iv && !iv.disabled){ iv.value = iva ? formatoPesos(Math.round(iva * 100) / 100) : ''; iv.dataset.auto = '1'; }
   if(e) e.innerHTML = `Productos ${formatPrice(base)}${neto && esA ? ' + IVA 21 % ' + formatPrice(iva) : esA ? ' (IVA incluido ' + formatPrice(iva) + ')' : ''}${pi || pb ? ' + percepciones ' + formatPrice(pi + pb) : ''} = <b>Total ${formatPrice(tot)}</b>`; }
 function cfDescuento(){ const s = numAr(document.getElementById('cf-sub').value) || 0, d = Math.min(100, Math.max(0, numAr(document.getElementById('cf-dto').value) || 0)); if(s > 0){ document.getElementById('cf-i').value = formatoPesos(Math.round(s * (1 - d / 100) * 100) / 100); cfDesglose(); } }
+function cfFiscal(v){ const c = document.getElementById('cf-fis'); if(!c) return; c.checked = !!v; document.querySelectorAll('#cf-fis-seg button').forEach(b => { const on = (b.dataset.v === 'si') === !!v; b.style.background = on ? '#3D2B4E' : '#fff'; b.style.color = on ? '#fff' : '#6B6258'; }); const t = document.getElementById('cf-t'); if(!v && t && t.value !== 'X') t.value = 'X'; if(v && t && t.value === 'X') t.value = 'A'; cfDesglose(); }
 function cfEtiqueta(){ const e = document.getElementById('cf-etq'); if(!e) return; const tp = document.getElementById('cf-t').value, fis = document.getElementById('cf-fis').checked && tp !== 'X', tt = (document.getElementById('pub-titulo') || {}).textContent || ''; e.innerHTML = bannerComp(/nota de cr/i.test(tt) ? 'ncc' : /nota de d/i.test(tt) ? 'ndc' : 'compra', tp, fis, '', (document.getElementById('cf-rz') || {}).value || 'propia', 'A NOMBRE DE'); }
 function cfDesglose(){ cfEtiqueta(); if(document.querySelector('.cfr-r') && !window.__cfrEnTot){ window.__cfrEnTot = true; try{ cfrTot(); } finally { window.__cfrEnTot = false; } } { const tp = document.getElementById('cf-t').value, iv = document.getElementById('cf-iva'); if(iv){ iv.disabled = !/^[AM]$/.test(tp); if(iv.disabled){ iv.value = ''; iv.placeholder = 'B y C no discriminan IVA'; } else iv.placeholder = 'opcional'; } }
   const t = numAr(document.getElementById('cf-i').value) || 0, tipo = document.getElementById('cf-t').value, iv = document.getElementById('cf-iva'), pi = numAr((document.getElementById('cf-piva') || {}).value) || 0, pb = numAr((document.getElementById('cf-piibb') || {}).value) || 0, e = document.getElementById('cf-neto'); if(!e) return;
@@ -22038,7 +22039,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v388';
+const APP_VERSION = '2026-10-02-v389';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
