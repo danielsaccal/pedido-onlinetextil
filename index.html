@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v372</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v373</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -12753,7 +12753,8 @@ function promptGemini(S, canal){
   const prod = { ajustable: 'fitted sheet', mantel: 'tablecloth', cubrecama: 'bedspread', sabanas: 'sheet set', toalla: 'towel', repasador: 'kitchen towel', bata: 'bathrobe', almohada: 'pillow', cortina: 'curtain', otro: 'textile product' }[t];
   // juegos de sabanas: 1 1/2 plaza = 1 funda (3 piezas); 2 1/2, queen y king = 2 fundas (4 piezas)
   const md = normBusqueda(medida + ' ' + nombre), mF = md.match(/(\d)\s*fundas?/), dosFundas = mF ? +mF[1] >= 2 : /2\s*½|2 1\/2|2,5|dos plazas|2 plazas|queen|king|matrimonial/.test(md), nf = mF ? Math.min(2, Math.max(1, +mF[1])) : (dosFundas ? 2 : 1); // si la medida dice cuantas fundas, manda eso
-    const escena = {
+    const panos = +((String(medida + ' ' + nombre).match(/(\d)\s*pa[ñn]os?/i) || [])[1] || 1); // cortinas: cantidad de panos
+  const escena = {
     mantel: `In this image the tablecloth must be FULLY UNFOLDED AND SPREAD OPEN, never folded. The same tablecloth (${medida}) fully spread over a rectangular dining table of the right size, covering the entire tabletop and hanging about 25 cm on every side, with soft natural folds at the corners. View from above at about 45°, nothing on the table covering the print.`,
     ajustable: `ONLY the same fitted sheet (${medida}) fitted tightly on a bare mattress of that size, the elastic corners wrapping the mattress, smooth and taut, no flat sheet, no pillowcases, no duvet, no other bedding. A plain pillow without case may be omitted. View from the foot of the bed at about 30°, so the corner and the mattress height are visible.`,
     sabanas: `The same sheet set (${medida}) on a made ${dosFundas ? 'double' : 'single'} bed of that size: fitted sheet on the mattress, flat sheet folded back about 30 cm at the head, ${dosFundas ? 'TWO pillows in the two matching pillowcases' : 'ONE pillow in the matching pillowcase'}. Neat hotel-style making, smooth with soft natural folds. View from the foot of the bed at about 30°.`,
@@ -12762,7 +12763,7 @@ function promptGemini(S, canal){
     repasador: `The same kitchen towel (${medida}) hanging OPEN from an oven handle or a hook in a clean kitchen, showing its full size.`,
     bata: `The same bathrobe hanging open on a simple hanger or hook in a clean bathroom, showing its full shape, sleeves and length.`,
     almohada: `The same pillow on a neatly made bed, showing its real size and shape.`,
-    cortina: `The same curtain hanging OPEN and straight from a rod in a bright room, showing its full width and length.`,
+    cortina: panos >= 2 ? `The curtain has EXACTLY ${panos === 2 ? 'TWO' : panos} identical panels (${medida}): show the ${panos === 2 ? 'two' : panos} panels hanging from the same rod in a bright room, one at each side of the window, framing it, each panel straight and open showing its full length, gathered evenly at the top. Exactly ${panos} panels, never only one, never more. Real proportions of each panel.` : `The same curtain hanging OPEN and straight from a rod in a bright room, showing its full width and length. Exactly one panel.`,
     otro: `The same product in use in a simple, realistic setting that shows its real size.`
   }[t];
   const color = blanco ? ` The product is WHITE: keep it a natural, clean white; never make it grey, blue, yellow or cream.` : '';
@@ -21823,7 +21824,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v372';
+const APP_VERSION = '2026-10-02-v373';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
