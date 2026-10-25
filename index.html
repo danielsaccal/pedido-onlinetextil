@@ -1681,7 +1681,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v387</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v388</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -8290,7 +8290,7 @@ async function pvGuardarProveedor(id){
   catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   await ccLog('Proveedor', d.nombre); cerrarPublicar(); pvSel = id; renderCompras();
 }
-function pvFormCompra(pid, nc){ setTimeout(() => { try{ cfEtiqueta(); } catch(e){} }, 30);
+function pvFormCompra(pid, nc){ setTimeout(() => { try{ cfEtiqueta(); } catch(e){} }, 30); cargarDatosRZ().then(() => { try{ cfEtiqueta(); } catch(e){} });
   const p = pvProv.find(x => x._id === pid), m = pvMon(p), hoy = ccHoy();
   const esND = nc === 'nd'; if(esND) nc = false;
   pvModal((nc ? 'Nota de crédito de ' : esND ? 'Nota de débito de ' : 'Factura de compra de ') + p.nombre, `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
@@ -8343,7 +8343,7 @@ function cfrTot(){ const L = cfrLeer(), base = L.reduce((a, x) => a + x.importe,
   document.getElementById('cf-i').value = formatoPesos(Math.round(tot * 100) / 100); const iv = document.getElementById('cf-iva'); if(iv && !iv.disabled){ iv.value = iva ? formatoPesos(Math.round(iva * 100) / 100) : ''; iv.dataset.auto = '1'; }
   if(e) e.innerHTML = `Productos ${formatPrice(base)}${neto && esA ? ' + IVA 21 % ' + formatPrice(iva) : esA ? ' (IVA incluido ' + formatPrice(iva) + ')' : ''}${pi || pb ? ' + percepciones ' + formatPrice(pi + pb) : ''} = <b>Total ${formatPrice(tot)}</b>`; }
 function cfDescuento(){ const s = numAr(document.getElementById('cf-sub').value) || 0, d = Math.min(100, Math.max(0, numAr(document.getElementById('cf-dto').value) || 0)); if(s > 0){ document.getElementById('cf-i').value = formatoPesos(Math.round(s * (1 - d / 100) * 100) / 100); cfDesglose(); } }
-function cfEtiqueta(){ const e = document.getElementById('cf-etq'); if(!e) return; const tp = document.getElementById('cf-t').value, fis = document.getElementById('cf-fis').checked && tp !== 'X', tt = (document.getElementById('pub-titulo') || {}).textContent || ''; e.innerHTML = bannerComp(/nota de cr/i.test(tt) ? 'ncc' : /nota de d/i.test(tt) ? 'ndc' : 'compra', tp, fis, ((document.getElementById('cf-rz') || {}).value || 'propia').replace(/^./, x => x.toUpperCase())); }
+function cfEtiqueta(){ const e = document.getElementById('cf-etq'); if(!e) return; const tp = document.getElementById('cf-t').value, fis = document.getElementById('cf-fis').checked && tp !== 'X', tt = (document.getElementById('pub-titulo') || {}).textContent || ''; e.innerHTML = bannerComp(/nota de cr/i.test(tt) ? 'ncc' : /nota de d/i.test(tt) ? 'ndc' : 'compra', tp, fis, '', (document.getElementById('cf-rz') || {}).value || 'propia', 'A NOMBRE DE'); }
 function cfDesglose(){ cfEtiqueta(); if(document.querySelector('.cfr-r') && !window.__cfrEnTot){ window.__cfrEnTot = true; try{ cfrTot(); } finally { window.__cfrEnTot = false; } } { const tp = document.getElementById('cf-t').value, iv = document.getElementById('cf-iva'); if(iv){ iv.disabled = !/^[AM]$/.test(tp); if(iv.disabled){ iv.value = ''; iv.placeholder = 'B y C no discriminan IVA'; } else iv.placeholder = 'opcional'; } }
   const t = numAr(document.getElementById('cf-i').value) || 0, tipo = document.getElementById('cf-t').value, iv = document.getElementById('cf-iva'), pi = numAr((document.getElementById('cf-piva') || {}).value) || 0, pb = numAr((document.getElementById('cf-piibb') || {}).value) || 0, e = document.getElementById('cf-neto'); if(!e) return;
   if(tipo === 'A' && t > 0){ const base = t - pi - pb, iva = base - base / 1.21; if(iv && (!iv.value || iv.dataset.auto === '1')){ iv.value = formatoPesos(Math.round(iva * 100) / 100); iv.dataset.auto = '1'; } e.textContent = `neto ${formatPrice(base / 1.21)} + IVA 21 % ${formatPrice(iva)}${pi || pb ? ' + percepciones ' + formatPrice(pi + pb) : ''}`; } else e.textContent = ''; }
@@ -8367,7 +8367,8 @@ async function pvFormPago(pid){
   window.__pvCheques = cheques;
   const rzDef = pvRzVer || (Object.entries(r.rz).sort((a, b) => b[1].saldo - a[1].saldo)[0] || ['propia'])[0];
   setTimeout(() => { opPintarFacturas(pid); document.querySelectorAll('#op-rz-box button').forEach(b => b.addEventListener('click', () => setTimeout(() => opPintarFacturas(pid), 0))); }, 0);
-  pvModal('💸 Orden de pago · ' + p.nombre, `${bannerComp('pago', '', undefined, p.nombre)}<div style="margin-bottom:8px;"><b style="font-size:.85rem;">Paga (razón social)</b>${selectorRZ('op-rz', rzDef)}<p class="note" style="text-align:left;margin:4px 0 0;">${PV_RAZONES.map(([k, t]) => `${t}: ${fmtMon(r.rz[k].saldo, m)}`).join(' · ')}</p></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+  setTimeout(() => { const e = document.getElementById('op-etq'); if(e) e.innerHTML = bannerComp('pago', '', undefined, p.nombre, (document.getElementById('op-rz') || {}).value || 'propia', 'PAGA'); }, 0);
+  pvModal('💸 Orden de pago · ' + p.nombre, `<div id="op-etq">${bannerComp('pago', '', undefined, p.nombre, 'propia', 'PAGA')}</div><div style="margin-bottom:8px;"><b style="font-size:.85rem;">Paga (razón social)</b>${selectorRZ('op-rz', rzDef)}<p class="note" style="text-align:left;margin:4px 0 0;">${PV_RAZONES.map(([k, t]) => `${t}: ${fmtMon(r.rz[k].saldo, m)}`).join(' · ')}</p></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     <label>Fecha<input type="date" id="op-f" value="${ccHoy()}" style="${pvInp}"></label>${m === 'USD' ? `<label>Tipo de cambio ($ por US$)<input id="op-tc" inputmode="decimal" style="${pvInp}" oninput="pvTotOP()"></label>` : '<span></span>'}
     <div style="grid-column:1/-1;"><b style="font-size:.88rem;">Medios de pago</b><div id="op-medios"></div><button type="button" class="btn-mini" onclick="pvAgregarMedio()">➕ Otro medio</button></div>
     <details style="grid-column:1/-1;"><summary style="cursor:pointer;font-size:.88rem;">Retenciones que usted le practica (opcional)</summary><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px;">${[['iibb', 'IIBB'], ['gan', 'Ganancias'], ['otras', 'Otras']].map(([k, t]) => `<label style="font-size:.8rem;">${t}<input id="op-r-${k}" inputmode="decimal" oninput="pvTotOP()" style="${pvInp}"></label>`).join('')}</div></details>
@@ -8685,7 +8686,7 @@ function ccFormCobro(k, tipo){
   const inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
   const t = document.getElementById('pub-titulo'); if(t) t.textContent = (tipo === 'sena' ? '💵 Seña de ' : '💵 Cobro de ') + c.nombre; { const caja = document.getElementById('pub-caja'); if(caja){ caja.style.maxWidth = '920px'; caja.style.borderTop = `6px solid ${COMP_COLOR.recibo[1]}`; } }
   document.getElementById('pub-cont').innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-      <div style="grid-column:1/-1;">${bannerComp(tipo === 'sena' ? 'recibo' : 'recibo', '', undefined, (tipo === 'sena' ? 'Seña · ' : '') + c.nombre)}</div>
+      <div style="grid-column:1/-1;">${bannerComp('recibo', '', undefined, (tipo === 'sena' ? 'Seña · ' : '') + c.nombre, 'propia', 'COBRA')}</div>
       <label>Fecha<input type="date" id="cb-f" value="${ccHoy()}" style="${inp}"></label><label>Importe recibido<input id="cb-i" inputmode="decimal" placeholder="$" style="${inp}"></label>
       <label style="grid-column:1/-1;">Medio<select id="cb-m" onchange="document.getElementById('cb-ch').style.display=/Cheque|E-cheq/.test(this.value)?'grid':'none'" style="${inp}">${['Efectivo', 'Transferencia a Santander', 'Transferencia a Mercado Pago', 'Cheque', 'E-cheq', 'Otro'].map(x => `<option>${x}</option>`).join('')}</select></label>
       <div id="cb-ch" style="display:none;grid-column:1/-1;grid-template-columns:1fr 1fr;gap:8px;"><label>Banco<input id="cb-cb" style="${inp}"></label><label>N.º de cheque<input id="cb-cn" style="${inp}"></label><label>Fecha de cobro<input type="date" id="cb-cf" style="${inp}"></label><label>Librador<input id="cb-cl" style="${inp}"></label></div>
@@ -13168,12 +13169,15 @@ function etiquetaComp(fam, letra, fiscal, corto){ const [txt, col] = COMP_COLOR[
   const caja = letra ? `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 4px;border-radius:5px;font-weight:800;font-size:.75rem;${nf ? `border:1.5px dashed ${col};color:${col};background:#fff;` : `background:${col};color:#fff;`}">${escaparHtml(letra)}</span>` : '';
   return `<span title="${escapeAttr(txt + (letra ? ' ' + letra : '') + (nf ? ' · sin CAE' : fiscal ? ' · fiscal' : ''))}" style="display:inline-flex;align-items:center;gap:5px;border:1px ${nf ? 'dashed' : 'solid'} ${col};color:${col};border-radius:999px;padding:1px 8px 1px 2px;font-size:.72rem;font-weight:700;white-space:nowrap;vertical-align:middle;">${caja}${corto ? '' : escaparHtml(txt)}${nf ? ' · sin CAE' : ''}</span>`; }
 // cartel grande dentro del formulario: que comprobante esta emitiendo (no equivocarse)
-function bannerComp(fam, letra, fiscal, extra){ const [txt, col] = COMP_COLOR[fam] || ['', '#8A8072'], nf = fiscal === false;
+function bannerComp(fam, letra, fiscal, extra, rz, rol){ const [txt, col] = COMP_COLOR[fam] || ['', '#8A8072'], nf = fiscal === false;
+  const rzk = rz || '', rzc = RZ_COLOR[rzk] || '#3D2B4E', rzNom = rzk ? (((datosRZ || {})[rzk] || {}).nombre || rzk[0].toUpperCase() + rzk.slice(1)) : '', rzCuit = rzk ? (((datosRZ || {})[rzk] || {}).cuit || '') : '';
+  const emisor = rzk ? `<div style="margin-left:auto;background:#fff;border:3px solid ${rzc};border-radius:10px;padding:6px 14px;text-align:right;color:${rzc};min-width:170px;"><div style="font-size:.64rem;letter-spacing:.1em;font-weight:700;opacity:.8;">${escaparHtml(rol || 'EMITE')}</div><div style="font:800 1.15rem Arial;line-height:1.15;">${escaparHtml(rzk.toUpperCase())}</div>${rzNom.toLowerCase() !== rzk ? `<div style="font-size:.72rem;font-weight:600;">${escaparHtml(rzNom)}${rzCuit ? ' · ' + escaparHtml(rzCuit) : ''}</div>` : ''}</div>` : '';
   return `<div style="display:flex;align-items:center;gap:14px;border-radius:12px;padding:10px 14px;margin:0 0 14px;${nf ? `background:repeating-linear-gradient(135deg,#fff,#fff 10px,${col}14 10px,${col}14 20px);border:2px dashed ${col};` : `background:${col};`}color:${nf ? col : '#fff'};">
     ${letra ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:8px;font:800 28px Arial;${nf ? `border:2px dashed ${col};background:#fff;` : 'background:#fff;color:' + col + ';'}">${escaparHtml(letra)}</span>` : ''}
-    <div><div style="font:800 1.05rem Arial;letter-spacing:.04em;text-transform:uppercase;">${escaparHtml(txt)}</div><div style="font-size:.82rem;opacity:.9;">${fiscal === undefined ? '' : nf ? 'SIN CAE · no fiscal · no va al IVA' : 'FISCAL · con CAE · va al IVA'}${extra ? (fiscal === undefined ? '' : ' · ') + escaparHtml(extra) : ''}</div></div></div>`; }
+    <div><div style="font:800 1.05rem Arial;letter-spacing:.04em;text-transform:uppercase;">${escaparHtml(txt)}</div><div style="font-size:.82rem;opacity:.9;">${fiscal === undefined ? '' : nf ? 'SIN CAE · no fiscal · no va al IVA' : 'FISCAL · con CAE · va al IVA'}${extra ? (fiscal === undefined ? '' : ' · ') + escaparHtml(extra) : ''}</div></div>${emisor}</div>`; }
 document.addEventListener('click', e => { document.querySelectorAll('details.pv-menu[open]').forEach(d => { if(!d.contains(e.target)) d.open = false; }); });
-window.__rzCambio = id => setTimeout(() => { try{ if(id === 'fv-rz') fvTot(); if(id === 'cf-rz') cfEtiqueta(); } catch(e){} }, 0);
+document.addEventListener('change', e => { if(e.target && (e.target.name === 'fv-cond' || e.target.name === 'fv-fis')){ try{ fvTot(); } catch(x){} } });
+window.__rzCambio = id => setTimeout(() => { try{ if(id === 'fv-rz') fvTot(); if(id === 'cf-rz') cfEtiqueta(); if(id === 'op-rz'){ const e = document.getElementById('op-etq'); if(e){ const t = (document.getElementById('pub-titulo') || {}).textContent || ''; e.innerHTML = bannerComp('pago', '', undefined, t.split('·').slice(1).join('·').trim(), document.getElementById('op-rz').value, 'PAGA'); } } } catch(e){} }, 0);
 function familiaPorTitulo(t){ t = normBusqueda(t || ''); return /nota de credito de venta|^\W*nota de credito$/.test(t) ? 'ncv' : /nota de debito de venta/.test(t) ? 'ndv' : /nota de credito de /.test(t) ? 'ncc' : /nota de debito de /.test(t) ? 'ndc' : /factura de compra|comprobante de compra/.test(t) ? 'compra' : /factura de venta/.test(t) ? 'venta' : /orden de pago/.test(t) ? 'pago' : /cobro|sena|recibo/.test(t) ? 'recibo' : /remito/.test(t) ? 'remito' : /presupuesto/.test(t) ? 'presu' : ''; }
 // ===== Vista previa de comprobantes (antes de confirmar) =====
 let __previa = null; // si esta activa, las funciones de guardar arman el comprobante y lo devuelven sin guardar
@@ -13315,14 +13319,14 @@ async function acGenerar(modo){
   } catch(e){ procesando.error(e.message); alert('No se pudo armar el catálogo: ' + e.message); }
 }
 // ===== Comprobante de venta cargado a mano (factura, NC o ND): pasa por los mismos controles que los subidos =====
-function fvManual(tipo){ window.__fvTipo = tipo; setTimeout(() => { try{ fvTot(); } catch(e){} }, 30); cargarListasPrecios(); cargarCfgFiscal().then(() => { try{ fvPvSegunTipo(); } catch(e){} }); if(!ccClientesDB || !ccClientesDB.length) db.collection('clientes').get().then(s => { ccClientesDB = s.docs.map(d => d.data()); }).catch(() => {});
+function fvManual(tipo){ window.__fvTipo = tipo; cargarDatosRZ().then(() => { try{ fvTot(); } catch(e){} }); setTimeout(() => { try{ fvTot(); } catch(e){} }, 30); cargarListasPrecios(); cargarCfgFiscal().then(() => { try{ fvPvSegunTipo(); } catch(e){} }); if(!ccClientesDB || !ccClientesDB.length) db.collection('clientes').get().then(s => { ccClientesDB = s.docs.map(d => d.data()); }).catch(() => {});
   const inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
   const nom = { f: 'Factura de venta', nc: 'Nota de crédito de venta', nd: 'Nota de débito de venta' }[tipo];
   let clientes = []; try{ clientes = (listaClientes || []).map(c => c.razonSocial || `${c.apellido || ''} ${c.nombre || ''}`.trim()).filter(Boolean); } catch(e){}
   const skus = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => skus.push(v.sku))));
   const seg = (name, ops, def, on) => `<div class="seg">${ops.map(([v, t]) => `<label><input type="radio" name="${name}" value="${v}" ${v === def ? 'checked' : ''} ${on ? `onchange="${on}"` : ''}><span>${t}</span></label>`).join('')}</div>`;
   pvModal('➕ ' + nom, `<div class="fx">
-    <div id="fv-etq"></div>
+    <div id="fv-etq"></div><div id="fv-rz-av"></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:14px;">${selectorRZ('fv-rz', (document.getElementById('fc-rz') || {}).value || 'propia')}${seg('fv-cond', [['ctacte', 'Cuenta corriente'], ['contado', 'Contado']], 'ctacte')}</div>
     <div class="fila"><div><span class="fl">Cliente</span><input id="fv-c" list="fv-cl" autocomplete="off" onchange="fvFacturasCliente('${tipo}');fvNotaCliente();{const c=clientePorNombre(this.value);if(c){const r=document.querySelector('input[name=fv-cond][value='+(c.condicion==='contado'?'contado':'ctacte')+']');if(r)r.checked=true;}}[...document.querySelectorAll('.fv-r')].forEach(fvPrecioFila)"><div id="fv-notacli" class="nota"></div></div></div>
     ${tipo !== 'f' ? `<div class="fila"><div><span class="fl">Comprobante relacionado${tipo === 'nc' ? ' (obligatorio)' : ' (opcional)'}</span><select id="fv-ref" onchange="fvTraerRenglones()"><option value="">Primero elija el cliente…</option></select></div></div>` : ''}<datalist id="fv-cl">${[...new Set(clientes)].sort().map(n => `<option value="${escapeAttr(n)}">`).join('')}</datalist>
@@ -13368,7 +13372,9 @@ function fvTot(){ const filas = [...document.querySelectorAll('.fv-r')], sub = f
   const desg = l === 'A' && fis; // factura A: neto + IVA discriminado
   filas.forEach(d => { const e = d.querySelector('.fv-iva'), i = numAr(d.querySelector('.fv-i').value) || 0, b = numAr((d.querySelector('.fv-b') || {}).value) || 0, n = fvNetoFila(d); if(e) e.textContent = b && i ? `bonif. ${b} %: −${formatPrice(i - n)} → ${formatPrice(n)}` : ''; });
   const L = (a, b, c) => `<div class="l${c ? ' ' + c : ''}"><span>${a}</span><span>${b}</span></div>`;
-  { const e2 = document.getElementById('fv-etq'); if(e2) e2.innerHTML = bannerComp(window.__fvTipo === 'nc' ? 'ncv' : window.__fvTipo === 'nd' ? 'ndv' : 'venta', l, fis, ((document.getElementById('fv-rz') || {}).value || 'propia').replace(/^./, x => x.toUpperCase())); }
+  { const e2 = document.getElementById('fv-etq'); if(e2) e2.innerHTML = bannerComp(window.__fvTipo === 'nc' ? 'ncv' : window.__fvTipo === 'nd' ? 'ndv' : 'venta', l, fis, '', (document.getElementById('fv-rz') || {}).value || 'propia', 'EMITE');
+    const rzN = (document.getElementById('fv-rz') || {}).value || 'propia', cond = (document.querySelector('input[name=fv-cond]:checked') || {}).value, av = document.getElementById('fv-rz-av');
+    if(av) av.innerHTML = rzN !== 'propia' && cond === 'ctacte' ? `<p style="background:#FFF8E6;border:1px solid #EBD9A8;border-radius:10px;padding:6px 10px;font-size:.82rem;margin:-6px 0 10px;">⚠️ ${rzN[0].toUpperCase() + rzN.slice(1)} vende solo de contado: revise la razón social o la condición.</p>` : ''; }
   document.getElementById('fv-tot').innerHTML = (bruto - sub > 0.004 ? L('Bonificaciones', '−' + formatPrice(bruto - sub)) : '') + (dg ? L('Subtotal', formatPrice(sub)) + L(`Descuento ${dg} %`, '−' + formatPrice(sub - t)) : '')
     + (desg ? L('Neto gravado', formatPrice(t / 1.21)) + L('IVA 21 %', formatPrice(t - t / 1.21)) : '') + L('Total' + (fis && !desg ? ' (IVA incluido)' : ''), formatPrice(t), 't'); }
 async function fvGuardar(tipo){
@@ -22032,7 +22038,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v387';
+const APP_VERSION = '2026-10-02-v388';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
