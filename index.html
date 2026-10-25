@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v376</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v377</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -8160,7 +8160,9 @@ function pvCalcular(){
       const debe = z.facts.reduce((a, f) => a + (f.nc ? -f.importe : f.importe), 0), haber = z.pagos.reduce((a, x) => a + (+x.aplicadoMon || 0), 0);
       z.saldo = Math.round((debe - haber) * 100) / 100;
       let disp = haber + z.facts.filter(f => f.nc).reduce((a, f) => a + f.importe, 0);
-      z.facts.filter(f => !f.nc).forEach(f => { const ap = Math.min(disp, f.importe); f.pendiente = Math.round((f.importe - ap) * 100) / 100; disp -= ap;
+      const pre = {}; z.pagos.filter(x => Array.isArray(x.aplica)).forEach(x => x.aplica.forEach(a => { const f = z.facts.find(y => y._id === a.id && !y.nc); if(!f) return; const ya = pre[f._id] || 0, q = Math.min(+a.importe || 0, f.importe - ya, disp); pre[f._id] = ya + q; disp -= q; }));
+      z.facts.filter(f => !f.nc).forEach(f => { const resto = f.importe - (pre[f._id] || 0), ap = Math.min(disp, resto); f.pendiente = Math.round((resto - ap) * 100) / 100; disp -= ap; if(f.pendiente > 0.5){ const vto = new Date(String(f.vence || f.fecha) + 'T12:00:00'); const d = Math.floor((vto - hoy) / 864e5); f.diasVto = d; if(d < 0) z.vencido += f.pendiente; else if(d <= 7) z.vence7 += f.pendiente; } });
+      if(false) z.facts.filter(f => !f.nc).forEach(f => { const ap = Math.min(disp, f.importe); f.pendiente = Math.round((f.importe - ap) * 100) / 100; disp -= ap;
         if(f.pendiente > 0.5){ const vto = new Date(String(f.vence || f.fecha) + 'T12:00:00'); const d = Math.floor((vto - hoy) / 864e5); f.diasVto = d; if(d < 0) z.vencido += f.pendiente; else if(d <= 7) z.vence7 += f.pendiente; } });
       r.saldo += z.saldo; r.vencido += z.vencido; r.vence7 += z.vence7; });
     r.saldo = Math.round(r.saldo * 100) / 100; });
@@ -8198,7 +8200,7 @@ function pvRenderProveedor(r){
   const p = r.p, m = pvMon(p), box = document.getElementById('pv-body'), rzv = pvRzVer;
   const fuente = rzv ? r.rz[rzv] : r;
   const filas = [...fuente.facts.map(f => ({ fecha: f.fecha, t: f.nc ? 'Nota de crédito' : f.nd ? 'Nota de débito' : f.liquidacion ? 'Liquidación taller' : 'Factura', det: `${f.tipo || ''} ${f.numero || ''}${f.detalle ? ' · ' + f.detalle : ''}`, rz: f.razon || 'propia', debe: f.nc ? 0 : f.importe, haber: f.nc ? f.importe : 0, f })),
-    ...fuente.pagos.map(x => ({ fecha: x.fecha, t: 'Pago OP ' + String(x.numero || '').padStart(5, '0'), det: (x.medios || []).map(y => y.medio).join(', ') + (x.tc ? ` · TC ${x.tc}` : ''), rz: x.razon || 'propia', debe: 0, haber: +x.aplicadoMon || 0, x }))].sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+    ...fuente.pagos.map(x => ({ fecha: x.fecha, t: 'Pago OP ' + String(x.numero || '').padStart(5, '0'), det: ((x.aplica || []).length ? 'paga ' + x.aplica.map(a => a.numero).join(', ') + ' · ' : '') + (x.medios || []).map(y => y.medio).join(', ') + (x.tc ? ` · TC ${x.tc}` : ''), rz: x.razon || 'propia', debe: 0, haber: +x.aplicadoMon || 0, x }))].sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
   let s = 0; filas.forEach(f => { s += f.debe - f.haber; f.saldo = s; });
   const pend = fuente.facts.filter(f => !f.nc && f.pendiente > 0.5);
   const rzCon = Object.entries(r.rz).filter(([, z]) => z.facts.length || z.pagos.length);
@@ -8308,13 +8310,15 @@ async function pvFormPago(pid){
   let cheques = []; try{ const s = await db.collection('cc_movimientos').get(); cheques = s.docs.map(d => ({ _id: d.id, ...d.data() })).filter(x => x.cheque && (x.cheque.estado || 'cartera') === 'cartera'); } catch(e){}
   window.__pvCheques = cheques;
   const rzDef = pvRzVer || (Object.entries(r.rz).sort((a, b) => b[1].saldo - a[1].saldo)[0] || ['propia'])[0];
+  setTimeout(() => { opPintarFacturas(pid); document.querySelectorAll('#op-rz-box button').forEach(b => b.addEventListener('click', () => setTimeout(() => opPintarFacturas(pid), 0))); }, 0);
   pvModal('💸 Orden de pago · ' + p.nombre, `<div style="margin-bottom:8px;"><b style="font-size:.85rem;">Paga (razón social)</b>${selectorRZ('op-rz', rzDef)}<p class="note" style="text-align:left;margin:4px 0 0;">${PV_RAZONES.map(([k, t]) => `${t}: ${fmtMon(r.rz[k].saldo, m)}`).join(' · ')}</p></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     <label>Fecha<input type="date" id="op-f" value="${ccHoy()}" style="${pvInp}"></label>${m === 'USD' ? `<label>Tipo de cambio ($ por US$)<input id="op-tc" inputmode="decimal" style="${pvInp}" oninput="pvTotOP()"></label>` : '<span></span>'}
     <div style="grid-column:1/-1;"><b style="font-size:.88rem;">Medios de pago</b><div id="op-medios"></div><button type="button" class="btn-mini" onclick="pvAgregarMedio()">➕ Otro medio</button></div>
     <details style="grid-column:1/-1;"><summary style="cursor:pointer;font-size:.88rem;">Retenciones que usted le practica (opcional)</summary><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px;">${[['iibb', 'IIBB'], ['gan', 'Ganancias'], ['otras', 'Otras']].map(([k, t]) => `<label style="font-size:.8rem;">${t}<input id="op-r-${k}" inputmode="decimal" oninput="pvTotOP()" style="${pvInp}"></label>`).join('')}</div></details>
+    <div style="grid-column:1/-1;" id="op-facts"></div>
     <label style="grid-column:1/-1;">Comprobante de transferencia (foto o PDF, opcional)<input type="file" id="op-cp" accept="image/*,application/pdf" style="${pvInp}"></label>
     <label style="grid-column:1/-1;">Detalle<input id="op-d" placeholder="opcional" style="${pvInp}"></label></div>
-    <p id="op-tot" style="font-weight:700;margin:8px 0;"></p><p class="note" style="text-align:left;">Saldo del proveedor: <b>${fmtMon(r.saldo, m)}</b>. Se aplica a las facturas más viejas.</p>
+    <p id="op-tot" style="font-weight:700;margin:8px 0;"></p><p class="note" style="text-align:left;">Saldo del proveedor: <b>${fmtMon(r.saldo, m)}</b>. Si no tilda facturas, se aplica a las más viejas.</p>
     <div style="display:flex;gap:8px;"><button class="btn btn-gold" style="flex:1;" onclick="pvGuardarPago('${pid}')">Guardar y ver la orden de pago</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="vistaPrevia('op','${pid}')">👁️ Vista previa</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`);
   pvAgregarMedio();
 }
@@ -8332,6 +8336,9 @@ function pvLeerOP(){
   const totalARS = medios.reduce((a, x) => a + x.importe, 0), retT = Object.values(ret).reduce((a, x) => a + x, 0);
   return { medios, ret, tc, totalARS, retT };
 }
+function opPintarFacturas(pid){ const r = pvCalcular()[pid]; const box = document.getElementById('op-facts'); if(!r || !box) return; const rz = (document.getElementById('op-rz') || {}).value || 'propia', m = pvMon(r.p);
+  const pend = ((r.rz[rz] || {}).facts || []).filter(f => !f.nc && f.pendiente > 0.5);
+  box.innerHTML = pend.length ? `<details open><summary style="cursor:pointer;font-size:.88rem;"><b>Facturas que paga</b> <span class="meta">(opcional)</span></summary>${pend.map(f => `<label class="op-fa" data-id="${f._id}" data-num="${escapeAttr((f.tipo || '') + ' ' + (f.numero || ''))}" style="display:grid;grid-template-columns:22px 1fr 130px 130px;gap:8px;align-items:center;padding:4px 0;border-top:1px solid #F3EFE8;font-size:.86rem;"><input type="checkbox" onchange="const i=this.parentNode.querySelector('.op-fai');if(this.checked&&!i.value)i.value=formatoPesos(${f.pendiente});if(!this.checked)i.value='';pvTotOP()"><span>${escaparHtml((f.tipo || '') + ' ' + (f.numero || ''))} <span class="meta">${String(f.fecha).split('-').reverse().join('/')}${f.diasVto < 0 ? ' · vencida' : ''}</span></span><span class="meta" style="text-align:right;">pend. ${fmtMon(f.pendiente, m)}</span><input class="op-fai" inputmode="decimal" placeholder="importe" oninput="this.parentNode.querySelector('input[type=checkbox]').checked=!!this.value;pvTotOP()" style="padding:6px 8px;border:1px solid var(--line);border-radius:8px;"></label>`).join('')}</details>` : `<p class="note" style="text-align:left;">Sin facturas pendientes de ${escaparHtml((PV_RAZONES.find(x => x[0] === rz) || [, rz])[1])}.</p>`; }
 function pvTotOP(){ const o = pvLeerOP(), e = document.getElementById('op-tot'); if(!e) return; e.textContent = `Total pagado: ${formatPrice(o.totalARS)}${o.retT ? ` + retenciones ${formatPrice(o.retT)}` : ''}${o.tc ? ` = US$ ${((o.totalARS + o.retT) / o.tc).toLocaleString('es-AR', { maximumFractionDigits: 2 })}` : ''}`; }
 const pvArchivoB64 = f => new Promise((res, rej) => { if(/^image\//.test(f.type)) return comprimirImagenAFotoBase64(f).then(res, rej); if(f.size > 700000) return rej(new Error('el PDF pesa más de 700 KB: adjunte una foto o captura')); const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(f); });
 async function pvGuardarPago(pid){ dashCache = null; if(!__previa && await mesBloqueado(document.getElementById('op-f').value || ccHoy())) return;
@@ -8344,7 +8351,9 @@ async function pvGuardarPago(pid){ dashCache = null; if(!__previa && await mesBl
   let comp = null; const fi = document.getElementById('op-cp').files[0]; if(fi){ try{ comp = await pvArchivoB64(fi); } catch(e){ alert('Comprobante: ' + e.message); return; } }
   let numero = 1;
   try{ const ref = db.collection('config').doc('op_num'); const d = await ref.get(); numero = ((d.exists && d.data().n) || 0) + 1; await ref.set({ n: numero });
-    const pago = { proveedorId: pid, razon: (document.getElementById('op-rz') || {}).value || 'propia', fecha: document.getElementById('op-f').value || ccHoy(), numero, medios: o.medios, retenciones: o.ret, tc: o.tc || null, totalARS: o.totalARS, aplicadoMon, moneda: m, detalle: document.getElementById('op-d').value.trim(), creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
+    const aplica = [...document.querySelectorAll('.op-fa')].map(l => ({ id: l.dataset.id, numero: l.dataset.num, importe: numAr(l.querySelector('.op-fai').value) || 0 })).filter(a => a.importe > 0);
+    if(aplica.length && aplica.reduce((x, a) => x + a.importe, 0) > aplicadoMon + 0.5){ alert('Lo aplicado a facturas supera el pago.'); return; }
+    const pago = { aplica, proveedorId: pid, razon: (document.getElementById('op-rz') || {}).value || 'propia', fecha: document.getElementById('op-f').value || ccHoy(), numero, medios: o.medios, retenciones: o.ret, tc: o.tc || null, totalARS: o.totalARS, aplicadoMon, moneda: m, detalle: document.getElementById('op-d').value.trim(), creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
     const r = await db.collection('pagos').add(comp ? { ...pago, comprobante: comp } : pago); pvPagos.push({ _id: r.id, ...pago, comprobante: comp });
     for(const x of o.medios.filter(x => x.chequeId)){ const c = (window.__pvCheques || []).find(y => y._id === x.chequeId); if(c) await db.collection('cc_movimientos').doc(c._id).set({ cheque: { ...c.cheque, estado: 'entregado', entregadoA: p.nombre, op: numero } }, { merge: true }); }
     await ccLog('Orden de pago', `OP ${numero} · ${p.nombre} · ${formatPrice(o.totalARS)}`);
@@ -8361,7 +8370,7 @@ function pvImprimirOP(id){
     <table><tr><th>Medio</th><th class="r">Importe</th></tr>${(x.medios || []).map(m => `<tr><td>${escaparHtml(m.medio)}</td><td class="r">${formatPrice(m.importe)}</td></tr>`).join('')}
     ${Object.entries(x.retenciones || {}).map(([k, v]) => `<tr><td>Retención ${k.toUpperCase()}</td><td class="r">${formatPrice(v)}</td></tr>`).join('')}
     <tr><td><b>Total</b></td><td class="r"><b>${formatPrice((x.totalARS || 0) + Object.values(x.retenciones || {}).reduce((a, v) => a + v, 0))}</b>${x.tc ? `<br>US$ ${x.aplicadoMon} (TC ${x.tc})` : ''}</td></tr></table>
-    ${x.detalle ? `<p>${escaparHtml(x.detalle)}</p>` : ''}
+    ${(x.aplica || []).length ? `<p><b>Facturas que se pagan:</b> ${x.aplica.map(f => escaparHtml(f.numero) + ' (' + fmtMon(f.importe, x.moneda || 'ARS') + ')').join(' · ')}</p>` : ''}${x.detalle ? `<p>${escaparHtml(x.detalle)}</p>` : ''}
     ${x.comprobante && /^data:image/.test(x.comprobante) ? `<p><b>Comprobante de transferencia:</b></p><img src="${x.comprobante}">` : x.comprobante ? '<p>Comprobante adjunto (PDF) guardado en el sistema.</p>' : ''}
     ${efectivo || x.firma ? `<div style="display:flex;gap:40px;margin-top:50px;">${bloqueFirma(x.firma, 'Recibí el pago')}<div style="flex:1;"></div></div>` : ''}<script>setTimeout(()=>print(),400)<\/script></body></html>`); w.document.close();
 }
@@ -8470,6 +8479,8 @@ function ccCalcular(){
     // las NC relacionadas se aplican a su factura; el resto (cobros y NC sin relacion) a las facturas mas viejas
     const pend = {}; c.facts.filter(f => f.importe > 0).forEach(f => pend[f.id] = f.importe);
     let disp = haber; c.facts.filter(f => f.importe < 0).forEach(nc => { let m = -nc.importe; if(nc.ref && pend[nc.ref] != null){ const a = Math.min(m, pend[nc.ref]); pend[nc.ref] -= a; m -= a; } disp += m; });
+    // cobros con facturas indicadas: primero se cancelan esas; lo que sobra va a las mas viejas
+    c.movs.filter(m => (m.tipo === 'cobro' || m.tipo === 'sena') && !m.aGrupo && Array.isArray(m.aplica)).forEach(m => m.aplica.forEach(a => { if(pend[a.id] == null) return; const x = Math.min(+a.importe || 0, pend[a.id], disp); pend[a.id] -= x; disp -= x; }));
     c.facts.filter(f => f.importe > 0).forEach(f => { const ap = Math.min(disp, pend[f.id]); f.pendiente = Math.round((pend[f.id] - ap) * 100) / 100; disp -= ap; });
     const hoy = new Date();
     c.vencido = 0; c.buckets = [0, 0, 0, 0];
@@ -8533,7 +8544,7 @@ function renderCtaCteCliente(c){
   if(ccSucVer && sucs.includes(ccSucVer)) c = { ...c, facts: c.facts.filter(f => f.sucursal === ccSucVer), movs: [] };
   const filas = [...c.facts.map(f => ({ fecha: f.fecha, t: f.esNC ? 'Nota de crédito' : 'Factura', det: f.numero, debe: f.importe > 0 ? f.importe : 0, haber: f.importe < 0 ? -f.importe : 0, f })),
     ...c.movs.map(m => { const ret = Object.values(m.retenciones || {}).reduce((x, y) => x + (+y || 0), 0); const neg = m.tipo === 'cobro' || m.tipo === 'sena';
-      return { fecha: m.fecha, t: { cobro: 'Cobro', sena: 'Seña', ajuste: 'Ajuste', inicial: 'Saldo inicial' }[m.tipo] || m.tipo, det: [m.medio, m.cheque ? `${m.cheque.electronico ? 'E-cheq' : 'Cheque'} ${m.cheque.banco || ''} N.º ${m.cheque.numero || ''}` : '', ret ? 'retenciones ' + formatPrice(ret) : '', m.detalle].filter(Boolean).join(' · '), debe: neg ? 0 : Math.max(0, m.importe), haber: neg ? m.importe + ret : Math.max(0, -m.importe), m }; })]
+      return { fecha: m.fecha, t: { cobro: 'Cobro', sena: 'Seña', ajuste: 'Ajuste', inicial: 'Saldo inicial' }[m.tipo] || m.tipo, det: [(m.aplica || []).length ? 'cancela ' + m.aplica.map(x => x.numero).join(', ') : '', m.medio, m.cheque ? `${m.cheque.electronico ? 'E-cheq' : 'Cheque'} ${m.cheque.banco || ''} N.º ${m.cheque.numero || ''}` : '', ret ? 'retenciones ' + formatPrice(ret) : '', m.detalle].filter(Boolean).join(' · '), debe: neg ? 0 : Math.max(0, m.importe), haber: neg ? m.importe + ret : Math.max(0, -m.importe), m }; })]
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
   let s = 0; filas.forEach(r => { s += r.debe - r.haber; r.saldo = s; });
   const pend = c.facts.filter(f => f.pendiente > 0.5);
@@ -8597,16 +8608,24 @@ function ccFormCobro(k, tipo){
       <div id="cb-ch" style="display:none;grid-column:1/-1;grid-template-columns:1fr 1fr;gap:8px;"><label>Banco<input id="cb-cb" style="${inp}"></label><label>N.º de cheque<input id="cb-cn" style="${inp}"></label><label>Fecha de cobro<input type="date" id="cb-cf" style="${inp}"></label><label>Librador<input id="cb-cl" style="${inp}"></label></div>
       <details style="grid-column:1/-1;"><summary style="cursor:pointer;font-size:.88rem;">Retenciones que le hizo el cliente (opcional)</summary><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px;">${[['iva', 'IVA'], ['iibb', 'IIBB'], ['gan', 'Ganancias'], ['otras', 'Otras']].map(([k2, t2]) => `<label style="font-size:.8rem;">${t2}<input id="cb-r-${k2}" inputmode="decimal" placeholder="$" style="${inp}"><input id="cb-c-${k2}" placeholder="N.º certificado" style="${inp}margin-top:4px;font-size:.78rem;"></label>`).join('')}<label style="font-size:.8rem;grid-column:1/-1;">Provincia de la retención de IIBB<input id="cb-rprov" placeholder="ej.: Buenos Aires" style="${inp}"></label><label style="font-size:.8rem;grid-column:1/-1;">📎 Comprobantes de las retenciones (foto o PDF, uno o varios)<input type="file" id="cb-adj" accept="image/*,application/pdf" multiple style="${inp}"></label></div></details>
       <label style="grid-column:1/-1;">Detalle (opcional)<input id="cb-d" placeholder="Recibo N.º, observación…" style="${inp}"></label>
+      ${(() => { const pend = c.facts.filter(f => f.importe > 0 && f.pendiente > 0.5); return pend.length ? `<details style="grid-column:1/-1;" open><summary style="cursor:pointer;font-size:.88rem;"><b>Facturas que cancela</b> <span class="meta">(opcional: si no tilda ninguna, se aplica a las más viejas)</span></summary>
+        <div style="margin-top:6px;">${pend.map(f => `<label class="cb-fa" data-id="${escapeAttr(f.id)}" data-num="${escapeAttr(f.numero)}" style="display:grid;grid-template-columns:22px 1fr 120px 130px;gap:8px;align-items:center;padding:4px 0;border-top:1px solid #F3EFE8;font-size:.86rem;"><input type="checkbox" onchange="const i=this.parentNode.querySelector('.cb-fai');if(this.checked&&!i.value)i.value=formatoPesos(${f.pendiente});if(!this.checked)i.value='';cbTotAplica()"><span>${escaparHtml(f.numero)} <span class="meta">${f.fecha.split('-').reverse().join('/')}${f.vencida ? ' · vencida' : ''}</span></span><span class="meta" style="text-align:right;">pend. ${formatPrice(f.pendiente)}</span><input class="cb-fai" inputmode="decimal" placeholder="importe" oninput="this.parentNode.querySelector('input[type=checkbox]').checked=!!this.value;cbTotAplica()" style="${inp}"></label>`).join('')}
+        <p id="cb-apl" class="note" style="text-align:left;margin:4px 0 0;"></p></div></details>` : ''; })()}
       ${c.miembros ? `<label style="grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:.88rem;"><input type="checkbox" id="cb-grupo" checked style="width:18px;height:18px;"> Aplicar a todo el grupo (${c.miembros.length + 1} empresas): cancela las facturas más viejas de cualquiera</label>` : ''}</div>
     <p class="note" style="text-align:left;">Se aplica a las facturas más viejas. Saldo actual: <b>${formatPrice(c.saldo || 0)}</b>.</p>
     <div style="display:flex;gap:8px;"><button class="btn btn-gold" style="flex:1;" onclick="ccGuardarCobro('${escapeAttr(k)}','${tipo}')">Guardar</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="vistaPrevia('recibo','${escapeAttr(k)}','${tipo}')">👁️ Vista previa</button><button class="btn btn-ghost" style="width:auto;padding:10px 16px;" onclick="cerrarPublicar()">Cancelar</button></div>`;
   document.getElementById('pub-modal').style.display = 'block';
 }
+function cbTotAplica(){ const e = document.getElementById('cb-apl'); if(!e) return; const s = [...document.querySelectorAll('.cb-fai')].reduce((x, i) => x + (numAr(i.value) || 0), 0), imp = numAr((document.getElementById('cb-i') || {}).value) || 0;
+  e.innerHTML = s ? `Aplicado a facturas: <b>${formatPrice(s)}</b>${imp ? (imp - s > 0.5 ? ` · a cuenta (facturas más viejas): ${formatPrice(imp - s)}` : imp - s < -0.5 ? ' · <span style="color:#A6432F;">supera el importe recibido</span>' : '') : ''}` : ''; }
 async function ccGuardarCobro(k, tipo){
   const g = id => document.getElementById(id).value.trim(), imp = numAr(g('cb-i'));
   if(!(imp > 0)){ alert('Escriba el importe.'); return; }
   const medio = g('cb-m'), ret = {}, retCert = {}; ['iva', 'iibb', 'gan', 'otras'].forEach(r => { const v = numAr(g('cb-r-' + r)); if(v > 0){ ret[r] = v; if(g('cb-c-' + r)) retCert[r] = g('cb-c-' + r); } });
   const mov = { cliente: k, nombre: (ccCalcular()[k] || {}).nombre || (document.getElementById('rc-c') || {}).value || window.__ccNombreNuevo || k, tipo, fecha: g('cb-f') || ccHoy(), importe: imp, medio, retenciones: ret, retCert, retProv: g('cb-rprov'), detalle: g('cb-d'), aGrupo: !!(document.getElementById('cb-grupo') || {}).checked };
+  { const apl = [...document.querySelectorAll('.cb-fa')].map(l => ({ id: l.dataset.id, numero: l.dataset.num, importe: numAr(l.querySelector('.cb-fai').value) || 0 })).filter(a => a.importe > 0);
+    const totRet = Object.values(ret).reduce((x, y) => x + (+y || 0), 0);
+    if(apl.length){ const s = apl.reduce((x, a) => x + a.importe, 0); if(s > imp + totRet + 0.5){ alert(`Lo aplicado a facturas (${formatPrice(s)}) supera el cobro (${formatPrice(imp + totRet)}).`); return; } mov.aplica = apl; } }
   if(/Cheque|E-cheq/.test(medio)){ if(!g('cb-cn')){ alert('Escriba el número de cheque.'); return; } mov.cheque = { electronico: medio === 'E-cheq', banco: g('cb-cb'), numero: g('cb-cn'), fechaCobro: g('cb-cf') || '', librador: g('cb-cl'), estado: 'cartera' }; }
   if(__previa){ __previa(mov); return; }
   const archivos = [...((document.getElementById('cb-adj') || {}).files || [])];
@@ -8636,7 +8655,7 @@ function ccResumenPDF(k){
   const c = C0[k]; if(!c) return; const pend = c.facts.filter(f => f.pendiente > 0.5);
   const filas = [...c.facts.map(f => ({ fecha: f.fecha, t: (f.esNC ? '' : 'Factura ') + f.numero, debe: f.importe > 0 ? f.importe : 0, haber: f.importe < 0 ? -f.importe : 0 })),
     ...c.movs.map(m => { const ret = Object.values(m.retenciones || {}).reduce((x, y) => x + (+y || 0), 0), neg = m.tipo === 'cobro' || m.tipo === 'sena';
-      return { fecha: m.fecha, t: ({ cobro: 'Recibo', sena: 'Seña', ajuste: 'Ajuste', inicial: 'Saldo inicial' }[m.tipo] || m.tipo) + (m.detalle ? ' · ' + m.detalle : '') + (ret ? ' (incluye retenciones ' + formatPrice(ret) + ')' : ''), debe: neg ? 0 : Math.max(0, m.importe), haber: neg ? m.importe + ret : Math.max(0, -m.importe) }; })].sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+      return { fecha: m.fecha, t: ({ cobro: 'Recibo', sena: 'Seña', ajuste: 'Ajuste', inicial: 'Saldo inicial' }[m.tipo] || m.tipo) + ((m.aplica || []).length ? ' · cancela ' + m.aplica.map(x => x.numero).join(', ') : '') + (m.detalle ? ' · ' + m.detalle : '') + (ret ? ' (incluye retenciones ' + formatPrice(ret) + ')' : ''), debe: neg ? 0 : Math.max(0, m.importe), haber: neg ? m.importe + ret : Math.max(0, -m.importe) }; })].sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
   let s = 0; filas.forEach(f => { s += f.debe - f.haber; f.saldo = s; });
   const w = window.open('', '_blank'); if(!w){ alert('Permita ventanas emergentes para imprimir.'); return; }
   w.document.write(`<html><head><title>Estado de cuenta · ${escaparHtml(c.nombre)}</title><style>body{font-family:Arial,sans-serif;padding:26px;color:#222}table{width:100%;border-collapse:collapse;font-size:12.5px}td,th{padding:6px;border-bottom:1px solid #ddd;text-align:left}.r{text-align:right}h1{font-size:20px;margin:0}h3{margin:18px 0 6px;color:#3D2B4E}</style></head><body>
@@ -13081,7 +13100,7 @@ function htmlRecibo(m){
     <table><tr><th>Concepto</th><th class="r">Importe</th></tr><tr><td>${escaparHtml(m.medio || '')}${m.cheque ? ` · ${m.cheque.electronico ? 'E-cheq' : 'Cheque'} ${escaparHtml(m.cheque.banco || '')} N.º ${escaparHtml(m.cheque.numero || '')}${m.cheque.fechaCobro ? ' · cobro ' + m.cheque.fechaCobro.split('-').reverse().join('/') : ''}` : ''}</td><td class="r">${formatPrice(m.importe)}</td></tr>
       ${ret.map(([k, v]) => `<tr><td>${nomR[k] || k}${(m.retCert || {})[k] ? ' · certificado ' + escaparHtml(m.retCert[k]) : ''}</td><td class="r">${formatPrice(+v)}</td></tr>`).join('')}
       <tr><td><b>Total cancelado</b></td><td class="r"><b>${formatPrice(m.importe + rt)}</b></td></tr></table>
-    ${m.detalle ? `<p>${escaparHtml(m.detalle)}</p>` : ''}${m.aGrupo ? '<p class="x">Aplicado a las facturas del grupo de empresas.</p>' : ''}
+    ${(m.aplica || []).length ? `<p><b>Cancela:</b> ${m.aplica.map(x => escaparHtml(x.numero) + ' (' + formatPrice(x.importe) + ')').join(' · ')}</p>` : ''}${m.detalle ? `<p>${escaparHtml(m.detalle)}</p>` : ''}${m.aGrupo ? '<p class="x">Aplicado a las facturas del grupo de empresas.</p>' : ''}
     <div style="margin-top:50px;display:flex;justify-content:flex-end;"><div style="width:280px;">${firmaEmisor && firmaEmisor.img ? `<div style="text-align:center;font-size:12px;"><img src="${firmaEmisor.img}" style="max-height:70px;max-width:100%;"><div style="border-top:1px solid #444;padding-top:4px;"><b>${escaparHtml(firmaEmisor.aclaracion || '')}</b><br>por ${escaparHtml(((datosRZ.propia || {}).nombre) || 'OnLineTextil')}</div></div>` : '<div style="height:70px;"></div><div style="border-top:1px solid #444;text-align:center;padding-top:6px;font-size:12px;">Firma y aclaración</div>'}</div></div>
     <script>setTimeout(()=>print(),400)<\/script></body></html>`;
 }
@@ -21887,7 +21906,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v376';
+const APP_VERSION = '2026-10-02-v377';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
