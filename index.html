@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v375</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v376</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -12746,6 +12746,17 @@ function tipoProductoPG(S){
   const t = (/\btelas?\b/.test(cat) || r.producto.metros) && !/mantel|cortina/.test(normBusqueda(r.producto.nombre)) ? 'tela' : /ajustable/.test(n) && !/juego/.test(n) ? 'ajustable' : /mantel|manteleria|camino de mesa/.test(n) ? 'mantel' : /cubrecama|acolchado|frazada|edredon|quilt|cobertor|plaid/.test(n) ? 'cubrecama' : /sabana|juego/.test(n) ? 'sabanas' : /toalla|toallon|bano|alfombra de bano/.test(n) ? 'toalla' : /repasador|secaplatos|pano de cocina/.test(n) ? 'repasador' : /bata/.test(n) ? 'bata' : /almohad/.test(n) ? 'almohada' : /cortina/.test(n) ? 'cortina' : 'otro';
   return { r, t, blanco: /blanc/.test(n) };
 }
+const ESCENA_USO = [
+  [/sabana/, 'a made bed with a fitted sheet, a flat sheet folded back at the head and a pillowcase, all sewn from this fabric'],
+  [/toalla|toallon/, 'towels and bath towels sewn from this fabric, neatly folded on a bathroom shelf and one hanging open on a towel bar'],
+  [/mantel/, 'a rectangular dining table fully covered with a tablecloth sewn from this fabric, hanging about 25 cm on every side'],
+  [/cortina/, 'curtains sewn from this fabric hanging from a rod at both sides of a bright window'],
+  [/acolchado|cubrecama|edredon|frazada/, 'a bedspread sewn from this fabric spread over a made bed, hanging naturally on the sides'],
+  [/bata/, 'a bathrobe sewn from this fabric hanging open on a hook in a bright bathroom'],
+  [/ambo|uniforme|hospital|medic/, 'two medical scrubs (top and trousers) sewn from this fabric, hanging neatly on wooden hangers against a clean white wall'],
+  [/funda|almohad/, 'pillows in pillowcases sewn from this fabric on a made bed'],
+  [/repasador|cocina/, 'kitchen towels sewn from this fabric, one hanging from an oven handle and two folded on a counter'],
+  [/individual|camino/, 'placemats and a table runner sewn from this fabric on a set table']];
 function promptTela(S, canal, x){
   const { r } = x, p = r.producto, v = r.variante, comp = p.composicion || '', nombre = p.nombre, px = canal === 'tn' ? '1024x1024' : '2000x2000';
   const n = normBusqueda(nombre + ' ' + comp + ' ' + (v.desc || '')), ancho = (comp.match(/ancho\s*(\d+(?:[.,]\d+)?)/i) || [])[1];
@@ -12755,7 +12766,13 @@ function promptTela(S, canal, x){
     : /voile|blackout|lienzo|cortina|gasa/.test(n) ? 'curtains sewn from this fabric hanging from a rod at both sides of a bright window'
     : /toalla|rizo|felpa|toallon/.test(n) ? 'towels sewn from this fabric folded on a bathroom shelf'
     : 'a simple home textile sewn from this fabric (cushion covers and a table runner) in a bright, neutral room';
-  return `Using the attached photo of the real fabric, generate these 7 images, one after another, in this order. The color, print, weave, thickness, sheen and texture must stay EXACTLY as in the photo in all images. Fabric: ${nombre}${v.desc ? ' — ' + v.desc : ''}${comp ? ' — ' + comp : ''}. Never saturate or shift the color; never invent prints, stripes or textures that are not in the photo.
+  // en uso: una imagen por cada uso cargado en Stock -> Telas (hasta 3); si no hay usos cargados, se deduce del nombre
+  const tl = (telasDatos && telasDatos.telas && (telasDatos.telas[String(S).toUpperCase()] || telasDatos.telas[S])) || null, usos = (tl && tl.usos) || [];
+  const escUso = usos.map(u => (ESCENA_USO.find(([re]) => re.test(normBusqueda(u))) || [, `a ${u.toLowerCase()} sewn from this fabric in a bright, realistic setting`])[1]).filter((e, i, a) => a.indexOf(e) === i).slice(0, 3);
+  const escenas = escUso.length ? escUso : [uso], nTot = 6 + escenas.length;
+  const bloquesUso = escenas.map((e, i) => `IMAGE ${4 + i} – IN USE${escenas.length > 1 ? ' ' + (i + 1) : ''}${usos[i] ? ' (' + usos[i] + ')' : ''}: Use the photo only as an exact texture and color reference. Show ${e}. Realistic proportions and real sizes, simple bright space, neutral colors, soft daylight, no brand names. Square 1:1, ${px}.`).join('\n\n');
+  const k = escenas.length - 1; // corrimiento de numeracion
+  return `Using the attached photo of the real fabric, generate these ${nTot} images, one after another, in this order. The color, print, weave, thickness, sheen and texture must stay EXACTLY as in the photo in all images. Fabric: ${nombre}${v.desc ? ' — ' + v.desc : ''}${comp ? ' — ' + comp : ''}. Never saturate or shift the color; never invent prints, stripes or textures that are not in the photo.
 
 IMAGE 1 – MAIN: The fabric laid in two or three soft overlapping layers with gentle waves, the cut edge finished with a PINKED (zigzag) edge clearly visible in the foreground, showing color, body and drape. Pure white seamless background #FFFFFF, soft diffused studio light, no hard shadows, soft contact shadow, filling 85-95% of the frame. Square 1:1, ${px}.
 
@@ -12763,13 +12780,13 @@ IMAGE 2 – ROLL: The same fabric rolled on a cardboard tube (bolt), standing or
 
 IMAGE 3 – WEAVE: Edit this photo. Do NOT redraw the fabric. Extreme close-up of the center of the fabric showing the weave and the yarns sharply (macro), even neutral white light, same color. No edges. Square 1:1, ${px}.
 
-IMAGE 4 – IN USE: Use the photo only as an exact texture and color reference. Show ${uso}. Realistic proportions, simple bright space, neutral colors, soft daylight, no brand names. Square 1:1, ${px}.
+${bloquesUso}
 
-IMAGE 5 – DRAPE: A length of the same fabric hanging over a horizontal wooden rod, falling freely in natural folds to show its real body (stiff or fluid exactly as the real fabric), white background, soft studio light. Square 1:1, ${px}.
+IMAGE ${5 + k} – DRAPE: A length of the same fabric hanging over a horizontal wooden rod, falling freely in natural folds to show its real body (stiff or fluid exactly as the real fabric), white background, soft studio light. Square 1:1, ${px}.
 
-IMAGE 6 – OPACITY: The same fabric held flat in front of a soft backlight (a bright window or light panel), showing honestly how much light passes through it, exactly as the real fabric would (opaque, semi-opaque or sheer); a hand partially behind the fabric to show the effect. Square 1:1, ${px}.
+IMAGE ${6 + k} – OPACITY: The same fabric held flat in front of a soft backlight (a bright window or light panel), showing honestly how much light passes through it, exactly as the real fabric would (opaque, semi-opaque or sheer); a hand partially behind the fabric to show the effect. Square 1:1, ${px}.
 
-IMAGE 7 – COLORS: Square swatches of this same fabric in ALL the colors shown in the attached photos, arranged in a neat grid with equal spacing on a pure white background #FFFFFF, soft diffused light, texture visible, no text, no numbers. If the photos show only one color, show a single large swatch. Square 1:1, ${px}.
+IMAGE ${7 + k} – COLORS: Square swatches of this same fabric in ALL the colors shown in the attached photos, arranged in a neat grid with equal spacing on a pure white background #FFFFFF, soft diffused light, texture visible, no text, no numbers. If the photos show only one color, show a single large swatch. Square 1:1, ${px}.
 
 For all images: no text, no logos, no watermark, no props over the fabric.${ancho ? ` Real width of the fabric: ${ancho} cm (keep realistic proportions).` : ''}`;
 }
@@ -12813,7 +12830,7 @@ IMAGE 3 – DETAIL: Edit this photo. Do NOT redraw the print. Crop a close-up fr
 For all images: no text, no logos, no watermark, no props over the product${fab ? ' (except the LEXINGTON print on the bag in IMAGE 4)' : ''}.`;
 }
 function copiarTexto(t, btn){ navigator.clipboard.writeText(t).then(() => { if(btn){ const o = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(() => btn.textContent = o, 1500); } }).catch(() => prompt('Copie el texto:', t)); }
-async function abrirPromptGemini(S){ await cargarDatosFabricacion();
+async function abrirPromptGemini(S){ await cargarDatosFabricacion(); try{ if(telasDatos === null) await cargarTelas(); } catch(e){}
   pvModal('📸 Prompt para Gemini', `<input id="pg-s" data-ac="sku" value="${escapeAttr(S || '')}" placeholder="SKU o nombre del producto" autocomplete="off" oninput="pgPintar()" onchange="pgPintar()" style="padding:9px;border:1px solid var(--line);border-radius:10px;width:100%;box-sizing:border-box;">
     <div style="display:flex;gap:6px;margin:8px 0;"><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pg-c" value="ml" checked onchange="pgPintar()"> Mercado Libre</label><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pg-c" value="tn" onchange="pgPintar()"> Tienda Nube</label></div>
     <div id="pg-res"></div>`);
@@ -12825,7 +12842,7 @@ function pgPintar(){ const S = (document.getElementById('pg-s').value || '').tri
   const selPanos = esCort ? `<div style="display:flex;gap:6px;align-items:center;margin:0 0 8px;font-size:.85rem;"><b>Paños:</b>${[1, 2].map(n => `<button type="button" class="btn-mini" style="${(np || 0) === n ? 'border-color:var(--purple);font-weight:700;' : ''}" onclick="guardarPanos('${S}', ${n}).then(pgPintar)">${n}</button>`).join('')}${np ? '' : ' <span style="color:#A6432F;">elija cuántos paños tiene (queda guardado)</span>'}</div>` : '';
   box.innerHTML = t ? `${selPanos}<p class="note" style="text-align:left;margin:0 0 6px;">En Gemini: chat nuevo → suba UNA foto real del producto → pegue el texto.${esFabricadoSku(S, rr ? rr.producto.nombre : '') ? ' · Fabricación propia: incluye la imagen con la bolsa LEXINGTON.' : ''}</p><textarea readonly style="width:100%;height:240px;box-sizing:border-box;font-size:.78rem;border:1px solid var(--line);border-radius:10px;padding:8px;">${escaparHtml(t)}</textarea><button type="button" class="btn btn-gold" style="width:100%;margin-top:6px;" onclick="copiarTexto(window.__pgTxt, this)">📋 Copiar prompt</button>` : '<p class="note">Ese SKU no está en el catálogo.</p>'; }
 // lote: todos los SKU de un producto, de una categoria o de una busqueda
-async function abrirPromptGeminiLote(){ await cargarDatosFabricacion();
+async function abrirPromptGeminiLote(){ await cargarDatosFabricacion(); try{ if(telasDatos === null) await cargarTelas(); } catch(e){}
   const cats = [...new Set(CATALOGO.map(c => c.categoria).filter(Boolean))];
   pvModal('📸 Prompts para Gemini en lote', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><label>Categoría<select id="pl-cat" onchange="plPintar()" style="padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;"><option value="">Todas</option>${cats.map(c => `<option>${escaparHtml(c)}</option>`).join('')}</select></label><label>Buscar<input id="pl-q" oninput="clearTimeout(window.__plT);window.__plT=setTimeout(plPintar,250)" placeholder="ej.: mantel, century" style="padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;"></label></div>
     <div style="display:flex;gap:6px;margin:8px 0;"><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pl-c" value="ml" checked onchange="plPintar()"> Mercado Libre</label><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pl-c" value="tn" onchange="plPintar()"> Tienda Nube</label><label class="btn-mini" style="cursor:pointer;margin-left:auto;"><input type="checkbox" id="pl-uno" checked onchange="plPintar()"> uno por producto (no por medida)</label></div>
@@ -21870,7 +21887,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v375';
+const APP_VERSION = '2026-10-02-v376';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
