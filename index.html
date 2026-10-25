@@ -1693,7 +1693,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v393</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v394</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -8306,7 +8306,7 @@ async function pvGuardarProveedor(id){
   catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   await ccLog('Proveedor', d.nombre); cerrarPublicar(); pvSel = id; renderCompras();
 }
-function pvFormCompra(pid, nc){ setTimeout(() => { try{ cfEtiqueta(); if(document.getElementById('cfr-rows') && !document.querySelector('.cfr-r')) cfrFila(); } catch(e){} }, 30); cargarDatosRZ().then(() => { try{ cfEtiqueta(); } catch(e){} });
+function pvFormCompra(pid, nc){ window.__cfDto = null; setTimeout(() => { try{ cfEtiqueta(); if(document.getElementById('cfr-rows') && !document.querySelector('.cfr-r')) cfrFila(); } catch(e){} }, 30); cargarDatosRZ().then(() => { try{ cfEtiqueta(); } catch(e){} });
   const p = pvProv.find(x => x._id === pid), m = pvMon(p), hoy = ccHoy();
   const esND = nc === 'nd'; if(esND) nc = false;
   pvModal((nc ? 'Nota de crédito de ' : esND ? 'Nota de débito de ' : 'Factura de compra de ') + p.nombre, `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
@@ -8350,7 +8350,7 @@ function cfrFila(x){ x = x || {}; const d = document.createElement('div'); d.cla
   document.getElementById('cfr-rows').appendChild(d); cfrTot(); }
 function cfrLeer(){ return [...document.querySelectorAll('.cfr-r')].map(d => { const cant = numAr(d.querySelector('.cfr-q').value) || (d.querySelector('.cfr-p').value ? 1 : 0), precio = numAr(d.querySelector('.cfr-p').value) || 0, bonif = Math.min(100, Math.max(0, numAr(d.querySelector('.cfr-b').value) || 0));
   return { codigo: d.querySelector('.cfr-c').value.trim().toUpperCase(), desc: d.querySelector('.cfr-d').value.trim(), cant, precio, bonif, importe: Math.round(cant * precio * (1 - bonif / 100) * 100) / 100 }; }).filter(x => x.importe > 0 || x.desc || x.codigo); }
-function cfrTot(){ const L = cfrLeer(), base = L.reduce((a, x) => a + x.importe, 0), e = document.getElementById('cfr-tot');
+function cfrTot(){ const L = cfrLeer(), base0 = L.reduce((a, x) => a + x.importe, 0), dP = base0 > 0 ? dtoPct('cf-dto', 'cf-dto-m', base0) : 0, base = base0 * (1 - dP / 100), e = document.getElementById('cfr-tot'); window.__cfDto = base0 > 0 && dP > 0 ? { sub: base0, pct: dP, monto: base0 - base } : null;
   document.querySelectorAll('.cfr-r').forEach((d, i) => { const x = L[i]; const s = d.querySelector('.cfr-i'); if(s) s.textContent = x && x.importe ? formatPrice(x.importe) : ''; });
   if(!base){ if(e) e.textContent = ''; try{ cfBig(); } catch(x){} return; }
   const tipo = document.getElementById('cf-t').value, esA = /^[AM]$/.test(tipo), neto = (document.querySelector('input[name=cfr-iva]:checked') || {}).value === 'neto';
@@ -8360,10 +8360,11 @@ function cfrTot(){ const L = cfrLeer(), base = L.reduce((a, x) => a + x.importe,
   if(e) e.innerHTML = ''; try{ cfBig(); } catch(x){} }
 function dtoPct(idVal, idModo, base){ const v = numAr((document.getElementById(idVal) || {}).value) || 0, modo = (document.getElementById(idModo) || {}).value || 'pct'; if(modo === 'monto') return base > 0 ? Math.min(100, Math.max(0, v / base * 100)) : 0; return Math.min(100, Math.max(0, v)); }
 function dtoSeg(idModo, fn){ return `<span id="${idModo}-seg" style="display:inline-flex;border:1px solid #E4DED4;border-radius:7px;overflow:hidden;vertical-align:middle;"><input type="hidden" id="${idModo}" value="pct">${[['pct', '%'], ['monto', '$']].map(([v, t]) => `<button type="button" data-v="${v}" onclick="document.getElementById('${idModo}').value='${v}';document.querySelectorAll('#${idModo}-seg button').forEach(b=>{const on=b.dataset.v==='${v}';b.style.background=on?'#3D2B4E':'#fff';b.style.color=on?'#fff':'#6B6258';});${fn}" style="border:none;padding:4px 9px;font-weight:700;font-size:.78rem;cursor:pointer;background:${v === 'pct' ? '#3D2B4E' : '#fff'};color:${v === 'pct' ? '#fff' : '#6B6258'};">${t}</button>`).join('')}</span>`; }
-function cfDescuento(){ const s = numAr(document.getElementById('cf-sub').value) || 0, d = dtoPct('cf-dto', 'cf-dto-m', s); if(s > 0){ document.getElementById('cf-i').value = formatoPesos(Math.round(s * (1 - d / 100) * 100) / 100); cfDesglose(); } }
+function cfDescuento(){ if(cfrLeer().some(x => x.importe > 0)){ cfrTot(); return; } window.__cfDto = null; const s = numAr(document.getElementById('cf-sub').value) || 0, d = dtoPct('cf-dto', 'cf-dto-m', s); if(s > 0){ document.getElementById('cf-i').value = formatoPesos(Math.round(s * (1 - d / 100) * 100) / 100); cfDesglose(); } }
 function cfBig(){ const e = document.getElementById('cf-big'); if(!e) return; document.querySelectorAll('#pub-cont details.cmp-sec').forEach(d => { if([...d.querySelectorAll('input')].some(i => i.value && i.value !== '0')) d.open = true; }); const v = id => numAr((document.getElementById(id) || {}).value) || 0, tot = v('cf-i'), iva = v('cf-iva'), pi = v('cf-piva'), pb = v('cf-piibb'), m = /US\$/.test((document.getElementById('pub-cont') || {}).textContent || '') && document.getElementById('cf-tc') ? 'USD' : 'ARS', F = x => fmtMon(x, m);
   const L = (a, b, c) => `<div class="l${c ? ' ' + c : ''}"><span>${a}</span><span>${b}</span></div>`;
-  e.innerHTML = tot ? (iva || pi || pb ? L('Neto', F(tot - iva - pi - pb)) : '') + (iva ? L('IVA', F(iva)) : '') + (pi ? L('Percepción IVA', F(pi)) : '') + (pb ? L('Percepción IIBB', F(pb)) : '') + L('Total', F(tot), 't') : ''; }
+  const dd = window.__cfDto || (() => { const s = v('cf-sub'); if(!s) return null; const d0 = dtoPct('cf-dto', 'cf-dto-m', s); return d0 ? { sub: s, pct: d0, monto: s * d0 / 100 } : null; })();
+  e.innerHTML = tot ? (dd ? L('Subtotal', F(dd.sub)) + L(`Descuento ${Math.round(dd.pct * 100) / 100} %`, '−' + F(dd.monto)) : '') + (iva || pi || pb ? L('Neto', F(tot - iva - pi - pb)) : '') + (iva ? L('IVA', F(iva)) : '') + (pi ? L('Percepción IVA', F(pi)) : '') + (pb ? L('Percepción IIBB', F(pb)) : '') + L('Total', F(tot), 't') : ''; }
 function cfFiscal(v){ const c = document.getElementById('cf-fis'); if(!c) return; c.checked = !!v; document.querySelectorAll('#cf-fis-seg button').forEach(b => { const on = (b.dataset.v === 'si') === !!v; b.style.background = on ? '#3D2B4E' : '#fff'; b.style.color = on ? '#fff' : '#6B6258'; }); const t = document.getElementById('cf-t'); if(!v && t && t.value !== 'X') t.value = 'X'; if(v && t && t.value === 'X') t.value = 'A'; cfDesglose(); }
 function cfEtiqueta(){ const e = document.getElementById('cf-etq'); if(!e) return; const tp = document.getElementById('cf-t').value, fis = document.getElementById('cf-fis').checked && tp !== 'X', tt = (document.getElementById('pub-titulo') || {}).textContent || ''; e.innerHTML = bannerComp(/nota de cr/i.test(tt) ? 'ncc' : /nota de d/i.test(tt) ? 'ndc' : 'compra', tp, fis, '', (document.getElementById('cf-rz') || {}).value || 'propia', 'A NOMBRE DE'); }
 function cfDesglose(){ cfEtiqueta(); setTimeout(cfBig, 0); if(document.querySelector('.cfr-r') && !window.__cfrEnTot){ window.__cfrEnTot = true; try{ cfrTot(); } finally { window.__cfrEnTot = false; } } { const tp = document.getElementById('cf-t').value, iv = document.getElementById('cf-iva'); if(iv){ iv.disabled = !/^[AM]$/.test(tp); if(iv.disabled){ iv.value = ''; iv.placeholder = 'B y C no discriminan IVA'; } else iv.placeholder = 'opcional'; } }
@@ -8371,7 +8372,7 @@ function cfDesglose(){ cfEtiqueta(); setTimeout(cfBig, 0); if(document.querySele
   if(tipo === 'A' && t > 0){ const base = t - pi - pb, iva = base - base / 1.21; if(iv && (!iv.value || iv.dataset.auto === '1')){ iv.value = formatoPesos(Math.round(iva * 100) / 100); iv.dataset.auto = '1'; } e.textContent = `neto ${formatPrice(base / 1.21)} + IVA 21 % ${formatPrice(iva)}${pi || pb ? ' + percepciones ' + formatPrice(pi + pb) : ''}`; } else e.textContent = ''; }
 async function pvGuardarCompra(pid, nc){ dashCache = null; if(await mesBloqueado(document.getElementById('cf-f').value)) return; const esND = nc === 'nd'; if(esND) nc = false;
   const g = x => document.getElementById(x).value.trim(), p = pvProv.find(x => x._id === pid);
-  const d = { proveedorId: pid, razon: g('cf-rz'), tipo: g('cf-t'), numero: g('cf-n'), fecha: g('cf-f'), vence: g('cf-v') || g('cf-f'), importe: numAr(g('cf-i')), items: (typeof cfrLeer === 'function' && document.getElementById('cfr-rows')) ? cfrLeer() : [], preciosNeto: (document.querySelector('input[name=cfr-iva]:checked') || {}).value === 'neto', tcFactura: document.getElementById('cf-tc') ? (numAr(g('cf-tc')) || null) : null, subtotal: numAr(g('cf-sub')) || null, descuento: numAr(g('cf-dto')) || 0, iva: numAr(g('cf-iva')) || 0, fiscal: document.getElementById('cf-fis').checked && g('cf-t') !== 'X', percIva: numAr(g('cf-piva')) || 0, percIibb: numAr(g('cf-piibb')) || 0, provIibb: g('cf-pprov'), moneda: pvMon(p), detalle: g('cf-d'), nc: !!nc, nd: esND, creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
+  const d = { proveedorId: pid, razon: g('cf-rz'), tipo: g('cf-t'), numero: g('cf-n'), fecha: g('cf-f'), vence: g('cf-v') || g('cf-f'), importe: numAr(g('cf-i')), items: (typeof cfrLeer === 'function' && document.getElementById('cfr-rows')) ? cfrLeer() : [], preciosNeto: (document.querySelector('input[name=cfr-iva]:checked') || {}).value === 'neto', tcFactura: document.getElementById('cf-tc') ? (numAr(g('cf-tc')) || null) : null, subtotal: (window.__cfDto ? window.__cfDto.sub : numAr(g('cf-sub'))) || null, descuento: window.__cfDto ? Math.round(window.__cfDto.pct * 100) / 100 : (numAr(g('cf-sub')) ? Math.round(dtoPct('cf-dto', 'cf-dto-m', numAr(g('cf-sub'))) * 100) / 100 : 0), iva: numAr(g('cf-iva')) || 0, fiscal: document.getElementById('cf-fis').checked && g('cf-t') !== 'X', percIva: numAr(g('cf-piva')) || 0, percIibb: numAr(g('cf-piibb')) || 0, provIibb: g('cf-pprov'), moneda: pvMon(p), detalle: g('cf-d'), nc: !!nc, nd: esND, creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
   if(!(d.importe > 0) || !d.fecha){ alert('Complete fecha y total.'); return; }
   const clave = x => { const m = String(x.numero || '').match(/(\d+)\D+(\d+)/); return `${x.proveedorId}|${x.nc ? 'NC' : x.nd ? 'ND' : 'FC'}|${x.tipo}|${m ? (+m[1]) + '-' + (+m[2]) : String(x.numero || '').replace(/\D/g, '').replace(/^0+/, '')}`; }; // mismo punto de venta y numero
   if(d.numero && pvCompras.some(x => clave(x) === clave(d))){ alert('Ya está cargado un comprobante de este proveedor con el mismo tipo y número. No se guardó.'); return; }
@@ -22065,7 +22066,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v393';
+const APP_VERSION = '2026-10-02-v394';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
