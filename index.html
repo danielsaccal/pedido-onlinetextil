@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v373</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v374</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -12753,7 +12753,7 @@ function promptGemini(S, canal){
   const prod = { ajustable: 'fitted sheet', mantel: 'tablecloth', cubrecama: 'bedspread', sabanas: 'sheet set', toalla: 'towel', repasador: 'kitchen towel', bata: 'bathrobe', almohada: 'pillow', cortina: 'curtain', otro: 'textile product' }[t];
   // juegos de sabanas: 1 1/2 plaza = 1 funda (3 piezas); 2 1/2, queen y king = 2 fundas (4 piezas)
   const md = normBusqueda(medida + ' ' + nombre), mF = md.match(/(\d)\s*fundas?/), dosFundas = mF ? +mF[1] >= 2 : /2\s*½|2 1\/2|2,5|dos plazas|2 plazas|queen|king|matrimonial/.test(md), nf = mF ? Math.min(2, Math.max(1, +mF[1])) : (dosFundas ? 2 : 1); // si la medida dice cuantas fundas, manda eso
-    const panos = +((String(medida + ' ' + nombre).match(/(\d)\s*pa[ñn]os?/i) || [])[1] || 1); // cortinas: cantidad de panos
+    const panos = panosDeSku(S, medida, nombre) || 1; // cortinas: cantidad de panos
   const escena = {
     mantel: `In this image the tablecloth must be FULLY UNFOLDED AND SPREAD OPEN, never folded. The same tablecloth (${medida}) fully spread over a rectangular dining table of the right size, covering the entire tabletop and hanging about 25 cm on every side, with soft natural folds at the corners. View from above at about 45°, nothing on the table covering the print.`,
     ajustable: `ONLY the same fitted sheet (${medida}) fitted tightly on a bare mattress of that size, the elastic corners wrapping the mattress, smooth and taut, no flat sheet, no pillowcases, no duvet, no other bedding. A plain pillow without case may be omitted. View from the foot of the bed at about 30°, so the corner and the mattress height are visible.`,
@@ -12770,7 +12770,7 @@ function promptGemini(S, canal){
   const forma = '';
 const pila = `exactly ${nf === 1 ? 'THREE' : 'FOUR'} pieces, stacked from bottom to top: the flat sheet (widest); the fitted sheet (clearly shorter than the one below); on top, ${nf === 1 ? 'ONE pillowcase folded flat (the shortest piece)' : 'TWO identical pillowcases folded flat, one on the other, the upper one slightly shifted back so both are visible (the shortest pieces)'}. Each sheet is folded into a long, low, flat rectangle with straight, well-defined edges, slightly softened corners, clean folds and no marked wrinkles; each piece is slightly shorter than the one below it, so the steps are clearly visible; all aligned and centered. PILLOWCASES: folded flat into thin rectangles, each one only about ONE THIRD of the thickness of a folded sheet; they must look flat and thin, with no volume at all, never stuffed: NO pillows, NO pillow inside, no puffy or rounded shapes, no piping around the edges. Exactly ${nf === 1 ? 'one pillowcase' : 'two pillowcases'}, no more. Each piece keeps the exact color and print it has in the photo (which one is plain and which one is printed). Hems and stitching only where they exist in the photo; do not invent hem lines; the fitted sheet has an elastic edge, never a wide hem. No labels, no logos, no ribbons, no decorative elements. Straight front view at the height of the stack, soft diffused studio light, no hard shadows, subtle natural shading only between the layers`;
   // fabricacion propia: 4.a imagen con la bolsa de polipropileno y la etiqueta LEXINGTON (bolsa de 25 x 40 cm)
-  const fab = !!(fabricacion && fabricacion.propios && fabricacion.propios[nombre]), nImg = fab ? 4 : 3;
+  const fab = esFabricadoSku(S, nombre), nImg = fab ? 4 : 3;
   const bolsa = fab ? `
 
 IMAGE 4 – PACKAGING: Use the photo only as an exact reference for the fabric color, print and texture. The same ${prod} folded into a flat, firm rectangular package (about 25 cm wide × 40 cm tall, portrait, proportion 1 : 1.6), wrapped like retail bedding packaging in a thin, glossy, clear polypropylene film that hugs the package tightly on all four sides, with the excess film folded flat behind it. THIS IS NOT A ZIP BAG: there is NO zip-lock, NO zipper, NO ridge, NO double line, NO band or strip across the top, NO flap, NO lip and NO empty space above the fabric; the only seam is an almost invisible thin heat seal along the top edge, flush with the fabric. Realistic soft reflections and highlights on the plastic, and slight signs of real handling: a few small soft wrinkles and creases in the film near the edges and corners, a little slack at one top corner, faint scuffs — subtle, not dirty, not torn. Printed directly on the front of the bag, centered horizontally and placed slightly above the middle, a solid dark taupe-grey rectangle (#4A4540), wide and short: it spans from 10% to 90% of the package width (about 20 cm wide × 6 cm tall, aspect ratio about 3.3 : 1, never small, never square), with sharp corners, and the word "LEXINGTON" in off-white serif capital letters (#F2EEE6), centered in the rectangle, the word filling about 80% of the rectangle width; spell it exactly L-E-X-I-N-G-T-O-N. NO white sticker, NO size label, NO SKU, NO other text or logo anywhere. The fabric color seen through the plastic must be exactly as in the photo, only very slightly softened by the film. Photorealistic product photography, it must look like a real photo of a real product, not a render: straight front view, soft diffused studio light, no hard shadows, pure white seamless background #FFFFFF, soft natural contact shadow under the package, centered, filling 85-95% of the frame. Square 1:1, ${px}.` : '';
@@ -12785,7 +12785,7 @@ IMAGE 3 – DETAIL: Edit this photo. Do NOT redraw the print. Crop a close-up fr
 For all images: no text, no logos, no watermark, no props over the product${fab ? ' (except the LEXINGTON print on the bag in IMAGE 4)' : ''}.`;
 }
 function copiarTexto(t, btn){ navigator.clipboard.writeText(t).then(() => { if(btn){ const o = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(() => btn.textContent = o, 1500); } }).catch(() => prompt('Copie el texto:', t)); }
-async function abrirPromptGemini(S){ try{ if(fabricacion === null) await cargarFabricacion(); } catch(e){}
+async function abrirPromptGemini(S){ await cargarDatosFabricacion();
   pvModal('📸 Prompt para Gemini', `<input id="pg-s" data-ac="sku" value="${escapeAttr(S || '')}" placeholder="SKU o nombre del producto" autocomplete="off" oninput="pgPintar()" onchange="pgPintar()" style="padding:9px;border:1px solid var(--line);border-radius:10px;width:100%;box-sizing:border-box;">
     <div style="display:flex;gap:6px;margin:8px 0;"><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pg-c" value="ml" checked onchange="pgPintar()"> Mercado Libre</label><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pg-c" value="tn" onchange="pgPintar()"> Tienda Nube</label></div>
     <div id="pg-res"></div>`);
@@ -12793,9 +12793,11 @@ async function abrirPromptGemini(S){ try{ if(fabricacion === null) await cargarF
 }
 function pgPintar(){ const S = (document.getElementById('pg-s').value || '').trim().toUpperCase().split(/\s/)[0], c = (document.querySelector('input[name=pg-c]:checked') || {}).value || 'ml', box = document.getElementById('pg-res'); if(!S){ box.innerHTML = ''; return; }
   const t = promptGemini(S, c); window.__pgTxt = t;
-  box.innerHTML = t ? `<p class="note" style="text-align:left;margin:0 0 6px;">En Gemini: chat nuevo → suba UNA foto real del producto → pegue el texto.</p><textarea readonly style="width:100%;height:240px;box-sizing:border-box;font-size:.78rem;border:1px solid var(--line);border-radius:10px;padding:8px;">${escaparHtml(t)}</textarea><button type="button" class="btn btn-gold" style="width:100%;margin-top:6px;" onclick="copiarTexto(window.__pgTxt, this)">📋 Copiar prompt</button>` : '<p class="note">Ese SKU no está en el catálogo.</p>'; }
+  const rr = buscarProductoPorSku(S), esCort = rr && /cortina/i.test(rr.producto.nombre + ' ' + (rr.variante.desc || '')), np = rr ? panosDeSku(S, rr.variante.desc || '', rr.producto.nombre) : 0;
+  const selPanos = esCort ? `<div style="display:flex;gap:6px;align-items:center;margin:0 0 8px;font-size:.85rem;"><b>Paños:</b>${[1, 2].map(n => `<button type="button" class="btn-mini" style="${(np || 0) === n ? 'border-color:var(--purple);font-weight:700;' : ''}" onclick="guardarPanos('${S}', ${n}).then(pgPintar)">${n}</button>`).join('')}${np ? '' : ' <span style="color:#A6432F;">elija cuántos paños tiene (queda guardado)</span>'}</div>` : '';
+  box.innerHTML = t ? `${selPanos}<p class="note" style="text-align:left;margin:0 0 6px;">En Gemini: chat nuevo → suba UNA foto real del producto → pegue el texto.${esFabricadoSku(S, rr ? rr.producto.nombre : '') ? ' · Fabricación propia: incluye la imagen con la bolsa LEXINGTON.' : ''}</p><textarea readonly style="width:100%;height:240px;box-sizing:border-box;font-size:.78rem;border:1px solid var(--line);border-radius:10px;padding:8px;">${escaparHtml(t)}</textarea><button type="button" class="btn btn-gold" style="width:100%;margin-top:6px;" onclick="copiarTexto(window.__pgTxt, this)">📋 Copiar prompt</button>` : '<p class="note">Ese SKU no está en el catálogo.</p>'; }
 // lote: todos los SKU de un producto, de una categoria o de una busqueda
-async function abrirPromptGeminiLote(){ try{ if(fabricacion === null) await cargarFabricacion(); } catch(e){}
+async function abrirPromptGeminiLote(){ await cargarDatosFabricacion();
   const cats = [...new Set(CATALOGO.map(c => c.categoria).filter(Boolean))];
   pvModal('📸 Prompts para Gemini en lote', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><label>Categoría<select id="pl-cat" onchange="plPintar()" style="padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;"><option value="">Todas</option>${cats.map(c => `<option>${escaparHtml(c)}</option>`).join('')}</select></label><label>Buscar<input id="pl-q" oninput="clearTimeout(window.__plT);window.__plT=setTimeout(plPintar,250)" placeholder="ej.: mantel, century" style="padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;"></label></div>
     <div style="display:flex;gap:6px;margin:8px 0;"><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pl-c" value="ml" checked onchange="plPintar()"> Mercado Libre</label><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pl-c" value="tn" onchange="plPintar()"> Tienda Nube</label><label class="btn-mini" style="cursor:pointer;margin-left:auto;"><input type="checkbox" id="pl-uno" checked onchange="plPintar()"> uno por producto (no por medida)</label></div>
@@ -12900,6 +12902,13 @@ let firmaEmisor = null;
 async function cargarFirmaEmisor(){ if(firmaEmisor !== null) return firmaEmisor; try{ const d = await db.collection('config').doc('firma_emisor').get(); firmaEmisor = d.exists ? d.data() : false; } catch(e){ firmaEmisor = false; } return firmaEmisor; }
 function abrirMiFirma(){ if(!esDueno()){ alert('Solo el dueño.'); return; }
   firmaPad('Mi firma para los recibos (se usa en todos)', false, async f => { try{ await db.collection('config').doc('firma_emisor').set(f); firmaEmisor = f; alert('✓ Firma guardada. Saldrá en los recibos.'); } catch(e){ alert('No se pudo guardar: ' + e.message); } }); }
+// fabricacion propia: lo marca usted, o la app lo deduce sola (SKU vinculado a un articulo de corte, ficha de articulo o tabla de consumo)
+function esFabricadoSku(S, nombre){ S = String(S || '').toUpperCase(); try{ if(fabricacion && fabricacion.propios && fabricacion.propios[nombre]) return true; if(fabricacion && fabricacion.vinculos && fabricacion.vinculos[S]) return true; if(typeof articuloDeSku === 'function' && articuloDeSku(S)) return true; } catch(e){} return false; }
+// cantidad de panos de una cortina: lo guardado, la descripcion, el nombre o el articulo de corte
+function panosDeSku(S, medida, nombre){ S = String(S || '').toUpperCase(); const g = fabricacion && fabricacion.panos && fabricacion.panos[S]; if(g) return +g;
+  let a = ''; try{ a = articuloDeSku(S) || ''; } catch(e){} const m = String(medida + ' ' + nombre + ' ' + a).match(/(\d)\s*pa[ñn]os?/i); return m ? +m[1] : 0; }
+async function cargarDatosFabricacion(){ try{ if(fabricacion === null) await cargarFabricacion(); if(tablaConsumo === null) await cargarTablaConsumo(); if(fichasArticulos === null) await cargarFichasArticulos(); } catch(e){} }
+async function guardarPanos(S, n){ try{ await cargarDatosFabricacion(); fabricacion.panos = fabricacion.panos || {}; fabricacion.panos[String(S).toUpperCase()] = n; await guardarFabricacion(); for(const k in bosqCache) delete bosqCache[k]; } catch(e){ alert('No se pudo guardar: ' + e.message); } }
 // ===== Bosquejo de medidas por SKU (lo dibuja la app, sin IA): ultima imagen de cada SKU =====
 // Los productos de fabricacion propia tienen la medida de CORTE: se muestra la TERMINADA (corte - confeccion).
 const CONFECCION = { cortina: { ancho: 5, alto: 15 }, funda: { ancho: 2, largo: 7 }, plana: { ancho: 2, largo: 10 }, mantel: { ancho: 2, largo: 2 }, otro: { ancho: 2, largo: 2 } };
@@ -12909,10 +12918,10 @@ function numsMedida(t){ return [...String(t || '').replace(/,/g, '.').matchAll(/
 function datosBosquejo(S){
   const r = buscarProductoPorSku(S); if(!r) return null;
   const p = r.producto, v = r.variante, cat = normBusqueda((CATALOGO[r.ci] || {}).categoria || ''), txt = (v.desc || '') + ' ' + p.nombre, n = normBusqueda(txt + ' ' + cat);
-  const fab = !!(fabricacion && fabricacion.propios && fabricacion.propios[p.nombre]), med = numsMedida(v.desc || '').concat(numsMedida(p.nombre)), tipoPG = (tipoProductoPG(S) || {}).t;
+  const fab = esFabricadoSku(S, p.nombre), med = numsMedida(v.desc || '').concat(numsMedida(p.nombre)), tipoPG = (tipoProductoPG(S) || {}).t;
   const d = { S, nombre: p.nombre, desc: v.desc || '', fab, filas: [], nota: '' };
   const terminar = (a, b, k) => fab ? [Math.round((a - (CONFECCION[k] || CONFECCION.otro).ancho) * 10) / 10, Math.round((b - (CONFECCION[k] || CONFECCION.otro)[k === 'cortina' ? 'alto' : 'largo']) * 10) / 10] : [a, b];
-  if(/cortina/.test(n) && med[0]){ const [a, b] = terminar(med[0][0], med[0][1], 'cortina'), pan = +((String(v.desc).match(/(\d+)\s*pa[ñn]os?/i) || [])[1] || 1);
+  if(/cortina/.test(n) && med[0]){ const [a, b] = terminar(med[0][0], med[0][1], 'cortina'), pan = panosDeSku(S, v.desc, p.nombre) || 1;
     Object.assign(d, { tipo: 'cortina', titulo: pan > 1 ? `Cortina de ${pan} paños${fab ? ' terminados' : ''} de` : (fab ? 'Cortina terminada de' : 'Cortina de'), medida: `${a} × ${b} cm${pan > 1 ? ' c/u' : ''}`, a, b, pan, nota: `Cubre una ventana de hasta ${(a * pan * FRUNCE_CORTINA / 100).toFixed(2).replace('.', ',')} m de ancho (con frunce)` }); d.filas.push([pan > 1 ? 'Paño de cortina' : 'Cortina', `${a} × ${b} cm`, pan]); return d; }
   if(/mantel|manteleria/.test(n) && !/individual/.test(n) && med[0]){ const [l0, a0] = med[0][0] >= med[0][1] ? med[0] : [med[0][1], med[0][0]], [l, a] = terminar(l0, a0, 'mantel');
     Object.assign(d, { tipo: 'mantel', titulo: fab ? 'Mantel terminado de' : 'Mantel de', medida: `${l} × ${a} cm`, l, a, mesa: [l - 2 * CAIDA_MANTEL, a - 2 * CAIDA_MANTEL], nota: `Ideal para mesas de hasta ${l - 2 * CAIDA_MANTEL} × ${a - 2 * CAIDA_MANTEL} cm (caída de ${CAIDA_MANTEL} cm por lado)` }); d.filas.push(['Mantel', `${l} × ${a} cm`, 1]); return d; }
@@ -21793,7 +21802,7 @@ async function pintarLinksNI(modo){
 <script>
 etiquetarProductosEstaticos();
 revisarRegresoDeInstagram();
-sesionLista.then(() => { try{ if(fabricacion === null) cargarFabricacion().then(() => { for(const k in bosqCache) delete bosqCache[k]; }).catch(() => {}); } catch(e){} }).catch(() => {});
+sesionLista.then(() => cargarDatosFabricacion()).then(() => { for(const k in bosqCache) delete bosqCache[k]; }).catch(() => {});
 sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFotosOverride(), cargarProductosNuevos(), cargarDatosBancarios(), cargarPerfilIG()])).then(() => {
   return cargarProductosEliminados();
 }).then(() => {
@@ -21824,7 +21833,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v373';
+const APP_VERSION = '2026-10-02-v374';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
