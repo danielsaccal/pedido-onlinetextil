@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v379</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v380</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -7886,8 +7886,8 @@ async function descargarLibroIVA(){
     await cargarCfgFiscal();
     const V = vf.docs.map(x => x.data()).filter(f => (f.razon || 'propia') === rz && mesDe(f.fecha) === mes && esFiscalVenta(f)).sort((a, b) => ccFechaISO(a.fecha).localeCompare(ccFechaISO(b.fecha))).map(f => { const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0), tot = f.total || n0 * 1.21, sg = f.esNC ? -1 : 1, m = String(f.numero || '').match(/(\d+)\D+(\d+)/);
       return { Fecha: f.fecha, Comprobante: (f.esNC ? 'NC' : f.esND ? 'ND' : 'FC') + ' ' + (f.tipo || ''), 'Punto de venta': m ? m[1] : '', Número: m ? m[2] : f.numero, Cliente: f.cliente || '', CUIT: cuitCli(f.cliente), 'Neto gravado 21%': r2(sg * n0), 'IVA 21%': r2(sg * (tot - n0)), Total: r2(sg * tot), CAE: f.cae || 'emitida en TFactura', 'Vto. CAE': f.caeVto || '' }; });
-    const C = cp.docs.map(x => x.data()).filter(c => (c.razon || 'propia') === rz && String(c.fecha).slice(0, 7) === mes && esFiscalCompra(c) && !c.liquidacion && c.moneda !== 'USD').sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))).map(c => { const sg = c.nc ? -1 : 1, iva = +c.iva || 0, piva = +c.percIva || 0, piibb = +c.percIibb || 0, neto = (+c.importe || 0) - iva - piva - piibb, m = String(c.numero || '').match(/(\d+)\D+(\d+)/), p = prov[c.proveedorId] || {};
-      return { Fecha: String(c.fecha).split('-').reverse().join('/'), Comprobante: (c.nc ? 'NC' : c.nd ? 'ND' : 'FC') + ' ' + (c.tipo || ''), 'Punto de venta': m ? m[1] : '', Número: m ? m[2] : c.numero, Proveedor: p.nombre || '', CUIT: p.cuit || '', 'Neto gravado': r2(sg * neto), IVA: r2(sg * iva), 'Percepción IVA': r2(sg * piva), 'Percepción IIBB': r2(sg * piibb), 'Provincia IIBB': c.provIibb || '', Total: r2(sg * (+c.importe || 0)) }; });
+    const C = cp.docs.map(x => x.data()).filter(c => (c.razon || 'propia') === rz && String(c.fecha).slice(0, 7) === mes && esFiscalCompra(c) && !c.liquidacion && c.moneda !== 'USD').sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))).map(c => { const sg = c.nc ? -1 : 1, esA = /^[AM]$/i.test(c.tipo || 'A'), iva = esA ? (+c.iva || 0) : 0, piva = esA ? (+c.percIva || 0) : 0, piibb = +c.percIibb || 0, noComp = esA ? 0 : (+c.importe || 0) - piibb, neto = esA ? (+c.importe || 0) - iva - piva - piibb : 0, m = String(c.numero || '').match(/(\d+)\D+(\d+)/), p = prov[c.proveedorId] || {};
+      return { Fecha: String(c.fecha).split('-').reverse().join('/'), Comprobante: (c.nc ? 'NC' : c.nd ? 'ND' : 'FC') + ' ' + (c.tipo || ''), 'Punto de venta': m ? m[1] : '', Número: m ? m[2] : c.numero, Proveedor: p.nombre || '', CUIT: p.cuit || '', 'Neto gravado': r2(sg * neto), IVA: r2(sg * iva), 'No computable (B/C)': r2(sg * noComp), 'Percepción IVA': r2(sg * piva), 'Percepción IIBB': r2(sg * piibb), 'Provincia IIBB': c.provIibb || '', Total: r2(sg * (+c.importe || 0)) }; });
     const s = (L, k) => r2(L.reduce((a, x) => a + (x[k] || 0), 0));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(V.length ? V : [{ Fecha: 'Sin facturas de venta cargadas en este mes' }]), 'Ventas');
@@ -7941,12 +7941,12 @@ async function abrirIVA(){ await cargarCfgFiscal();
   if(!esDueno()){ alert('Solo el dueño puede ver la posición de IVA.'); return; }
   mostrarPaso('step-iva'); const f = document.getElementById('iv-f'); if(!f.value) f.value = ccHoy();
   document.getElementById('iv-body').innerHTML = '<p class="empty-msg">Cargando…</p>';
-  const [vf, cp, md, rs, cf] = await Promise.all([db.collection('ventas_facturadas').get(), db.collection('compras').get(), db.collection('ml_detalle').get().catch(() => ({ docs: [] })), db.collection('config').doc('ml_resumen_mensual').get(), db.collection('config').doc('iva').get()]);
-  ivDatos = { fact: vf.docs.map(d => d.data()), compras: cp.docs.map(d => d.data()), det: md.docs.map(d => d.data()), res: rs.exists ? (rs.data().m || {}) : {}, cfg: cf.exists ? cf.data() : {} };
+  const [vf, cp, md, rs, cf, mv, bx] = await Promise.all([db.collection('ventas_facturadas').get(), db.collection('compras').get(), db.collection('ml_detalle').get().catch(() => ({ docs: [] })), db.collection('config').doc('ml_resumen_mensual').get(), db.collection('config').doc('iva').get(), db.collection('cc_movimientos').get().catch(() => ({ docs: [] })), db.collection('teso_extractos').get().catch(() => ({ docs: [] }))]);
+  ivDatos = { fact: vf.docs.map(d => d.data()), compras: cp.docs.map(d => d.data()), det: md.docs.map(d => d.data()), res: rs.exists ? (rs.data().m || {}) : {}, cfg: cf.exists ? cf.data() : {}, movs: mv.docs.map(d => d.data()), banco: bx.docs.map(d => d.data()) };
   renderIVA();
 }
 function calcIVA(fecha){
-  const mes = fecha.slice(0, 7), R = {}; IV_RZ.forEach(([k]) => R[k] = { deb: 0, cred: 0, credML: 0, perc: 0, ant: +(((ivDatos.cfg[mes] || {})[k]) || 0), vtas: 0, nComp: 0, mlEst: false });
+  const mes = fecha.slice(0, 7), R = {}; IV_RZ.forEach(([k]) => R[k] = { deb: 0, cred: 0, credML: 0, perc: 0, ret: 0, ant: +(((ivDatos.cfg[mes] || {})[k]) || 0), vtas: 0, nComp: 0, mlEst: false });
   const enRango = iso => iso && iso.slice(0, 7) === mes && iso <= fecha;
   // propia: ventas facturadas
   const conFacturas = new Set(); ivDatos.fact.forEach(f => { const iso = ccFechaISO(f.fecha); if(!enRango(iso) || !esFiscalVenta(f)) return; const k = f.razon || 'propia'; if(!R[k]) return; if(k !== 'propia') conFacturas.add(k);
@@ -7955,13 +7955,19 @@ function calcIVA(fecha){
   ivDatos.det.filter(d => d.periodo === mes).forEach(d => { const k = String(d.cuenta || '').toLowerCase(); if(!R[k] || conFacturas.has(k)) return; /* si hay facturas de esa razon social, mandan las facturas */ const L = String(d.csv || '').split('\n'), cab = (L.shift() || '').split(';'), ix = c => cab.indexOf(c);
     L.forEach(l => { const r = l.split(';'); const iso = ccFechaISO(r[ix('fecha')]); if(!enRango(iso)) return; if(r[ix('tipo')] !== 'Venta' || /cancel/i.test(r[ix('estado')] || '')) return; const v = +r[ix('precio')] || 0; if(!v) return; R[k].vtas += v; R[k].deb += v / 1.21 * 0.21; }); });
   // credito: facturas de compra
-  ivDatos.compras.forEach(c => { if(!enRango(c.fecha) || !R[c.razon] || c.moneda === 'USD' || !esFiscalCompra(c)) return; const sg = c.nc ? -1 : 1; R[c.razon].cred += sg * (+c.iva || 0); R[c.razon].perc += sg * (+c.percIva || 0); R[c.razon].nComp++; });
+  ivDatos.compras.forEach(c => { if(!enRango(c.fecha) || !R[c.razon] || c.moneda === 'USD' || !esFiscalCompra(c)) return; const sg = c.nc ? -1 : 1;
+    if(/^[AM]$/i.test(c.tipo || 'A')){ R[c.razon].cred += sg * (+c.iva || 0); R[c.razon].perc += sg * (+c.percIva || 0); } /* B y C: el IVA no es computable (va al costo) */
+    R[c.razon].nComp++; });
+  // retenciones de IVA que le hicieron los clientes (recibos) y percepciones de IVA del banco: a cuenta del IVA de la razon propia
+  (ivDatos.movs || []).forEach(m => { if((m.tipo === 'cobro' || m.tipo === 'sena') && enRango(m.fecha) && +((m.retenciones || {}).iva)) R.propia.ret += +m.retenciones.iva; });
+  (ivDatos.banco || []).forEach(x => { if(/percepci[oó]n de iva/i.test(x.tipo || '') && enRango(x.fecha)) R.propia.ret += Math.abs(+x.importe || 0); });
   // credito: cargos que factura ML (estimado: proporcional a las ventas hasta la fecha)
   const FACTURA_ML = /comisi|cargo fijo|cuotas|env[ií]os|full|publicidad/i, NO = /impuesto|retenc|cadete|cancelac|otros/i;
   ['alberto', 'rita'].forEach(k => { const x = Object.values(ivDatos.res).find(y => y.periodo === mes && String(y.cuenta).toLowerCase() === k); if(!x) return;
     const cargos = Object.entries(x.desglose || {}).filter(([c]) => FACTURA_ML.test(c) && !NO.test(c)).reduce((a, [, v]) => a + (+v || 0), 0);
     const prop = x.vendido > 0 ? Math.min(1, R[k].vtas / x.vendido) : 0; R[k].credML = cargos * prop / 1.21 * 0.21; R[k].mlEst = true; });
-  IV_RZ.forEach(([k]) => { const r = R[k]; r.saldo = r.deb - r.cred - r.credML - r.perc - r.ant; });
+  // saldo tecnico (debito - credito; el excedente pasa al mes siguiente) y libre disponibilidad (retenciones y percepciones)
+  IV_RZ.forEach(([k]) => { const r = R[k]; r.tecnico = r.deb - r.cred - r.credML - r.ant; r.saldo = r.tecnico - r.perc - r.ret; });
   return R;
 }
 function renderIVA(){
@@ -7975,7 +7981,8 @@ function renderIVA(){
       ${fila('<b>Débito fiscal</b>', 'deb')}
       ${fila('Crédito fiscal (facturas de compra)', 'cred', true)}
       ${fila('Crédito fiscal (cargos de Mercado Libre)', 'credML', true, 'estimado: comisiones, cargo fijo, cuotas, envíos, Full y publicidad; confirmar con la factura mensual de ML')}
-      ${fila('Percepciones de IVA', 'perc', true)}
+      ${fila('Percepciones de IVA (compras)', 'perc', true)}
+      ${fila('Retenciones de IVA (clientes) y percepciones bancarias', 'ret', true, 'De los recibos con retención de IVA y del extracto del banco')}
       <tr style="border-top:1px solid var(--line);"><td style="padding:7px 6px;">Saldo a favor del mes anterior</td>${IV_RZ.map(([z]) => `<td style="padding:7px 6px;text-align:right;"><input inputmode="decimal" value="${R[z].ant ? formatoPesos(Math.round(R[z].ant)) : ''}" placeholder="$ 0" onchange="ivGuardarAnt('${mes}','${z}',this.value)" style="width:110px;padding:5px;border:1px solid var(--line);border-radius:8px;text-align:right;"></td>`).join('')}<td style="padding:7px 6px;text-align:right;color:#2F7A47;">${T('ant') ? '− ' : ''}${fP(T('ant'))}</td></tr>
       <tr style="border-top:2px solid var(--purple);font-weight:800;"><td style="padding:8px 6px;">A pagar (+) / a favor (−)</td>${IV_RZ.map(([z]) => `<td style="padding:8px 6px;text-align:right;color:${R[z].saldo > 0 ? '#A6432F' : '#2F7A47'};">${fP(R[z].saldo)}</td>`).join('')}<td style="padding:8px 6px;text-align:right;">${fP(T('saldo'))}</td></tr></table></div>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;"><button type="button" class="btn-mini" onclick="ivImprimir()">🖨️ Para el contador (imprimir o PDF)</button></div>
@@ -8296,7 +8303,8 @@ async function pvLeerPDF(inp){
   } catch(e){ alert('No pude leer el PDF: complete a mano.'); }
 }
 function cfDescuento(){ const s = numAr(document.getElementById('cf-sub').value) || 0, d = Math.min(100, Math.max(0, numAr(document.getElementById('cf-dto').value) || 0)); if(s > 0){ document.getElementById('cf-i').value = formatoPesos(Math.round(s * (1 - d / 100) * 100) / 100); cfDesglose(); } }
-function cfDesglose(){ const t = numAr(document.getElementById('cf-i').value) || 0, tipo = document.getElementById('cf-t').value, iv = document.getElementById('cf-iva'), pi = numAr((document.getElementById('cf-piva') || {}).value) || 0, pb = numAr((document.getElementById('cf-piibb') || {}).value) || 0, e = document.getElementById('cf-neto'); if(!e) return;
+function cfDesglose(){ { const tp = document.getElementById('cf-t').value, iv = document.getElementById('cf-iva'); if(iv){ iv.disabled = !/^[AM]$/.test(tp); if(iv.disabled){ iv.value = ''; iv.placeholder = 'B y C no discriminan IVA'; } else iv.placeholder = 'opcional'; } }
+  const t = numAr(document.getElementById('cf-i').value) || 0, tipo = document.getElementById('cf-t').value, iv = document.getElementById('cf-iva'), pi = numAr((document.getElementById('cf-piva') || {}).value) || 0, pb = numAr((document.getElementById('cf-piibb') || {}).value) || 0, e = document.getElementById('cf-neto'); if(!e) return;
   if(tipo === 'A' && t > 0){ const base = t - pi - pb, iva = base - base / 1.21; if(iv && (!iv.value || iv.dataset.auto === '1')){ iv.value = formatoPesos(Math.round(iva * 100) / 100); iv.dataset.auto = '1'; } e.textContent = `neto ${formatPrice(base / 1.21)} + IVA 21 % ${formatPrice(iva)}${pi || pb ? ' + percepciones ' + formatPrice(pi + pb) : ''}`; } else e.textContent = ''; }
 async function pvGuardarCompra(pid, nc){ dashCache = null; if(await mesBloqueado(document.getElementById('cf-f').value)) return; const esND = nc === 'nd'; if(esND) nc = false;
   const g = x => document.getElementById(x).value.trim(), p = pvProv.find(x => x._id === pid);
@@ -21956,7 +21964,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v379';
+const APP_VERSION = '2026-10-02-v380';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
