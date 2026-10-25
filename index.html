@@ -1684,7 +1684,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v390</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v391</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6251,7 +6251,7 @@ async function pintarCategoria(k){
   const g = GRUPOS_INICIO[k] || {}, cols = k === 'ag' ? [{ titulo: 'Agentes', items: [['🎨 Director de arte', 'abrirDirectorArte()'], ['🧾 Auditor contable', 'abrirAuditor()']].filter(([, f]) => puede(permisoDeAccion(f))) }] : sbItems(k);
   const titulo = k === 'ag' ? '🤖 Agentes IA' : k === 'i' ? '⚙️ Configuración' : (g.titulo || '');
   window.__catItems = []; const reg = it => { window.__catItems.push(it); return window.__catItems.length - 1; };
-  const opciones = cols.map(c => `<details class="d-pl" ${cols.length === 1 ? 'open' : ''}><summary>${escaparHtml((c.titulo || titulo).replace(/^\d+ · /, ''))} <span class="cnt">${c.items.length}</span></summary><div><div class="d-acc" style="margin:0;">${c.items.map(([t, f]) => `<button type="button" style="${/ResultadosML|CalculadoraML|VentasML/.test(f) ? 'background:#FFE600;border-color:#E6CF00;color:#2D3277;font-weight:700;' : ''}" onclick="catUsar(${reg([t, f])})">${escaparHtml(t)}</button>`).join('')}</div></div></details>`).join('');
+  const opciones = cols.map(c => { const tc = (c.titulo || titulo).replace(/^\d+ · /, ''); return `<details class="d-pl" ${cols.length === 1 ? 'open' : ''} data-tc="${escapeAttr(tc)}"><summary>${escaparHtml(tc)} <span class="cnt">${c.items.length}</span></summary><div><div class="d-acc" style="margin:0;">${c.items.map(([t, f]) => `<button type="button" data-t="${escapeAttr(t)}" style="${/ResultadosML|CalculadoraML|VentasML/.test(f) ? 'background:#FFE600;border-color:#E6CF00;color:#2D3277;font-weight:700;' : ''}" onclick="catUsar(${reg([t, f])})">${escaparHtml(t)}</button>`).join('')}</div></div></details>`; }).join('');
   const resumen = V => { if(!V || !esDueno() && !['art', 'ped'].includes(k)) return '';
     const c = { cli: [['Clientes', V.nClientes != null ? V.nClientes.toLocaleString('es-AR') : '—', '', 'abrirClientes()'], ['A cobrar · vencido', V.cobrar != null ? formatPrice(V.cobrar) : '—', V.venc > 0 ? formatPrice(V.venc) : '', 'abrirCtaCte()'], ['Clientes con saldo', V.conSaldo != null ? V.conSaldo : '—', '', 'abrirCtaCte()']],
       prov: [['Proveedores', V.nProv != null ? V.nProv : '—', '', 'abrirCompras()'], ['A pagar · vence esta semana', V.pagar != null ? formatPrice(V.pagar) : '—', V.p7 > 0 ? formatPrice(V.p7) : '', 'abrirCompras()']],
@@ -6262,8 +6262,12 @@ async function pintarCategoria(k){
       imp: [['Posición de IVA del mes', 'Ver', '', 'abrirIVA()']] }[k];
     return c ? `<div class="d-num">${c.map(([t, v, e, f]) => `<span ${f ? `onclick="${f}"` : ''}>${t} <b>${v}</b>${e ? ` <span style="color:#A6432F;">(vencido ${e})</span>` : ''}</span>`).join('')}</div>` : ''; };
   const altas = cols.flatMap(c => c.items).filter(([t]) => /^➕/.test(t)); // las altas ("nuevo") siempre a la vista
-  const accRapidas = altas.length ? `<div class="d-acc">${altas.map(([t, f]) => `<button type="button" onclick="catUsar(${reg([t, f])})">${escaparHtml(t)}</button>`).join('')}</div>` : '';
-  const pintar = V => { if(run !== dashRun) return; box.innerHTML = `<h2 style="font-family:Georgia,serif;color:var(--purple);margin:6px 0 10px;font-weight:600;">${titulo.replace(/^\S+\s/, '')}</h2>${accRapidas}${resumen(V)}${opciones}`; };
+  // Comprobantes: cada tipo con el mismo color que tiene el comprobante
+  const colAcc = t => { if(k !== 'comp') return ''; const n = normBusqueda(t); const fam = /nota de credito/.test(n) ? 'ncv' : /nota de debito/.test(n) ? 'ndv' : /factura de compra|^compras$/.test(n) ? 'compra' : /factura de venta|^ventas$/.test(n) ? 'venta' : /recibo|^cobros$/.test(n) ? 'recibo' : /orden de pago|^pagos$/.test(n) ? 'pago' : /remito/.test(n) ? 'remito' : /presupuesto/.test(n) ? 'presu' : ''; return fam ? COMP_COLOR[fam][1] : ''; };
+  const btnAcc = (t, f) => { const c = colAcc(t); return `<button type="button" onclick="catUsar(${reg([t, f])})" style="${c ? `border-left:5px solid ${c};` : ''}">${c ? `<span style="color:${c};font-weight:800;">${escaparHtml(t.match(/^\S+/)[0])}</span>${escaparHtml(t.replace(/^\S+/, ''))}` : escaparHtml(t)}</button>`; };
+  const accRapidas = altas.length ? `<div class="d-acc">${altas.map(([t, f]) => btnAcc(t, f)).join('')}</div>` : '';
+  const pintar = V => { if(run !== dashRun) return; box.innerHTML = `<h2 style="font-family:Georgia,serif;color:var(--purple);margin:6px 0 10px;font-weight:600;">${titulo.replace(/^\S+\s/, '')}</h2>${accRapidas}${resumen(V)}${opciones}`;
+    if(k === 'comp') box.querySelectorAll('details.d-pl').forEach(d => { const c = colAcc(d.dataset.tc || ''); if(c){ d.style.borderLeft = `5px solid ${c}`; const s = d.querySelector('summary'); if(s) s.style.color = c; } d.querySelectorAll('button[data-t]').forEach(b => { const cb = colAcc(b.dataset.t); if(cb) b.style.borderLeft = `5px solid ${cb}`; }); }); };
   pintar(dashCache); window.scrollTo(0, 0);
   if(['cli', 'prov', 'comp', 'teso', 'est', 'art'].includes(k)){ try{ pintar(await dashDatos()); } catch(e){ console.error(e); } }
 }
@@ -22050,7 +22054,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v390';
+const APP_VERSION = '2026-10-02-v391';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
