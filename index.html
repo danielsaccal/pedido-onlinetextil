@@ -1680,7 +1680,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v380</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v381</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13296,6 +13296,7 @@ function fvTraerRenglones(){
   document.getElementById('fv-rows').innerHTML = '';
   (f.items || []).forEach(it => { const imp = (it.neto || 0) * fx, q = +it.cant || 1; fvFila({ sku: skuDeFactura(it.codigo), cant: q, imp, unit: imp / q, max: q }); });
   document.getElementById('fv-l').value = f.tipo || document.getElementById('fv-l').value;
+  { const fis = esFiscalVenta(f), r = document.querySelector(`input[name=fv-fis][value=${fis ? 'si' : 'no'}]`); if(r) r.checked = true; const pv = document.getElementById('fv-n-pv'); if(pv && !pv.dataset.tocado){ const m = String(f.numero || '').match(/(\d+)\D/); if(m) pv.value = m[1].padStart(5, '0'); numCompUnir('fv-n'); } fvTot(); }
 }
 const fvNetoFila = d => (numAr(d.querySelector('.fv-i').value) || 0) * (1 - Math.min(100, Math.max(0, numAr((d.querySelector('.fv-b') || {}).value) || 0)) / 100); // importe - bonificacion del renglon
 function fvTot(){ const filas = [...document.querySelectorAll('.fv-r')], sub = filas.reduce((a, d) => a + fvNetoFila(d), 0), bruto = [...document.querySelectorAll('.fv-i')].reduce((a, e) => a + (numAr(e.value) || 0), 0), dg = Math.min(100, Math.max(0, numAr((document.getElementById('fv-dg') || {}).value) || 0)), t = sub * (1 - dg / 100), l = (document.getElementById('fv-l') || {}).value, fis = (document.querySelector('input[name=fv-fis]:checked') || {}).value !== 'no';
@@ -13315,6 +13316,7 @@ async function fvGuardar(tipo){
   if(ref && tipo === 'nc'){ const tNC = items.reduce((a, x) => a + x.neto * 1.21, 0); if(tNC > (ref.total || 0) + 1){ alert('La nota de crédito no puede superar el total de la factura relacionada (' + formatPrice(ref.total) + ').'); return; } }
   const f = g('fv-f').split('-'), total = items.reduce((a, x) => a + (x._conIva != null ? x._conIva : x.neto * 1.21), 0); items.forEach(x => delete x._conIva); // el total es exactamente el que se ve en pantalla
   const fa = { numero: g('fv-n'), tipo: g('fv-l'), fecha: `${f[2]}/${f[1]}/${f[0]}`, cliente: g('fv-c'), total: Math.round(total * 100) / 100, items, esNC: tipo === 'nc', esND: tipo === 'nd', devolvieron: true, controlOk: true, razon: g('fv-rz') || 'propia', manual: true, descGeneral: dg, condicion: (document.querySelector('input[name=fv-cond]:checked') || {}).value || 'ctacte', fiscal: (document.querySelector('input[name=fv-fis]:checked') || {}).value === 'si', cae: g('fv-cae').replace(/\D/g, ''), caeVto: g('fv-caev') ? g('fv-caev').split('-').reverse().join('/') : '', facturaRef: ref ? { id: ref._id || String(ref.numero).replace(/\//g, '-'), numero: `${ref.tipo || ''} ${ref.numero}` } : null };
+  if(fa.facturaRef && fa.facturaRef.id){ const ff = (facturas || []).find(x => (x._id || String(x.numero).replace(/\//g, '-')) === fa.facturaRef.id); if(ff && esFiscalVenta(ff) !== (fa.fiscal !== false)){ alert(`La ${tipo === 'nc' ? 'nota de crédito' : 'nota de débito'} tiene que ser del mismo tipo que su factura: la factura ${ff.tipo || ''} ${ff.numero} es ${esFiscalVenta(ff) ? 'FISCAL (con CAE)' : 'SIN CAE'}.`); return; } }
   if(__previa){ __previa(fa); return; }
   const k = claveComprobante(fa); fa.yaEsta = (facturas || []).some(x => claveComprobante(x) === k);
   if(window.__rmFacturando){ fa.remitoRef = window.__rmFacturando; }
@@ -21964,7 +21966,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v380';
+const APP_VERSION = '2026-10-02-v381';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
