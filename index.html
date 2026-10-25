@@ -448,6 +448,8 @@ body.con-sb header.top .menu-toggle{height:32px;padding:0 12px!important;border-
 .note,.meta{color:var(--ds-tx3)!important;}
 details>summary{cursor:pointer;}
 .empty-msg{color:var(--ds-tx3);font-size:.86rem;text-align:center;padding:26px 10px;}
+/* botones anchos de las pantallas: al ancho de su texto */
+.step .btn[style*="width:100%"],.step label.btn{width:auto!important;display:inline-flex!important;padding:0 18px!important;}
 /* menu lateral: iconos de linea, sin emojis, submenus livianos */
 #sb a{font-size:.9rem!important;font-weight:500!important;color:var(--ds-tx2)!important;padding:8px 16px!important;border-left:none!important;border-radius:8px;margin:1px 8px;}
 #sb a.on{background:#F1ECF5!important;color:#3D2B4E!important;font-weight:600!important;}
@@ -1732,7 +1734,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v395</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v396</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -4768,7 +4770,7 @@ async function borrarFicha(){
   if(!sku) return;
   const usan = Object.keys(fichasArticulos.fichas).filter(s => (fichasArticulos.fichas[s].componentes||[]).some(c => normalizarSku(c.sku) === sku));
   if(usan.length){ alert(`No se puede borrar ${sku}: lo usan estos juegos: ${usan.join(', ')}. Quítelo de ahí primero.`); return; }
-  if(!confirm('¿Borrar la ficha ' + sku + '?')) return;
+  if(!await dsConfirm('¿Borrar la ficha ' + sku + '?')) return;
   const nuevas = { ...fichasArticulos.fichas };
   delete nuevas[sku];
   try{
@@ -4908,7 +4910,7 @@ async function borrarArticuloInstruccion(){
   if(!art){ alert('Elija primero el artículo que quiere borrar.'); return; }
   const hijas = Object.keys(tablaConsumo.instrucciones || {}).filter(a => Object.values(tablaConsumo.instrucciones[a] || {}).some(g => g && g.auto && g.origen === art));
   const msg = `¿Borrar "${art}" con todas sus instrucciones y su consumo en la tabla?` + (hijas.length ? `\n\nTambién se borran sus piezas sueltas generadas: ${hijas.join(', ')}.` : '');
-  if(!confirm(msg)) return;
+  if(!await dsConfirm(msg)) return;
   delete tablaConsumo.articulos[art];
   if(tablaConsumo.instrucciones) delete tablaConsumo.instrucciones[art];
   hijas.forEach(a => {
@@ -5239,7 +5241,7 @@ async function guardarPiezaDeJuegoAC(piezasNuevas){
     return x;
   });
   if(!cambiada) return false;
-  if(!confirm(`"${acArticulo}" es una pieza del "${juego}". El cambio se hace en el juego y se actualizan juntas todas sus piezas sueltas. ¿Seguir?`)) return true;
+  if(!await dsConfirm(`"${acArticulo}" es una pieza del "${juego}". El cambio se hace en el juego y se actualizan juntas todas sus piezas sueltas. ¿Seguir?`)) return true;
   const W = Object.keys(tablaConsumo.instrucciones[juego]).find(k => { const x = tablaConsumo.instrucciones[juego][k]; return x && !x.auto && piezasValidas(x); }) || g.anchos[0];
   const corte = calcularCorte(piezasJuego, parseFloat(W));
   const otras = {};
@@ -5268,7 +5270,7 @@ async function guardarAC(){
   if(!W){ errorEl.textContent = 'Estas piezas no entran en ninguno de sus anchos de tela.'; errorEl.style.display = 'block'; return; }
   const previas = Object.entries(tablaConsumo.instrucciones[a] || {}).filter(([k, g]) => g && !g.auto);
   const distintas = previas.filter(([k, g]) => JSON.stringify((g.piezas||[]).map(p => [p.nombre, +p.ancho, +p.largo, +(p.cantidad||1), +(p.partes||1)])) !== JSON.stringify(piezas.map(p => [p.nombre, p.ancho, p.largo, p.cantidad, p.partes])));
-  if(distintas.length && !confirm(`Tenía cortes distintos cargados en ${distintas.map(d => d[0]).join(', ')} cm. Se reemplazan por este, que vale para todos los anchos. ¿Seguir?`)) return;
+  if(distintas.length && !await dsConfirm(`Tenía cortes distintos cargados en ${distintas.map(d => d[0]).join(', ')} cm. Se reemplazan por este, que vale para todos los anchos. ¿Seguir?`)) return;
   const nota = document.getElementById('ac-nota').value.trim();
   const corte = calcularCorte(piezas, W);
   // una sola instruccion para el articulo: los demas anchos se calculan solos a partir de esta
@@ -5551,7 +5553,7 @@ async function unirArticuloAbiertoAC(){
   if(!nombre) return;
   const destino = articulosAC().find(x => x.toLowerCase() === nombre.toLowerCase());
   if(!destino || destino === acArticulo){ alert('No encontré ese artículo. Escríbalo igual que en la lista.'); return; }
-  if(!confirm(`"${acArticulo}" se borra y lo que tenga pasa a "${destino}". ¿Seguir?`)) return;
+  if(!await dsConfirm(`"${acArticulo}" se borra y lo que tenga pasa a "${destino}". ¿Seguir?`)) return;
   unirArticulosAC(acArticulo, destino);
 }
 async function borrarDuplicadoAC(a){
@@ -5840,7 +5842,7 @@ async function guardarEmpaqueAC(sinConfirmar){
     });
     const quitados = Object.keys((fabricacion && fabricacion.vinculos) || {}).filter(s => s !== sku && fabricacion.vinculos[s].articulo === acArticulo && otrosSkuPend && !otrosSkuPend.some(o => o.sku === s));
     quitados.forEach(s => lineas.push(`• Se quita el SKU ${s} de este artículo`));
-    if(!confirm(`Se va a guardar en "${acArticulo}":\n\n${lineas.length ? lineas.join('\n') : '(sin cambios visibles)'}\n\n¿Confirmar?`)) return;
+    if(!await dsConfirm(`Se va a guardar en "${acArticulo}":\n\n${lineas.length ? lineas.join('\n') : '(sin cambios visibles)'}\n\n¿Confirmar?`)) return;
   }
   try{
     if(fabricacion === null) await cargarFabricacion();
@@ -5870,7 +5872,7 @@ async function guardarEmpaqueAC(sinConfirmar){
     pintarBotonesPublicarAC();
     { const herm = articulosHermanos(acArticulo).map(x => String(((tablaConsumo.empaque || {})[x] || {}).sku || '').toUpperCase());
       const nuevos = [...new Set([sku, ...otrosSkuActuales().map(o => o.sku), ...herm])].filter(s => s && !buscarProductoPorSku(s));
-      if(nuevos.length && confirm(`${nuevos.join(', ')} todavía no ${nuevos.length === 1 ? 'está' : 'están'} en el catálogo. ¿Publicar${nuevos.length === 1 ? 'lo' : 'los juntos'} ahora con foto, categoría y precio?`)) abrirPublicarVarios(nuevos); }
+      if(nuevos.length && await dsConfirm(`${nuevos.join(', ')} todavía no ${nuevos.length === 1 ? 'está' : 'están'} en el catálogo. ¿Publicar${nuevos.length === 1 ? 'lo' : 'los juntos'} ahora con foto, categoría y precio?`)) abrirPublicarVarios(nuevos); }
     renderOtrosSkuAC();
   } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
@@ -5901,7 +5903,7 @@ async function etiquetasOrden(o){
   const rs = (o.renglones || []).filter(r => (+r.cantidad || 0) > 0);
   if(!rs.length){ alert('La orden no tiene productos.'); return; }
   const total = rs.reduce((s, r) => s + Math.ceil((+r.cantidad || 0) / (r.bolsa ? (r.porBolsa || 1) : 1)), 0);
-  if(total > 300 && !confirm(`Son ${total} etiquetas. ¿Armar el PDF con todas?`)) return;
+  if(total > 300 && !await dsConfirm(`Son ${total} etiquetas. ¿Armar el PDF con todas?`)) return;
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: [50, 25], orientation: 'landscape' });
   let primera = true;
@@ -6190,11 +6192,25 @@ function dsToast(msg, opt){ opt = opt || {}; let box = document.getElementById('
   const cerrar = () => { t.remove(); }; t.querySelector('.x').onclick = cerrar; if(opt.deshacer) t.querySelector('b').onclick = () => { cerrar(); try{ opt.deshacer(); } catch(e){} };
   box.appendChild(t); setTimeout(cerrar, opt.ms || Math.min(9000, 3500 + String(msg).length * 35)); }
 // los avisos del navegador pasan a ser avisos propios (no bloquean; la logica sigue igual)
-(() => { const nativo = window.alert.bind(window); window.__alertNativo = nativo;
+(() => { if(window.__alertNativoTest) return; const nativo = window.alert.bind(window); window.__alertNativo = nativo;
   window.alert = m => { try{ const s = String(m == null ? '' : m); dsToast(s, { err: /^(no se pudo|error|falta|faltan|el archivo|no hay|no encontr|ese |inv[aá]lid|solo el|elija|escriba|complete)/i.test(s.replace(/^[^\wÁÉÍÓÚáéíóúÑñ¿]+/, '')) }); } catch(e){ nativo(m); } }; })();
 // botones y titulos: se quita el emoji inicial cuando hay texto (los botones de solo icono, como 🗑️, quedan)
 function dsLimpiarEmojis(raiz){ (raiz || document).querySelectorAll('.step button, .step summary, .step .btn-mini, #pub-cont button, #pub-cont summary, #pub-titulo, .step h2, .step h3').forEach(el => { const n = [...el.childNodes].find(x => x.nodeType === 3 && x.textContent.trim()); if(!n) return; const s = n.textContent, l = sinEmoji(s); if(l !== s && /[A-Za-zÁÉÍÓÚáéíóúÑñ0-9+]/.test(l)) n.textContent = (s.match(/^\s*/) || [''])[0] + l.trimStart(); }); }
-new MutationObserver(ms => { if(window.__dsT) return; window.__dsT = setTimeout(() => { window.__dsT = null; try{ dsLimpiarEmojis(); } catch(e){} }, 60); }).observe(document.documentElement, { childList: true, subtree: true });
+// notas largas de las pantallas: plegadas detras de un "ⓘ Cómo funciona"
+function dsPlegarNotas(){ document.querySelectorAll('.step p.note').forEach(n => { if(n.dataset.dsA || n.closest('#pub-cont')) return; const t = (n.textContent || '').trim(); if(t.length < 150 || n.querySelector('input,select,button,textarea') || /\$\s?\d/.test(t)) return;
+    n.dataset.dsA = '1'; n.style.display = 'none'; const a = document.createElement('a'); a.href = '#'; a.textContent = 'ⓘ Cómo funciona'; a.style.cssText = 'display:inline-block;font-size:.76rem;color:#A89E90;margin:0 0 8px;text-decoration:none;'; a.onclick = e => { e.preventDefault(); const ver = n.style.display === 'none'; n.style.display = ver ? '' : 'none'; a.textContent = ver ? 'ⓘ Ocultar' : 'ⓘ Cómo funciona'; }; n.parentNode.insertBefore(a, n); }); }
+new MutationObserver(ms => { if(window.__dsT) return; window.__dsT = setTimeout(() => { window.__dsT = null; try{ dsLimpiarEmojis(); dsPlegarNotas(); } catch(e){} }, 60); }).observe(document.documentElement, { childList: true, subtree: true });
+// confirmaciones propias (reemplazan el cuadro del navegador): devuelve una promesa con true/false
+function dsConfirm(msg){ if(window.__dsAuto !== undefined) return Promise.resolve(!!window.__dsAuto);
+  return new Promise(res => { const s = String(msg == null ? '' : msg), peligro = /^\s*¿?\s*(borrar|eliminar|anular|vaciar|reemplazar|deshacer)/i.test(s.replace(/^[^\wÁÉÍÓÚáéíóú¿]+/, ''));
+    const ov = document.createElement('div'); ov.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(30,22,40,.35);display:flex;align-items:center;justify-content:center;padding:16px;';
+    const lineas = s.split('\n'), tit = lineas.shift(), resto = lineas.join('\n').trim();
+    ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:440px;width:100%;padding:18px 20px;box-shadow:0 18px 50px rgba(0,0,0,.2);animation:dsIn .15s ease-out;"><div style="font-weight:700;color:#2B2622;font-size:.98rem;line-height:1.35;">${escaparHtml(tit)}</div>${resto ? `<div style="margin-top:8px;color:#6B6258;font-size:.86rem;white-space:pre-line;">${escaparHtml(resto)}</div>` : ''}
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;"><button type="button" class="btn btn-ghost" data-r="0" style="width:auto;">Cancelar</button><button type="button" class="btn ${peligro ? '' : 'btn-gold'}" data-r="1" style="width:auto;${peligro ? 'background:#A6432F;color:#fff;border:1px solid #A6432F;' : ''}">${peligro ? (/eliminar/i.test(s) ? 'Eliminar' : /anular/i.test(s) ? 'Anular' : /vaciar/i.test(s) ? 'Vaciar' : 'Borrar') : 'Aceptar'}</button></div></div>`;
+    const fin = v => { ov.remove(); document.removeEventListener('keydown', tec, true); res(v); };
+    const tec = e => { if(e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); fin(false); } else if(e.key === 'Enter'){ e.preventDefault(); e.stopPropagation(); fin(true); } };
+    ov.addEventListener('click', e => { const b = e.target.closest('button[data-r]'); if(b) fin(b.dataset.r === '1'); else if(e.target === ov) fin(false); });
+    document.addEventListener('keydown', tec, true); document.body.appendChild(ov); setTimeout(() => { const b = ov.querySelector('button[data-r="1"]'); if(b) b.focus(); }, 30); }); }
 // ===== Barra lateral: las mismas opciones del inicio, con sus permisos =====
 const SB_ORDEN = [['ped', '🛒', 'Pedidos'], ['comp', '🧾', 'Comprobantes'], ['cli', '👥', 'Clientes'], ['art', '📦', 'Artículos'], ['prov', '🏭', 'Proveedores'], ['teso', '💰', 'Fondos'], ['imp', '🧮', 'Impuestos'], ['est', '📊', 'Informes'], ['c', '📣', 'Difusión y creatividad']];
 let sbAbierto = null; const sbSubAbiertos = new Set(); // subcategorias desplegadas (por defecto, contraidas)
@@ -6437,7 +6453,7 @@ async function guardarEnvioTela(){
 }
 async function borrarEnvioTela(id){
   if(ordenesDeEnvio(id).length){ alert('Este envío ya tiene órdenes armadas. Bórrelas primero desde el historial de órdenes.'); return; }
-  if(!confirm('¿Borrar este envío de tela?')) return;
+  if(!await dsConfirm('¿Borrar este envío de tela?')) return;
   try{ await db.collection('envios_tela').doc(id).delete(); enviosTela = enviosTela.filter(e => e._id !== id); renderEnviosTela(); }
   catch(e){ alert('No se pudo borrar: ' + e.message); }
 }
@@ -6573,7 +6589,7 @@ async function registrarIngresoTaller(){
   // controlar que no se pase de lo pendiente
   for(const [id, arr] of cambios){
     const o = historialOT.find(x => x._docId === id);
-    for(const c of arr){ const r = o.renglones[c.i]; if(c.b + c.f + c.x > pendienteRenglon(r) && !confirm(`${r.articulo} (${o.numero}): quedan ${pendienteRenglon(r)} pendientes y está cargando ${c.b + c.f + c.x}. ¿Registrar igual?`)) return; }
+    for(const c of arr){ const r = o.renglones[c.i]; if(c.b + c.f + c.x > pendienteRenglon(r) && !await dsConfirm(`${r.articulo} (${o.numero}): quedan ${pendienteRenglon(r)} pendientes y está cargando ${c.b + c.f + c.x}. ¿Registrar igual?`)) return; }
   }
   const detalle = [];
   const fv = (document.getElementById('it-fecha') || {}).value;
@@ -6596,7 +6612,7 @@ async function registrarIngresoTaller(){
     alert(`Entrega registrada: ${tb} buenas${tf ? `, ${tf} falladas` : ''}${tx ? `, ${tx} que no entrega` : ''}.`);
     document.getElementById('it-nota').value = '';
     renderIngresoTaller();
-    if(tb > 0 && puede('compras') && confirm(`¿Cargar ahora la factura de compra de ${t} por esta entrega? (para después poder pagarla)`)){ try{ await facturaDesdeIngreso(refIng.id, t, detalle); } catch(e){ alert('No se pudo abrir la factura: ' + e.message); } }
+    if(tb > 0 && puede('compras') && await dsConfirm(`¿Cargar ahora la factura de compra de ${t} por esta entrega? (para después poder pagarla)`)){ try{ await facturaDesdeIngreso(refIng.id, t, detalle); } catch(e){ alert('No se pudo abrir la factura: ' + e.message); } }
     else { try{ ofrecerDifusion(detalle.filter(d => d.sku && d.buenas > 0).map(d => d.sku)); } catch(e){ console.error(e); } }
   } catch(e){ err.textContent = 'No se pudo registrar: ' + e.message; err.style.display = 'block'; }
 }
@@ -6607,7 +6623,7 @@ async function cerrarPartidaEnvio(id){
     const o = (historialOT || []).find(x => x._docId === id.slice(3));
     if(!o) return;
     const m = calcularMerma([o]);
-    if(!confirm(`Cerrar ${o.numero}\n\nMerma: ${textoMerma(m)}\n\nLo que no llegó deja de figurar como pendiente. ¿Cerrar?`)) return;
+    if(!await dsConfirm(`Cerrar ${o.numero}\n\nMerma: ${textoMerma(m)}\n\nLo que no llegó deja de figurar como pendiente. ¿Cerrar?`)) return;
     try{ await db.collection('ordenes_trabajo').doc(o._docId).update({ cerrada: true, cerradaFecha: new Date().toISOString(), merma: m }); o.cerrada = true; o.merma = m; renderEnviosTela(); }
     catch(err){ alert('No se pudo cerrar: ' + err.message); }
     return;
@@ -6617,7 +6633,7 @@ async function cerrarPartidaEnvio(id){
   if(!e || !ots.length) return;
   const m = calcularMerma(ots);
   const resto = Math.round((e.metros - asignadoEnvio(id)) * 100) / 100;
-  if(!confirm(`Cerrar la partida ${e.skuTela} (${e.taller})\n\nMerma: ${textoMerma(m)}` + (resto > 0.01 ? `\n\nOjo: quedan ${fmtCm(resto)} m sin asignar a ninguna orden.` : '') + `\n\nLo que no llegó deja de figurar como pendiente. ¿Cerrar?`)) return;
+  if(!await dsConfirm(`Cerrar la partida ${e.skuTela} (${e.taller})\n\nMerma: ${textoMerma(m)}` + (resto > 0.01 ? `\n\nOjo: quedan ${fmtCm(resto)} m sin asignar a ninguna orden.` : '') + `\n\nLo que no llegó deja de figurar como pendiente. ¿Cerrar?`)) return;
   try{
     const ahora = new Date().toISOString();
     for(const o of ots){ await db.collection('ordenes_trabajo').doc(o._docId).update({ cerrada: true, cerradaFecha: ahora }); o.cerrada = true; }
@@ -6630,7 +6646,7 @@ async function cerrarOrdenOT(docId){
   const o = (historialOT || []).find(x => x._docId === docId);
   if(!o) return;
   const m = calcularMerma([o]);
-  if(!confirm(`Cerrar ${o.numero}\n\nMerma: ${textoMerma(m)}\n\nLo que no llegó deja de figurar como pendiente. ¿Cerrar?`)) return;
+  if(!await dsConfirm(`Cerrar ${o.numero}\n\nMerma: ${textoMerma(m)}\n\nLo que no llegó deja de figurar como pendiente. ¿Cerrar?`)) return;
   try{
     await db.collection('ordenes_trabajo').doc(docId).update({ cerrada: true, cerradaFecha: new Date().toISOString(), merma: m });
     o.cerrada = true; o.merma = m;
@@ -6792,7 +6808,7 @@ async function guardarEdicionEnvio(id){
   };
   if(!d.taller || !d.skuTela || !(d.metros > 0)){ alert('Complete taller, código de tela y metros.'); return; }
   const asignado = asignadoEnvio(id);
-  if(d.metros + 0.01 < asignado && !confirm(`Las órdenes de este envío ya usan ${fmtCm(asignado)} m y está poniendo ${fmtCm(d.metros)} m. ¿Guardar igual?`)) return;
+  if(d.metros + 0.01 < asignado && !await dsConfirm(`Las órdenes de este envío ya usan ${fmtCm(asignado)} m y está poniendo ${fmtCm(d.metros)} m. ¿Guardar igual?`)) return;
   try{ await db.collection('envios_tela').doc(id).update(d); Object.assign(e, d); dtEditando = false; renderDeudaTela(); }
   catch(err){ alert('No se pudo guardar: ' + err.message); }
 }
@@ -6804,12 +6820,12 @@ async function eliminarPartidaDT(id){
   }
   const ots = ordenesDeEnvio(id);
   if(ots.length){
-    if(!confirm(`Este envío tiene ${ots.length} orden(es): ${ots.map(o => o.numero).join(', ')}.\n\nSe borran el envío y sus órdenes, con sus entregas. No se puede deshacer. ¿Seguir?`)) return;
+    if(!await dsConfirm(`Este envío tiene ${ots.length} orden(es): ${ots.map(o => o.numero).join(', ')}.\n\nSe borran el envío y sus órdenes, con sus entregas. No se puede deshacer. ¿Seguir?`)) return;
     try{
       for(const o of ots) await db.collection('ordenes_trabajo').doc(o._docId).delete();
       historialOT = (historialOT || []).filter(o => !ots.includes(o));
     } catch(err){ alert('No se pudieron borrar las órdenes: ' + err.message); return; }
-  } else if(!confirm('¿Eliminar este envío de tela?')) return;
+  } else if(!await dsConfirm('¿Eliminar este envío de tela?')) return;
   try{ await db.collection('envios_tela').doc(id).delete(); enviosTela = enviosTela.filter(x => x._id !== id); dtAbierta = null; renderDeudaTela(); }
   catch(err){ alert('No se pudo eliminar: ' + err.message); }
 }
@@ -7106,7 +7122,7 @@ async function guardarTela(){
   const fam = familiaTela(t);
   const otros = Object.keys(nuevas).filter(c => c !== codigo && familiaTela(nuevas[c]) === fam && t.nombre);
   const distintos = otros.filter(c => JSON.stringify([...(nuevas[c].usos || [])].sort()) !== JSON.stringify([...t.usos].sort()));
-  if(distintos.length && confirm(`Esta tela también está en otros anchos: ${distintos.map(c => c + ' (' + (nuevas[c].ancho || '?') + ' cm)').join(', ')}.\n\n¿Aplicarles los mismos usos?`)){
+  if(distintos.length && await dsConfirm(`Esta tela también está en otros anchos: ${distintos.map(c => c + ' (' + (nuevas[c].ancho || '?') + ' cm)').join(', ')}.\n\n¿Aplicarles los mismos usos?`)){
     distintos.forEach(c => nuevas[c] = { ...nuevas[c], usos: [...t.usos] });
   }
   try{
@@ -7125,7 +7141,7 @@ async function guardarTela(){
   } catch(e){ err.textContent = 'No se pudo guardar: ' + e.message; err.style.display = 'block'; }
 }
 async function borrarTela(codigo){
-  if(!confirm(`¿Borrar la tela ${codigo}?`)) return;
+  if(!await dsConfirm(`¿Borrar la tela ${codigo}?`)) return;
   const nuevas = { ...telasDatos.telas }; delete nuevas[codigo];
   try{ await db.collection('config').doc('telas').set({ ...telasDatos, telas: nuevas }); telasDatos.telas = nuevas; await cargarTelas(); document.getElementById('tl-editor').style.display = 'none'; renderTelas(); }
   catch(e){ alert('No se pudo borrar: ' + e.message); }
@@ -7177,7 +7193,7 @@ function colorEnNombre(nombre){
 async function separarColorTelas(){
   const cambios = Object.entries(telasDatos.telas).filter(([c, t]) => !t.color && colorEnNombre(t.nombre));
   if(!cambios.length) return;
-  if(!confirm(cambios.map(([c, t]) => { const s = colorEnNombre(t.nombre); return `${c}: "${t.nombre}" → nombre "${s.nombre}", color ${s.color}`; }).join('\n') + '\n\n¿Aplicar?')) return;
+  if(!await dsConfirm(cambios.map(([c, t]) => { const s = colorEnNombre(t.nombre); return `${c}: "${t.nombre}" → nombre "${s.nombre}", color ${s.color}`; }).join('\n') + '\n\n¿Aplicar?')) return;
   const nuevas = { ...telasDatos.telas };
   cambios.forEach(([c, t]) => { const s = colorEnNombre(t.nombre); nuevas[c] = { ...t, nombre: s.nombre, color: s.color }; });
   try{ await db.collection('config').doc('telas').set({ ...telasDatos, telas: nuevas }); telasDatos.telas = nuevas; await cargarTelas(); renderTelas(); }
@@ -7314,7 +7330,7 @@ async function aplicarMasivoTelas(){
   if(accionUso) desc.push(`${accionUso === 'agregar' ? 'Agregar' : 'Quitar'} uso: ${uso}`);
   if(!desc.length){ alert('No completó nada para cambiar.'); return; }
   const codigos = [...tlSeleccion];
-  if(!confirm(`Aplicar a ${codigos.length} tela${codigos.length === 1 ? '' : 's'}:\n\n• ${desc.join('\n• ')}\n\n¿Seguir?`)) return;
+  if(!await dsConfirm(`Aplicar a ${codigos.length} tela${codigos.length === 1 ? '' : 's'}:\n\n• ${desc.join('\n• ')}\n\n¿Seguir?`)) return;
   const nuevas = { ...telasDatos.telas };
   codigos.forEach(c => {
     const t = { ...nuevas[c], ...cambios };
@@ -7342,7 +7358,7 @@ async function usoMasivoTelas(agregar){
     if(ya) uso = ya; else telasDatos.usos.push(uso);
   }
   const codigos = [...tlSeleccion];
-  if(!confirm(`${agregar ? 'Agregar' : 'Quitar'} el uso "${uso}" ${agregar ? 'a' : 'de'} ${codigos.length} tela${codigos.length === 1 ? '' : 's'}?`)) return;
+  if(!await dsConfirm(`${agregar ? 'Agregar' : 'Quitar'} el uso "${uso}" ${agregar ? 'a' : 'de'} ${codigos.length} tela${codigos.length === 1 ? '' : 's'}?`)) return;
   const nuevas = { ...telasDatos.telas };
   codigos.forEach(c => {
     const t = { ...nuevas[c] }; const us = new Set(t.usos || []);
@@ -7840,7 +7856,7 @@ async function abrirRevisarHistorial(){
 }
 async function corregirHistorialSel(){
   const sel = [...document.querySelectorAll('.rh-sel:checked')].map(x => rhFilas[+x.dataset.i]); const n = sel.reduce((a, f) => a + f.malos.length, 0);
-  if(!n || !confirm(`Se van a corregir ${n} registro(s) de ${sel.length} SKU con su costo actual. Las ventas facturadas y los resultados de Mercado Libre se recalculan. ¿Continuar?`)) return;
+  if(!n || !await dsConfirm(`Se van a corregir ${n} registro(s) de ${sel.length} SKU con su costo actual. Las ventas facturadas y los resultados de Mercado Libre se recalculan. ¿Continuar?`)) return;
   try{ const todos = sel.flatMap(f => f.malos.map(x => ({ id: x.id, costo: f.act, antes: x.costo })));
     for(let i = 0; i < todos.length; i += 400){ const b = db.batch(); todos.slice(i, i + 400).forEach(t => b.set(db.collection('historial_costos').doc(t.id), { costo: t.costo, costoAnterior: t.antes, corregido: new Date().toISOString() }, { merge: true })); await b.commit(); } }
   catch(e){ alert('No se pudo corregir: ' + e.message); return; }
@@ -7871,7 +7887,7 @@ function pintarBarraGuardarCP(){
 async function guardarTodoCP(){
   const lista = Object.entries(ppPend).filter(([S]) => buscarProductoPorSku(S));
   const bajos = lista.filter(([S, n]) => { let cu = null; try{ cu = costoUnidadSku(S); } catch(e){} return cu > 0 && n < cu * divisorVenta(S); });
-  if(bajos.length && !confirm(`¿Seguro? ${bajos.length} precio(s) quedan por debajo del costo:\n` + bajos.slice(0, 15).map(([S, n]) => `${S}: ${formatPrice(n)}`).join('\n'))) return;
+  if(bajos.length && !await dsConfirm(`¿Seguro? ${bajos.length} precio(s) quedan por debajo del costo:\n` + bajos.slice(0, 15).map(([S, n]) => `${S}: ${formatPrice(n)}`).join('\n'))) return;
   try{
     if(typeof crPend !== 'undefined' && Object.keys(crPend).length) await guardarCostosReventa();
     if(lista.length){ const ok = await guardarPreciosSkus(lista); lista.forEach(([S]) => delete ppPend[S]); alert(`Listo: ${ok} ${ok === 1 ? 'precio guardado' : 'precios guardados'} en el catálogo.`); }
@@ -7902,7 +7918,7 @@ async function aplicarPctMasivo(skus, pct){
   skus.forEach(S => { const r = buscarProductoPorSku(S); if(!r){ sinPub.push(S); return; } let cu = null; try{ cu = costoUnidadSku(S); } catch(e){} if(!(cu > 0)){ sinCosto.push(S); return; }
     lista.push([S, Math.ceil(cu * divisorVenta(S) * (1 + pct / 100) / 10) * 10]); });
   if(!lista.length){ alert('Ningún SKU seleccionado tiene costo y está publicado.'); return; }
-  if(!confirm(`¿Poner el precio de ${lista.length} SKU con ${pct} % sobre su costo?\n\n` + lista.slice(0, 15).map(([S, n]) => `${S}: ${formatPrice(n)}`).join('\n') + (lista.length > 15 ? '\n…' : '') + (sinCosto.length ? `\n\nSin costo (no se tocan): ${sinCosto.join(', ')}` : '') + (sinPub.length ? `\nSin publicar (no se tocan): ${sinPub.join(', ')}` : ''))) return;
+  if(!await dsConfirm(`¿Poner el precio de ${lista.length} SKU con ${pct} % sobre su costo?\n\n` + lista.slice(0, 15).map(([S, n]) => `${S}: ${formatPrice(n)}`).join('\n') + (lista.length > 15 ? '\n…' : '') + (sinCosto.length ? `\n\nSin costo (no se tocan): ${sinCosto.join(', ')}` : '') + (sinPub.length ? `\nSin publicar (no se tocan): ${sinPub.join(', ')}` : ''))) return;
   try{ const ok = await guardarPreciosSkus(lista); alert(`Listo: ${ok} precios actualizados.`); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   try{ renderProductosFabrico(); } catch(e){} try{ if(esDueno()) renderCostosReventa(); } catch(e){}
 }
@@ -7933,7 +7949,7 @@ async function abrirCierreMes(){
     ${meses.map(m => { const c = cierres[m]; return `<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--line);"><span style="flex:1;">${new Date(m + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</span>${c && c.cerrado ? `<span class="meta">🔒 cerrado el ${new Date(c.fecha).toLocaleDateString('es-AR')}</span><button type="button" class="btn-mini" onclick="cambiarCierre('${m}', false)">Reabrir</button>` : `<button type="button" class="btn-mini" onclick="cambiarCierre('${m}', true)">Cerrar mes</button>`}</div>`; }).join('')}`);
 }
 async function cambiarCierre(m, cerrar){
-  if(!confirm(cerrar ? `¿Cerrar ${m.split('-').reverse().join('/')}? No se podrá modificar nada de ese mes.` : `¿Reabrir ${m.split('-').reverse().join('/')}? Se podrá volver a modificar.`)) return;
+  if(!await dsConfirm(cerrar ? `¿Cerrar ${m.split('-').reverse().join('/')}? No se podrá modificar nada de ese mes.` : `¿Reabrir ${m.split('-').reverse().join('/')}? Se podrá volver a modificar.`)) return;
   const n = { ...cierres, [m]: { cerrado: cerrar, fecha: new Date().toISOString(), por: (firebase.auth().currentUser || {}).email || '' } };
   try{ await db.collection('config').doc('cierres').set({ m: n }); cierres = n; } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   await ccLog(cerrar ? 'Mes cerrado' : 'Mes reabierto', m); abrirCierreMes();
@@ -8183,7 +8199,7 @@ async function tsImportarSantander(inp){
   procesando.listo('✓ Extracto importado');
   const ultimo = L.slice().sort((a, b) => a.fecha.localeCompare(b.fecha)).pop();
   await ccLog('Extracto Santander', `${f.name}: ${nuevos.length} movimientos nuevos de ${L.length}`);
-  if(ultimo && isFinite(ultimo.saldo) && confirm(`Se importaron ${nuevos.length} movimientos nuevos (${L.length - nuevos.length} ya estaban).\n\nEl saldo final del extracto es ${formatPrice(ultimo.saldo)} (${ultimo.fecha.split('-').reverse().join('/')}).\n¿Usarlo como saldo real de Santander?`)){
+  if(ultimo && isFinite(ultimo.saldo) && await dsConfirm(`Se importaron ${nuevos.length} movimientos nuevos (${L.length - nuevos.length} ya estaban).\n\nEl saldo final del extracto es ${formatPrice(ultimo.saldo)} (${ultimo.fecha.split('-').reverse().join('/')}).\n¿Usarlo como saldo real de Santander?`)){
     const saldos = { ...tsCfg.saldos, santander: { real: ultimo.saldo, fecha: new Date().toISOString() } }; try{ await db.collection('config').doc('tesoreria').set({ ...tsCfg, saldos }); tsCfg.saldos = saldos; } catch(e){} }
   await tsCargar(); renderTesoreria(); tsVerExtractos();
 }
@@ -8437,7 +8453,7 @@ async function pvGuardarCompra(pid, nc){ dashCache = null; if(await mesBloqueado
     if(esGasto){ const gr = await db.collection('gastos').add({ fecha: d.fecha, monto: d.moneda === 'USD' ? 0 : d.importe, concepto: p.nombre + (d.detalle ? ' · ' + d.detalle : ''), quien: 'Proveedor', medio: 'Cuenta corriente', nota: `Factura ${d.tipo} ${d.numero}`, tipo: g('cf-gt'), origen: 'compra', compraId: r.id, creado: new Date().toISOString() }); await db.collection('compras').doc(r.id).set({ gastoId: gr.id }, { merge: true }); pvCompras[pvCompras.length - 1].gastoId = gr.id; } }
   catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   await ccLog(nc ? 'NC de compra' : 'Factura de compra', `${p.nombre} · ${d.tipo} ${d.numero} · ${fmtMon(d.importe, d.moneda)}`); cerrarPublicar(); pvSel = pid; renderCompras(); pintarAvisoCompras();
-  if(p.condicion === 'contado' && !nc && confirm(`${p.nombre} es proveedor de contado. ¿Registrar el pago ahora (orden de pago)?`)){ setTimeout(() => pvFormPago(pid), 100); }
+  if(p.condicion === 'contado' && !nc && await dsConfirm(`${p.nombre} es proveedor de contado. ¿Registrar el pago ahora (orden de pago)?`)){ setTimeout(() => pvFormPago(pid), 100); }
 }
 async function pvFormPago(pid){
   const p = pvProv.find(x => x._id === pid), m = pvMon(p), r = pvCalcular()[pid];
@@ -8494,7 +8510,7 @@ async function pvGuardarPago(pid){ dashCache = null; if(!__previa && await mesBl
     for(const x of o.medios.filter(x => x.chequeId)){ const c = (window.__pvCheques || []).find(y => y._id === x.chequeId); if(c) await db.collection('cc_movimientos').doc(c._id).set({ cheque: { ...c.cheque, estado: 'entregado', entregadoA: p.nombre, op: numero } }, { merge: true }); }
     await ccLog('Orden de pago', `OP ${numero} · ${p.nombre} · ${formatPrice(o.totalARS)}`);
     cerrarPublicar(); pvSel = pid; renderCompras(); pintarAvisoCompras();
-    if(confirm('¿Que el proveedor firme ahora en la pantalla?\nCancelar = imprimir para firmar con birome.')) firmarOP(r.id); else pvImprimirOP(r.id);
+    if(await dsConfirm('¿Que el proveedor firme ahora en la pantalla?\nCancelar = imprimir para firmar con birome.')) firmarOP(r.id); else pvImprimirOP(r.id);
   } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
 function pvImprimirOP(id){
@@ -8512,7 +8528,7 @@ function pvImprimirOP(id){
 }
 async function pvBorrar(col, id){
   const x = (col === 'compras' ? pvCompras : pvPagos).find(y => y._id === id); if(!x) return; if(await mesBloqueado(x.fecha)) return;
-  if(!confirm(`¿Borrar ${col === 'compras' ? 'esta factura' : 'esta orden de pago'}?${col === 'pagos' && (x.medios || []).some(m => m.chequeId) ? '\nLos cheques entregados vuelven a la cartera.' : ''}`)) return;
+  if(!await dsConfirm(`¿Borrar ${col === 'compras' ? 'esta factura' : 'esta orden de pago'}?${col === 'pagos' && (x.medios || []).some(m => m.chequeId) ? '\nLos cheques entregados vuelven a la cartera.' : ''}`)) return;
   try{ await db.collection(col).doc(id).delete();
     if(col === 'compras' && x.gastoId) await db.collection('gastos').doc(x.gastoId).delete();
     if(col === 'pagos') for(const m of (x.medios || []).filter(m => m.chequeId)){ const d = await db.collection('cc_movimientos').doc(m.chequeId).get(); if(d.exists) await db.collection('cc_movimientos').doc(m.chequeId).set({ cheque: { ...d.data().cheque, estado: 'cartera', entregadoA: '', op: null } }, { merge: true }); } }
@@ -8551,7 +8567,7 @@ async function pvAplicarMasivo(){
   const v = id => (document.getElementById(id).value || '').trim(), c = {};
   if(v('pm-cond')) c.condicion = v('pm-cond'); if(v('pm-plazo') !== '') c.plazo = Math.max(0, Math.round(numAr(v('pm-plazo')) || 0)); if(v('pm-rubro')) c.rubro = v('pm-rubro'); if(v('pm-desc') !== '') c.desc = Math.min(100, Math.max(0, numAr(v('pm-desc')) || 0));
   if(!Object.keys(c).length){ alert('Elija al menos un cambio.'); return; }
-  if(!confirm(`¿Aplicar a ${pvSelM.size} proveedores?\n${JSON.stringify(c).replace(/[{}"]/g, '').replace(/,/g, ' · ')}`)) return;
+  if(!await dsConfirm(`¿Aplicar a ${pvSelM.size} proveedores?\n${JSON.stringify(c).replace(/[{}"]/g, '').replace(/,/g, ' · ')}`)) return;
   try{ const b = db.batch(); [...pvSelM].forEach(id => b.set(db.collection('proveedores').doc(id), c, { merge: true })); await b.commit(); pvProv.forEach(p => { if(pvSelM.has(p._id)) Object.assign(p, c); }); await ccLog('Cambio masivo de proveedores', `${pvSelM.size} · ${JSON.stringify(c)}`); }
   catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   pvSelM.clear(); renderCompras(); alert('✓ Cambios aplicados.');
@@ -8727,7 +8743,7 @@ async function ccGuardarCfg(){
 }
 async function ccMarcarContado(id){
   const ids = Array.isArray(id) ? id : [id];
-  if(!confirm(ids.length > 1 ? `¿Las ${ids.length} facturas pendientes se cobraron en el momento (contado)? Dejan de figurar en la cuenta corriente.` : '¿Esta factura se cobró en el momento (contado)? Deja de figurar en la cuenta corriente.')) return;
+  if(!await dsConfirm(ids.length > 1 ? `¿Las ${ids.length} facturas pendientes se cobraron en el momento (contado)? Dejan de figurar en la cuenta corriente.` : '¿Esta factura se cobró en el momento (contado)? Deja de figurar en la cuenta corriente.')) return;
   const ct = { ...(ccCfg.contado || {}) }; ids.forEach(x => ct[x] = true);
   try{ await db.collection('config').doc('ctacte').set({ ...ccCfg, contado: ct }); ccCfg.contado = ct; } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   await ccLog('Factura de contado', ids.join(', ')); renderCtaCte(); pintarAvisoCtaCte();
@@ -8788,7 +8804,7 @@ function cbBuscarFactura(k){ const q = (document.getElementById('cb-busf').value
   box.innerHTML = L.slice(0, 12).map(({ f, c }, i) => `<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-top:1px solid #F3EFE8;font-size:.85rem;"><span style="flex:1;"><b>${escaparHtml(f.numero)}</b> <span class="meta">${escaparHtml(c.nombre)} · ${f.fecha.split('-').reverse().join('/')} · pend. ${formatPrice(f.pendiente)}</span></span><button type="button" class="btn-mini" onclick="cbTraerFactura('${escapeAttr(k)}','${escapeAttr(f.id)}')">Traer</button></div>`).join('') || '<p class="note" style="text-align:left;">No encontré facturas pendientes con eso.</p>'; }
 async function cbTraerFactura(k, fid){
   const C = ccCalcular(); let f = null, origen = null; Object.values(C).forEach(c => { const x = c.facts.find(y => y.id === fid); if(x){ f = x; origen = c; } }); if(!f) return;
-  if(!confirm(`¿Vincular las facturas de "${f.cliente}" a este cliente?\nDesde ahora, sus facturas y saldo quedan en esta cuenta corriente.`)) return;
+  if(!await dsConfirm(`¿Vincular las facturas de "${f.cliente}" a este cliente?\nDesde ahora, sus facturas y saldo quedan en esta cuenta corriente.`)) return;
   ccCfg.vinculos = ccCfg.vinculos || {}; ccCfg.vinculos[ccClave(f.cliente)] = k;
   try{ await db.collection('config').doc('ctacte').set({ ...ccCfg }); await ccLog('Vínculo de cliente', `"${f.cliente}" → ${(C[k] || {}).nombre || k}`); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   // reabre el cobro con lo ya cargado
@@ -8822,7 +8838,7 @@ async function ccGuardarMov(mov){ dashCache = null; if(await mesBloqueado(mov.fe
   ccCli = mov.cliente; renderCtaCte(); pintarAvisoCtaCte();
 }
 async function ccBorrarMov(id){
-  const m = ccMovs.find(x => x._id === id); if(m && await mesBloqueado(m.fecha)) return; if(!m || !confirm(`¿Borrar este movimiento (${m.tipo}, ${formatPrice(m.importe)})?`)) return;
+  const m = ccMovs.find(x => x._id === id); if(m && await mesBloqueado(m.fecha)) return; if(!m || !await dsConfirm(`¿Borrar este movimiento (${m.tipo}, ${formatPrice(m.importe)})?`)) return;
   try{ await db.collection('cc_movimientos').doc(id).delete(); } catch(e){ alert('No se pudo borrar: ' + e.message); return; }
   ccMovs = ccMovs.filter(x => x._id !== id); await ccLog('Borrado', `${m.nombre} · ${m.tipo} · ${formatPrice(m.importe)}`); renderCtaCte(); pintarAvisoCtaCte();
 }
@@ -9213,7 +9229,7 @@ async function limpiarPiezasRepetidas(silencioso){
   const grupos = piezasSueltasRepetidas();
   if(!grupos.length){ if(!silencioso) alert('No hay piezas sueltas repetidas.'); return; }
   const txt = grupos.map(g => `• Se dejan de mostrar: ${g.borrar.join(', ')}\n   (son iguales a "${g.queda}")`).join('\n');
-  if(!confirm(`Encontré piezas sueltas que son exactamente iguales a otra:\n\n${txt}\n\n¿Quitarlas? En las órdenes se usa la que queda.`)) return;
+  if(!await dsConfirm(`Encontré piezas sueltas que son exactamente iguales a otra:\n\n${txt}\n\n¿Quitarlas? En las órdenes se usa la que queda.`)) return;
   grupos.forEach(g => g.borrar.forEach(a => { delete tablaConsumo.instrucciones[a]; delete tablaConsumo.articulos[a]; }));
   try{ await guardarTablaYConsumo(); renderListaAC(); } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
@@ -9236,7 +9252,7 @@ async function normalizarFundas5085(){
   tablaConsumo.fundas5085 = true;
   if(!cambios.length){ guardarTablaYConsumo().catch(() => {}); return; }
   const unicos = [...new Set(cambios)];
-  if(!confirm(`Paso todas las fundas de almohada (salvo King) a 50 × 85:\n\n${unicos.slice(0, 25).join('\n')}${unicos.length > 25 ? `\n… y ${unicos.length - 25} más` : ''}\n\n¿Aplicar?`)){
+  if(!await dsConfirm(`Paso todas las fundas de almohada (salvo King) a 50 × 85:\n\n${unicos.slice(0, 25).join('\n')}${unicos.length > 25 ? `\n… y ${unicos.length - 25} más` : ''}\n\n¿Aplicar?`)){
     await cargarTablaConsumo(); tablaConsumo.fundas5085 = true; guardarTablaYConsumo().catch(() => {}); return;
   }
   // los textos guardados se rearman con la medida nueva
@@ -9634,7 +9650,7 @@ async function skMovTela(k, tipo){
 async function devResolver(id, como, destino){
   const x = (window.__devs || []).find(d => d._id === id); if(!x) return;
   const txt = { bien: `vuelve al stock (${destino === 'full' ? 'Full' : 'depósito'})`, fallada: `pasa a segunda (${x.sku}-2DA)`, no: 'no se mueve el stock (quedó perdida: conviene reclamar a ML)' }[como];
-  if(!confirm(`${x.sku} · ${x.unid} u.: ${txt}. ¿Confirmar?`)) return;
+  if(!await dsConfirm(`${x.sku} · ${x.unid} u.: ${txt}. ¿Confirmar?`)) return;
   try{ if(como === 'bien') await moverStockVarios([{ sku: x.sku, cantidad: x.unid, ubic: destino, tipo: 'devolución ML (volvió bien)', ref: x.cuenta + ' ' + x.op }]);
     if(como === 'fallada') await moverStockVarios([{ sku: x.sku + '-2DA', cantidad: x.unid, tipo: 'devolución ML (fallada)', ref: x.cuenta + ' ' + x.op }]);
     await db.collection('devoluciones_ml').doc(id).set({ estado: como, destino: destino || '', resuelto: new Date().toISOString(), por: (firebase.auth().currentUser || {}).email || '' }, { merge: true }); }
@@ -9658,11 +9674,11 @@ async function skGuardarMov(){
   const x = (stockDatos.skus || {})[S] || {}; let movs = [];
   if(t === 'ingreso') movs = [{ sku: S, cantidad: n, tipo: 'ingreso de mercadería', ref: d }];
   else if(t === 'full') movs = [{ sku: S, cantidad: -n, tipo: 'envío a Full', ref: d }, { sku: S, cantidad: n, ubic: 'full', tipo: 'envío a Full', ref: d }];
-  else if(t === 'fullml'){ const dif = n - (+x.full || 0); if(!dif){ alert('Coincide con lo que tiene la app: no hay diferencia.'); return; } if(!confirm(`Full de ${S}: la app tiene ${+x.full || 0} y Mercado Libre dice ${n}. ¿Ajustar ${dif > 0 ? '+' : ''}${dif}?`)) return; movs = [{ sku: S, cantidad: dif, ubic: 'full', tipo: 'ajuste Full (según ML)', ref: d }]; }
+  else if(t === 'fullml'){ const dif = n - (+x.full || 0); if(!dif){ alert('Coincide con lo que tiene la app: no hay diferencia.'); return; } if(!await dsConfirm(`Full de ${S}: la app tiene ${+x.full || 0} y Mercado Libre dice ${n}. ¿Ajustar ${dif > 0 ? '+' : ''}${dif}?`)) return; movs = [{ sku: S, cantidad: dif, ubic: 'full', tipo: 'ajuste Full (según ML)', ref: d }]; }
   else if(t === 'segunda') movs = [{ sku: S, cantidad: -n, tipo: 'pasa a segunda calidad', ref: d }, { sku: S + '-2DA', cantidad: n, tipo: 'segunda calidad', ref: S }];
   else if(t === 'armar' || t === 'desarmar'){ if(kitsDatos === null) await cargarKits(); const k = kitsDatos && kitsDatos[S]; if(!k){ alert(`${S} no es un juego: cargue sus piezas en Costos de productos (juego armado), por ejemplo "KA131 + KA131A + KA131F x2".`); return; }
     const sg = t === 'armar' ? 1 : -1, partes = partesKit(k); const det = partes.map(p => `${p.sku} × ${p.n * n}`).join(', ');
-    if(!confirm(`${t === 'armar' ? 'Armar' : 'Desarmar'} ${n} ${S}:\n${t === 'armar' ? 'se descuentan' : 'se suman'} ${det}.\n¿Confirmar?`)) return;
+    if(!await dsConfirm(`${t === 'armar' ? 'Armar' : 'Desarmar'} ${n} ${S}:\n${t === 'armar' ? 'se descuentan' : 'se suman'} ${det}.\n¿Confirmar?`)) return;
     movs = [{ sku: S, cantidad: sg * n, tipo: t === 'armar' ? 'juego armado' : 'juego desarmado', ref: d }].concat(partes.map(p => ({ sku: p.sku, cantidad: -sg * p.n * n, tipo: t === 'armar' ? 'pieza usada en juego' : 'pieza de juego desarmado', ref: S }))); }
   else movs = [{ sku: S, cantidad: -n, tipo: 'salida', ref: d }];
   try{ await moverStockVarios(movs); } catch(e){ alert('No se pudo guardar: ' + e.message); await cargarStock(); return; }
@@ -9806,7 +9822,7 @@ async function agregarALista(id){
 }
 async function quitarDeLista(id, i){
   const lista = valoresLista(id);
-  if(!confirm(`¿Quitar "${lista[i]}" de la lista? Lo que ya esté cargado con ese valor no se borra.`)) return;
+  if(!await dsConfirm(`¿Quitar "${lista[i]}" de la lista? Lo que ya esté cargado con ese valor no se borra.`)) return;
   lista.splice(i, 1);
   try{ await guardarLista(id, lista); renderListas(); } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
@@ -9913,7 +9929,7 @@ async function aplicarPfMasivo(){
   if(!desc.length){ alert('No completó nada para cambiar.'); return; }
   if(hayFotos) desc.push('Fotos');
   const skus = [...pfSel];
-  if(!confirm(`Aplicar a ${skus.length} SKU:\n\n• ${desc.join('\n• ')}\n\n¿Seguir?`)) return;
+  if(!await dsConfirm(`Aplicar a ${skus.length} SKU:\n\n• ${desc.join('\n• ')}\n\n¿Seguir?`)) return;
   try{
     // calidad y articulo: por SKU
     skus.forEach(s => {
@@ -10119,7 +10135,7 @@ async function otraMedidaAC(medidaDada, skuDado){
     nombre = a.replace(new RegExp(nums[nums.length - 1].replace('.', '\\.') + '(?!.*\\d)'), String(nuevo));
     let cambio = false;
     piezas = g.piezas.map(p => { const q = { ...p }; if(Math.abs(q.largo - viejo) < 1){ q.largo = nuevo; cambio = true; } else if(Math.abs(q.ancho - viejo) < 1){ q.ancho = nuevo; cambio = true; } return q; });
-    if(!cambio && !confirm(`Ninguna pieza mide ${viejo}, así que se copian las mismas medidas para que las corrija. ¿Seguir?`)) return;
+    if(!cambio && !await dsConfirm(`Ninguna pieza mide ${viejo}, así que se copian las mismas medidas para que las corrija. ¿Seguir?`)) return;
   } else { nombre = r.trim(); piezas = g.piezas.map(p => ({ ...p })); }
   if(tablaConsumo.instrucciones[nombre] || (tablaConsumo.articulos || {})[nombre]){ alert(`Ya existe "${nombre}".`); return; }
   const W = g.anchos[0];
@@ -10141,7 +10157,7 @@ async function otraMedidaAC(medidaDada, skuDado){
       fabricacion.vinculos[e.sku] = { ...(fabricacion.vinculos[e.sku] || {}), articulo: nombre, calidad: calOrig };
       await guardarFabricacion();
       renderListaAC(); abrirArticuloAC(nombre);
-      if(!buscarProductoPorSku(e.sku) && confirm(`Se creó "${nombre}" con el SKU ${e.sku}. ¿Publicarlo ahora en el catálogo junto a ${a}?`)) abrirPublicarVarios([e.sku, String(((tablaConsumo.empaque || {})[a] || {}).sku || '')].filter(Boolean));
+      if(!buscarProductoPorSku(e.sku) && await dsConfirm(`Se creó "${nombre}" con el SKU ${e.sku}. ¿Publicarlo ahora en el catálogo junto a ${a}?`)) abrirPublicarVarios([e.sku, String(((tablaConsumo.empaque || {})[a] || {}).sku || '')].filter(Boolean));
       return;
     }
     renderListaAC(); abrirArticuloAC(nombre);
@@ -10428,7 +10444,7 @@ async function npfGuardar(){
     if(!String(f.desc || '').trim() || !(numAr(f.precio) > 0)){ err.textContent = `Falta la descripción o el precio de ${f.sku}.`; err.style.display = 'block'; return; }
   }
   const resumen = filas.map(f => `• ${f.sku}: ${f.articulo} · $ ${f.precio}`).join('\n');
-  if(!confirm(`${existente ? 'Se agregan medidas a' : 'Se va a crear'} "${nombre}" en ${cat}${cal ? ' (tela: ' + (calidadesTela().find(q => q.clave === cal) || {}).etiqueta + ')' : ''}:\n\n${resumen}\n\n¿Confirmar?`)) return;
+  if(!await dsConfirm(`${existente ? 'Se agregan medidas a' : 'Se va a crear'} "${nombre}" en ${cat}${cal ? ' (tela: ' + (calidadesTela().find(q => q.clave === cal) || {}).etiqueta + ')' : ''}:\n\n${resumen}\n\n¿Confirmar?`)) return;
   let fotos = [];
   try{ fotos = await leerFotosPublicar(); } catch(e){ err.textContent = 'No se pudo procesar alguna foto.'; err.style.display = 'block'; return; }
   const variantes = filas.map(f => ({ sku: f.sku, desc: String(f.desc).trim(), precio: numAr(f.precio).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }));
@@ -10607,7 +10623,7 @@ async function cambiarTelaProductoAC(s){
   } catch(err){ alert('No se pudo guardar: ' + err.message); }
 }
 async function quitarProductoAC(s){
-  if(!confirm(`¿Quitar ${s} de "${acArticulo}"? Si está en el catálogo, sigue publicado (se borra desde Editar producto).`)) return;
+  if(!await dsConfirm(`¿Quitar ${s} de "${acArticulo}"? Si está en el catálogo, sigue publicado (se borra desde Editar producto).`)) return;
   if(fabricacion.vinculos[s]) delete fabricacion.vinculos[s].articulo;
   const e = tablaConsumo.empaque[acArticulo] || {};
   try{
@@ -10693,7 +10709,7 @@ async function anpGuardar(){
   if(yaEnCat) lineas.push(`• Ya está en el catálogo (${yaEnCat.producto.nombre}): no se publica de nuevo`);
   else if(publicar) lineas.push(`• Se publica en ${cat} → ${sel === '__nuevo__' ? 'producto nuevo "' + nombreNuevo + '"' : '"' + prod.nombre + '"'} · $ ${formatoPesos(pr)}`);
   else lineas.push('• No se publica todavía');
-  if(!confirm(`Se va a guardar:\n\n${lineas.join('\n')}\n\n¿Confirmar?`)) return;
+  if(!await dsConfirm(`Se va a guardar:\n\n${lineas.join('\n')}\n\n¿Confirmar?`)) return;
   let fotos = [];
   try{ const files = [...document.getElementById('anp-fotos').files]; for(const f of files) fotos.push(await comprimirImagenAFotoBase64(f)); } catch(e){ err.textContent = 'No se pudo procesar alguna foto.'; err.style.display = 'block'; return; }
   try{
@@ -10905,7 +10921,7 @@ async function guardarReventa(){
     else { const s = key.slice(2); reventaDatos.variantes[s] = { ...(reventaDatos.variantes[s] || {}), ...rvPend[key] }; const x = prods.find(y => y.p.variantes.some(v => String(v.sku).toUpperCase() === s)); if(x) afectados.add(x.p._editKey); }
   });
   Object.keys(rvPend).forEach(k => delete rvPend[k]);
-  if(!confirm(`Se van a actualizar las descripciones de ${afectados.size} producto${afectados.size === 1 ? '' : 's'} en el catálogo. ¿Confirmar?`)){ return; }
+  if(!await dsConfirm(`Se van a actualizar las descripciones de ${afectados.size} producto${afectados.size === 1 ? '' : 's'} en el catálogo. ¿Confirmar?`)){ return; }
   try{
     await db.collection('config').doc('reventa').set(JSON.parse(JSON.stringify(reventaDatos)));
     for(const k of afectados){
@@ -10991,7 +11007,7 @@ async function fcCrear(){
   const anchos = anchosConocidos().filter(w => w >= pz.ancho - Math.max(10, pz.ancho * 0.05));
   const W = anchos.length ? anchos[0] : anchosConocidos().slice(-1)[0];
   const k = calcularCorte([pz], W);
-  if(tablaConsumo.instrucciones[nombre] && !confirm(`${destino ? 'Se actualiza' : 'Ya existe'} "${nombre}" con la pieza ${fmtCm(pz.ancho)} × ${fmtCm(pz.largo)} (colchón ${a} × ${l} × ${h}). Sus SKU, bolsa, confección y avíos se mantienen. ¿Seguir?`)) return;
+  if(tablaConsumo.instrucciones[nombre] && !await dsConfirm(`${destino ? 'Se actualiza' : 'Ya existe'} "${nombre}" con la pieza ${fmtCm(pz.ancho)} × ${fmtCm(pz.largo)} (colchón ${a} × ${l} × ${h}). Sus SKU, bolsa, confección y avíos se mantienen. ¿Seguir?`)) return;
   tablaConsumo.articulos = tablaConsumo.articulos || {};
   tablaConsumo.articulos[nombre] = { [W]: k.metros };
   tablaConsumo.instrucciones[nombre] = { [W]: { texto: textoCorte(nombre, [pz], W, ''), bosquejoBase64: '', piezas: [pz], tipo: 'personalizado', consumo: k.metros, guardado: Date.now() } };
@@ -11063,7 +11079,7 @@ async function deshacerUltimaPublicacion(){
   const u = ultimaPublicacion(); if(!u) { alert('No hay nada para deshacer.'); return; }
   const esta = u.skus.filter(s => buscarProductoPorSku(s));
   if(!esta.length){ alert('Esos SKU ya no están en el catálogo.'); localStorage.removeItem('ot_ultima_pub'); return; }
-  if(!confirm(`Se sacan del catálogo: ${esta.join(', ')} (de "${u.producto}").\nSiguen en fabricación, para publicarlos de nuevo donde corresponde. ¿Seguir?`)) return;
+  if(!await dsConfirm(`Se sacan del catálogo: ${esta.join(', ')} (de "${u.producto}").\nSiguen en fabricación, para publicarlos de nuevo donde corresponde. ¿Seguir?`)) return;
   try{
     await sacarSkusDelCatalogo(esta);
     localStorage.removeItem('ot_ultima_pub');
@@ -11971,7 +11987,7 @@ async function aplicarMinimosTodos(){
     if(cambio){ arts.add(art); const c = calcularCorte(g.piezas, parseFloat(k)); if(!c.avisos.length){ g.consumo = c.metros; tablaConsumo.articulos = tablaConsumo.articulos || {}; tablaConsumo.articulos[art] = tablaConsumo.articulos[art] || {}; tablaConsumo.articulos[art][k] = c.metros; } }
   }));
   if(!piezas){ alert('No había nada para cambiar.'); return; }
-  if(!confirm(`Se actualizan ${piezas} piezas en ${arts.size} artículos. ¿Guardar?`)){ await cargarTablaConsumo(); return; }
+  if(!await dsConfirm(`Se actualizan ${piezas} piezas en ${arts.size} artículos. ¿Guardar?`)){ await cargarTablaConsumo(); return; }
   try{ propagarMinimosJuegos(); await guardarTablaYConsumo(); cerrarPublicar(); renderListaAC(); if(acArticulo) abrirArticuloAC(acArticulo); alert('Listo: mínimos aplicados.'); }
   catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
@@ -12099,7 +12115,7 @@ async function agregarUsuario(){
   catch(e){ alert('No se pudo agregar: ' + e.message); }
 }
 async function quitarUsuario(mail){
-  if(!confirm(`¿Quitarle el acceso a ${mail}?`)) return;
+  if(!await dsConfirm(`¿Quitarle el acceso a ${mail}?`)) return;
   try{ await db.collection('usuarios').doc(mail).delete(); abrirUsuarios(); } catch(e){ alert('No se pudo quitar: ' + e.message); }
 }
 
@@ -12297,7 +12313,7 @@ async function crMasivo(acc){
   const skus = [...crSel]; if(!skus.length) return;
   if(acc === 'costo'){ const v = numAr(document.getElementById('crm-costo').value); if(!(v > 0)){ alert('Escriba el costo.'); return; } skus.forEach(s => crPend[s] = String(v)); }
   else if(acc === 'pct'){ const p = numAr(document.getElementById('crm-pct').value); if(!p){ alert('Escriba el porcentaje.'); return; } let sin = 0; skus.forEach(s => { const c = numAr(crValor(s)); if(c > 0) crPend[s] = String(Math.round(c * (1 + p / 100) * 100) / 100); else sin++; }); if(sin) alert(sin + ' SKU no tenían costo y no se modificaron.'); }
-  else if(acc === 'borrar'){ if(!confirm(`¿Borrar el costo de ${skus.length} SKU? (se guarda con 💾 Guardar)`)) return; skus.forEach(s => crPend[s] = ''); }
+  else if(acc === 'borrar'){ if(!await dsConfirm(`¿Borrar el costo de ${skus.length} SKU? (se guarda con 💾 Guardar)`)) return; skus.forEach(s => crPend[s] = ''); }
   else if(acc === 'uv'){ const u = document.getElementById('crm-uv').value; if(!u){ alert('Elija la unidad.'); return; } const conv = skus.map(s => ({ S: s, antes: unidadVentaSku(s), despues: u === 'unidad' ? '' : u })); const prevs = skus.map(s => [s, unidadesVenta['sku:' + s]]); skus.forEach(s => unidadesVenta['sku:' + s] = u); try{ await db.collection('config').doc('unidades').set({ u: unidadesVenta }); } catch(e){ prevs.forEach(([s, x]) => { if(x === undefined) delete unidadesVenta['sku:' + s]; else unidadesVenta['sku:' + s] = x; }); renderCostosReventa(); alert('No se pudo guardar: ' + e.message); return; } await convertirCostoUnidad(conv); registrarHistorialCostos().catch(() => {}); }
   renderCostosReventa(); crMostrarGuardar();
 }
@@ -12307,7 +12323,7 @@ async function convertirCostoUnidad(items){
   if(!L.length) return;
   const nom = u => u ? u : 'unidad';
   const det = L.slice(0, 10).map(x => `${x.S}: $ ${formatoPesos(x.c)} por ${nom(x.antes)} → $ ${formatoPesos(Math.round(x.c * x.d / x.a * 100) / 100)} por ${nom(x.despues)}`).join('\n') + (L.length > 10 ? '\n…' : '');
-  if(!confirm(`Cambió la unidad de venta. El costo de compra guardado estaba en la unidad anterior:\n\n${det}\n\nAceptar = convertir el costo a la unidad nueva (como arriba)\nCancelar = dejarlo igual (el costo guardado ya era el de la unidad nueva)`)) return;
+  if(!await dsConfirm(`Cambió la unidad de venta. El costo de compra guardado estaba en la unidad anterior:\n\n${det}\n\nAceptar = convertir el costo a la unidad nueva (como arriba)\nCancelar = dejarlo igual (el costo guardado ya era el de la unidad nueva)`)) return;
   const prev = L.map(x => [String(x.S).toUpperCase(), x.c]);
   L.forEach(x => { costosReventa[String(x.S).toUpperCase()] = Math.round(x.c * x.d / x.a * 100) / 100; });
   try{ await db.collection('config').doc('costos_reventa').set({ c: costosReventa, actualizado: new Date().toISOString() }); } catch(e){ prev.forEach(([S, c]) => costosReventa[S] = c); alert('No se pudo convertir el costo (quedó como estaba): ' + e.message); }
@@ -12334,7 +12350,7 @@ function crTodo(pi, v){
 }
 async function guardarCostosReventa(){
   { const raros = Object.entries(crPend).map(([s, v]) => { const n = numAr(v), a = costosReventa && costosReventa[s]; return n > 0 && a > 0 && (n / a > 5 || a / n > 5) ? `${s}: antes ${formatPrice(a)} → ahora ${formatPrice(n)}` : null; }).filter(Boolean);
-    if(raros.length && !confirm('¿Seguro? Estos costos cambian más de 5 veces:\n\n' + raros.join('\n') + '\n\nAceptar = guardar igual · Cancelar = revisar')) return; }
+    if(raros.length && !await dsConfirm('¿Seguro? Estos costos cambian más de 5 veces:\n\n' + raros.join('\n') + '\n\nAceptar = guardar igual · Cancelar = revisar')) return; }
   const nuevo = { ...costosReventa };
   const telas = { ...telasDatos.telas }; let cambioTelas = false;
   Object.entries(crPend).forEach(([s, v]) => {
@@ -12478,7 +12494,7 @@ function tipoGastoSugerido(concepto){
 const gsSel = new Set();
 async function marcarTipoGastos(tipo){
   const ids = [...gsSel]; if(!ids.length) return;
-  if(!confirm(`¿Marcar ${ids.length} gasto(s) como ${tipo}?`)) return;
+  if(!await dsConfirm(`¿Marcar ${ids.length} gasto(s) como ${tipo}?`)) return;
   try{ const b = db.batch(); ids.forEach(id => b.set(db.collection('gastos').doc(id), { tipo }, { merge: true })); await b.commit(); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   gastos.forEach(g => { if(gsSel.has(g._id)) g.tipo = tipo; }); gsSel.clear(); renderGastos();
 }
@@ -12525,8 +12541,9 @@ function editarGasto(id){
 async function borrarGasto(id){
   { const g1 = (gastos || []).find(x => x._id === id); if(g1 && await mesBloqueado(g1.fecha)) return; }
   { const g0 = (gastos || []).find(x => x._id === arguments[0]); if(g0 && g0.origen === 'compra'){ alert('Este gasto viene de una factura de compra: bórrela desde Proveedores y pagos, y se borra también acá.'); return; } }
-  if(!confirm('¿Borrar este gasto?')) return;
-  try{ await db.collection('gastos').doc(id).delete(); gastos = gastos.filter(g => g._id !== id); renderGastos(); } catch(e){ alert('No se pudo borrar: ' + e.message); }
+  const g1 = (gastos || []).find(x => x._id === id), copia = g1 ? JSON.parse(JSON.stringify(g1)) : null; if(copia) delete copia._id;
+  try{ await db.collection('gastos').doc(id).delete(); gastos = gastos.filter(g => g._id !== id); renderGastos(); } catch(e){ alert('No se pudo borrar: ' + e.message); return; }
+  dsToast(`Gasto borrado${g1 && g1.concepto ? ': ' + g1.concepto : ''}`, { ms: 9000, deshacer: copia ? async () => { try{ await db.collection('gastos').doc(id).set(copia); gastos.push({ _id: id, ...copia }); renderGastos(); dsToast('Gasto restaurado'); } catch(e){ alert('No se pudo restaurar: ' + e.message); } } : null });
 }
 function verComprobante(id){
   const g = gastos.find(x => x._id === id); if(!g || !g.comprobante) return;
@@ -12871,7 +12888,7 @@ function renderRemitos(){
       <td style="padding:6px;white-space:nowrap;"><button type="button" class="btn-mini" title="Firma del transporte (retira)" onclick="firmarRemito('${r._id}','transporte')">✍️ Transp.${r.firmaTransporte ? ' ✓' : ''}</button> <button type="button" class="btn-mini" title="Firma del cliente (recibe)" onclick="firmarRemito('${r._id}','cliente')">✍️ Cliente${r.firmaCliente ? ' ✓' : ''}</button> <button type="button" class="btn-mini" onclick="rmImprimir('${r._id}')">🖨️</button>${!r.anulado && !r.facturaRef ? ` <button type="button" class="btn-mini" onclick="rmAnular('${r._id}')">Anular</button>` : ''}</td></tr>`).join('')}</table></div>` : '<p class="empty-msg">No hay remitos en esta vista.</p>'}`;
 }
 async function rmCambiarBaja(){ const nuevo = stockDatos.bajaCon === 'remito' ? 'factura' : 'remito';
-  if(!confirm(`¿Que el stock baje con ${nuevo === 'remito' ? 'el REMITO (cuando sale la mercadería)' : 'la FACTURA'}?\nAplica a lo que se cargue desde ahora.`)) return;
+  if(!await dsConfirm(`¿Que el stock baje con ${nuevo === 'remito' ? 'el REMITO (cuando sale la mercadería)' : 'la FACTURA'}?\nAplica a lo que se cargue desde ahora.`)) return;
   stockDatos.bajaCon = nuevo; try{ await db.collection('config').doc('stock').set(JSON.parse(JSON.stringify(stockDatos))); } catch(e){ alert('No se pudo guardar: ' + e.message); return; } renderRemitos(); }
 function rmForm(pre){
   pre = pre || {}; const inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
@@ -12916,7 +12933,7 @@ async function rmGuardar(pedido){
     if(stockDatos.bajaCon === 'remito'){ const movs = items.filter(x => x.sku && skuControlado(x.sku)).map(x => ({ sku: x.sku, cantidad: -(x.cant * divisorVenta(x.sku)) })); await moverStockVarios(movs, 'remito', 'R ' + numero); r.stockAplicado = movs.length > 0; }
     const res = await db.collection('remitos').add(r); remitos.push({ _id: res.id, ...r });
     await ccLog('Remito', `R ${numero} · ${r.cliente}`);
-    if(pedido && confirm('¿Marcar el pedido ' + pedido + ' como entregado?')){ try{ await db.collection('pedidos').doc(pedido).update({ estado: 'entregado' }); } catch(e){} }
+    if(pedido && await dsConfirm('¿Marcar el pedido ' + pedido + ' como entregado?')){ try{ await db.collection('pedidos').doc(pedido).update({ estado: 'entregado' }); } catch(e){} }
     cerrarPublicar(); if(document.getElementById('step-remitos').classList.contains('active')) renderRemitos(); rmImprimir(res.id);
   } catch(e){ alert('No se pudo guardar: ' + e.message); }
 }
@@ -12924,7 +12941,7 @@ async function remitoDesdePedido(numero){
   const p = (historialPedidos || []).find(x => x.numero === numero); if(!p){ alert('No encontré el pedido.'); return; }
   if(!remitos.length){ try{ const s = await db.collection('remitos').get(); remitos = s.docs.map(d => ({ _id: d.id, ...d.data() })); } catch(e){} }
   const c = p.cliente || {}; const ya = remitos.filter(r => r.pedido === numero && !r.anulado).length;
-  if(ya && !confirm(`Este pedido ya tiene ${ya} remito(s). ¿Hacer otro (por ejemplo, una entrega parcial)?`)) return;
+  if(ya && !await dsConfirm(`Este pedido ya tiene ${ya} remito(s). ¿Hacer otro (por ejemplo, una entrega parcial)?`)) return;
   const cdb = clientePorNombre(c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim()) || {};
   const valor = (p.items || []).reduce((a, i) => a + (parsePrice(i.precio) || 0) * (+i.cantidad || 0) * (1 - (i.descuentoItemPct || 0) / 100), 0) * (1 - (p.descuentoPct || 0) / 100);
   rmForm({ cliente: c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim(), cuit: c.cuit || cdb.cuit || '', condicionIva: cdb.condicionIva || '', tel: [cdb.contacto, c.telefono || cdb.telefono].filter(Boolean).join(' · '), valor, transporte: c.transporte || cdb.transporte || '', direccion: [c.direccion || cdb.direccion, c.localidad || cdb.localidad, c.provincia || cdb.provincia].filter(Boolean).join(', '), bultos: p.bultos || 1, obs: p.observaciones || '', pedido: numero,
@@ -12939,7 +12956,7 @@ function rmImprimir(id){
     <table><tr><th>SKU</th><th>Descripción</th><th class="r">Cantidad</th></tr>${(r.items || []).map(x => `<tr><td>${escaparHtml(x.sku || '')}</td><td>${escaparHtml(x.desc || '')}</td><td class="r">${x.cant}</td></tr>`).join('')}</table>
     ${r.obs ? `<p>${escaparHtml(r.obs)}</p>` : ''}<div style="display:flex;gap:40px;margin-top:50px;">${bloqueFirma(r.firmaTransporte, 'Retiró (transporte)')}${bloqueFirma(r.firmaCliente, 'Recibí conforme (cliente)')}</div><script>setTimeout(()=>print(),400)<\/script></body></html>`); w.document.close();
 }
-async function rmAnular(id){ const r = remitos.find(x => x._id === id); if(!r || !confirm(`¿Anular el remito R ${r.numero}?${r.stockAplicado ? ' La mercadería vuelve al stock.' : ''}`)) return; if(await mesBloqueado(r.fecha)) return;
+async function rmAnular(id){ const r = remitos.find(x => x._id === id); if(!r || !await dsConfirm(`¿Anular el remito R ${r.numero}?${r.stockAplicado ? ' La mercadería vuelve al stock.' : ''}`)) return; if(await mesBloqueado(r.fecha)) return;
   try{ if(r.stockAplicado) await moverStockVarios(r.items.filter(x => x.sku && skuControlado(x.sku)).map(x => ({ sku: x.sku, cantidad: x.cant * divisorVenta(x.sku) })), 'remito anulado', 'R ' + r.numero);
     await db.collection('remitos').doc(id).set({ anulado: true }, { merge: true }); r.anulado = true; } catch(e){ alert('No se pudo anular: ' + e.message); return; }
   await ccLog('Remito anulado', 'R ' + r.numero); renderRemitos(); }
@@ -13148,11 +13165,11 @@ function bloqueFirma(f, leyenda){ const fh = f && f.fecha ? new Date(f.fecha).to
 async function firmarRemito(id, quien){ const r = remitos.find(x => x._id === id); if(!r) return;
   firmaPad(quien === 'transporte' ? `Retiró la mercadería (transporte) · Remito R ${r.numero}` : `Recibí conforme (cliente) · Remito R ${r.numero}`, true, async f => {
     const k = quien === 'transporte' ? 'firmaTransporte' : 'firmaCliente'; try{ await db.collection('remitos').doc(id).set({ [k]: f }, { merge: true }); r[k] = f; await ccLog('Firma en pantalla', `Remito R ${r.numero} · ${quien} · ${f.aclaracion}`); } catch(e){ alert('No se pudo guardar la firma: ' + e.message); return; }
-    renderRemitos(); if(confirm('Firma guardada. ¿Imprimir el remito firmado?')) rmImprimir(id); }); }
+    renderRemitos(); if(await dsConfirm('Firma guardada. ¿Imprimir el remito firmado?')) rmImprimir(id); }); }
 async function firmarOP(id){ const x = pvPagos.find(y => y._id === id); if(!x) return; const p = pvProv.find(y => y._id === x.proveedorId) || {};
   firmaPad(`Recibí el pago · Orden de pago ${String(x.numero).padStart(5, '0')} · ${p.nombre || ''}`, true, async f => {
     try{ await db.collection('pagos').doc(id).set({ firma: f }, { merge: true }); x.firma = f; await ccLog('Firma en pantalla', `OP ${x.numero} · ${f.aclaracion}`); } catch(e){ alert('No se pudo guardar la firma: ' + e.message); return; }
-    renderCompras(); if(confirm('Firma guardada. ¿Imprimir la orden de pago firmada?')) pvImprimirOP(id); }); }
+    renderCompras(); if(await dsConfirm('Firma guardada. ¿Imprimir la orden de pago firmada?')) pvImprimirOP(id); }); }
 // firma del emisor (usted) para los recibos: se carga una sola vez
 let firmaEmisor = null;
 async function cargarFirmaEmisor(){ if(firmaEmisor !== null) return firmaEmisor; try{ const d = await db.collection('config').doc('firma_emisor').get(); firmaEmisor = d.exists ? d.data() : false; } catch(e){ firmaEmisor = false; } return firmaEmisor; }
@@ -13492,7 +13509,7 @@ async function guardarFactura(i, reemplazar){
   if(fa.repetidaEnLote && !reemplazar){ alert('Este mismo comprobante aparece dos veces en los archivos que subió. Guarde solo uno.'); return; }
   if(previas.length && !reemplazar){ alert(`Ya hay un comprobante guardado con el mismo punto de venta y número (${fa.tipo || ''} ${fa.numero}). No se guardó. Si quiere reemplazarlo, use "Reemplazar la guardada".`); return; }
   if(previas.length && reemplazar){
-    if(!confirm(`¿Reemplazar el comprobante ${fa.tipo || ''} ${fa.numero} ya guardado (${previas[0].fecha || ''}${previas[0].cliente ? ' · ' + previas[0].cliente : ''}) por este? El anterior se borra.`)) return;
+    if(!await dsConfirm(`¿Reemplazar el comprobante ${fa.tipo || ''} ${fa.numero} ya guardado (${previas[0].fecha || ''}${previas[0].cliente ? ' · ' + previas[0].cliente : ''}) por este? El anterior se borra.`)) return;
     try{ for(const x of previas){ await db.collection('ventas_facturadas').doc(x._id || String(x.numero).replace(/\//g, '-')).delete(); if(x.stockAplicado){ try{ await stockPorFactura(x, -1, 'factura reemplazada ' + x.numero); } catch(e){} } } } catch(e){ alert('No se pudo reemplazar: ' + e.message); return; }
     facturas = (facturas || []).filter(x => claveComprobante(x) !== k);
   }
@@ -13513,7 +13530,7 @@ function actualizarSelFact(){
 async function borrarFacturasSel(){
   const ids = [...document.querySelectorAll('.fc-sel:checked')].map(c => c.value); if(!ids.length) return;
   for(const f of (facturas || []).filter(f => ids.includes(f._id || String(f.numero).replace(/\//g, '-')))){ if(await mesBloqueado(f.fecha)) return; }
-  if(!confirm(`¿Quitar ${ids.length} ${ids.length === 1 ? 'factura' : 'facturas'} de la app? (en TFactura no se toca)`)) return;
+  if(!await dsConfirm(`¿Quitar ${ids.length} ${ids.length === 1 ? 'factura' : 'facturas'} de la app? (en TFactura no se toca)`)) return;
   try{ for(let i = 0; i < ids.length; i += 400){ const b = db.batch(); ids.slice(i, i + 400).forEach(id => b.delete(db.collection('ventas_facturadas').doc(id))); await b.commit(); } }
   catch(e){ alert('No se pudieron borrar: ' + e.message); return; }
   const s = new Set(ids);
@@ -13522,7 +13539,7 @@ async function borrarFacturasSel(){
   facturasNuevas.forEach(fa => { if(!fa.error) fa.yaEsta = (facturas || []).some(x => claveComprobante(x) === claveComprobante(fa)); });
   document.getElementById('fc-todas').checked = false; renderFacturasNuevas(); renderFacturas(); actualizarSelFact();
 }
-async function borrarFactura(id){ { const f0 = (facturas || []).find(f => (f._id || String(f.numero).replace(/\//g, '-')) === id); if(f0 && await mesBloqueado(f0.fecha)) return; } if(!confirm('¿Quitar esta factura de la app? (en TFactura no se toca)')) return;
+async function borrarFactura(id){ { const f0 = (facturas || []).find(f => (f._id || String(f.numero).replace(/\//g, '-')) === id); if(f0 && await mesBloqueado(f0.fecha)) return; } if(!await dsConfirm('¿Quitar esta factura de la app? (en TFactura no se toca)')) return;
   try{ await db.collection('ventas_facturadas').doc(id).delete(); } catch(e){ alert('No se pudo borrar: ' + e.message); return; }
   { const f0 = facturas.find(f => (f._id || String(f.numero).replace(/\//g, '-')) === id); if(f0 && f0.stockAplicado){ try{ await stockPorFactura(f0, -1, 'factura quitada ' + f0.numero); } catch(e){} } }
   facturas = facturas.filter(f => (f._id || String(f.numero).replace(/\//g, '-')) !== id);
@@ -13700,13 +13717,13 @@ function ccRedondear(){ const m = +document.getElementById('cc-red').value || 10
 async function ccMarcarRevisados(skus){ const act = costosVentaActuales(); skus.forEach(s => { if(act[s] != null) ccBase[s] = act[s]; }); await db.collection('config').doc('costos_base').set({ b: ccBase, actualizado: new Date().toISOString() }); ccPend = ccPend.filter(c => !skus.includes(c.sku)); pintarAvisoCostos(); }
 async function ccDejar(){
   const sel = [...document.querySelectorAll('.cc-sel:checked')].map(x => ccFilas[+x.dataset.i]); if(!sel.length) return;
-  if(!confirm(`¿Dejar el precio como está en ${sel.length} SKU? Dejan de aparecer como pendientes.`)) return;
+  if(!await dsConfirm(`¿Dejar el precio como está en ${sel.length} SKU? Dejan de aparecer como pendientes.`)) return;
   await ccMarcarRevisados(sel.map(f => f.sku)); ccFilas = ccFilas.filter(f => !sel.includes(f)); renderRevisarCostos();
 }
 async function ccAplicar(){
   const sel = [...document.querySelectorAll('.cc-sel:checked')].map(x => { const i = +x.dataset.i; return { ...ccFilas[i], nuevo: numAr(document.querySelector(`.cc-pr[data-i="${i}"]`).value) }; }).filter(f => f.nuevo > 0);
   if(!sel.length){ alert('No hay precios seleccionados.'); return; }
-  const bajos = sel.filter(f => f.nuevo < f.ahora); if(bajos.length && !confirm(`¿Seguro? ${bajos.length} precio(s) quedan por debajo del costo:\n` + bajos.map(f => `${f.sku}: ${formatPrice(f.nuevo)} < costo ${formatPrice(f.ahora)}`).join('\n'))) return;
+  const bajos = sel.filter(f => f.nuevo < f.ahora); if(bajos.length && !await dsConfirm(`¿Seguro? ${bajos.length} precio(s) quedan por debajo del costo:\n` + bajos.map(f => `${f.sku}: ${formatPrice(f.nuevo)} < costo ${formatPrice(f.ahora)}`).join('\n'))) return;
   const porProd = new Map(); sel.forEach(f => { const p = f.r.producto; (porProd.get(p) || porProd.set(p, []).get(p)).push(f); });
   let ok = 0; const guardados = [], fallas = [];
   for(const [p, fs] of porProd){
@@ -14039,10 +14056,11 @@ function renderTotalesPresu(){
   document.getElementById('pe-totales').innerHTML = `<div>Subtotal: ${formatPrice(t.sub)}</div>${t.dItems > 0.5 ? `<div>Descuentos por renglón: −${formatPrice(t.dItems)}</div>` : ''}${t.dTot > 0.5 ? `<div>Descuento sobre el total: −${formatPrice(t.dTot)}</div>` : ''}<div style="font-size:1.25rem;font-weight:800;color:var(--purple);margin-top:4px;">Total: ${formatPrice(t.total)}</div><div class="note" style="text-align:right;margin:0;">IVA incluido</div>`;
 }
 async function eliminarPresupuesto(id){
-  if(!id){ if(confirm('Este presupuesto todavía no se guardó. ¿Descartarlo?')) abrirPresupuestos(); return; }
+  if(!id){ if(await dsConfirm('Este presupuesto todavía no se guardó. ¿Descartarlo?')) abrirPresupuestos(); return; }
   const p = (presupuestos || []).find(x => x._id === id) || presu;
-  if(!confirm(`¿Eliminar el presupuesto ${numPresu(p && p.numero)}${p && p.cliente && p.cliente.nombre ? ' de ' + p.cliente.nombre : ''}? No se puede deshacer y el número no se vuelve a usar.`)) return;
+  const copiaP = p ? JSON.parse(JSON.stringify(p)) : null; if(copiaP) delete copiaP._id;
   try{ await db.collection('presupuestos').doc(id).delete(); } catch(e){ alert('No se pudo eliminar: ' + e.message); return; }
+  setTimeout(() => dsToast(`Presupuesto ${numPresu(p && p.numero)} eliminado`, { ms: 9000, deshacer: copiaP ? async () => { try{ await db.collection('presupuestos').doc(id).set(copiaP); presupuestos = (presupuestos || []).concat([{ _id: id, ...copiaP }]); try{ renderPresupuestos(); } catch(x){} dsToast('Presupuesto restaurado'); } catch(e){ alert('No se pudo restaurar: ' + e.message); } } : null }), 50);
   presupuestos = (presupuestos || []).filter(x => x._id !== id);
   if(document.getElementById('step-presupuesto').classList.contains('active')) abrirPresupuestos(); else renderPresupuestos();
 }
@@ -14092,7 +14110,7 @@ async function enviarPresupuesto(medio){
 }
 async function convertirPresuEnPedido(){
   await guardarPresupuesto(true);
-  if(!confirm(`¿Pasar el presupuesto ${numPresu(presu.numero)} al pedido? Se cargan los productos, precios y descuentos.`)) return;
+  if(!await dsConfirm(`¿Pasar el presupuesto ${numPresu(presu.numero)} al pedido? Se cargan los productos, precios y descuentos.`)) return;
   Object.keys(cart).forEach(k => delete cart[k]); Object.keys(descuentosItem).forEach(k => delete descuentosItem[k]);
   presu.items.forEach((it, n) => { const r = it.sku ? buscarProductoPorSku(it.sku) : null; let id;
     if(r){ const vi = r.producto.variantes.findIndex(v => String(v.sku).toUpperCase() === String(it.sku).toUpperCase()); id = rowId(r.ci, r.pi, vi); }
@@ -14450,7 +14468,7 @@ async function guardarInstruccionCorte(){
     return;
   }
   const corte = calcularCorte(piezas, parseFloat(ancho));
-  if(corte.avisos.length && !confirm(corte.avisos.join('\n') + '\n¿Guardar igual?')) return;
+  if(corte.avisos.length && !await dsConfirm(corte.avisos.join('\n') + '\n¿Guardar igual?')) return;
   const nota = document.getElementById('ic-nota').value.trim();
   const tipo = document.getElementById('ic-tipo-corte').value;
   const texto = armarTextoInstruccion(piezas, nota);
@@ -14478,7 +14496,7 @@ async function borrarInstruccionCorte(){
   const articulo = document.getElementById('ic-articulo').value;
   const ancho = document.getElementById('ic-ancho').value;
   if(!articulo || !ancho) return;
-  if(!confirm('¿Borrar la instrucción de "' + articulo + '" a ' + ancho + ' cm?')) return;
+  if(!await dsConfirm('¿Borrar la instrucción de "' + articulo + '" a ' + ancho + ' cm?')) return;
 
   const copia = { ...(tablaConsumo.instrucciones[articulo]||{}) };
   delete copia[ancho];
@@ -14706,7 +14724,7 @@ async function generarOrdenTrabajoCompleta(){
     const taller = document.getElementById('ot-taller').value, tela = document.getElementById('ot-sku-tela').value.trim().toUpperCase();
     const arts = [...document.querySelectorAll('#ot-renglones .ot-r-articulo')].map(s => s.value).filter(Boolean).sort().join('|');
     const igual = [...(historialOT || []), ...(window.__ultimasOT || [])].find(o => o.taller === taller && String(o.skuTela || '').toUpperCase() === tela && (o.renglones || []).map(r => r.articulo).sort().join('|') === arts && Date.now() - new Date(o.fecha).getTime() < 24 * 3600000);
-    if(igual && !confirm(`Ya hay una orden igual de hoy: ${igual.numero} (${taller}, ${tela}).\n\n¿Crear otra igual de todos modos?`)) return;
+    if(igual && !await dsConfirm(`Ya hay una orden igual de hoy: ${igual.numero} (${taller}, ${tela}).\n\n¿Crear otra igual de todos modos?`)) return;
   }
   generandoOT = true; if(btn){ btn.disabled = true; btn.dataset.txt = btn.textContent; btn.textContent = 'Generando…'; }
   try{ await generarOrdenTrabajoCompletaReal(); }
@@ -14913,7 +14931,7 @@ async function generarOrdenTrabajoCompletaReal(){
       cont.insertAdjacentHTML('afterbegin', `<p class="note" style="color:#3D7A3D;font-weight:700;margin-bottom:8px;">✓ Cambios guardados en ${escaparHtml(numeroFormateado)}.</p>`);
     } else {
       const fechaNueva = new Date().toISOString();
-      if(!otEnvioId && skuTela && metrosTotales > 0 && confirm(`La tela ${skuTela} no está registrada como ingreso al taller ${taller}.\n\n¿Registrar ahora el ingreso de ${fmtCm(metrosTotales)} m${comprobante ? ' (' + comprobante + ')' : ''}? Así queda en "Tela en talleres" y se controla lo que entrega.`)){
+      if(!otEnvioId && skuTela && metrosTotales > 0 && await dsConfirm(`La tela ${skuTela} no está registrada como ingreso al taller ${taller}.\n\n¿Registrar ahora el ingreso de ${fmtCm(metrosTotales)} m${comprobante ? ' (' + comprobante + ')' : ''}? Así queda en "Tela en talleres" y se controla lo que entrega.`)){
         try{
           const nuevo = { taller, skuTela, metros: metrosTotales, comprobante, fecha: fechaNueva.slice(0, 10), creado: fechaNueva };
           const r = await db.collection('envios_tela').add(nuevo);
@@ -15154,7 +15172,7 @@ async function borrarOrdenOT(docId){
   const o = (historialOT || []).find(x => x._docId === docId);
   if(!o) return;
   const entregas = (o.renglones || []).some(r => (r.entregado || 0) > 0);
-  if(!confirm(`¿Borrar la orden ${o.numero}?` + (entregas ? '\n\nOjo: ya tiene entregas registradas.' : '') + '\n\nNo se puede deshacer.')) return;
+  if(!await dsConfirm(`¿Borrar la orden ${o.numero}?` + (entregas ? '\n\nOjo: ya tiene entregas registradas.' : '') + '\n\nNo se puede deshacer.')) return;
   try{
     await db.collection('ordenes_trabajo').doc(docId).delete();
     historialOT = historialOT.filter(x => x._docId !== docId);
@@ -15309,7 +15327,7 @@ async function registrarEntregaRenglonOT(docId, renglonIdx){
   const renglon = orden.renglones[renglonIdx];
   const pendienteAntes = pendienteRenglon(renglon);
   if(cantidadRecibida > pendienteAntes){
-    if(!confirm(`Pidió ${renglon.cantidad} y ya tenía ${renglon.entregado||0} entregadas — quedan ${pendienteAntes} pendientes. ¿Registrar igual ${cantidadRecibida}?`)) return;
+    if(!await dsConfirm(`Pidió ${renglon.cantidad} y ya tenía ${renglon.entregado||0} entregadas — quedan ${pendienteAntes} pendientes. ¿Registrar igual ${cantidadRecibida}?`)) return;
   }
 
   const nuevosRenglones = orden.renglones.map((r, i) => i === renglonIdx ? { ...r, entregado: (r.entregado||0) + cantidadRecibida } : r);
@@ -16044,7 +16062,7 @@ async function guardarEdicionHistorial(numero){
   }
 
   if(itemsIgnorados.length > 0){
-    const seguir = confirm('Estos productos NO se van a guardar porque les falta un dato:\n\n' + itemsIgnorados.join('\n') + '\n\n¿Guardar igual el resto del pedido sin ellos?');
+    const seguir = await dsConfirm('Estos productos NO se van a guardar porque les falta un dato:\n\n' + itemsIgnorados.join('\n') + '\n\n¿Guardar igual el resto del pedido sin ellos?');
     if(!seguir) return;
   }
 
@@ -16174,7 +16192,7 @@ async function cambiarEstadoPedido(numero, nuevoEstado, selectEl){
 }
 
 async function cancelarPedidoHistorial(numero){
-  if(!confirm('¿Cancelar el pedido ' + numero + '? Queda marcado como cancelado, no se borra del historial.')) return;
+  if(!await dsConfirm('¿Cancelar el pedido ' + numero + '? Queda marcado como cancelado, no se borra del historial.')) return;
   try{
     await db.collection('pedidos').doc(numero).update({ estado: 'cancelado' });
     const p = (historialPedidos || []).find(x => x.numero === numero);
@@ -16335,7 +16353,7 @@ async function cliAplicarMasivo(){
   if(v('cm-desc') !== '') cambios.descuento = Math.min(100, Math.max(0, numAr(v('cm-desc')) || 0)); if(v('cm-plazo') !== '') cambios.plazo = Math.max(0, Math.round(numAr(v('cm-plazo')) || 0)); if(v('cm-transp')) cambios.transporte = v('cm-transp');
   if(!Object.keys(cambios).length){ alert('Elija al menos un cambio.'); return; }
   const txt = Object.entries(cambios).map(([k, x]) => `${{ condicion: 'condición', lista: 'lista', descuento: 'descuento', plazo: 'plazo', transporte: 'transporte' }[k]}: ${k === 'lista' ? ((listasPrecios || []).find(l => l.id === x) || {}).nombre || x : k === 'condicion' ? (x === 'contado' ? 'contado' : 'cuenta corriente') : x}${k === 'descuento' ? ' %' : k === 'plazo' ? ' días' : ''}`).join(' · ');
-  if(!confirm(`¿Aplicar a ${cliSel.size} clientes?\n${txt}`)) return;
+  if(!await dsConfirm(`¿Aplicar a ${cliSel.size} clientes?\n${txt}`)) return;
   try{ const ids = [...cliSel]; for(let i = 0; i < ids.length; i += 400){ const b = db.batch(); ids.slice(i, i + 400).forEach(id => b.set(db.collection('clientes').doc(id), cambios, { merge: true })); await b.commit(); }
     (listaClientes || []).forEach(c => { if(cliSel.has(c.id)) Object.assign(c, cambios); }); ccClientesDB = []; try{ if(acCache) delete acCache.clientes; } catch(e){}
     await ccLog('Cambio masivo de clientes', `${ids.length} clientes · ${txt}`); }
@@ -17582,7 +17600,7 @@ function renderGastosPeriodicosML(){
 }
 
 async function eliminarGastoPeriodicoML(id){
-  if(!confirm('¿Eliminar este gasto?')) return;
+  if(!await dsConfirm('¿Eliminar este gasto?')) return;
   try{
     await db.collection('gastos_periodicos_ml').doc(id).delete();
     listaGastosPeriodicosML = listaGastosPeriodicosML.filter(g => g.id !== id);
@@ -17737,8 +17755,8 @@ async function borrarMovimientosViejosQueCoincidan(nuevosMovs, cuenta){
 async function borrarTodosLosMovimientosML(){
   if(!listaVentasML || listaVentasML.length === 0){ alert('No hay movimientos cargados.'); return; }
   const total = listaVentasML.length;
-  if(!confirm(`Esto borra las ${total} líneas de TODOS los movimientos importados (Excel y facturas), de las dos cuentas. No se puede deshacer. ¿Continuar?`)) return;
-  if(!confirm('Confirmo de nuevo: se va a borrar TODO el historial de movimientos de Mercado Libre. ¿Está seguro?')) return;
+  if(!await dsConfirm(`Esto borra las ${total} líneas de TODOS los movimientos importados (Excel y facturas), de las dos cuentas. No se puede deshacer. ¿Continuar?`)) return;
+  if(!await dsConfirm('Confirmo de nuevo: se va a borrar TODO el historial de movimientos de Mercado Libre. ¿Está seguro?')) return;
 
   try{
     const ids = listaVentasML.map(m => m.id);
@@ -17773,7 +17791,7 @@ async function detectarYBorrarDuplicadosML(){
     alert('No encontré duplicados.');
     return;
   }
-  if(!confirm(`Encontré ${totalSobrantes} línea(s) duplicada(s) (mismo movimiento cargado más de una vez). Se va a conservar una sola copia de cada una y se borran las demás. ¿Continuar?`)) return;
+  if(!await dsConfirm(`Encontré ${totalSobrantes} línea(s) duplicada(s) (mismo movimiento cargado más de una vez). Se va a conservar una sola copia de cada una y se borran las demás. ¿Continuar?`)) return;
 
   try{
     const idsABorrar = [];
@@ -18002,7 +18020,7 @@ async function guardarFilaCostos(id){
 }
 
 async function eliminarFilaCostos(id){
-  if(!confirm('¿Eliminar esta fila?')) return;
+  if(!await dsConfirm('¿Eliminar esta fila?')) return;
   try{
     await db.collection('calculadora_costos').doc(id).delete();
   } catch(e){ /* si era una fila local sin guardar todavia, no hay drama */ }
@@ -18458,7 +18476,7 @@ async function confirmarEliminarVariante(sku){
   const p = match.producto;
   const esUnica = p.variantes.length === 1;
 
-  if(!confirm(esUnica ? '¿Eliminar todo el producto "' + p.nombre + '"? No se puede deshacer.' : '¿Eliminar la medida ' + sku + ' de "' + p.nombre + '"?')){
+  if(!await dsConfirm(esUnica ? '¿Eliminar todo el producto "' + p.nombre + '"? No se puede deshacer.' : '¿Eliminar la medida ' + sku + ' de "' + p.nombre + '"?')){
     return;
   }
 
@@ -21675,7 +21693,7 @@ function conectarInstagram(){
 }
 
 async function desconectarInstagram(){
-  if(!confirm('¿Desconectar Instagram? La vista previa va a volver a usar los datos cargados a mano.')) return;
+  if(!await dsConfirm('¿Desconectar Instagram? La vista previa va a volver a usar los datos cargados a mano.')) return;
   try{
     const resp = await fetch(URL_WORKER_IA, {
       method: 'POST',
@@ -22122,7 +22140,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v395';
+const APP_VERSION = '2026-10-02-v396';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
