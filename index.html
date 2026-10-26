@@ -478,6 +478,11 @@ details>summary{cursor:pointer;}
 /* botones anchos de las pantallas: al ancho de su texto */
 .step .btn[style*="width:100%"],.step label.btn{width:auto!important;display:inline-flex!important;padding:0 18px!important;}
 /* menu lateral: iconos de linea, sin emojis, submenus livianos */
+#sb .sb-sep{font-size:.62rem;letter-spacing:.09em;color:#A89E90;text-transform:uppercase;font-weight:700;padding:12px 24px 4px;}
+#sb a.sb-fav{font-size:.84rem!important;padding:6px 16px!important;}#sb a.sb-fav.rec{font-size:.8rem!important;color:#8A8072!important;}
+#sb .sb-sub div{display:flex;align-items:center;}#sb .sb-star{margin-left:auto;color:#D8D0C2;font-size:.85rem;padding:0 2px;opacity:0;transition:opacity .15s;}
+#sb .sb-sub div:hover .sb-star,#sb .sb-star.on{opacity:1;}#sb .sb-star.on{color:#E2B93B;}
+
 #sb a{font-size:.9rem!important;font-weight:500!important;color:var(--ds-tx2)!important;padding:8px 16px!important;border-left:none!important;border-radius:8px;margin:1px 8px;}
 #sb a.on{background:#F1ECF5!important;color:#3D2B4E!important;font-weight:600!important;}
 #sb a svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;flex:0 0 17px;}
@@ -1761,7 +1766,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v400</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v401</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6212,6 +6217,8 @@ window.addEventListener('scroll', () => { const p = document.getElementById('ac-
 // ===== Etapa 1: avisos propios, menu sin emojis =====
 const DS_ICON = { home: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>', ped: '<path d="M3 4h2l2 12h11l2-8H6"/><circle cx="9" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/>', comp: '<path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h7"/>', cli: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M16 6.5a3 3 0 0 1 0 5.5M18 14.8c1.8.7 3 2.5 3 5.2"/>', art: '<path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/>', prov: '<path d="M3 21V10l6 3V9l6 3V5h6v16z"/>', teso: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>', imp: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M8 15h2M12 15h2M16 11v4"/>', est: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>', c: '<path d="M3 11v2l13 5V6z"/><path d="M16 9a3 3 0 0 1 0 6"/>', ag: '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01"/>', i: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>' };
 const dsIco = k => `<svg viewBox="0 0 24 24">${DS_ICON[k] || DS_ICON.comp}</svg>`;
+const DS_ICON2 = { sell: '<path d="M4 4h10l6 6-10 10-6-6z"/><circle cx="9" cy="9" r="1.5"/>', cash: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>', buy: '<path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/>', pay: '<path d="M4 12h16M14 6l6 6-6 6"/>', box: '<path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/>', cut: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.5 7.5 20 18M8.5 16.5 20 6"/>', mega: '<path d="M3 11v2l13 5V6z"/><path d="M16 9a3 3 0 0 1 0 6"/>', chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>', comp: '<path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h7"/>' };
+const dsIco2 = k => `<svg viewBox="0 0 24 24">${DS_ICON2[k] || DS_ICON2.comp}</svg>`;
 // quita el emoji del comienzo de un texto ("➕ Factura" -> "+ Factura", "📋 Ver" -> "Ver")
 const sinEmoji = t => String(t || '').replace(/^\s*➕\s*/, '+ ').replace(/^\s*(?:\p{Extended_Pictographic}|\p{Emoji_Presentation})(?:\uFE0F|\u200D|\p{Extended_Pictographic})*\s*/u, '');
 function dsToast(msg, opt){ opt = opt || {}; let box = document.getElementById('ds-toasts'); if(!box){ box = document.createElement('div'); box.id = 'ds-toasts'; document.body.appendChild(box); }
@@ -6242,6 +6249,26 @@ function dsConfirm(msg){ if(window.__dsAuto !== undefined) return Promise.resolv
 const COND_IVA = ['Responsable inscripto', 'Monotributista', 'Exento', 'Consumidor final', 'No alcanzado', 'Cliente del exterior'];
 function normCondIva(v){ const s = normBusqueda(v || ''); if(!s) return ''; if(/inscr|^ri$|responsable/.test(s)) return 'Responsable inscripto'; if(/monot/.test(s)) return 'Monotributista'; if(/exent/.test(s)) return 'Exento'; if(/consum|final|^cf$/.test(s)) return 'Consumidor final'; if(/alcanz/.test(s)) return 'No alcanzado'; if(/exterior/.test(s)) return 'Cliente del exterior'; return v; }
 function selCondIva(id, val, estilo){ const v = normCondIva(val); return `<select id="${id}" style="${estilo || ''}"><option value="">— elegir —</option>${COND_IVA.map(x => `<option ${v === x ? 'selected' : ''}>${x}</option>`).join('')}${v && !COND_IVA.includes(v) ? `<option selected>${escaparHtml(v)}</option>` : ''}</select>`; }
+// ===== Etapa 3: menu por tareas (usa las mismas opciones y permisos de siempre) =====
+const TAREAS = [
+  ['t_vender', 'Vender', 'sell', [['Antes de vender', ['irACatalogoDesdeInicio()', 'abrirPedidoIA()', 'abrirPresupuestos()']], ['Entregar y facturar', ['abrirPendientesEntrega()', 'abrirRemitos().then(() => rmForm())', 'abrirRemitos()', "abrirFacturas().then(() => fvManual('f'))", "abrirFacturas().then(() => fvManual('nc'))", "abrirFacturas().then(() => fvManual('nd'))", "abrirFacturas().then(() => document.getElementById('fc-rz-se", 'abrirFacturas()', 'abrirHistorial()']], ['Clientes', ['abrirClientes(); setTimeout(() => cliForm()', 'abrirClientes()', 'abrirListasPrecios()']]]],
+  ['t_cobrar', 'Cobrar', 'cash', [['Cobros', ["abrirCtaCte('recibos').then(", "abrirCtaCte('recibos')", 'abrirCtaCte()', "abrirCtaCte('cheques')"]]]],
+  ['t_comprar', 'Comprar', 'buy', [['Comprobantes de compra', ["abrirCompras('compras').then(() => pvElegirProveedor('compra'", "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nc'", "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nd'", "abrirCompras('compras')"]], ['Proveedores', ["abrirCompras('proveedores').then(", 'abrirCompras()']], ['Talleres', ["abrirCompras('talleres')", 'abrirIngresoTaller()']]]],
+  ['t_pagar', 'Pagar', 'pay', [['Pagos', ["abrirCompras('pagos').then(", "abrirCompras('pagos')"]], ['Caja y gastos', ['abrirTesoreria().then(() => tsFormCaja())', 'abrirGastos()', 'abrirTesoreria()']]]],
+  ['t_stock', 'Stock y productos', 'box', [['Stock', ['abrirStock()', 'abrirFaltantes()']], ['Productos', ['abrirNuevoProducto()', 'abrirEditarProducto()', 'abrirCategorias()', 'abrirActualizarFoto()', 'abrirReventa()', 'abrirLinksWeb()']], ['Precios', ['abrirListaPrecios()', 'abrirImportarExcel()', 'abrirAumentoMasivo()', 'abrirHistorialPrecios()']], ['Costos', ['abrirCostosProductos()', 'abrirConfeccion()', 'abrirCalculadoraCostos()']]]],
+  ['t_producir', 'Producir', 'cut', [['Qué fabrico', ['abrirTelas()', 'abrirArticulosCortes()']], ['Planificar', ['abrirAsistenteOT()', 'abrirTrabajoMedida()']], ['En el taller', ['abrirEnviosTela()', 'abrirDeudaTela()', 'abrirEnProduccion()', 'abrirIngresoTaller()']], ['Consultas', ['abrirHistorialOT()', 'abrirHistorialEntregas()', 'abrirHistorialSku()']]]],
+  ['t_difundir', 'Difundir', 'mega', [['Catálogo a clientes', ['abrirCompartirRubro()', 'abrirArmarCatalogo()', 'abrirEnviarCatalogo()']], ['Videos', ['abrirCrearVideo()', 'abrirCompartirVideoProducto()']], ['Redes y anuncios', ['abrirNuevoIngreso()', 'abrirAnuncio()', 'abrirDirectorArte()']], ['Fotos de producto', ['abrirPromptGemini()', 'abrirPromptGeminiLote()']]]],
+  ['t_numeros', 'Números', 'chart', [['Resultados', ['abrirResultadoNegocio()', 'abrirRankings()', 'abrirResultadosML()', 'abrirVentasML()']], ['Impuestos', ['abrirIVA()', 'abrirLibroIVA()', 'abrirRetenciones()', 'abrirCierreMes()', 'abrirPuntosVentaFiscales()']], ['Auditoría', ['abrirAuditor()']]]],
+];
+const TAR_FUENTES = ['ped', 'comp', 'cli', 'art', 'prov', 'teso', 'imp', 'est', 'c', 'h', 'i', 'k', 'f', 'g', 'd', 'a'];
+function tarBuscar(pref){ for(const exacto of [true, false]) for(const k of TAR_FUENTES){ const g = GRUPOS_INICIO[k]; if(!g) continue; for(const it of (g.columnas || []).flat()){ if(exacto ? it[1] === pref : it[1].startsWith(pref)) return { k, it }; } } return null; }
+function armarTareas(){ TAREAS.forEach(([k, t, ic, secs]) => { const tit = [], cols = []; secs.forEach(([st, prefs]) => { const items = []; prefs.forEach(pf => { const r = tarBuscar(pf); if(r && !items.some(x => x[1] === r.it[1])) items.push(r.it); }); if(items.length){ tit.push(st); cols.push(items); } }); GRUPOS_INICIO[k] = { lado: 'int', titulo: t, titulosColumnas: tit, columnas: cols, tarea: true }; }); }
+// permiso de una opcion dentro de una tarea: el de su pantalla de origen
+function permisoTarea(k, f){ for(const o of TAR_FUENTES){ const g = GRUPOS_INICIO[o]; if(g && (g.columnas || []).flat().some(([, ff]) => ff === f)) return permisoGrupoItem(o, f); } return null; }
+// favoritos (por usuario, en este dispositivo)
+const favClave = () => 'olt_fav_' + (((firebase.auth().currentUser || {}).email) || 'x');
+function favLeer(){ try{ return JSON.parse(localStorage.getItem(favClave()) || '[]'); } catch(e){ return []; } }
+function favToggle(t, f){ let L = favLeer(); const i = L.findIndex(x => x.f === f); if(i >= 0) L.splice(i, 1); else L.push({ t, f }); try{ localStorage.setItem(favClave(), JSON.stringify(L)); } catch(e){} pintarBarraLateral(); dsToast(i >= 0 ? 'Quitado de favoritos' : 'Agregado a favoritos'); }
 // ===== Barra lateral: las mismas opciones del inicio, con sus permisos =====
 const SB_ORDEN = [['ped', '🛒', 'Pedidos'], ['comp', '🧾', 'Comprobantes'], ['cli', '👥', 'Clientes'], ['art', '📦', 'Artículos'], ['prov', '🏭', 'Proveedores'], ['teso', '💰', 'Fondos'], ['imp', '🧮', 'Impuestos'], ['est', '📊', 'Informes'], ['c', '📣', 'Difusión y creatividad']];
 let sbAbierto = null; const sbSubAbiertos = new Set(); // subcategorias desplegadas (por defecto, contraidas)
@@ -6251,15 +6278,21 @@ function pintarBarraLateral(){
   const sb = document.getElementById('sb'); if(!sb) return;
   if(!rolActual){ document.body.classList.remove('con-sb'); return; }
   document.body.classList.add('con-sb');
-  window.__sbItems = [];
+  window.__sbItems = []; if(!GRUPOS_INICIO.t_vender) armarTareas();
   const reg = it => { window.__sbItems.push(it); return window.__sbItems.length - 1; };
+  const favs = favLeer().filter(x => puede(permisoDeAccion(x.f)) && TAREAS.some(([k]) => (sbItems(k) || []).some(c => c.items.some(([, ff]) => ff === x.f))) || /abrirDirectorArte|abrirAuditor|abrirUsuarios|abrirDatosRazones|abrirCopia|abrirListas|abrirDatosBancarios|abrirMiFirma|abrirPuntosVenta/.test(x.f));
+  let recs = []; try{ recs = JSON.parse(localStorage.getItem('ot_recientes') || '[]').filter(x => puede(permisoDeAccion(x.f)) && !favs.some(y => y.f === x.f)).slice(0, 3); } catch(e){}
+  const icoDe = f => { const t = TAREAS.find(([k]) => (sbItems(k) || []).some(c => c.items.some(([, ff]) => ff === f))); return t ? t[2] : 'comp'; };
+  const fila = (x, cls) => `<a class="sb-fav ${cls || ''}" onclick="sbUsar(${reg([x.t, x.f])})">${dsIco2(icoDe(x.f))} <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escaparHtml(sinEmoji(x.t).replace(/^\+\s*/, ''))}</span></a>`;
+  const bloqueFav = (favs.length ? `<div class="sb-sep">Favoritos</div>${favs.map(x => fila(x)).join('')}` : '') + (recs.length ? `<div class="sb-sep">Recientes</div>${recs.map(x => fila(x, 'rec')).join('')}` : '');
   const grupo = (k, ic, t) => { const cols = sbItems(k); if(!cols.length) return '';
-    return `<a class="${sbAbierto === k ? 'on' : ''}" onclick="sbAbierto=sbAbierto==='${k}'?null:'${k}';pintarBarraLateral();pintarCategoria('${k}')">${dsIco(k)} ${t}<span style="margin-left:auto;font-size:.8rem;color:#A89E90;">${sbAbierto === k ? '▾' : '▸'}</span></a>${sbAbierto === k ? `<div class="sb-sub">${cols.map((c, ci) => { const key = k + ':' + ci, abierta = cols.length === 1 || !c.titulo || sbSubAbiertos.has(key);
-      return (cols.length > 1 && c.titulo ? `<b style="cursor:pointer;display:flex;justify-content:space-between;" onclick="sbToggleSub('${key}')"><span>${escaparHtml(c.titulo.replace(/^\d+ · /, ''))}</span><span>${abierta ? '▾' : '▸'}</span></b>` : '') + (abierta ? c.items.map(([tt, f]) => `<div class="${/ResultadosML|CalculadoraML|VentasML/.test(f) ? 'ml' : ''}" onclick="sbUsar(${reg([tt, f])})">${escaparHtml(/^➕/.test(tt) ? tt.replace(/^➕\s*/, '+ ') : tt.replace(/^\S+\s/, ''))}</div>`).join('') : ''); }).join('')}</div>` : ''}`; };
+    return `<a class="${sbAbierto === k ? 'on' : ''}" onclick="sbAbierto=sbAbierto==='${k}'?null:'${k}';pintarBarraLateral();pintarCategoria('${k}')">${/^t_/.test(k) ? dsIco2(ic) : dsIco(k)} ${t}<span style="margin-left:auto;font-size:.8rem;color:#A89E90;">${sbAbierto === k ? '▾' : '▸'}</span></a>${sbAbierto === k ? `<div class="sb-sub">${cols.map((c, ci) => { const key = k + ':' + ci, abierta = cols.length === 1 || !c.titulo || sbSubAbiertos.has(key);
+      return (cols.length > 1 && c.titulo ? `<b style="cursor:pointer;display:flex;justify-content:space-between;" onclick="sbToggleSub('${key}')"><span>${escaparHtml(c.titulo.replace(/^\d+ · /, ''))}</span><span>${abierta ? '▾' : '▸'}</span></b>` : '') + (abierta ? c.items.map(([tt, f]) => { const esFav = favLeer().some(x => x.f === f), ri = reg([tt, f]); return `<div class="${/ResultadosML|CalculadoraML|VentasML/.test(f) ? 'ml' : ''}" onclick="sbUsar(${ri})">${escaparHtml(/^➕/.test(tt) ? tt.replace(/^➕\s*/, '+ ') : tt.replace(/^\S+\s/, ''))}<span class="sb-star ${esFav ? 'on' : ''}" title="${esFav ? 'Quitar de favoritos' : 'Agregar a favoritos'}" onclick="event.stopPropagation();const it=window.__sbItems[${ri}];favToggle(it[0], it[1])">${esFav ? '★' : '☆'}</span></div>`; }).join('') : ''); }).join('')}</div>` : ''}`; };
   const agentes = [['🎨', 'Director de arte', 'abrirDirectorArte()'], ['🧾', 'Auditor contable', 'abrirAuditor()']].filter(([, , f]) => puede(permisoDeAccion(f)));
   sb.innerHTML = `<div class="sb-logo">OnLineTextil</div>
     <a onclick="sbAbierto=null;irInicio();pintarBarraLateral();document.body.classList.remove('sb-abierta')">${dsIco('home')} Inicio</a>
-    ${SB_ORDEN.map(([k, ic, t]) => grupo(k, ic, t)).join('')}<hr>
+    ${bloqueFav}<div class="sb-sep">Tareas</div>
+    ${TAREAS.map(([k, t, ic]) => grupo(k, ic, t)).join('')}<hr>
     ${agentes.length ? `<a class="${sbAbierto === 'ag' ? 'on' : ''}" onclick="sbAbierto=sbAbierto==='ag'?null:'ag';pintarBarraLateral();pintarCategoria('ag')">${dsIco('ag')} Agentes IA<span style="margin-left:auto;font-size:.8rem;color:#A89E90;">${sbAbierto === 'ag' ? '▾' : '▸'}</span></a>${sbAbierto === 'ag' ? `<div class="sb-sub">${agentes.map(([ic, t, f]) => `<div onclick="sbUsar(${reg([t, f])})">${ic} ${t}</div>`).join('')}</div>` : ''}` : ''}
     ${grupo('i', '⚙️', 'Configuración')}`;
   sb.querySelectorAll('.sb-sub div').forEach(d => { const n = d.firstChild; if(n && n.nodeType === 3) n.textContent = sinEmoji(n.textContent); else if(d.childNodes.length === 1) d.textContent = sinEmoji(d.textContent); });
@@ -6414,11 +6447,11 @@ async function pintarCategoria(k){
     return c ? `<div class="d-num">${c.map(([t, v, e, f]) => `<span ${f ? `onclick="${f}"` : ''}>${t} <b>${v}</b>${e ? ` <span style="color:#A6432F;">(vencido ${e})</span>` : ''}</span>`).join('')}</div>` : ''; };
   const altas = cols.flatMap(c => c.items).filter(([t]) => /^➕/.test(t)); // las altas ("nuevo") siempre a la vista
   // Comprobantes: cada tipo con el mismo color que tiene el comprobante
-  const colAcc = t => { if(k !== 'comp') return ''; const n = normBusqueda(t); const fam = /nota de credito/.test(n) ? 'ncv' : /nota de debito/.test(n) ? 'ndv' : /factura de compra|^compras$/.test(n) ? 'compra' : /factura de venta|^ventas$/.test(n) ? 'venta' : /recibo|^cobros$/.test(n) ? 'recibo' : /orden de pago|^pagos$/.test(n) ? 'pago' : /remito/.test(n) ? 'remito' : /presupuesto/.test(n) ? 'presu' : ''; return fam ? COMP_COLOR[fam][1] : ''; };
+  const colAcc = t => { if(!/^(comp|t_vender|t_cobrar|t_comprar|t_pagar)$/.test(k)) return ''; const n = normBusqueda(t); const fam = /nota de credito/.test(n) ? 'ncv' : /nota de debito/.test(n) ? 'ndv' : /factura de compra|^compras$/.test(n) ? 'compra' : /factura de venta|^ventas$/.test(n) ? 'venta' : /recibo|^cobros$/.test(n) ? 'recibo' : /orden de pago|^pagos$/.test(n) ? 'pago' : /remito/.test(n) ? 'remito' : /presupuesto/.test(n) ? 'presu' : ''; return fam ? COMP_COLOR[fam][1] : ''; };
   const btnAcc = (t, f) => { const c = colAcc(t); return `<button type="button" onclick="catUsar(${reg([t, f])})" style="${c ? `border-left:5px solid ${c};` : ''}">${escaparHtml(sinEmoji(t))}</button>`; };
   const accRapidas = altas.length ? `<div class="d-acc">${altas.map(([t, f]) => btnAcc(t, f)).join('')}</div>` : '';
   const pintar = V => { if(run !== dashRun) return; box.innerHTML = `<h2 style="font-family:Georgia,serif;color:var(--purple);margin:6px 0 10px;font-weight:600;">${titulo.replace(/^\S+\s/, '')}</h2>${accRapidas}${resumen(V)}${opciones}`;
-    if(k === 'comp') box.querySelectorAll('details.d-pl').forEach(d => { const c = colAcc(d.dataset.tc || ''); if(c){ d.style.borderLeft = `5px solid ${c}`; const s = d.querySelector('summary'); if(s) s.style.color = c; } d.querySelectorAll('button[data-t]').forEach(b => { const cb = colAcc(b.dataset.t); if(cb) b.style.borderLeft = `5px solid ${cb}`; }); }); };
+    if(/^(comp|t_vender|t_cobrar|t_comprar|t_pagar)$/.test(k)) box.querySelectorAll('details.d-pl').forEach(d => { const c = colAcc(d.dataset.tc || ''); if(c){ d.style.borderLeft = `5px solid ${c}`; const s = d.querySelector('summary'); if(s) s.style.color = c; } d.querySelectorAll('button[data-t]').forEach(b => { const cb = colAcc(b.dataset.t); if(cb) b.style.borderLeft = `5px solid ${cb}`; }); }); };
   pintar(dashCache); window.scrollTo(0, 0);
   if(['cli', 'prov', 'comp', 'teso', 'est', 'art'].includes(k)){ try{ pintar(await dashDatos()); } catch(e){ console.error(e); } }
 }
@@ -13892,7 +13925,7 @@ function puede(perm){
   const P = permisosActuales || PERMISOS_BASE; return !!P[perm];
 }
 function permisoDeGrupo(k){ return { a: 'pedidos', c: 'difusion', g: 'produccion' }[k] || null; }
-function permisoGrupoItem(k, f){ if(k !== 'art') return permisoDeGrupo(k); for(const o of ['f', 'g']){ const g = GRUPOS_INICIO[o]; if(g && (g.columnas || []).flat().some(([, ff]) => ff === f)) return permisoDeGrupo(o); } return null; }
+function permisoGrupoItem(k, f){ if(/^t_/.test(k)) return permisoTarea(k, f); if(k !== 'art') return permisoDeGrupo(k); for(const o of ['f', 'g']){ const g = GRUPOS_INICIO[o]; if(g && (g.columnas || []).flat().some(([, ff]) => ff === f)) return permisoDeGrupo(o); } return null; }
 function aplicarPermisosInicio(){
   try{ pintarBarraLateral(); } catch(e){ console.error(e); }
   if(rolActual === 'dueño') return;
@@ -22243,7 +22276,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v400';
+const APP_VERSION = '2026-10-02-v401';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
