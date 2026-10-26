@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v411</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v412</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13274,7 +13274,13 @@ function pgPintar(){ const S = (document.getElementById('pg-s').value || '').tri
   let esPack = false; try{ esPack = cantUnidadVenta(unidadVentaSku(S) || '') > 1 || /\bx\s*\d{1,2}\b|docena/.test(normBusqueda(rr.producto.nombre + ' ' + (rr.variante.desc || ''))); } catch(e){}
   const pcv = (window.__pgColores || {})[S] || 'foto';
   const selColores = esPack ? `<div style="display:flex;gap:6px;align-items:center;margin:0 0 8px;font-size:.85rem;"><b>Unidades del pack:</b>${[['foto', 'Como en la foto'], ['blancas', 'Blancas'], ['surtidas', 'Surtidas']].map(([v, tx]) => `<button type="button" class="btn-mini" style="${pcv === v ? 'border-color:var(--purple);font-weight:700;' : ''}" onclick="window.__pgColores=window.__pgColores||{};window.__pgColores['${S}']='${v}';try{localStorage.setItem('olt_pg_colores',JSON.stringify(window.__pgColores))}catch(e){};pgPintar()">${tx}</button>`).join('')}</div>` : '';
-  box.innerHTML = t ? `${selPanos}${selColores}<p class="note" style="text-align:left;margin:0 0 6px;">En Gemini: chat nuevo → suba UNA foto real del producto → pegue el texto.${esFabricadoSku(S, rr ? rr.producto.nombre : '') ? ' · Fabricación propia: incluye la imagen con la bolsa LEXINGTON.' : ''}</p><textarea id="pg-txt" oninput="window.__pgTxt=this.value" style="width:100%;height:240px;box-sizing:border-box;font-size:.78rem;border:1px solid var(--line);border-radius:10px;padding:8px;">${escaparHtml(t)}</textarea><button type="button" class="btn btn-gold" style="width:100%;margin-top:6px;" onclick="copiarTexto(window.__pgTxt, this)">📋 Copiar prompt</button>` : '<p class="note">Ese SKU no está en el catálogo.</p>'; }
+  box.innerHTML = t ? `${selPanos}${selColores}<p class="note" style="text-align:left;margin:0 0 6px;">En Gemini: chat nuevo → suba UNA foto real del producto → pegue el texto.${esFabricadoSku(S, rr ? rr.producto.nombre : '') ? ' · Fabricación propia: incluye la imagen con la bolsa LEXINGTON.' : ''}</p><textarea id="pg-txt" oninput="window.__pgTxt=this.value" style="width:100%;height:240px;box-sizing:border-box;font-size:.78rem;border:1px solid var(--line);border-radius:10px;padding:8px;">${escaparHtml(t)}</textarea>${(() => { const P = pgPartes(t); return P.length > 1 ? `<div style="margin-top:8px;"><b style="font-size:.82rem;">Gemini: pida de a UNA imagen, en el mismo chat</b><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${P.map((x, i) => `<button type="button" class="btn ${i === 0 ? 'btn-gold' : 'btn-ghost'}" style="width:auto;" onclick="copiarTexto(pgPartes(window.__pgTxt)[${i}], this)">${i + 1}. Copiar imagen ${i + 1}${i === 0 ? ' (con la foto)' : ''}</button>`).join('')}</div><p class="note" style="text-align:left;margin:6px 0 0;">1) Chat nuevo, suba la foto y pegue la imagen 1. 2) Cuando la termine, pegue la imagen 2 en el mismo chat, y así.</p></div>` : ''; })()}
+    <button type="button" class="btn btn-ghost" style="width:100%;margin-top:8px;" onclick="copiarTexto(window.__pgTxt, this)">Copiar todo junto</button>` : '<p class="note">Ese SKU no está en el catálogo.</p>'; }
+// separa el prompt en un mensaje por imagen (Gemini descarga mejor de a una)
+function pgPartes(t){ t = String(t || ''); const ms = [...t.matchAll(/(^|\n)\s*(IMAGE \d+\s*[–-][^\n]*)/g)]; if(ms.length < 2) return [t];
+  const ini = ms.map(m => m.index + (m[1] ? 1 : 0)), cab = t.slice(0, ini[0]).trim(), pf = t.search(/\n\s*For all images/), pie = pf >= 0 ? t.slice(pf).trim() : '';
+  const bloques = ini.map((s, i) => t.slice(s, i + 1 < ini.length ? ini[i + 1] : (pf >= 0 ? pf : t.length)).trim());
+  return bloques.map((b, i) => i === 0 ? `${cab.replace(/generate these \d+ images, one after another, in this order/i, 'generate ONE image (more will follow in this same chat)')}\n\n${b}\n\n${pie}`.trim() : `Same product, same attached photo and same rules as before (design, texture, real size, colors and quantity). Now generate ONLY this image:\n\n${b}\n\n${pie}`.trim()); }
 // lote: todos los SKU de un producto, de una categoria o de una busqueda
 async function abrirPromptGeminiLote(){ await cargarDatosFabricacion(); try{ if(telasDatos === null) await cargarTelas(); } catch(e){}
   const cats = [...new Set(CATALOGO.map(c => c.categoria).filter(Boolean))];
@@ -22381,7 +22387,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v411';
+const APP_VERSION = '2026-10-02-v412';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
