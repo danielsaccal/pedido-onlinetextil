@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v407</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v408</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6215,7 +6215,7 @@ const GRUPOS_INICIO = {
     [['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']]
   ] },
   k: { lado: 'int', titulo: 'Agentes IA', titulosColumnas: ['1 · Agentes'], columnas: [
-    [['🎨 Director de arte', 'abrirDirectorArte()'], ['🧾 Auditor contable', 'abrirAuditor()']],
+    [['🎨 Director de arte', 'abrirDirectorArte()'], ['🧾 Auditor contable', 'abrirAuditor()'], ['⚖️ Reclamos ML / MP', 'abrirReclamosML()']],
   ] },
 };
 // ===== Buscador con sugerencias en los campos de texto: escribe una parte (ej. "jorg") y ofrece todo lo que la contiene =====
@@ -6334,7 +6334,7 @@ function pintarBarraLateral(){
   const grupo = (k, ic, t) => { const cols = sbItems(k); if(!cols.length) return '';
     return `<a class="${sbAbierto === k ? 'on' : ''}" onclick="sbAbierto=sbAbierto==='${k}'?null:'${k}';pintarBarraLateral();pintarCategoria('${k}')">${/^t_/.test(k) ? dsIco2(ic) : dsIco(k)} ${t}<span style="margin-left:auto;font-size:.8rem;color:#A89E90;">${sbAbierto === k ? '▾' : '▸'}</span></a>${sbAbierto === k ? `<div class="sb-sub">${cols.map((c, ci) => { const key = k + ':' + ci, abierta = cols.length === 1 || !c.titulo || sbSubAbiertos.has(key);
       return (cols.length > 1 && c.titulo ? `<b style="cursor:pointer;display:flex;justify-content:space-between;" onclick="sbToggleSub('${key}')"><span>${escaparHtml(c.titulo.replace(/^\d+ · /, ''))}</span><span>${abierta ? '▾' : '▸'}</span></b>` : '') + (abierta ? c.items.map(([tt, f]) => { const esFav = favLeer().some(x => x.f === f), ri = reg([tt, f]); return `<div class="${/ResultadosML|CalculadoraML|VentasML/.test(f) ? 'ml' : ''}" onclick="sbUsar(${ri})">${escaparHtml(/^➕/.test(tt) ? tt.replace(/^➕\s*/, '+ ') : tt.replace(/^\S+\s/, ''))}<span class="sb-star ${esFav ? 'on' : ''}" title="${esFav ? 'Quitar de favoritos' : 'Agregar a favoritos'}" onclick="event.stopPropagation();const it=window.__sbItems[${ri}];favToggle(it[0], it[1])">${esFav ? '★' : '☆'}</span></div>`; }).join('') : ''); }).join('')}</div>` : ''}`; };
-  const agentes = [['🎨', 'Director de arte', 'abrirDirectorArte()'], ['🧾', 'Auditor contable', 'abrirAuditor()']].filter(([, , f]) => puede(permisoDeAccion(f)));
+  const agentes = [['🎨', 'Director de arte', 'abrirDirectorArte()'], ['🧾', 'Auditor contable', 'abrirAuditor()'], ['⚖️', 'Reclamos ML / MP', 'abrirReclamosML()']].filter(([, , f]) => puede(permisoDeAccion(f)));
   sb.innerHTML = `<div class="sb-logo">OnLineTextil</div>
     <a onclick="sbAbierto=null;irInicio();pintarBarraLateral();document.body.classList.remove('sb-abierta')">${dsIco('home')} Inicio</a>
     ${bloqueFav}<div class="sb-sep">Tareas</div>
@@ -6478,7 +6478,7 @@ let sbCategoria = null;
 async function pintarCategoria(k){
   const box = document.getElementById('dash'); if(!box) return; const run = ++dashRun; sbCategoria = k;
   if(document.querySelector('.step.active') !== document.getElementById('step-inicio')){ const menu = document.querySelector('.menu-dropdown'); if(menu) menu.classList.remove('open'); mostrarPaso('step-inicio'); }
-  const g = GRUPOS_INICIO[k] || {}, cols = k === 'ag' ? [{ titulo: 'Agentes', items: [['🎨 Director de arte', 'abrirDirectorArte()'], ['🧾 Auditor contable', 'abrirAuditor()']].filter(([, f]) => puede(permisoDeAccion(f))) }] : sbItems(k);
+  const g = GRUPOS_INICIO[k] || {}, cols = k === 'ag' ? [{ titulo: 'Agentes', items: [['🎨 Director de arte', 'abrirDirectorArte()'], ['🧾 Auditor contable', 'abrirAuditor()'], ['⚖️ Reclamos ML / MP', 'abrirReclamosML()']].filter(([, f]) => puede(permisoDeAccion(f))) }] : sbItems(k);
   const titulo = k === 'ag' ? '🤖 Agentes IA' : k === 'i' ? '⚙️ Configuración' : (g.titulo || '');
   window.__catItems = []; const reg = it => { window.__catItems.push(it); return window.__catItems.length - 1; };
   const opciones = cols.map(c => { const tc = (c.titulo || titulo).replace(/^\d+ · /, ''); return `<details class="d-pl" ${cols.length === 1 ? 'open' : ''} data-tc="${escapeAttr(tc)}"><summary>${escaparHtml(tc)} <span class="cnt">${c.items.length}</span></summary><div><div class="d-acc" style="margin:0;">${c.items.map(([t, f]) => `<button type="button" data-t="${escapeAttr(t)}" style="${/ResultadosML|CalculadoraML|VentasML/.test(f) ? 'background:#FFE600;border-color:#E6CF00;color:#2D3277;font-weight:700;' : ''}" onclick="catUsar(${reg([t, f])})">${escaparHtml(sinEmoji(t))}</button>`).join('')}</div></div></details>`; }).join('');
@@ -12268,9 +12268,9 @@ auth.onAuthStateChanged(async u => {
     setTimeout(() => { pintarDash().catch(() => {}); }, 1200);
     setTimeout(() => { copiaAutomatica().catch(() => {}); }, 9000);
     if(ES_PESTANA_AGENTE) setTimeout(async () => { try{ const q = new URLSearchParams(location.search), paq = (q.get('paq') || '').split(',').filter(Boolean);
-      document.title = (ES_PESTANA_AGENTE === 'auditor' ? 'Auditor' : 'Director de arte') + ' · OnLineTextil';
+      document.title = (ES_PESTANA_AGENTE === 'auditor' ? 'Auditor' : ES_PESTANA_AGENTE === 'reclamos' ? 'Reclamos ML' : 'Director de arte') + ' · OnLineTextil';
       if(q.get('mes')) window.__audMes = q.get('mes');
-      if(!puede(permisoDeAccion(ES_PESTANA_AGENTE === 'auditor' ? 'abrirAuditor()' : 'abrirDirectorArte()'))){ alert('No tiene permiso para este agente.'); return; }
+      if(!puede(permisoDeAccion(ES_PESTANA_AGENTE === 'auditor' ? 'abrirAuditor()' : ES_PESTANA_AGENTE === 'reclamos' ? 'abrirReclamosML()' : 'abrirDirectorArte()'))){ alert('No tiene permiso para este agente.'); return; }
       await abrirChatAgente(ES_PESTANA_AGENTE); for(const pq of paq) await adjuntarPaqueteAud(pq, q.get('mes') || undefined); if(paq.length) document.getElementById('da-texto').value = 'Auditar'; } catch(e){ console.error(e); } }, 600);
     if(rol === 'dueño') setTimeout(() => registrarHistorialCostos().catch(e => console.error('historial de costos', e)), 8000);
 
@@ -13970,6 +13970,7 @@ let permisosActuales = null;
 // que permiso hace falta para cada pantalla
 function permisoDeAccion(f){
   const s = String(f);
+  if(/abrirReclamosML/.test(s)) return null; // todos los usuarios
   if(/abrirUsuarios|abrirCopiaSeguridad/.test(s)) return 'dueno';
   if(/abrirResultadosML|abrirCalculadoraML/.test(s)) return 'resultadosML';
   if(/abrirFacturas/.test(s)) return 'facturas';
@@ -14397,14 +14398,20 @@ let daAgente = 'arte';
 // los agentes se abren en otra pestana, para seguir usando la app en esta
 const ES_PESTANA_AGENTE = new URLSearchParams(location.search).get('agente');
 function abrirAgenteEnPestana(agente, extra){ const q = new URLSearchParams({ agente, ...(extra || {}) }); const w = window.open(location.pathname + '?' + q.toString(), 'agente-' + agente); if(!w) return false; try{ w.focus(); } catch(e){} return true; }
+async function abrirReclamosML(){ if(!ES_PESTANA_AGENTE && abrirAgenteEnPestana('reclamos')) return; return abrirChatAgente('reclamos'); }
 async function abrirDirectorArte(){ if(!ES_PESTANA_AGENTE && abrirAgenteEnPestana('arte')) return; return abrirChatAgente('arte'); }
 async function abrirAuditor(paquetes){ if(!ES_PESTANA_AGENTE && abrirAgenteEnPestana('auditor', paquetes && paquetes.length ? { paq: paquetes.join(',') } : {})) return; await abrirChatAgente('auditor'); if(paquetes && paquetes.length) for(const pq of paquetes) await adjuntarPaqueteAud(pq); }
 async function abrirChatAgente(agente){
   if(daAgente !== agente){ daChat = null; daProds = []; daImgs = []; daDocs = []; }
   daAgente = agente;
   mostrarPaso('step-director');
-  document.getElementById('da-tit').textContent = agente === 'auditor' ? '🧾 Auditor contable' : '🎨 Director de arte';
-  document.getElementById('da-canales').style.display = agente === 'auditor' ? 'none' : '';
+  document.getElementById('da-tit').textContent = agente === 'auditor' ? '🧾 Auditor contable' : agente === 'reclamos' ? '⚖️ Reclamos ML / MP' : '🎨 Director de arte';
+  document.getElementById('da-canales').style.display = agente === 'auditor' || agente === 'reclamos' ? 'none' : '';
+  { let b = document.getElementById('da-rec'); if(!b){ b = document.createElement('div'); b.id = 'da-rec'; const c = document.getElementById('da-canales'); c.parentNode.insertBefore(b, c); }
+    b.style.display = agente === 'reclamos' ? '' : 'none';
+    if(agente === 'reclamos') b.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 8px;font-size:.85rem;"><b>Cuenta:</b>${['Alberto', 'Rita'].map(c => `<button type="button" class="btn-mini da-cta" data-c="${c}" onclick="window.__recCta='${c}';document.querySelectorAll('.da-cta').forEach(x=>x.style.cssText=x.dataset.c===window.__recCta?'border-color:var(--purple);font-weight:700;':'')">${c}</button>`).join('')}
+      <input id="da-venta" inputmode="numeric" placeholder="N.º de venta (opcional)" style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;width:200px;"></div>
+      <p class="note" style="text-align:left;margin:0 0 8px;">Suba la <b>captura del reclamo</b> y las <b>fotos del comprador</b> (📎). El asistente redacta; usted revisa y pega en Mercado Libre.</p>`; }
   pintarDatosAud();
   try{ const d = await db.collection('config').doc('agente').get(); daCfg = d.exists ? d.data() : {}; } catch(e){ daCfg = {}; }
   pintarConfigDA();
@@ -14530,12 +14537,18 @@ function fichaDA(S){
 async function enviarDA(){
   if(!daCfg || !daCfg.url){ alert('Primero conecte el agente.'); return; }
   const texto = document.getElementById('da-texto').value.trim(); if(!texto && !daProds.length){ alert('Escriba el pedido.'); return; }
-  if(daAgente !== 'auditor' && !daCanal){ alert('Antes de enviar, elija para qué es: Mercado Libre, Tienda Nube, Post, Historia, Carrusel o Catálogo.'); const c = document.getElementById('da-canales'); if(c){ c.style.outline = '2px solid #A6432F'; c.style.borderRadius = '10px'; setTimeout(() => c.style.outline = '', 2500); c.scrollIntoView({ block: 'center' }); } return; }
+  if(daAgente === 'reclamos' && !window.__recCta){ alert('Elija la cuenta: Alberto o Rita.'); return; }
+  if(daAgente !== 'auditor' && daAgente !== 'reclamos' && !daCanal){ alert('Antes de enviar, elija para qué es: Mercado Libre, Tienda Nube, Post, Historia, Carrusel o Catálogo.'); const c = document.getElementById('da-canales'); if(c){ c.style.outline = '2px solid #A6432F'; c.style.borderRadius = '10px'; setTimeout(() => c.style.outline = '', 2500); c.scrollIntoView({ block: 'center' }); } return; }
   const btn = document.getElementById('da-enviar'); btn.disabled = true;
   try{
     procesando('Preparando el pedido…');
     const recordatorio = /Mercado Libre|Tienda Nube/.test(daCanal) ? 'OBLIGATORIO: usá la PLANTILLA FIJA del canal tal cual (portada y detalle empiezan con "Edit this photo. Do NOT redraw"); un solo prompt para todas las fotos; antes de responder, verificá la lista de control.\n' : /Catálogo/.test(daCanal) ? 'OBLIGATORIO: usá la PLANTILLA FIJA DE LÁMINA DE CATÁLOGO tal cual, sin conceptos; la foto del producto se EDITA ("Edit this photo. Do NOT redraw"); textos y precios exactos de la ficha; antes de responder, verificá la lista de control.\n' : '';
-    let cuerpo = (daCanal ? `Canal: ${daCanal}\n` + recordatorio : '') + (daProds.length ? `Fichas de producto (desde la app):\n${daProds.map(fichaDA).join('\n\n')}\n\n` : '') + `Pedido: ${texto}`;
+    let ctxRec = '';
+    if(daAgente === 'reclamos'){ const nv = ((document.getElementById('da-venta') || {}).value || '').replace(/\D/g, ''); let fila = '';
+      if(nv){ try{ procesando.texto('Buscando la venta…'); const s2 = await db.collection('ml_detalle').get(); for(const d of s2.docs){ const x = d.data(); if(String(x.cuenta || '').toLowerCase() !== window.__recCta.toLowerCase()) continue; const L = String(x.csv || '').split('\n'), cab = L[0]; const f = L.find(l => l.split(';')[2] === nv); if(f){ fila = cab + '\n' + f; break; } } } catch(e){} }
+      const sku = fila ? (fila.split('\n')[1].split(';')[6] || fila.split('\n')[1].split(';')[5]) : '';
+      ctxRec = `Cuenta: ${window.__recCta} (usar SOLO datos de esta cuenta; nunca mencionar otras cuentas, razones sociales ni al titular).\n` + (nv ? `N.º de venta: ${nv}\n` : '') + (fila ? `Datos de la venta (desde la app):\n${fila}\n` : nv ? 'La venta no está cargada en la app.\n' : '') + (sku && buscarProductoPorSku(sku) ? `Ficha del producto:\n${fichaDA(sku)}\n` : '') + `FORMATO OBLIGATORIO: 1) Análisis de las pruebas (fotos/captura) 2) Estrategia en 2-3 líneas 3) Respuesta para pegar en ML de hasta 300 caracteres, como persona común, sin citar leyes, sin admitir culpa 4) Qué adjuntar 5) Próximo paso y plazo. Si falta un dato clave, preguntalo primero.\n\n`; }
+    let cuerpo = ctxRec + (daCanal ? `Canal: ${daCanal}\n` + recordatorio : '') + (daProds.length ? `Fichas de producto (desde la app):\n${daProds.map(fichaDA).join('\n\n')}\n\n` : '') + `Pedido: ${texto}`;
     const content = [{ type: 'text', text: cuerpo }];
     for(const S of daProds){ const r = buscarProductoPorSku(S); if(!r) continue; const fs = fotosDeSkuOProducto(S, r.ci, r.pi, r.producto).slice(0, 3);
       for(const f of fs){ const b64 = await imagenABase64DA(f); if(b64) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } }); } }
@@ -22348,7 +22361,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v407';
+const APP_VERSION = '2026-10-02-v408';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
