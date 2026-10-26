@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v415</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v416</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13275,7 +13275,7 @@ function pgPintar(){ const S = (document.getElementById('pg-s').value || '').tri
   let esPack = false; try{ esPack = cantUnidadVenta(unidadVentaSku(S) || '') > 1 || /\bx\s*\d{1,2}\b|docena/.test(normBusqueda(rr.producto.nombre + ' ' + (rr.variante.desc || ''))); } catch(e){}
   const pcv = (window.__pgColores || {})[S] || 'foto';
   const selColores = esPack ? `<div style="display:flex;gap:6px;align-items:center;margin:0 0 8px;font-size:.85rem;"><b>Unidades del pack:</b>${[['foto', 'Como en la foto'], ['blancas', 'Blancas'], ['surtidas', 'Surtidas']].map(([v, tx]) => `<button type="button" class="btn-mini" style="${pcv === v ? 'border-color:var(--purple);font-weight:700;' : ''}" onclick="window.__pgColores=window.__pgColores||{};window.__pgColores['${S}']='${v}';try{localStorage.setItem('olt_pg_colores',JSON.stringify(window.__pgColores))}catch(e){};pgPintar()">${tx}</button>`).join('')}</div>` : '';
-  box.innerHTML = t ? `${selPanos}${selColores}<p class="note" style="text-align:left;margin:0 0 6px;">En Gemini: chat nuevo → suba UNA foto real del producto → pegue el texto.</p>${esFabricadoSku(S, rr ? rr.producto.nombre : '') ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 8px;padding:8px 10px;background:#F5F3EF;border-radius:10px;font-size:.84rem;"><b>Bolsa Lexington sin IA:</b><button type="button" class="btn-mini" onclick="descargarBolsaLexington('${S}', document.getElementById('pg-bcol').dataset.usar ? document.getElementById('pg-bcol').value : '')">Descargar imagen en bolsa</button><label style="display:flex;gap:4px;align-items:center;">color a mano <input type="color" id="pg-bcol" value="#FFFFFF" oninput="this.dataset.usar='1'"></label><span class="note" style="margin:0;">(si no elige, toma el color de la foto del producto)</span></div>` : ''}<textarea id="pg-txt" oninput="window.__pgTxt=this.value" style="width:100%;height:240px;box-sizing:border-box;font-size:.78rem;border:1px solid var(--line);border-radius:10px;padding:8px;">${escaparHtml(t)}</textarea>${(() => { const P = pgPartes(t); return P.length > 1 ? `<div style="margin-top:8px;"><b style="font-size:.82rem;">Gemini: pida de a UNA imagen, en el mismo chat</b><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${P.map((x, i) => `<button type="button" class="btn ${i === 0 ? 'btn-gold' : 'btn-ghost'}" style="width:auto;" onclick="copiarTexto(pgPartes(window.__pgTxt)[${i}], this)">${i + 1}. Copiar imagen ${i + 1}${i === 0 ? ' (con la foto)' : ''}</button>`).join('')}</div><p class="note" style="text-align:left;margin:6px 0 0;">1) Chat nuevo, suba la foto y pegue la imagen 1. 2) Cuando la termine, pegue la imagen 2 en el mismo chat, y así.</p></div>` : ''; })()}
+  box.innerHTML = t ? `${selPanos}${selColores}<p class="note" style="text-align:left;margin:0 0 6px;">En Gemini: chat nuevo → suba UNA foto real del producto → pegue el texto.</p>${esFabricadoSku(S, rr ? rr.producto.nombre : '') ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 8px;padding:8px 10px;background:#F5F3EF;border-radius:10px;font-size:.84rem;"><b>Bolsa Lexington sin IA:</b><button type="button" class="btn-mini" onclick="descargarBolsaLexington('${S}', document.getElementById('pg-bcol').dataset.usar ? document.getElementById('pg-bcol').value : '', document.getElementById('pg-best').checked)">Descargar imagen en bolsa</button><label style="display:flex;gap:4px;align-items:center;">color a mano <input type="color" id="pg-bcol" value="#FFFFFF" oninput="this.dataset.usar='1'"></label><label style="display:flex;gap:4px;align-items:center;"><input type="checkbox" id="pg-best"> es estampada (usar la foto como tela)</label><span class="note" style="margin:0;">Si no elige nada, usa el color liso de la foto del producto.</span></div>` : ''}<textarea id="pg-txt" oninput="window.__pgTxt=this.value" style="width:100%;height:240px;box-sizing:border-box;font-size:.78rem;border:1px solid var(--line);border-radius:10px;padding:8px;">${escaparHtml(t)}</textarea>${(() => { const P = pgPartes(t); return P.length > 1 ? `<div style="margin-top:8px;"><b style="font-size:.82rem;">Gemini: pida de a UNA imagen, en el mismo chat</b><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${P.map((x, i) => `<button type="button" class="btn ${i === 0 ? 'btn-gold' : 'btn-ghost'}" style="width:auto;" onclick="copiarTexto(pgPartes(window.__pgTxt)[${i}], this)">${i + 1}. Copiar imagen ${i + 1}${i === 0 ? ' (con la foto)' : ''}</button>`).join('')}</div><p class="note" style="text-align:left;margin:6px 0 0;">1) Chat nuevo, suba la foto y pegue la imagen 1. 2) Cuando la termine, pegue la imagen 2 en el mismo chat, y así.</p></div>` : ''; })()}
     <button type="button" class="btn btn-ghost" style="width:100%;margin-top:8px;" onclick="copiarTexto(window.__pgTxt, this)">Copiar todo junto</button>` : '<p class="note">Ese SKU no está en el catálogo.</p>'; }
 // separa el prompt en un mensaje por imagen (Gemini descarga mejor de a una)
 function pgPartes(t){ t = String(t || ''); const ms = [...t.matchAll(/(^|\n)\s*(IMAGE \d+\s*[–-][^\n]*)/g)]; if(ms.length < 2) return [t];
@@ -13403,18 +13403,20 @@ let __moldeBolsa = null;
 function cargarImg(src){ return new Promise((ok, no) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => ok(im); im.onerror = no; im.src = src; }); }
 async function moldeBolsa(){ if(__moldeBolsa) return __moldeBolsa; const im = await cargarImg(MOLDE_BOLSA.url); const c = document.createElement('canvas'); c.width = MOLDE_BOLSA.W; c.height = MOLDE_BOLSA.H; const x = c.getContext('2d'); x.drawImage(im, 0, 0, c.width, c.height); __moldeBolsa = x.getImageData(0, 0, c.width, c.height); return __moldeBolsa; }
 // tela del producto: color liso (promedio) o estampa (recorte central de su foto)
-async function telaDeProducto(S, colorManual){ const W = MOLDE_BOLSA.W, H = MOLDE_BOLSA.H, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+async function telaDeProducto(S, colorManual, estampada){ const W = MOLDE_BOLSA.W, H = MOLDE_BOLSA.H, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
   if(colorManual){ x.fillStyle = colorManual; x.fillRect(0, 0, W, H); return { datos: x.getImageData(0, 0, W, H), liso: true }; }
   const r = buscarProductoPorSku(S); const f = r ? (fotosDeSkuOProducto(S, r.ci, r.pi, r.producto) || [])[0] : null; if(!f){ x.fillStyle = '#FFFFFF'; x.fillRect(0, 0, W, H); return { datos: x.getImageData(0, 0, W, H), liso: true }; }
-  const im = await cargarImg(f); const s = Math.min(im.width, im.height) * 0.5, sx = (im.width - s) / 2, sy = (im.height - s) / 2;
-  const m = document.createElement('canvas'); m.width = 60; m.height = 60; const mx = m.getContext('2d'); mx.drawImage(im, sx, sy, s, s, 0, 0, 60, 60); const d = mx.getImageData(0, 0, 60, 60).data;
-  let R = 0, G = 0, B = 0, n = 0; for(let i = 0; i < d.length; i += 4){ R += d[i]; G += d[i + 1]; B += d[i + 2]; n++; } R /= n; G /= n; B /= n;
-  let v = 0; for(let i = 0; i < d.length; i += 4){ v += (d[i] - R) ** 2 + (d[i + 1] - G) ** 2 + (d[i + 2] - B) ** 2; } const desv = Math.sqrt(v / n / 3);
-  if(desv < 22){ // liso: se corrige la luz de la foto (se lleva el color a una luminosidad pareja)
-    const mxv = Math.max(R, G, B), k = mxv > 225 ? 255 / mxv : 1; x.fillStyle = `rgb(${Math.min(255, R * k)},${Math.min(255, G * k)},${Math.min(255, B * k)})`; x.fillRect(0, 0, W, H); return { datos: x.getImageData(0, 0, W, H), liso: true }; }
-  let sw = im.width * 0.8, sh = sw * H / W; if(sh > im.height * 0.9){ sh = im.height * 0.9; sw = sh * W / H; } x.drawImage(im, (im.width - sw) / 2, (im.height - sh) / 2, sw, sh, 0, 0, W, H); return { datos: x.getImageData(0, 0, W, H), liso: false }; }
-async function imagenBolsaLexington(S, colorManual){
-  const mo = await moldeBolsa(), t = await telaDeProducto(S, colorManual), W = MOLDE_BOLSA.W, H = MOLDE_BOLSA.H;
+  const im = await cargarImg(f);
+  if(estampada){ let sw = im.width * 0.8, sh = sw * H / W; if(sh > im.height * 0.9){ sh = im.height * 0.9; sw = sh * W / H; } x.drawImage(im, (im.width - sw) / 2, (im.height - sh) / 2, sw, sh, 0, 0, W, H); return { datos: x.getImageData(0, 0, W, H), liso: false }; }
+  // liso (por defecto): color de la tela = mediana de los pixeles mas claros de la foto (descarta etiquetas, sombras y fondo oscuro)
+  const m = document.createElement('canvas'); m.width = 80; m.height = 80; const mx = m.getContext('2d'); mx.drawImage(im, im.width * 0.15, im.height * 0.15, im.width * 0.7, im.height * 0.7, 0, 0, 80, 80); const d = mx.getImageData(0, 0, 80, 80).data;
+  const P = []; for(let i = 0; i < d.length; i += 4) P.push([d[i], d[i + 1], d[i + 2], d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11]);
+  P.sort((a, b) => a[3] - b[3]); const T = P.slice(Math.floor(P.length * 0.45), Math.floor(P.length * 0.9)); // la tela, sin lo oscuro (etiquetas) ni los brillos
+  const med = k => { const v = T.map(p => p[k]).sort((a, b) => a - b); return v[Math.floor(v.length / 2)]; };
+  let R = med(0), G = med(1), B = med(2); const mxv = Math.max(R, G, B); if(mxv > 215){ const k = 255 / mxv; R *= k; G *= k; B *= k; } // los blancos quedan blancos
+  x.fillStyle = `rgb(${Math.round(R)},${Math.round(G)},${Math.round(B)})`; x.fillRect(0, 0, W, H); return { datos: x.getImageData(0, 0, W, H), liso: true }; }
+async function imagenBolsaLexington(S, colorManual, estampada){
+  const mo = await moldeBolsa(), t = await telaDeProducto(S, colorManual, estampada), W = MOLDE_BOLSA.W, H = MOLDE_BOLSA.H;
   const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); const out = x.createImageData(W, H), a = mo.data, b = t.datos.data, o = out.data;
   for(let i = 0; i < a.length; i += 4){ const lum = Math.min(1.08, a[i] / 235), sp = a[i + 1] / 255 * 0.85;
     for(let k = 0; k < 3; k++){ let v = b[i + k] * lum; v = v + (255 - v) * sp; o[i + k] = v < 0 ? 0 : v > 255 ? 255 : v; } o[i + 3] = 255; }
@@ -13431,7 +13433,7 @@ async function imagenBolsaLexington(S, colorManual){
   lx.save(); lx.shadowColor = 'rgba(0,0,0,0.22)'; lx.shadowBlur = 50; lx.shadowOffsetY = 24; lx.fillStyle = '#FFFFFF'; lx.fillRect(ox + 20, oy + 20, w2 - 40, h2 - 30); lx.restore();
   lx.imageSmoothingQuality = 'high'; lx.drawImage(c, ox, oy, w2, h2);
   return L.toDataURL('image/jpeg', 0.92); }
-async function descargarBolsaLexington(S, colorManual){ try{ procesando('Armando la imagen en bolsa…'); const u = await imagenBolsaLexington(S, colorManual); procesando.fin && procesando.fin(); const a = document.createElement('a'); a.href = u; a.download = `${String(S).toUpperCase()}-bolsa-lexington.jpg`; a.click(); dsToast('Imagen en bolsa descargada'); } catch(e){ try{ procesando.fin && procesando.fin(); } catch(x){} alert('No se pudo armar la imagen: ' + e.message); } }
+async function descargarBolsaLexington(S, colorManual, estampada){ try{ procesando('Armando la imagen en bolsa…'); const u = await imagenBolsaLexington(S, colorManual, estampada); procesando.fin && procesando.fin(); const a = document.createElement('a'); a.href = u; a.download = `${String(S).toUpperCase()}-bolsa-lexington.jpg`; a.click(); dsToast('Imagen en bolsa descargada'); } catch(e){ try{ procesando.fin && procesando.fin(); } catch(x){} alert('No se pudo armar la imagen: ' + e.message); } }
 // ===== Bosquejo de medidas por SKU (lo dibuja la app, sin IA): ultima imagen de cada SKU =====
 // Los productos de fabricacion propia tienen la medida de CORTE: se muestra la TERMINADA (corte - confeccion).
 const CONFECCION = { cortina: { ancho: 5, alto: 15 }, funda: { ancho: 2, largo: 7 }, plana: { ancho: 2, largo: 10 }, mantel: { ancho: 2, largo: 2 }, otro: { ancho: 2, largo: 2 } };
@@ -22423,7 +22425,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v415';
+const APP_VERSION = '2026-10-02-v416';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
