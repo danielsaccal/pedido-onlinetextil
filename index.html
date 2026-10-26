@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v422</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v423</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13268,12 +13268,12 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
   if(t === 'ajustable') L.push(['MAIN PHOTO', [`ONE fitted sheet only (no flat sheet, no pillowcase), folded into a neat, low, flat rectangle with straight edges and clean folds.`, `The elastic edges are tucked inside: not visible.`, `Front view, slightly elevated.`]]);
   else if(t === 'sabanas') L.push(['MAIN PHOTO', [
     `A stack of EXACTLY ${nf === 1 ? 'THREE' : 'FOUR'} folded pieces, from bottom to top:`,
-    `  1. Flat sheet — the widest piece.`, `  2. Fitted sheet — about 10% narrower; elastic tucked inside, not visible.`,
+    `  1. Flat sheet — the widest piece.`, `  2. Fitted sheet — about 10% narrower; elastic tucked inside, not visible; NO hem line and NO stitching on it (a fitted sheet has no hem: plain folded fabric only).`,
     nf === 1 ? `  3. Pillowcase — about 30% narrower.` : `  3–4. Two identical pillowcases — about 30% narrower, one exactly on top of the other.`,
     `Every piece is folded like linen in a closet: a long, low, flat rectangle with straight sharp edges and clean folds; each piece narrower than the one below, so the steps are visible.`,
     `The ${nf === 1 ? 'pillowcase is folded like a napkin into a thin, flat strip' : 'pillowcases are folded like napkins into thin, flat strips'}: crisp, pressed, one third the height of a folded sheet, square corners, empty and completely flat.`,
     `Count before finishing: ${nf === 1 ? '3' : '4'} pieces in total — one flat sheet, one fitted sheet, ${nf === 1 ? 'one pillowcase' : 'two pillowcases'}. Nothing loose, no hanging corners, no extra layers.`,
-    `Hems and stitching only where they exist in the photo. Straight front view at the height of the stack.`]]);
+    `Hems: only the flat sheet and the pillowcases may show the hem line seen in the photo; the fitted sheet never. Straight front view at the height of the stack.`]]);
   else if(packN > 1) L.push(['MAIN PHOTO', [`Use the photo as the exact reference of ONE unit.`, `Show EXACTLY ${packN} identical units: one laid OPEN and flat on top showing its full design, and the other ${packN - 1} folded in half and neatly stacked in ${packN >= 10 ? 'two short piles' : 'one pile'} beside it, with the same lines visible on each fold.`, `Count them before finishing: exactly ${packN}.`]]);
   else L.push(['MAIN PHOTO', [`EDIT the photo — do not redraw the product.`, `Keep the ${prod} exactly as it is: same shape, folds, print and finishing.`, `Only: remove room shadows and dark areas so the brightness is even; straighten the outline; smooth small wrinkles; replace the background.`]]);
   // IMAGEN 2 · EN USO
@@ -22460,7 +22460,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v422';
+const APP_VERSION = '2026-10-02-v423';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
