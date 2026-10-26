@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v410</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v411</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -14415,7 +14415,7 @@ ACUSACIONES DE ML: pedí número de envío, valores registrados, quién verific�
 ESCALADA: revisión humana y apelación en plazo → Centro de Ayuda con capturas → COPREC → abogado.`;
 async function recCopiarGratis(b){ if(!window.__recCta){ alert('Elija la cuenta: Alberto o Rita.'); return; }
   const txt = REC_REGLAS + '\n\n' + await recContexto() + 'RECLAMO: ' + (((document.getElementById('da-texto') || {}).value || '').trim() || '(ver la captura adjunta)') + '\n(Adjunto la captura del reclamo y las fotos del comprador.)';
-  try{ await navigator.clipboard.writeText(txt); dsToast('Copiado. Péguelo en Gemini o ChatGPT gratis, junto con la captura y las fotos.'); } catch(e){ prompt('Copie este texto:', txt); } }
+  try{ await navigator.clipboard.writeText(txt); dsToast('Copiado. Péguelo en Claude, Gemini o ChatGPT, junto con la captura y las fotos.'); } catch(e){ prompt('Copie este texto:', txt); } }
 async function abrirReclamosML(){ if(!ES_PESTANA_AGENTE && abrirAgenteEnPestana('reclamos')) return; return abrirChatAgente('reclamos'); }
 async function abrirDirectorArte(){ if(!ES_PESTANA_AGENTE && abrirAgenteEnPestana('arte')) return; return abrirChatAgente('arte'); }
 async function abrirAuditor(paquetes){ if(!ES_PESTANA_AGENTE && abrirAgenteEnPestana('auditor', paquetes && paquetes.length ? { paq: paquetes.join(',') } : {})) return; await abrirChatAgente('auditor'); if(paquetes && paquetes.length) for(const pq of paquetes) await adjuntarPaqueteAud(pq); }
@@ -14431,11 +14431,11 @@ async function abrirChatAgente(agente){
       if(tx) tx.placeholder = agente === 'reclamos' ? 'Escriba el reclamo. Ej.: dice que recibió 6 de 12, sin fotos' : 'Escriba el pedido. Ej: 3 fotos para Mercado Libre de este producto';
       if(sk) sk.style.display = agente === 'reclamos' ? 'none' : ''; if(agente !== 'reclamos') recQuitarColor(); else if(window.__recCta) setTimeout(() => recCuenta(window.__recCta), 0); }
     { const en = document.getElementById('da-enviar'), cf = document.getElementById('da-config'); if(en) en.style.display = agente === 'reclamos' ? 'none' : ''; if(cf) cf.style.display = agente === 'reclamos' ? 'none' : '';
-      let cp = document.getElementById('da-rec-copiar'); if(!cp && en){ cp = document.createElement('button'); cp.id = 'da-rec-copiar'; cp.type = 'button'; cp.className = 'btn btn-gold'; cp.style.width = 'auto'; cp.textContent = 'Copiar para Gemini / ChatGPT'; cp.onclick = () => recCopiarGratis(cp); en.parentNode.insertBefore(cp, en); }
+      let cp = document.getElementById('da-rec-copiar'); if(!cp && en){ cp = document.createElement('button'); cp.id = 'da-rec-copiar'; cp.type = 'button'; cp.className = 'btn btn-gold'; cp.style.width = 'auto'; cp.textContent = 'Copiar para Claude / Gemini / ChatGPT'; cp.onclick = () => recCopiarGratis(cp); en.parentNode.insertBefore(cp, en); }
       if(cp) cp.style.display = agente === 'reclamos' ? '' : 'none'; }
     if(agente === 'reclamos') b.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 8px;font-size:.85rem;"><b>Cuenta:</b>${['Alberto', 'Rita'].map(c => `<button type="button" class="btn-mini da-cta" data-c="${c}" onclick="recCuenta('${c}')" style="border-color:${RZ_COLOR[c.toLowerCase()]}!important;color:${RZ_COLOR[c.toLowerCase()]}!important;font-weight:700;">${c}</button>`).join('')}
       <input id="da-venta" inputmode="numeric" placeholder="N.º de venta (opcional)" style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;width:200px;"></div>
-      <p class="note" style="text-align:left;margin:0 0 8px;">Sin costo: elija la cuenta, ponga el N.º de venta, escriba el reclamo y toque <b>Copiar para Gemini / ChatGPT</b>. Péguelo allá (gratis) junto con la captura y las fotos.</p>`; }
+      <p class="note" style="text-align:left;margin:0 0 8px;">Sin costo: elija la cuenta, ponga el N.º de venta, escriba el reclamo y toque <b>Copiar</b> y péguelo en <b>Claude</b>, Gemini o ChatGPT, junto con la captura y las fotos.</p>`; }
   pintarDatosAud();
   try{ const d = await db.collection('config').doc('agente').get(); daCfg = d.exists ? d.data() : {}; } catch(e){ daCfg = {}; }
   pintarConfigDA();
@@ -14472,7 +14472,7 @@ function renderMsgsDA(){
     ? `<div style="margin:8px 0 8px 15%;background:#3D2B4E;color:#fff;border-radius:12px;padding:8px 10px;white-space:pre-wrap;font-size:.88rem;">${escaparHtml(m.texto)}</div>`
     : `<div style="margin:8px 15% 8px 0;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 10px;font-size:.88rem;">${htmlRespuestaDA(m.texto, i)}
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:6px;border-top:1px dashed var(--line);">${Object.keys(window.__daCopias || {}).some(k => k.startsWith(i + '-') && window.__daCopias[k].p) ? `<button type="button" class="btn-mini" onclick="copiarTodosDA(${i},this)">📋 Copiar todos los prompts</button>` : ''}<button type="button" class="btn-mini" onclick="copiarRespuestaDA(${i},this)">📋 Copiar respuesta completa</button></div></div>`).join('')
-    : (daAgente === 'reclamos' ? '<p class="note">Elija la cuenta, ponga el N.º de venta y escriba el reclamo. Después copie el texto para Gemini o ChatGPT (gratis).</p>' : '<p class="note">Elija productos, el canal y escriba el pedido. El agente responde con conceptos y especificaciones listas para el generador de imágenes.</p>');
+    : (daAgente === 'reclamos' ? '<p class="note">Elija la cuenta, ponga el N.º de venta y escriba el reclamo. Después copie el texto para Claude, Gemini o ChatGPT.</p>' : '<p class="note">Elija productos, el canal y escriba el pedido. El agente responde con conceptos y especificaciones listas para el generador de imágenes.</p>');
   box.scrollTop = box.scrollHeight;
 }
 // cada bloque ESPECIFICACION con botones para copiar el bloque o solo la indicacion en ingles
@@ -22381,7 +22381,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v410';
+const APP_VERSION = '2026-10-02-v411';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
