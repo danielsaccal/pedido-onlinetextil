@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v421</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v422</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13292,7 +13292,8 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
     `Remove the small white code sticker of PHOTO B: no sticker, no size, no SKU, no other text.`,
     `Photorealistic: it must look like a real photo of a real product. Straight front view.`], 'No other text or logo except the "Lexington" label. No watermark.']);
   const N = L.length;
-  return L.map(([tit, lin, ext], k) => (k === 0 ? `Generate ONE image now (${N} in total, one per message in this chat).\n\n${reglas}\n\n` : `Same product, same photo and same rules as before. Generate ONLY this image:\n\n`) + `IMAGE ${k + 1} of ${N} – ${tit}\n${lin.filter(Boolean).join('\n')}\n\n${fmt(ext)}`).join(SEP);
+  // cada mensaje es completo por si solo (sirve en el mismo chat o en uno nuevo): siempre lleva el producto y las reglas
+  return L.map(([tit, lin, ext], k) => `Generate ONE image (image ${k + 1} of ${N}). Attach the photo of the real product${k === 3 && fab ? ' and the photo of the real Lexington package' : ''} to this message if it is not already in this chat.\n\n${reglas}\n\nIMAGE ${k + 1} of ${N} – ${tit}\n${lin.filter(Boolean).join('\n')}\n\n${fmt(ext)}`).join(SEP);
 }
 function copiarTexto(t, btn){ navigator.clipboard.writeText(t).then(() => { if(btn){ const o = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(() => btn.textContent = o, 1500); } }).catch(() => prompt('Copie el texto:', t)); }
 async function abrirPromptGemini(S){ await cargarDatosFabricacion(); try{ if(telasDatos === null) await cargarTelas(); } catch(e){}
@@ -22459,7 +22460,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v421';
+const APP_VERSION = '2026-10-02-v422';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
