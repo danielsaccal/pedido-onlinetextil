@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v420</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v421</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13250,15 +13250,49 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
   if(packN <= 1){ const mm = normBusqueda(nombre + ' ' + medida).match(/\bx\s*(\d{1,2})\b|\b(docena)\b|\b(media docena)\b/); if(mm) packN = mm[3] ? 6 : mm[2] ? 12 : +mm[1] || 1; }
   const pc = (window.__pgColores || {})[String(S).toUpperCase()] || 'foto', numTxt = { 2: 'TWO', 3: 'THREE', 4: 'FOUR', 6: 'SIX', 10: 'TEN', 12: 'TWELVE', 24: 'TWENTY-FOUR' }[packN] || String(packN);
   const pack = packN > 1 ? ` SALES UNIT: this product is sold as a pack of ${packN} units${packN === 12 ? ' (one dozen)' : packN === 6 ? ' (half a dozen)' : ''}. In IMAGE 1, use the photo only as an exact reference of ONE unit (same fabric, size, finishing) and show EXACTLY ${numTxt} (${packN}) units, all the same product and size, neatly arranged together (folded and stacked or fanned out in tidy rows) so all ${packN} can be counted: exactly ${packN}, no more, no less. ${pc === 'blancas' ? `All ${packN} units are natural clean WHITE (#FFFFFF), identical.` : pc === 'surtidas' ? `The ${packN} units are in ASSORTED colors: ${packN} clearly different solid colors chosen at random (no two alike, no white). Each unit is ONE single solid color, never two-tone, striped in other colors or color-blocked; only the design lines of the photo (in white) are kept. Each unit keeps exactly the same design and size as the photo.` : `The units have exactly the colors and prints shown in the photo.`} In IMAGE 2 show several units in use (not just one).` : '';
-  return `Using the attached photo of the real product, generate these ${nImg} images, one after another, in this order. The print, colors, motif size, fabric and finishing must stay EXACTLY as in the photo in all ${nImg} images.${color} Product: ${nombre} — ${medida}${comp ? ' — ' + comp : ''}.${escala} DESIGN: copy the exact layout of every line, stripe, band or border seen in the photo (how many, where, in which direction, how thick, plain or dashed); do not add, remove, move or thicken any line, and do not invent woven bands, stitching or fringes. COLOR: keep exactly the color of the photo, corrected to neutral daylight; never warm up, yellow or dull it — if the fabric is white in the photo, it stays a clean pure white (#FFFFFF), never cream, ivory or beige. TEXTURE: keep exactly the weave seen in the photo${/toall|rizo|felpa|toallon/.test(normBusqueda(nombre + ' ' + comp)) ? ': TERRY LOOP PILE (soft cotton loops, "rizo"), never waffle, never honeycomb, never flat weave' : ' (terry, waffle, percale, canvas, velvet…); never change it to another weave'}.${pack}
-
-${t === 'ajustable' ? `IMAGE 1 – MAIN: Use the photo only as an exact reference for the color, print and fabric. Show ONE single fitted sheet (only one piece: no flat sheet, no pillowcase), folded into a neat, low, flat rectangle with straight, well-defined edges, slightly softened corners and clean folds, the elastic edges tucked inside so they are not visible. No labels, no ribbons, no decorative elements. Straight front view, slightly elevated, soft diffused studio light, no hard shadows. ${fondo}, soft contact shadow, centered, filling 85-95% of the frame. Square 1:1, ${px}.` : t === 'sabanas' ? `IMAGE 1 – MAIN: Use the photo only as an exact reference for colors, prints and fabric of each piece. Show the sheet set in the standard fold: ${pila}. ${fondo}, soft contact shadow, product centered filling 85-95% of the frame. Square 1:1, ${px}.` : packN > 1 ? `IMAGE 1 – MAIN (pack of ${packN}): Use the photo only as an exact reference of ONE unit: same fabric and texture, same color, same lines and borders in the same places, same real size (${medida}). Show EXACTLY ${numTxt} (${packN}) identical units on a pure white background: one unit laid OPEN and flat on top showing its full design exactly as in the photo, and the other ${packN - 1} folded in half and neatly stacked in ${packN >= 10 ? 'two short piles' : 'one pile'} beside it, with the same lines visible on each fold. Count them: exactly ${packN}. Soft diffused studio light, no hard shadows, soft contact shadow, centered, filling 85-95% of the frame. Square 1:1, ${px}.` : `IMAGE 1 – MAIN: Edit this photo. Do NOT redraw, regenerate or reinterpret the product. Keep the ${prod} exactly as it is: same print, same motifs or stripes with the same widths, size and position, same shape and folds; hems and stitching ONLY where they are visible in the photo.${forma} Remove any shadows or darker areas caused by the room light (they are not part of the fabric) so the whole product has even, uniform brightness, keeping its real colors exactly, without saturating or shifting them. Straighten the outline and smooth small wrinkles without changing the print. ${fondo}, soft contact shadow under the product, centered, filling 85-95% of the frame. Square 1:1, ${px}.`}
-
-IMAGE 2 – IN USE: Use the photo only as an exact texture reference for the print, color and fabric. ${escena} Copy the print exactly at the same scale as in the photo: motifs keep their real size, never shrink or enlarge them. Do not invent seams, center lines, borders, trims, embroidery or piping that are not in the photo. Simple bright room, neutral colors, soft daylight, no brand names. Square 1:1, ${px}.
-
-IMAGE 3 – DETAIL: Edit this photo. Do NOT redraw the print. Crop a close-up from the CENTER of the fabric only: completely inside the fabric surface, with NO edges, NO hems, NO corners and NO stitching visible. Show the print and the fabric weave sharply, with even neutral white light. Same colors. Square 1:1, ${px}.${bolsa}
-
-For all images: no text, no logos, no watermark, no props over the product${fab ? ' (except the LEXINGTON print on the bag in IMAGE 4)' : ''}.`;
+  // ===== Armado final: un mensaje por imagen, ordenado y corto (Gemini trabaja mejor de a una) =====
+  const SEP = '\n\n──────────\n\n', esToalla = /toall|rizo|felpa|toallon/.test(normBusqueda(nombre + ' ' + comp));
+  const fmt = (extra) => `FORMAT: square 1:1, ${px}. ${fondo === 'pure white seamless background #FFFFFF' ? 'Pure white seamless background (#FFFFFF)' : 'Background: ' + fondo}, soft diffused studio light, no hard shadows, soft contact shadow, product centered filling 85–95% of the frame. ${extra || 'No text, no logos, no watermark, no props.'}`;
+  const tamano = dimsM.length ? `${dimsM[0]} × ${dimsM[1]} cm${chica ? (ladoMax >= 25 ? ', about the size of an A4 sheet of paper' : ', smaller than an adult hand') : ''}` : '';
+  const reglas = [
+    `PRODUCT: ${nombre} — ${medida}${comp ? ' — ' + comp : ''}.`,
+    `The attached photo shows the REAL product. In every image keep from it:`,
+    `• COLOR: exactly as in the photo, corrected to neutral daylight; never warmer, yellower or duller. White stays pure white (#FFFFFF), never cream or ivory.`,
+    `• FABRIC: ${esToalla ? 'terry loop pile (soft cotton loops), never waffle or flat weave' : 'the same weave and texture as in the photo, never another weave'}.`,
+    `• DESIGN: the same lines, stripes, borders and prints, in the same places, same direction and thickness; nothing added, removed or moved; no invented bands, stitching or fringes.`,
+    tamano ? `• REAL SIZE: ${tamano}; keep this size relative to ${refTam}.` : '',
+    packN > 1 ? `• SALES UNIT: pack of ${packN} units${packN === 12 ? ' (one dozen)' : ''}. ${pc === 'blancas' ? `All ${packN} units are pure white and identical.` : pc === 'surtidas' ? `The ${packN} units are in ${packN} clearly different solid colors (no white, no two alike); each unit is ONE solid color, never two-tone; the design lines stay as in the photo.` : 'The units have the colors and prints of the photo.'}` : ''
+  ].filter(Boolean).join('\n');
+  const L = []; // [titulo, lineas, formatoExtra]
+  // IMAGEN 1 · PRINCIPAL
+  if(t === 'ajustable') L.push(['MAIN PHOTO', [`ONE fitted sheet only (no flat sheet, no pillowcase), folded into a neat, low, flat rectangle with straight edges and clean folds.`, `The elastic edges are tucked inside: not visible.`, `Front view, slightly elevated.`]]);
+  else if(t === 'sabanas') L.push(['MAIN PHOTO', [
+    `A stack of EXACTLY ${nf === 1 ? 'THREE' : 'FOUR'} folded pieces, from bottom to top:`,
+    `  1. Flat sheet — the widest piece.`, `  2. Fitted sheet — about 10% narrower; elastic tucked inside, not visible.`,
+    nf === 1 ? `  3. Pillowcase — about 30% narrower.` : `  3–4. Two identical pillowcases — about 30% narrower, one exactly on top of the other.`,
+    `Every piece is folded like linen in a closet: a long, low, flat rectangle with straight sharp edges and clean folds; each piece narrower than the one below, so the steps are visible.`,
+    `The ${nf === 1 ? 'pillowcase is folded like a napkin into a thin, flat strip' : 'pillowcases are folded like napkins into thin, flat strips'}: crisp, pressed, one third the height of a folded sheet, square corners, empty and completely flat.`,
+    `Count before finishing: ${nf === 1 ? '3' : '4'} pieces in total — one flat sheet, one fitted sheet, ${nf === 1 ? 'one pillowcase' : 'two pillowcases'}. Nothing loose, no hanging corners, no extra layers.`,
+    `Hems and stitching only where they exist in the photo. Straight front view at the height of the stack.`]]);
+  else if(packN > 1) L.push(['MAIN PHOTO', [`Use the photo as the exact reference of ONE unit.`, `Show EXACTLY ${packN} identical units: one laid OPEN and flat on top showing its full design, and the other ${packN - 1} folded in half and neatly stacked in ${packN >= 10 ? 'two short piles' : 'one pile'} beside it, with the same lines visible on each fold.`, `Count them before finishing: exactly ${packN}.`]]);
+  else L.push(['MAIN PHOTO', [`EDIT the photo — do not redraw the product.`, `Keep the ${prod} exactly as it is: same shape, folds, print and finishing.`, `Only: remove room shadows and dark areas so the brightness is even; straighten the outline; smooth small wrinkles; replace the background.`]]);
+  // IMAGEN 2 · EN USO
+  L.push(['IN USE', [`Use the photo only as the exact reference for fabric, color and print.`, escena, `The print keeps its real scale; nothing invented (no seams, borders, trims or embroidery that are not in the photo).`, `Simple bright room, neutral colors, soft daylight, no brand names.`], 'No text, no logos, no watermark.']);
+  // IMAGEN 3 · DETALLE
+  L.push(['DETAIL', [`EDIT the photo — do not redraw the fabric.`, `Close-up cropped from the CENTER of the fabric: no edges, no hems, no corners, no stitching.`, `The weave and the print sharp, even neutral white light, same colors.`], 'No text, no logos, no watermark.']);
+  // IMAGEN 4 · BOLSA LEXINGTON (fabricacion propia)
+  if(fab) L.push(['PACKAGING — attach now a 2nd photo: the real Lexington package (PHOTO B)', [
+    `Use PHOTO B for the package and the product photo for the fabric.`,
+    `PACKAGE: identical to PHOTO B — the same ${prod} folded flat and firm inside a thin, glossy, clear polypropylene film that hugs it tightly, with the same soft wrinkles, reflections and sealed edges. PORTRAIT: height about 1.25 × the width. No zipper, no flap, no empty space at the top.`,
+    `FABRIC inside: exactly the color and print of the product photo, only slightly softened by the plastic.`,
+    `LABEL (printed on the film): a perfectly straight DARK GREY rectangle (#3A3B3F), not a band — the fabric shows on both sides of it.`,
+    `  • Width: 65% of the package (17% margin on each side). Height: two thirds of its width.`,
+    `  • Position: centered horizontally, its center at 60% of the package height, as in PHOTO B.`,
+    `  • Text: "Lexington" (capital L, rest lowercase), off-white classic serif (#EEECE8), centered, with one thin straight underline.`,
+    `Remove the small white code sticker of PHOTO B: no sticker, no size, no SKU, no other text.`,
+    `Photorealistic: it must look like a real photo of a real product. Straight front view.`], 'No other text or logo except the "Lexington" label. No watermark.']);
+  const N = L.length;
+  return L.map(([tit, lin, ext], k) => (k === 0 ? `Generate ONE image now (${N} in total, one per message in this chat).\n\n${reglas}\n\n` : `Same product, same photo and same rules as before. Generate ONLY this image:\n\n`) + `IMAGE ${k + 1} of ${N} – ${tit}\n${lin.filter(Boolean).join('\n')}\n\n${fmt(ext)}`).join(SEP);
 }
 function copiarTexto(t, btn){ navigator.clipboard.writeText(t).then(() => { if(btn){ const o = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(() => btn.textContent = o, 1500); } }).catch(() => prompt('Copie el texto:', t)); }
 async function abrirPromptGemini(S){ await cargarDatosFabricacion(); try{ if(telasDatos === null) await cargarTelas(); } catch(e){}
@@ -13278,7 +13312,7 @@ function pgPintar(){ const S = (document.getElementById('pg-s').value || '').tri
   box.innerHTML = t ? `${selPanos}${selColores}<p class="note" style="text-align:left;margin:0 0 6px;">En Gemini: chat nuevo → suba UNA foto real del producto → pegue el texto.${esFabricadoSku(S, rr ? rr.producto.nombre : '') ? ' · Fabricación propia: la imagen 4 es la bolsa LEXINGTON (para esa, suba también una foto de la bolsa real).' : ''}</p><textarea id="pg-txt" oninput="window.__pgTxt=this.value" style="width:100%;height:240px;box-sizing:border-box;font-size:.78rem;border:1px solid var(--line);border-radius:10px;padding:8px;">${escaparHtml(t)}</textarea>${(() => { const P = pgPartes(t); return P.length > 1 ? `<div style="margin-top:8px;"><b style="font-size:.82rem;">Gemini: pida de a UNA imagen, en el mismo chat</b><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${P.map((x, i) => `<button type="button" class="btn ${i === 0 ? 'btn-gold' : 'btn-ghost'}" style="width:auto;" onclick="copiarTexto(pgPartes(window.__pgTxt)[${i}], this)">${i + 1}. Copiar imagen ${i + 1}${i === 0 ? ' (con la foto)' : ''}</button>`).join('')}</div><p class="note" style="text-align:left;margin:6px 0 0;">1) Chat nuevo, suba la foto y pegue la imagen 1. 2) Cuando la termine, pegue la imagen 2 en el mismo chat, y así.</p></div>` : ''; })()}
     <button type="button" class="btn btn-ghost" style="width:100%;margin-top:8px;" onclick="copiarTexto(window.__pgTxt, this)">Copiar todo junto</button>` : '<p class="note">Ese SKU no está en el catálogo.</p>'; }
 // separa el prompt en un mensaje por imagen (Gemini descarga mejor de a una)
-function pgPartes(t){ t = String(t || ''); const ms = [...t.matchAll(/(^|\n)\s*(IMAGE \d+\s*[–-][^\n]*)/g)]; if(ms.length < 2) return [t];
+function pgPartes(t){ t = String(t || ''); if(t.includes('──────────')) return t.split(/\n*──────────\n*/).map(s => s.trim()).filter(Boolean); const ms = [...t.matchAll(/(^|\n)\s*(IMAGE \d+\s*[–-][^\n]*)/g)]; if(ms.length < 2) return [t];
   const ini = ms.map(m => m.index + (m[1] ? 1 : 0)), cab = t.slice(0, ini[0]).trim(), pf = t.search(/\n\s*For all images/), pie = pf >= 0 ? t.slice(pf).trim() : '';
   const bloques = ini.map((s, i) => t.slice(s, i + 1 < ini.length ? ini[i + 1] : (pf >= 0 ? pf : t.length)).trim());
   return bloques.map((b, i) => i === 0 ? `${cab.replace(/generate these \d+ images, one after another, in this order/i, 'generate ONE image (more will follow in this same chat)')}\n\n${b}\n\n${pie}`.trim() : `Same product, same attached photo and same rules as before (design, texture, real size, colors and quantity). Now generate ONLY this image:\n\n${b}\n\n${pie}`.trim()); }
@@ -22425,7 +22459,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v420';
+const APP_VERSION = '2026-10-02-v421';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
