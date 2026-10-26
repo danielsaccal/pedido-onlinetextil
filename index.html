@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v404</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v405</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13224,7 +13224,7 @@ function promptGemini(S, canal){
     const panos = panosDeSku(S, medida, nombre) || 1; // cortinas: cantidad de panos
   const nc = normBusqueda(nombre + ' ' + medida), cabezal = /pasabarral|jareta|pasa barral/.test(nc) ? ' HEADING: ROD POCKET (pasabarral): the rod passes THROUGH a sewn fabric tunnel at the top of each panel, so the rod is hidden inside the fabric and the top is softly gathered along the rod. NO rings, NO hooks, NO clips, NO grommets, NO eyelets, NO pinch pleats, NO curtain tape.' : /ollao|ojal|argolla|grommet/.test(nc) ? ' HEADING: metal GROMMETS (eyelets) along the top, the rod passing through them, forming even soft waves. No hooks, no pleats.' : /presilla|trabilla/.test(nc) ? ' HEADING: fabric TAB TOP loops sewn at the top, the rod passing through the loops. No rings, no hooks, no grommets.' : /gancho|cinta|plisad|tabla/.test(nc) ? ' HEADING: pleated curtain tape with hooks on rings or a track, even pleats.' : '';
   const dimsM = (String(medida).replace(/,/g, '.').match(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)/) || []).slice(1).map(Number), ladoMax = dimsM.length ? Math.max(...dimsM) : 0, chica = ladoMax > 0 && ladoMax <= 40;
-  const escala = dimsM.length ? ` REAL SIZE: ${dimsM[0]} × ${dimsM[1]} cm${chica ? ' — a SMALL piece, about the size of an adult hand; never show it as a hand towel or bath towel' : ''}. Keep this real size relative to the hands, the sink, the faucet and the other objects.` : '';
+  const escala = dimsM.length ? ` REAL SIZE: ${dimsM[0]} × ${dimsM[1]} cm${chica ? ` — a SMALL piece, ${ladoMax >= 25 ? 'about the size of a sheet of A4 paper (21 × 29.7 cm) or an open adult hand' : 'smaller than an adult hand'}; never show it as a hand towel or bath towel` : ladoMax <= 80 ? ' — a medium piece, about as long as an adult arm from elbow to fingertips' : ''}. Keep this real size relative to the hands, the sink, the faucet and the other objects.` : '';
   const escena = {
     mantel: `In this image the tablecloth must be FULLY UNFOLDED AND SPREAD OPEN, never folded. The same tablecloth (${medida}) fully spread over a rectangular dining table of the right size, covering the entire tabletop and hanging about 25 cm on every side, with soft natural folds at the corners. View from above at about 45°, nothing on the table covering the print.`,
     ajustable: `ONLY the same fitted sheet (${medida}) fitted tightly on a bare mattress of that size, the elastic corners wrapping the mattress, smooth and taut, no flat sheet, no pillowcases, no duvet, no other bedding. A plain pillow without case may be omitted. View from the foot of the bed at about 30°, so the corner and the mattress height are visible.`,
@@ -22348,7 +22348,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v404';
+const APP_VERSION = '2026-10-02-v405';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
