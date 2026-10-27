@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v424</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v425</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13261,7 +13261,7 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
     `• FABRIC: ${esToalla ? 'terry loop pile (soft cotton loops), never waffle or flat weave' : 'the same weave and texture as in the photo, never another weave'}.`,
     `• DESIGN: the same lines, stripes, borders and prints, in the same places, same direction and thickness; nothing added, removed or moved; no invented bands, stitching or fringes.`,
     tamano ? `• REAL SIZE: ${tamano}; keep this size relative to ${refTam}.` : '',
-    packN > 1 ? `• SALES UNIT: pack of ${packN} units${packN === 12 ? ' (one dozen)' : ''}. ${pc === 'blancas' ? `All ${packN} units are pure white and identical.` : pc === 'surtidas' ? `The ${packN} units are in ${packN} clearly different solid colors (no white, no two alike); each unit is ONE solid color, never two-tone; the design lines stay as in the photo.` : 'The units have the colors and prints of the photo.'}` : ''
+    packN > 1 ? `• SALES UNIT: pack of ${packN} units${packN === 12 ? ' (one dozen)' : ''}. ${/^lista:/.test(pc) ? `Use ONLY these colors, ${(() => { const cs = pc.slice(6).split(',').map(s => s.trim()).filter(Boolean); const rep = Math.max(1, Math.floor(packN / cs.length)); return cs.length ? `${rep} unit${rep > 1 ? 's' : ''} of each: ${cs.join(', ')}` : ''; })()} — no other colors; each unit ONE solid color.` : pc === 'blancas' ? `All ${packN} units are pure white and identical.` : pc === 'surtidas' ? `The ${packN} units are in ${packN} clearly different solid colors (no white, no two alike); each unit is ONE solid color, never two-tone; the design lines stay as in the photo.` : 'The units have the colors and prints of the photo.'}` : ''
   ].filter(Boolean).join('\n');
   const L = []; // [titulo, lineas, formatoExtra]
   // IMAGEN 1 · PRINCIPAL
@@ -13274,7 +13274,7 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
     `The ${nf === 1 ? 'pillowcase is folded like a napkin into a thin, flat strip' : 'pillowcases are folded like napkins into thin, flat strips'}: crisp, pressed, one third the height of a folded sheet, square corners, empty and completely flat.`,
     `Count before finishing: ${nf === 1 ? '3' : '4'} pieces in total — one flat sheet, one fitted sheet, ${nf === 1 ? 'one pillowcase' : 'two pillowcases'}. Nothing loose, no hanging corners, no extra layers.`,
     `Hems: only the flat sheet and the pillowcases may show the hem line seen in the photo; the fitted sheet never. Straight front view at the height of the stack.`]]);
-  else if(packN > 1) L.push(['MAIN PHOTO', [`Use the photo as the exact reference of ONE unit.`, `Show EXACTLY ${packN} identical units: one laid OPEN and flat on top showing its full design, and the other ${packN - 1} folded in half and neatly stacked in ${packN >= 10 ? 'two short piles' : 'one pile'} beside it, with the same lines visible on each fold.`, `Count them before finishing: exactly ${packN}.`]]);
+  else if(packN > 1) L.push(['MAIN PHOTO', [`Use the photo as the exact reference of ONE unit.`, `Show EXACTLY ${packN} identical units: one laid OPEN and flat showing its full design, and the other ${packN - 1} folded in half and neatly stacked in ${packN >= 10 ? 'two piles' : 'one pile'} beside it, with the same lines visible on each fold.`, `SIZE CHECK: all units are the same size${dimsM.length ? ` (${dimsM[0]} × ${dimsM[1]} cm)` : ''}. The open unit is EXACTLY as wide as a folded one and EXACTLY twice its length (it is the same piece unfolded); it must never look bigger, like a bath towel.`, `Count them before finishing: exactly ${packN}.`]]);
   else L.push(['MAIN PHOTO', [`EDIT the photo — do not redraw the product.`, `Keep the ${prod} exactly as it is: same shape, folds, print and finishing.`, `Only: remove room shadows and dark areas so the brightness is even; straighten the outline; smooth small wrinkles; replace the background.`]]);
   // IMAGEN 2 · EN USO
   L.push(['IN USE', [`Use the photo only as the exact reference for fabric, color and print.`, escena, `The print keeps its real scale; nothing invented (no seams, borders, trims or embroidery that are not in the photo).`, `Simple bright room, neutral colors, soft daylight, no brand names.`], 'No text, no logos, no watermark.']);
@@ -13305,13 +13305,14 @@ async function abrirPromptGemini(S){ await cargarDatosFabricacion(); try{ if(tel
   pgPintar();
 }
 try{ window.__pgColores = JSON.parse(localStorage.getItem('olt_pg_colores') || '{}'); } catch(e){ window.__pgColores = {}; }
+function pgSetColores(S, v){ window.__pgColores = window.__pgColores || {}; window.__pgColores[S] = v; try{ localStorage.setItem('olt_pg_colores', JSON.stringify(window.__pgColores)); } catch(e){} pgPintar(); }
 function pgPintar(){ const S = (document.getElementById('pg-s').value || '').trim().toUpperCase().split(/\s/)[0], c = (document.querySelector('input[name=pg-c]:checked') || {}).value || 'ml', box = document.getElementById('pg-res'); if(!S){ box.innerHTML = ''; return; }
   const t = promptGemini(S, c); window.__pgTxt = t;
   const rr = buscarProductoPorSku(S), esCort = rr && /cortina/i.test(rr.producto.nombre + ' ' + (rr.variante.desc || '')), np = rr ? panosDeSku(S, rr.variante.desc || '', rr.producto.nombre) : 0;
   const selPanos = esCort ? `<div style="display:flex;gap:6px;align-items:center;margin:0 0 8px;font-size:.85rem;"><b>Paños:</b>${[1, 2].map(n => `<button type="button" class="btn-mini" style="${(np || 0) === n ? 'border-color:var(--purple);font-weight:700;' : ''}" onclick="guardarPanos('${S}', ${n}).then(pgPintar)">${n}</button>`).join('')}${np ? '' : ' <span style="color:#A6432F;">elija cuántos paños tiene (queda guardado)</span>'}</div>` : '';
   let esPack = false; try{ esPack = cantUnidadVenta(unidadVentaSku(S) || '') > 1 || /\bx\s*\d{1,2}\b|docena/.test(normBusqueda(rr.producto.nombre + ' ' + (rr.variante.desc || ''))); } catch(e){}
   const pcv = (window.__pgColores || {})[S] || 'foto';
-  const selColores = esPack ? `<div style="display:flex;gap:6px;align-items:center;margin:0 0 8px;font-size:.85rem;"><b>Unidades del pack:</b>${[['foto', 'Como en la foto'], ['blancas', 'Blancas'], ['surtidas', 'Surtidas']].map(([v, tx]) => `<button type="button" class="btn-mini" style="${pcv === v ? 'border-color:var(--purple);font-weight:700;' : ''}" onclick="window.__pgColores=window.__pgColores||{};window.__pgColores['${S}']='${v}';try{localStorage.setItem('olt_pg_colores',JSON.stringify(window.__pgColores))}catch(e){};pgPintar()">${tx}</button>`).join('')}</div>` : '';
+  const selColores = esPack ? `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:0 0 8px;font-size:.85rem;"><b>Unidades del pack:</b>${[['foto', 'Como en la foto'], ['blancas', 'Blancas'], ['surtidas', 'Surtidas']].map(([v, tx]) => `<button type="button" class="btn-mini" style="${pcv === v ? 'border-color:var(--purple);font-weight:700;' : ''}" onclick="pgSetColores('${S}','${v}')">${tx}</button>`).join('')}<input id="pg-clista" placeholder="o escriba los colores: blanco, amarillo patito, azul francia…" value="${/^lista:/.test(pcv) ? escapeAttr(pcv.slice(6)) : ''}" style="flex:1;min-width:220px;padding:5px 8px;border:1px solid ${/^lista:/.test(pcv) ? 'var(--purple)' : 'var(--line)'};border-radius:8px;" onchange="pgSetColores('${S}', this.value.trim() ? 'lista:' + this.value.trim() : 'foto')"></div>` : '';
   box.innerHTML = t ? `${selPanos}${selColores}<p class="note" style="text-align:left;margin:0 0 6px;">En Gemini: chat nuevo → suba UNA foto real del producto → pegue el texto.${esFabricadoSku(S, rr ? rr.producto.nombre : '') ? ' · Fabricación propia: la imagen 4 es la bolsa LEXINGTON (con la descripción completa de la bolsa; no hace falta otra foto).' : ''}</p><textarea id="pg-txt" oninput="window.__pgTxt=this.value" style="width:100%;height:240px;box-sizing:border-box;font-size:.78rem;border:1px solid var(--line);border-radius:10px;padding:8px;">${escaparHtml(t)}</textarea>${(() => { const P = pgPartes(t); return P.length > 1 ? `<div style="margin-top:8px;"><b style="font-size:.82rem;">Gemini: pida de a UNA imagen, en el mismo chat</b><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${P.map((x, i) => `<button type="button" class="btn ${i === 0 ? 'btn-gold' : 'btn-ghost'}" style="width:auto;" onclick="copiarTexto(pgPartes(window.__pgTxt)[${i}], this)">${i + 1}. Copiar imagen ${i + 1}${i === 0 ? ' (con la foto)' : ''}</button>`).join('')}</div><p class="note" style="text-align:left;margin:6px 0 0;">1) Chat nuevo, suba la foto y pegue la imagen 1. 2) Cuando la termine, pegue la imagen 2 en el mismo chat, y así.</p></div>` : ''; })()}
     <button type="button" class="btn btn-ghost" style="width:100%;margin-top:8px;" onclick="copiarTexto(window.__pgTxt, this)">Copiar todo junto</button>` : '<p class="note">Ese SKU no está en el catálogo.</p>'; }
 // separa el prompt en un mensaje por imagen (Gemini descarga mejor de a una)
@@ -22462,7 +22463,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v424';
+const APP_VERSION = '2026-10-02-v425';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
