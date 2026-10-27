@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v435</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v436</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13531,19 +13531,43 @@ async function sfsElegir(inp){ const sinExt = n => n.replace(/\.[^.]+$/, ''); co
   if(otros) setTimeout(() => dsToast(`${otros} foto${otros > 1 ? 's' : ''} en formato TIF, HEIC u otro que el navegador no abre: no se cargan. Páselas a JPG para subirlas.`, { ms: 9000 }), 300);
   sfsLista = img.map(f => { const ruta = (f.webkitRelativePath || '').split('/'), carpeta = ruta.length > 1 ? ruta[ruta.length - 2] : ''; return { f, nombre: (ruta.length > 2 ? carpeta + '/' : '') + f.name, sku: sfsSkuDeNombre(f.name) || sfsSkuDeNombre(carpeta), url: URL.createObjectURL(f) }; });
   if(!sfsLista.length) dsToast('No encontré fotos en lo que eligió'); sfsPintar(); }
+// lista: se arma UNA vez; al cambiar un SKU se actualiza solo ese renglon (rapido con miles de fotos)
+let sfsFiltro = 'todas';
+function sfsCarpeta(x){ const k = x.nombre.lastIndexOf('/'); return k > 0 ? x.nombre.slice(0, k) : '(sin carpeta)'; }
+function sfsInfo(x){ const r = x.sku ? buscarProductoPorSku(x.sku) : null, ya = x.sku ? (fotosSku[x.sku] || []).length : 0;
+  return r ? escaparHtml(r.producto.nombre + ' · ' + (r.variante.desc || '')) + (ya ? ` <span class="note" style="margin:0;">(ya tiene ${ya})</span>` : '') : '<b style="color:#A6432F;">SKU no encontrado</b>'; }
+function sfsFilaHtml(x, i){ return `<div class="sfs-r" data-i="${i}" style="display:flex;gap:8px;align-items:center;padding:5px 8px;border-bottom:1px solid #F3EFE8;${x.sku ? '' : 'background:#FBEDEA;'}"><input type="checkbox" class="sfs-ck" data-i="${i}" ${x.sel ? 'checked' : ''} onchange="sfsLista[${i}].sel=this.checked;sfsContar()">
+    <img src="${x.url}" loading="lazy" style="width:42px;height:42px;object-fit:cover;border-radius:6px;border:1px solid var(--line);"><div style="flex:1;min-width:0;"><div style="font-size:.74rem;color:#8A8072;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escaparHtml(x.nombre.split('/').pop())}</div><div class="sfs-inf" style="font-size:.8rem;">${sfsInfo(x)}</div></div>
+    <input list="sfs-skus" value="${escapeAttr(x.sku)}" placeholder="SKU" style="width:105px;padding:4px 8px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;" onchange="sfsPonerSku([${i}], this.value)"><button type="button" class="btn-mini" title="Quitar de la lista" onclick="sfsQuitar([${i}])">✕</button></div>`; }
 function sfsPintar(){ const box = document.getElementById('sfs-box'); if(!box) return; if(!sfsLista.length){ box.innerHTML = ''; return; }
-  const lst0 = document.getElementById('sfs-lst'), sc = lst0 ? lst0.scrollTop : 0, caja = document.getElementById('pub-modal'), sc2 = caja ? caja.scrollTop : 0;
-  setTimeout(() => { const l = document.getElementById('sfs-lst'); if(l) l.scrollTop = sc; if(caja) caja.scrollTop = sc2; }, 0);
-  const ok = sfsLista.filter(x => x.sku).length, skus = [...new Set(sfsLista.filter(x => x.sku).map(x => x.sku))];
-  box.innerHTML = `<datalist id="sfs-skus">${Object.keys(window.__todosSku || {}).slice(0, 0).join('')}${(() => { const L = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => L.push(`<option value="${escapeAttr(v.sku)}">${escaparHtml(p.nombre + ' · ' + (v.desc || ''))}</option>`)))); return L.join(''); })()}</datalist>
-    <div style="font-size:.86rem;margin-bottom:8px;"><b>${ok}</b> de ${sfsLista.length} fotos con SKU · ${skus.length} SKU${sfsLista.length - ok ? ` · <span style="color:#A6432F;">${sfsLista.length - ok} sin SKU (escríbalo o se descartan)</span>` : ''}</div>
-    <div id="sfs-lst" style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px;">${sfsLista.map((x, i) => { const r = x.sku ? buscarProductoPorSku(x.sku) : null, ya = x.sku ? (fotosSku[x.sku] || []).length : 0;
-      return `<div style="display:flex;gap:10px;align-items:center;padding:6px 8px;border-bottom:1px solid #F3EFE8;${x.sku ? '' : 'background:#FBEDEA;'}"><img src="${x.url}" style="width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid var(--line);"><div style="flex:1;min-width:0;"><div style="font-size:.78rem;color:#8A8072;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escaparHtml(x.nombre)}</div><div style="font-size:.82rem;">${r ? escaparHtml(r.producto.nombre + ' · ' + (r.variante.desc || '')) + (ya ? ` <span class="note" style="margin:0;">(ya tiene ${ya})</span>` : '') : '<b style="color:#A6432F;">SKU no encontrado</b>'}</div></div>
-        <input list="sfs-skus" value="${escapeAttr(x.sku)}" placeholder="SKU" style="width:110px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;" onchange="sfsLista[${i}].sku=(buscarProductoPorSku(this.value.trim().toUpperCase())?this.value.trim().toUpperCase():'');sfsPintar()"><button type="button" class="btn-mini" title="Quitar" onclick="sfsLista.splice(${i},1);sfsPintar()">✕</button></div>`; }).join('')}</div>
+  if(!document.getElementById('sfs-skus')){ const L = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => L.push(`<option value="${escapeAttr(v.sku)}">${escaparHtml(p.nombre + ' · ' + (v.desc || ''))}</option>`)))); document.body.insertAdjacentHTML('beforeend', `<datalist id="sfs-skus">${L.join('')}</datalist>`); }
+  const G = new Map(); sfsLista.forEach((x, i) => { if(x.quitada) return; if(sfsFiltro === 'sin' && x.sku) return; if(sfsFiltro === 'con' && !x.sku) return; const c = sfsCarpeta(x); if(!G.has(c)) G.set(c, []); G.get(c).push(i); });
+  box.innerHTML = `<div id="sfs-cont" style="font-size:.86rem;margin-bottom:6px;"></div>
+    <div style="position:sticky;top:0;z-index:2;background:#fff;display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;">
+      <span id="sfs-nsel" style="font-size:.84rem;font-weight:600;">0 seleccionadas</span>
+      <input id="sfs-masivo" list="sfs-skus" placeholder="SKU para las seleccionadas" style="width:190px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;" onkeydown="if(event.key==='Enter')sfsAplicarMasivo()">
+      <button type="button" class="btn-mini" onclick="sfsAplicarMasivo()">Aplicar SKU</button><button type="button" class="btn-mini" onclick="sfsQuitar(sfsSel())">Quitar seleccionadas</button><button type="button" class="btn-mini" onclick="sfsMarcar(false)">Ninguna</button>
+      <span style="margin-left:auto;font-size:.8rem;">Ver: ${[['todas', 'todas'], ['sin', 'sin SKU'], ['con', 'con SKU']].map(([v, t]) => `<button type="button" class="btn-mini" style="${sfsFiltro === v ? 'border-color:var(--purple);font-weight:700;' : ''}" onclick="sfsFiltro='${v}';sfsPintar()">${t}</button>`).join('')}</span></div>
+    <div id="sfs-lst" style="max-height:50vh;overflow:auto;border:1px solid var(--line);border-radius:10px;">${[...G.entries()].map(([c, idx]) => `<div style="position:sticky;top:0;background:#F5F1EB;display:flex;gap:8px;align-items:center;padding:5px 8px;font-size:.8rem;font-weight:700;color:#3D2B4E;border-bottom:1px solid var(--line);z-index:1;"><input type="checkbox" onchange="sfsMarcarCarpeta(${JSON.stringify(c).replace(/"/g, '&quot;')}, this.checked)"> ${escaparHtml(c)} <span style="font-weight:400;color:#8A8072;">· ${idx.length} fotos</span></div>` + idx.map(i => sfsFilaHtml(sfsLista[i], i)).join('')).join('')}</div>
     <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:10px;font-size:.86rem;"><label><input type="radio" name="sfs-modo" value="agregar" checked> Agregar a las fotos que ya tiene cada SKU</label><label><input type="radio" name="sfs-modo" value="reemplazar"> Reemplazar sus fotos</label></div>
-    <button type="button" class="btn btn-gold" style="margin-top:10px;" ${ok ? '' : 'disabled'} onclick="sfsGuardar(this)">Cargar ${ok} foto${ok === 1 ? '' : 's'} en ${skus.length} SKU</button>`; }
+    <button type="button" id="sfs-cargar" class="btn btn-gold" style="margin-top:10px;" onclick="sfsGuardar(this)"></button>`;
+  sfsContar(); }
+function sfsSel(){ return sfsLista.map((x, i) => x.sel && !x.quitada ? i : -1).filter(i => i >= 0); }
+function sfsContar(){ const vis = sfsLista.filter(x => !x.quitada), ok = vis.filter(x => x.sku).length, skus = new Set(vis.filter(x => x.sku).map(x => x.sku)).size, ns = sfsSel().length;
+  const c = document.getElementById('sfs-cont'); if(c) c.innerHTML = `<b>${ok}</b> de ${vis.length} fotos con SKU · ${skus} SKU${vis.length - ok ? ` · <span style="color:#A6432F;">${vis.length - ok} sin SKU (se descartan)</span>` : ''}`;
+  const s = document.getElementById('sfs-nsel'); if(s) s.textContent = `${ns} seleccionada${ns === 1 ? '' : 's'}`;
+  const b = document.getElementById('sfs-cargar'); if(b){ b.textContent = `Cargar ${ok} foto${ok === 1 ? '' : 's'} en ${skus} SKU`; b.disabled = !ok; } }
+function sfsActualizarFila(i){ const x = sfsLista[i], el = document.querySelector(`.sfs-r[data-i="${i}"]`); if(!el) return; el.style.background = x.sku ? '' : '#FBEDEA'; el.querySelector('.sfs-inf').innerHTML = sfsInfo(x); const inp = el.querySelector('input[list]'); if(inp) inp.value = x.sku; const ck = el.querySelector('.sfs-ck'); if(ck) ck.checked = !!x.sel; }
+function sfsPonerSku(I, v){ const s = String(v || '').trim().toUpperCase(), ok = s && buscarProductoPorSku(s) ? s : ''; if(s && !ok){ dsToast(`El SKU ${s} no existe en la app`); }
+  I.forEach(i => { sfsLista[i].sku = ok; sfsActualizarFila(i); }); sfsContar(); }
+function sfsAplicarMasivo(){ const I = sfsSel(), v = (document.getElementById('sfs-masivo') || {}).value || ''; if(!I.length){ dsToast('Marque primero las fotos (o una carpeta entera)'); return; }
+  const s = v.trim().toUpperCase(); if(!s || !buscarProductoPorSku(s)){ dsToast(`El SKU ${s || '(vacío)'} no existe en la app`); return; }
+  sfsPonerSku(I, s); I.forEach(i => { sfsLista[i].sel = false; sfsActualizarFila(i); }); sfsContar(); dsToast(`SKU ${s} aplicado a ${I.length} foto${I.length === 1 ? '' : 's'}`); }
+function sfsQuitar(I){ if(!I.length) return; I.forEach(i => { sfsLista[i].quitada = true; sfsLista[i].sel = false; const el = document.querySelector(`.sfs-r[data-i="${i}"]`); if(el) el.remove(); }); sfsContar(); }
+function sfsMarcar(v){ sfsLista.forEach((x, i) => { if(x.sel !== v){ x.sel = v; sfsActualizarFila(i); } }); sfsContar(); }
+function sfsMarcarCarpeta(c, v){ sfsLista.forEach((x, i) => { if(!x.quitada && sfsCarpeta(x) === c && (sfsFiltro === 'todas' || (sfsFiltro === 'sin') === !x.sku)){ x.sel = v; sfsActualizarFila(i); } }); sfsContar(); }
 async function sfsGuardar(b){ const modo = (document.querySelector('input[name=sfs-modo]:checked') || {}).value || 'agregar', G = {};
-  sfsLista.filter(x => x.sku).forEach(x => { (G[x.sku] = G[x.sku] || []).push(x.f); });
+  sfsLista.filter(x => x.sku && !x.quitada).forEach(x => { (G[x.sku] = G[x.sku] || []).push(x.f); });
   const S = Object.keys(G); if(modo === 'reemplazar' && !await dsConfirm(`¿Reemplazar las fotos actuales de ${S.length} SKU?\nLas fotos que tenían se borran.`)) return;
   b.disabled = true; let n = 0, err = [];
   for(const s of S){ b.textContent = `Cargando ${++n} de ${S.length}…`;
@@ -22544,7 +22568,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v435';
+const APP_VERSION = '2026-10-02-v436';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
