@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v423</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v424</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13281,19 +13281,21 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
   // IMAGEN 3 · DETALLE
   L.push(['DETAIL', [`EDIT the photo — do not redraw the fabric.`, `Close-up cropped from the CENTER of the fabric: no edges, no hems, no corners, no stitching.`, `The weave and the print sharp, even neutral white light, same colors.`], 'No text, no logos, no watermark.']);
   // IMAGEN 4 · BOLSA LEXINGTON (fabricacion propia)
-  if(fab) L.push(['PACKAGING — attach now a 2nd photo: the real Lexington package (PHOTO B)', [
-    `Use PHOTO B for the package and the product photo for the fabric.`,
-    `PACKAGE: identical to PHOTO B — the same ${prod} folded flat and firm inside a thin, glossy, clear polypropylene film that hugs it tightly, with the same soft wrinkles, reflections and sealed edges. PORTRAIT: height about 1.25 × the width. No zipper, no flap, no empty space at the top.`,
-    `FABRIC inside: exactly the color and print of the product photo, only slightly softened by the plastic.`,
-    `LABEL (printed on the film): a perfectly straight DARK GREY rectangle (#3A3B3F), not a band — the fabric shows on both sides of it.`,
-    `  • Width: 65% of the package (17% margin on each side). Height: two thirds of its width.`,
-    `  • Position: centered horizontally, its center at 60% of the package height, as in PHOTO B.`,
-    `  • Text: "Lexington" (capital L, rest lowercase), off-white classic serif (#EEECE8), centered, with one thin straight underline.`,
-    `Remove the small white code sticker of PHOTO B: no sticker, no size, no SKU, no other text.`,
-    `Photorealistic: it must look like a real photo of a real product. Straight front view.`], 'No other text or logo except the "Lexington" label. No watermark.']);
+  if(fab) L.push(['PACKAGING (Lexington bag)', [
+    `PACKAGE: the same ${prod} folded into a flat, firm, rectangular block inside a clear, glossy, transparent polypropylene bag. PORTRAIT: the height is 1.3 × the width. Straight front view, upright.`,
+    `FILM: thin and crystal clear, fitted around the block; a narrow transparent margin of film is visible along the top and both sides, with straight heat-sealed edges; a few soft natural wrinkles and light reflections near the edges, smooth over the center. No zipper, no zip-lock strip, no flap, no handle, no empty space above the fabric.`,
+    `FABRIC inside: exactly the color and print of the product photo, seen sharply through the film (only very slightly softened); straight, neatly folded edges.`,
+    `LABEL printed on the film — a solid, flat, matte charcoal-grey rectangle (#41444A), perfectly straight, sharp square corners, no border, no shadow:`,
+    `  • Width: 69% of the package width, with fabric visible on both sides (about 15% margin left and right). It is a rectangle, never a band from edge to edge.`,
+    `  • Height: about half of its width (proportion 1.9 : 1).`,
+    `  • Position: centered horizontally; its center at 55% of the package height (slightly below the middle).`,
+    `  • Text: the word "Lexington" — capital L, the rest lowercase — in a classic elegant serif typeface (like Century or Times), off-white (#EFEBE4), centered, the word about 84% of the label width, letters about one quarter of the label height.`,
+    `  • Underline: one thin off-white line under the word, the same width as the word, interrupted only where the descender of the "g" passes.`,
+    `NOTHING ELSE: no sticker, no size, no SKU, no barcode, no other text or logo.`,
+    `Photorealistic product photography: it must look like a real photo of a real product. Pure white background, soft even studio light, soft contact shadow, the package filling about 90% of the frame height.`], 'No other text or logo except the "Lexington" label. No watermark.']);
   const N = L.length;
   // cada mensaje es completo por si solo (sirve en el mismo chat o en uno nuevo): siempre lleva el producto y las reglas
-  return L.map(([tit, lin, ext], k) => `Generate ONE image (image ${k + 1} of ${N}). Attach the photo of the real product${k === 3 && fab ? ' and the photo of the real Lexington package' : ''} to this message if it is not already in this chat.\n\n${reglas}\n\nIMAGE ${k + 1} of ${N} – ${tit}\n${lin.filter(Boolean).join('\n')}\n\n${fmt(ext)}`).join(SEP);
+  return L.map(([tit, lin, ext], k) => `Generate ONE image (image ${k + 1} of ${N}). Attach the photo of the real product to this message if it is not already in this chat.\n\n${reglas}\n\nIMAGE ${k + 1} of ${N} – ${tit}\n${lin.filter(Boolean).join('\n')}\n\n${fmt(ext)}`).join(SEP);
 }
 function copiarTexto(t, btn){ navigator.clipboard.writeText(t).then(() => { if(btn){ const o = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(() => btn.textContent = o, 1500); } }).catch(() => prompt('Copie el texto:', t)); }
 async function abrirPromptGemini(S){ await cargarDatosFabricacion(); try{ if(telasDatos === null) await cargarTelas(); } catch(e){}
@@ -13310,7 +13312,7 @@ function pgPintar(){ const S = (document.getElementById('pg-s').value || '').tri
   let esPack = false; try{ esPack = cantUnidadVenta(unidadVentaSku(S) || '') > 1 || /\bx\s*\d{1,2}\b|docena/.test(normBusqueda(rr.producto.nombre + ' ' + (rr.variante.desc || ''))); } catch(e){}
   const pcv = (window.__pgColores || {})[S] || 'foto';
   const selColores = esPack ? `<div style="display:flex;gap:6px;align-items:center;margin:0 0 8px;font-size:.85rem;"><b>Unidades del pack:</b>${[['foto', 'Como en la foto'], ['blancas', 'Blancas'], ['surtidas', 'Surtidas']].map(([v, tx]) => `<button type="button" class="btn-mini" style="${pcv === v ? 'border-color:var(--purple);font-weight:700;' : ''}" onclick="window.__pgColores=window.__pgColores||{};window.__pgColores['${S}']='${v}';try{localStorage.setItem('olt_pg_colores',JSON.stringify(window.__pgColores))}catch(e){};pgPintar()">${tx}</button>`).join('')}</div>` : '';
-  box.innerHTML = t ? `${selPanos}${selColores}<p class="note" style="text-align:left;margin:0 0 6px;">En Gemini: chat nuevo → suba UNA foto real del producto → pegue el texto.${esFabricadoSku(S, rr ? rr.producto.nombre : '') ? ' · Fabricación propia: la imagen 4 es la bolsa LEXINGTON (para esa, suba también una foto de la bolsa real).' : ''}</p><textarea id="pg-txt" oninput="window.__pgTxt=this.value" style="width:100%;height:240px;box-sizing:border-box;font-size:.78rem;border:1px solid var(--line);border-radius:10px;padding:8px;">${escaparHtml(t)}</textarea>${(() => { const P = pgPartes(t); return P.length > 1 ? `<div style="margin-top:8px;"><b style="font-size:.82rem;">Gemini: pida de a UNA imagen, en el mismo chat</b><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${P.map((x, i) => `<button type="button" class="btn ${i === 0 ? 'btn-gold' : 'btn-ghost'}" style="width:auto;" onclick="copiarTexto(pgPartes(window.__pgTxt)[${i}], this)">${i + 1}. Copiar imagen ${i + 1}${i === 0 ? ' (con la foto)' : ''}</button>`).join('')}</div><p class="note" style="text-align:left;margin:6px 0 0;">1) Chat nuevo, suba la foto y pegue la imagen 1. 2) Cuando la termine, pegue la imagen 2 en el mismo chat, y así.</p></div>` : ''; })()}
+  box.innerHTML = t ? `${selPanos}${selColores}<p class="note" style="text-align:left;margin:0 0 6px;">En Gemini: chat nuevo → suba UNA foto real del producto → pegue el texto.${esFabricadoSku(S, rr ? rr.producto.nombre : '') ? ' · Fabricación propia: la imagen 4 es la bolsa LEXINGTON (con la descripción completa de la bolsa; no hace falta otra foto).' : ''}</p><textarea id="pg-txt" oninput="window.__pgTxt=this.value" style="width:100%;height:240px;box-sizing:border-box;font-size:.78rem;border:1px solid var(--line);border-radius:10px;padding:8px;">${escaparHtml(t)}</textarea>${(() => { const P = pgPartes(t); return P.length > 1 ? `<div style="margin-top:8px;"><b style="font-size:.82rem;">Gemini: pida de a UNA imagen, en el mismo chat</b><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${P.map((x, i) => `<button type="button" class="btn ${i === 0 ? 'btn-gold' : 'btn-ghost'}" style="width:auto;" onclick="copiarTexto(pgPartes(window.__pgTxt)[${i}], this)">${i + 1}. Copiar imagen ${i + 1}${i === 0 ? ' (con la foto)' : ''}</button>`).join('')}</div><p class="note" style="text-align:left;margin:6px 0 0;">1) Chat nuevo, suba la foto y pegue la imagen 1. 2) Cuando la termine, pegue la imagen 2 en el mismo chat, y así.</p></div>` : ''; })()}
     <button type="button" class="btn btn-ghost" style="width:100%;margin-top:8px;" onclick="copiarTexto(window.__pgTxt, this)">Copiar todo junto</button>` : '<p class="note">Ese SKU no está en el catálogo.</p>'; }
 // separa el prompt en un mensaje por imagen (Gemini descarga mejor de a una)
 function pgPartes(t){ t = String(t || ''); if(t.includes('──────────')) return t.split(/\n*──────────\n*/).map(s => s.trim()).filter(Boolean); const ms = [...t.matchAll(/(^|\n)\s*(IMAGE \d+\s*[–-][^\n]*)/g)]; if(ms.length < 2) return [t];
@@ -22460,7 +22462,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v423';
+const APP_VERSION = '2026-10-02-v424';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
