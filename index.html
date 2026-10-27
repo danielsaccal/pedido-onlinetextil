@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v437</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v438</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13774,7 +13774,11 @@ async function acLamina(x){
     c.fillStyle = VIO; c.fillRect(0, 0, W, 90); c.fillStyle = '#fff'; c.font = '600 40px Georgia, serif'; c.textBaseline = 'middle'; c.fillText('OnLineTextil', 50, 46);
     c.font = '500 22px Arial'; c.textAlign = 'right'; c.fillStyle = ORO; c.fillText(String(x.cat || '').toUpperCase(), W - 50, 47); c.textAlign = 'left';
     // alto del bloque de textos y tabla, para que las fotos ocupen todo lo demas
-    const alto = 46, bloqueTxt = primera ? 70 + (x.p.composicion ? 36 : 0) + 18 + alto * (filas.length + 1) + (vs.length > filas.length ? 34 : 0) : 70;
+    const alto = 46, anchoM = (acState.skus ? 640 : (acState.precios ? W - 330 : W - 120)) - 60 - 24;
+    const mc = document.createElement('canvas').getContext('2d'); mc.font = '21px Arial';
+    const lineasDe = t => { const pal = String(t || '').split(/\s+/).filter(Boolean), L = []; let l = ''; for(const w of pal){ const pr = l ? l + ' ' + w : w; if(mc.measureText(pr).width > anchoM && l){ L.push(l); l = w; } else l = pr; } if(l) L.push(l); return L.slice(0, 4); };
+    const LIN = filas.map(v => lineasDe(v.desc)), ALT = LIN.map(L => Math.max(alto, 18 + L.length * 26));
+    const bloqueTxt = primera ? 70 + (x.p.composicion ? 36 : 0) + 18 + alto + ALT.reduce((a, b) => a + b, 0) + (vs.length > filas.length ? 34 : 0) : 70;
     const fy = 108, fh = H - 70 - 24 - bloqueTxt - fy, fx = 40, fw = W - 80;
     const ims = []; for(const s of grupos[gi]) ims.push(await acCargarImg(s));
     if(ims.filter(Boolean).length) acGrilla(c, ims.length ? ims : [null], fx, fy, fw, fh);
@@ -13787,10 +13791,10 @@ async function acLamina(x){
       c.fillStyle = VIO; c.fillRect(40, y, W - 80, alto); c.fillStyle = '#fff'; c.font = '700 20px Arial';
       const colM = 60, colS = acState.skus ? 640 : 0, colP = W - 60; c.fillText('MEDIDA', colM, y + 30); if(acState.skus) c.fillText('SKU', colS, y + 30); if(acState.precios){ c.textAlign = 'right'; c.fillText('PRECIO', colP, y + 30); c.textAlign = 'left'; }
       y += alto;
-      filas.forEach((v, i) => { c.fillStyle = i % 2 ? '#fff' : '#FBF9F5'; c.fillRect(40, y, W - 80, alto); c.fillStyle = '#3B3530'; c.font = '22px Arial';
-        c.fillText(String(v.desc || '').slice(0, acState.skus ? 40 : 58), colM, y + 30); if(acState.skus){ c.fillStyle = '#8A8072'; c.fillText(String(v.sku), colS, y + 30); }
-        if(acState.precios){ const base = parsePrice(v.precio); if(base > 0){ c.fillStyle = VIO; c.font = '700 22px Arial'; c.textAlign = 'right'; c.fillText(formatPrice(Math.round(base * f.factor * 100) / 100) + (divisorVenta(v.sku) > 1 ? ' x ' + ({ 12: 'docena', 6: 'media doc.', 2: 'par' })[divisorVenta(v.sku)] : ''), colP, y + 30); c.textAlign = 'left'; } }
-        y += alto; });
+      filas.forEach((v, i) => { const ah = ALT[i], ym = y + ah / 2; c.fillStyle = i % 2 ? '#fff' : '#FBF9F5'; c.fillRect(40, y, W - 80, ah); c.fillStyle = '#3B3530'; c.font = '21px Arial'; c.textBaseline = 'middle';
+        LIN[i].forEach((l, k) => c.fillText(l, colM, ym + (k - (LIN[i].length - 1) / 2) * 26)); if(acState.skus){ c.fillStyle = '#8A8072'; c.font = '22px Arial'; c.fillText(String(v.sku), colS, ym); }
+        if(acState.precios){ const base = parsePrice(v.precio); if(base > 0){ c.fillStyle = VIO; c.font = '700 22px Arial'; c.textAlign = 'right'; c.fillText(formatPrice(Math.round(base * f.factor * 100) / 100) + (divisorVenta(v.sku) > 1 ? ' x ' + ({ 12: 'docena', 6: 'media doc.', 2: 'par' })[divisorVenta(v.sku)] : ''), colP, ym); c.textAlign = 'left'; } }
+        y += ah; });
       if(vs.length > filas.length){ c.fillStyle = '#8A8072'; c.font = '20px Arial'; c.fillText(`+ ${vs.length - filas.length} medidas más`, colM, y + 26); }
     }
     c.fillStyle = ORO; c.fillRect(0, H - 70, W, 70); c.fillStyle = VIO; c.font = '600 26px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(acState.pie || '', W / 2, H - 35); c.textAlign = 'left';
@@ -22569,7 +22573,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v437';
+const APP_VERSION = '2026-10-02-v438';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
