@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v432</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v433</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13515,10 +13515,13 @@ function sfsSkuDeNombre(nombre){ const base = String(nombre || '').replace(/\.[a
 function abrirSubirFotosSku(){ sfsLista = [];
   document.getElementById('pub-modal').style.display = 'block'; document.getElementById('pub-titulo').textContent = '🗂️ Subir fotos por SKU';
   document.getElementById('pub-cont').innerHTML = (`<p class="note" style="text-align:left;margin:0 0 8px;">Elija todas las fotos juntas. El SKU se toma del <b>nombre del archivo</b>: <i>KA131J.jpg</i>, <i>KA131J-1.jpg</i>, <i>KA131J_2.png</i>, <i>KA131J (3).jpg</i>. Las fotos no pasan por ninguna IA.</p>
-    <label class="btn btn-gold" style="display:inline-flex;width:auto;cursor:pointer;">Elegir fotos<input type="file" accept="image/*" multiple style="display:none;" onchange="sfsElegir(this)"></label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;"><label class="btn btn-gold" style="display:inline-flex;width:auto;cursor:pointer;">Elegir una carpeta<input type="file" webkitdirectory directory multiple style="display:none;" onchange="sfsElegir(this)"></label><label class="btn btn-ghost" style="display:inline-flex;width:auto;cursor:pointer;">Elegir fotos sueltas<input type="file" accept="image/*" multiple style="display:none;" onchange="sfsElegir(this)"></label></div>
+    <p class="note" style="text-align:left;margin:6px 0 0;">Con una carpeta, busca en todas sus subcarpetas. Si el nombre de la foto no tiene el SKU, usa el nombre de la subcarpeta (por ejemplo, <i>KA131J/foto1.jpg</i>).</p>
     <div id="sfs-box" style="margin-top:12px;"></div>`); }
 async function sfsElegir(inp){ const sinExt = n => n.replace(/\.[^.]+$/, ''); const F = [...(inp.files || [])].sort((a, b) => sinExt(a.name).localeCompare(sinExt(b.name), 'es', { numeric: true })); // KA131J antes que KA131J-2
-  sfsLista = F.map(f => ({ f, nombre: f.name, sku: sfsSkuDeNombre(f.name), url: URL.createObjectURL(f) })); sfsPintar(); }
+  const img = F.filter(f => /^image\//.test(f.type) || /\.(jpe?g|png|webp|gif|heic|jfif)$/i.test(f.name));
+  sfsLista = img.map(f => { const ruta = (f.webkitRelativePath || '').split('/'), carpeta = ruta.length > 1 ? ruta[ruta.length - 2] : ''; return { f, nombre: (ruta.length > 2 ? carpeta + '/' : '') + f.name, sku: sfsSkuDeNombre(f.name) || sfsSkuDeNombre(carpeta), url: URL.createObjectURL(f) }; });
+  if(!sfsLista.length) dsToast('No encontré fotos en lo que eligió'); sfsPintar(); }
 function sfsPintar(){ const box = document.getElementById('sfs-box'); if(!box) return; if(!sfsLista.length){ box.innerHTML = ''; return; }
   const ok = sfsLista.filter(x => x.sku).length, skus = [...new Set(sfsLista.filter(x => x.sku).map(x => x.sku))];
   box.innerHTML = `<datalist id="sfs-skus">${Object.keys(window.__todosSku || {}).slice(0, 0).join('')}${(() => { const L = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => L.push(`<option value="${escapeAttr(v.sku)}">${escaparHtml(p.nombre + ' · ' + (v.desc || ''))}</option>`)))); return L.join(''); })()}</datalist>
@@ -22530,7 +22533,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v432';
+const APP_VERSION = '2026-10-02-v433';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
