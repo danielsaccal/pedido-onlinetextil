@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v429</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v430</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13252,7 +13252,7 @@ function promptGemini(S, canal){
     repasador: `The same kitchen towel (${medida}) hanging OPEN from an oven handle or a hook in a clean kitchen, showing its full size.`,
     bata: `The same bathrobe hanging open on a simple hanger or hook in a clean bathroom, showing its full shape, sleeves and length.`,
     almohada: `The same pillow on a neatly made bed, showing its real size and shape.`,
-    funda: packN > 1 ? `The same ${packN} pillowcases (${medida}), each one on its own pillow, lying side by side on a neatly made bed with plain white bedding, showing their real size, the open end and the finishing. Only the pillowcases are this product.` : `The same pillowcase (${medida}) on a pillow, lying on a neatly made bed with plain white bedding, showing its real size, the open end and the finishing. Only the pillowcase is this product.`,
+    funda: packN > 1 ? `The same ${packN} pillowcases (${medida}), each one on its own pillow, lying side by side at the head of a neatly made bed with plain white bedding, showing their real size; the open end of each one faces the same side, with the 4–5 cm hem and its single stitch line visible and the pillow fully inside. Only the pillowcases are this product.` : `The same pillowcase (${medida}) on a pillow, lying at the head of a neatly made bed with plain white bedding; the open end with the 4–5 cm hem and its single stitch line visible on one side, the pillow fully inside, showing its real size. Only the pillowcase is this product.`,
     delantal: `The same apron worn by a person cooking in a clean kitchen (face not shown, from the shoulders down), showing its real size, the pockets and the ties.`,
     cortinabano: `The same shower curtain hanging OPEN from a shower rod with its rings or hooks in a clean bathroom, showing its full width and length and the print at its real scale.`,
     alfombra: `The same bath mat lying flat on a clean bathroom floor in front of the shower or the bathtub, showing its real size and shape.`,
@@ -13274,6 +13274,8 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
   const SEP = '\n\n──────────\n\n', esToalla = /toall|rizo|felpa|toallon/.test(normBusqueda(nombre + ' ' + comp));
   const fmt = (extra, escenaUso) => escenaUso ? `FORMAT: square 1:1, ${px}. Realistic photo of the real scene (not a white background), natural soft daylight, the product as the clear protagonist. ${extra || 'No text, no logos, no watermark.'}` : `FORMAT: square 1:1, ${px}. ${fondo === 'pure white seamless background #FFFFFF' ? 'Pure white seamless background (#FFFFFF)' : 'Background: ' + fondo}, soft diffused studio light, no hard shadows, soft contact shadow, product centered filling 85–95% of the frame. ${extra || 'No text, no logos, no watermark, no props.'}`;
   const tamano = dimsM.length ? `${dimsM[0]} × ${dimsM[1]} cm${chica ? (ladoMax >= 25 ? ', about the size of an A4 sheet of paper' : ', smaller than an adult hand') : ''}` : '';
+  const CONF_FUNDA = 'open end finished with a simple folded hem about 4–5 cm wide, held by ONE straight line of stitching (single topstitch) along the inner edge of the hem; NO flap, NO envelope, NO buttons, NO zipper, NO piping; the other three sides are closed with plain seams on the inside (not visible), with sharp straight edges';
+  const conFunda = t === 'funda' || (t === 'sabanas' && fab);
   const reglas = [
     `PRODUCT: ${nombre} — ${medida}${comp ? ' — ' + comp : ''}.`,
     `The attached photo shows the REAL product. In every image keep from it:`,
@@ -13281,6 +13283,7 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
     `• FABRIC: ${esToalla ? 'terry loop pile (soft cotton loops), never waffle or flat weave' : 'the same weave and texture as in the photo, never another weave'}.`,
     `• DESIGN: the same lines, stripes, borders and prints, in the same places, same direction and thickness; nothing added, removed or moved; no invented bands, stitching or fringes.`,
     tamano ? `• REAL SIZE: ${tamano}; keep this size relative to ${refTam}.` : '',
+    conFunda ? `• PILLOWCASE CONSTRUCTION (always, even if the photo shows only the fabric): ${CONF_FUNDA}.` : '',
     packN > 1 ? `• SALES UNIT: pack of ${packN} units${packN === 12 ? ' (one dozen)' : ''}. ${/^lista:/.test(pc) ? `Use ONLY these colors, ${(() => { const cs = pc.slice(6).split(',').map(s => s.trim()).filter(Boolean); const rep = Math.max(1, Math.floor(packN / cs.length)); return cs.length ? `${rep} unit${rep > 1 ? 's' : ''} of each: ${cs.join(', ')}` : ''; })()} — no other colors; each unit ONE solid color.` : pc === 'blancas' ? `All ${packN} units are pure white and identical.` : pc === 'surtidas' ? `The ${packN} units are in ${packN} clearly different solid colors (no white, no two alike); each unit is ONE solid color, never two-tone; the design lines stay as in the photo.` : 'The units have the colors and prints of the photo.'}` : ''
   ].filter(Boolean).join('\n');
   const L = []; // [titulo, lineas, formatoExtra]
@@ -13294,8 +13297,8 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
     `The ${nf === 1 ? 'pillowcase is folded like a napkin into a thin, flat strip' : 'pillowcases are folded like napkins into thin, flat strips'}: crisp, pressed, one third the height of a folded sheet, square corners, empty and completely flat.`,
     `Count before finishing: ${nf === 1 ? '3' : '4'} pieces in total — one flat sheet, one fitted sheet, ${nf === 1 ? 'one pillowcase' : 'two pillowcases'}. Nothing loose, no hanging corners, no extra layers.`,
     `Hems: only the flat sheet and the pillowcases may show the hem line seen in the photo; the fitted sheet never. Straight front view at the height of the stack.`]]);
-  else if(t === 'funda' && packN > 1 && packN <= 4) L.push(['MAIN PHOTO', [`EXACTLY ${packN === 2 ? 'TWO' : packN} identical pillowcases — no sheets, no other pieces, no pillow inside.`, `Each one folded neatly into the same flat rectangle, like linen in a closet: straight sharp edges, clean folds, empty and completely flat.`, `Stacked one on top of the other, the upper one slightly shifted back so all ${packN} are clearly visible and can be counted.`, `Count before finishing: exactly ${packN} pillowcases. Front view, slightly elevated.`]]);
-  else if(t === 'funda' && packN <= 1) L.push(['MAIN PHOTO', [`ONE single pillowcase only — no sheets, no other pieces, no pillow inside.`, `Laid FLAT and UNFOLDED on the background, so it is clearly recognizable as a pillowcase: a long rectangle in its real proportion${dimsM.length ? ` (${dimsM[0]} × ${dimsM[1]} cm, ${(Math.max(...dimsM) / Math.min(...dimsM)).toFixed(1).replace('.', ',')} times longer than wide)` : ''}, horizontal.`, `The OPEN END on the right, slightly opened so the opening can be seen, with its hem or flap exactly as in the photo; the other three sides closed and straight.`, `Smooth and empty, no volume, no wrinkles except a few soft natural ones.`, `View from above, slightly angled.`]]);
+  else if(t === 'funda' && packN > 1 && packN <= 4) L.push(['MAIN PHOTO', [`EXACTLY ${packN === 2 ? 'TWO' : packN} identical pillowcases — no sheets, no other pieces, no pillow inside.`, `Each one folded neatly into the same flat rectangle, like linen in a closet: straight sharp edges, clean folds, empty and completely flat.`, `Stacked one on top of the other, the upper one slightly shifted back so all ${packN} are clearly visible and can be counted; on each one the 4–5 cm hem of the open end with its single stitch line is visible on the same side.`, `Count before finishing: exactly ${packN} pillowcases. Front view, slightly elevated.`]]);
+  else if(t === 'funda' && packN <= 1) L.push(['MAIN PHOTO', [`ONE single pillowcase only — no sheets, no other pieces, no pillow inside.`, `Laid FLAT and UNFOLDED on the background, so it is clearly recognizable as a pillowcase: a long rectangle in its real proportion${dimsM.length ? ` (${dimsM[0]} × ${dimsM[1]} cm, ${(Math.max(...dimsM) / Math.min(...dimsM)).toFixed(1).replace('.', ',')} times longer than wide)` : ''}, horizontal.`, `The OPEN END on the right, slightly opened so the opening can be seen: the 4–5 cm hem band with its single straight stitch line clearly visible; no flap. The other three sides closed, straight and clean (seams inside, not visible).`, `Smooth and empty, no volume, no wrinkles except a few soft natural ones.`, `View from above, slightly angled.`]]);
   else if(packN > 1) L.push(['MAIN PHOTO', [`Use the photo as the exact reference of ONE unit.`, `Show EXACTLY ${packN} identical units: one laid OPEN and flat showing its full design, and the other ${packN - 1} folded in half and neatly stacked in ${packN >= 10 ? 'two piles' : 'one pile'} beside it, with the same lines visible on each fold.`, `SIZE CHECK: all units are the same size${dimsM.length ? ` (${dimsM[0]} × ${dimsM[1]} cm)` : ''}. The open unit is EXACTLY as wide as a folded one and EXACTLY twice its length (it is the same piece unfolded); it must never look bigger, like a bath towel.`, `Count them before finishing: exactly ${packN}.`]]);
   else L.push(['MAIN PHOTO', [`EDIT the photo — do not redraw the product.`, `Keep the ${prod} exactly as it is: same shape, folds, print and finishing.`, `Only: remove room shadows and dark areas so the brightness is even; straighten the outline; smooth small wrinkles; replace the background.`]]);
   // IMAGEN 2 · EN USO
@@ -22485,7 +22488,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v429';
+const APP_VERSION = '2026-10-02-v430';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
