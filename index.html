@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v434</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v435</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13526,14 +13526,18 @@ function abrirSubirFotosSku(){ sfsLista = [];
     <p class="note" style="text-align:left;margin:6px 0 0;">Con una carpeta, busca en todas sus subcarpetas. Si el nombre de la foto no tiene el SKU, usa el nombre de la subcarpeta (por ejemplo, <i>KA131J/foto1.jpg</i>).</p>
     <div id="sfs-box" style="margin-top:12px;"></div>`); }
 async function sfsElegir(inp){ const sinExt = n => n.replace(/\.[^.]+$/, ''); const F = [...(inp.files || [])].sort((a, b) => sinExt(a.name).localeCompare(sinExt(b.name), 'es', { numeric: true })); // KA131J antes que KA131J-2
-  const img = F.filter(f => /^image\//.test(f.type) || /\.(jpe?g|png|webp|gif|heic|jfif)$/i.test(f.name));
+  const img = F.filter(f => /\.(jpe?g|png|webp|gif|jfif|bmp)$/i.test(f.name) || /^image\/(jpeg|png|webp|gif|bmp)$/.test(f.type));
+  const otros = F.filter(f => /\.(tiff?|heic|heif|psd|raw|cr2|nef)$/i.test(f.name)).length;
+  if(otros) setTimeout(() => dsToast(`${otros} foto${otros > 1 ? 's' : ''} en formato TIF, HEIC u otro que el navegador no abre: no se cargan. Páselas a JPG para subirlas.`, { ms: 9000 }), 300);
   sfsLista = img.map(f => { const ruta = (f.webkitRelativePath || '').split('/'), carpeta = ruta.length > 1 ? ruta[ruta.length - 2] : ''; return { f, nombre: (ruta.length > 2 ? carpeta + '/' : '') + f.name, sku: sfsSkuDeNombre(f.name) || sfsSkuDeNombre(carpeta), url: URL.createObjectURL(f) }; });
   if(!sfsLista.length) dsToast('No encontré fotos en lo que eligió'); sfsPintar(); }
 function sfsPintar(){ const box = document.getElementById('sfs-box'); if(!box) return; if(!sfsLista.length){ box.innerHTML = ''; return; }
+  const lst0 = document.getElementById('sfs-lst'), sc = lst0 ? lst0.scrollTop : 0, caja = document.getElementById('pub-modal'), sc2 = caja ? caja.scrollTop : 0;
+  setTimeout(() => { const l = document.getElementById('sfs-lst'); if(l) l.scrollTop = sc; if(caja) caja.scrollTop = sc2; }, 0);
   const ok = sfsLista.filter(x => x.sku).length, skus = [...new Set(sfsLista.filter(x => x.sku).map(x => x.sku))];
   box.innerHTML = `<datalist id="sfs-skus">${Object.keys(window.__todosSku || {}).slice(0, 0).join('')}${(() => { const L = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => L.push(`<option value="${escapeAttr(v.sku)}">${escaparHtml(p.nombre + ' · ' + (v.desc || ''))}</option>`)))); return L.join(''); })()}</datalist>
     <div style="font-size:.86rem;margin-bottom:8px;"><b>${ok}</b> de ${sfsLista.length} fotos con SKU · ${skus.length} SKU${sfsLista.length - ok ? ` · <span style="color:#A6432F;">${sfsLista.length - ok} sin SKU (escríbalo o se descartan)</span>` : ''}</div>
-    <div style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px;">${sfsLista.map((x, i) => { const r = x.sku ? buscarProductoPorSku(x.sku) : null, ya = x.sku ? (fotosSku[x.sku] || []).length : 0;
+    <div id="sfs-lst" style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px;">${sfsLista.map((x, i) => { const r = x.sku ? buscarProductoPorSku(x.sku) : null, ya = x.sku ? (fotosSku[x.sku] || []).length : 0;
       return `<div style="display:flex;gap:10px;align-items:center;padding:6px 8px;border-bottom:1px solid #F3EFE8;${x.sku ? '' : 'background:#FBEDEA;'}"><img src="${x.url}" style="width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid var(--line);"><div style="flex:1;min-width:0;"><div style="font-size:.78rem;color:#8A8072;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escaparHtml(x.nombre)}</div><div style="font-size:.82rem;">${r ? escaparHtml(r.producto.nombre + ' · ' + (r.variante.desc || '')) + (ya ? ` <span class="note" style="margin:0;">(ya tiene ${ya})</span>` : '') : '<b style="color:#A6432F;">SKU no encontrado</b>'}</div></div>
         <input list="sfs-skus" value="${escapeAttr(x.sku)}" placeholder="SKU" style="width:110px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;" onchange="sfsLista[${i}].sku=(buscarProductoPorSku(this.value.trim().toUpperCase())?this.value.trim().toUpperCase():'');sfsPintar()"><button type="button" class="btn-mini" title="Quitar" onclick="sfsLista.splice(${i},1);sfsPintar()">✕</button></div>`; }).join('')}</div>
     <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:10px;font-size:.86rem;"><label><input type="radio" name="sfs-modo" value="agregar" checked> Agregar a las fotos que ya tiene cada SKU</label><label><input type="radio" name="sfs-modo" value="reemplazar"> Reemplazar sus fotos</label></div>
@@ -22540,7 +22544,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v434';
+const APP_VERSION = '2026-10-02-v435';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
