@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v425</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v426</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13166,7 +13166,22 @@ async function rmFacturar(id){
 // ===== Prompt para Gemini con plantilla fija (sin IA, sin creditos): 3 imagenes por SKU =====
 function tipoProductoPG(S){
   const r = buscarProductoPorSku(S); if(!r) return null; const cat = normBusqueda((CATALOGO[r.ci] || {}).categoria || ''), n = normBusqueda(r.producto.nombre + ' ' + cat);
-  const t = (/\btelas?\b/.test(cat) || r.producto.metros) && !/mantel|cortina/.test(normBusqueda(r.producto.nombre)) ? 'tela' : /ajustable/.test(n) && !/juego/.test(n) ? 'ajustable' : /mantel|manteleria|camino de mesa/.test(n) ? 'mantel' : /cubrecama|acolchado|frazada|edredon|quilt|cobertor|plaid/.test(n) ? 'cubrecama' : /sabana|juego/.test(n) ? 'sabanas' : /toalla|toallon|bano|alfombra de bano/.test(n) ? 'toalla' : /repasador|secaplatos|pano de cocina/.test(n) ? 'repasador' : /bata/.test(n) ? 'bata' : /almohad/.test(n) ? 'almohada' : /cortina/.test(n) ? 'cortina' : 'otro';
+  const nn = normBusqueda(r.producto.nombre);
+  const t = (/\btelas?\b/.test(cat) || r.producto.metros) && !/mantel|cortina/.test(nn) ? 'tela'
+    : /funda/.test(nn) && /almohad/.test(nn) && !/juego/.test(nn) ? 'funda'
+    : /nordic|duvet/.test(nn) ? 'cubrecama'
+    : /protector|cubre ?colchon|funda.*colchon/.test(nn) ? 'protector'
+    : /ajustable/.test(n) && !/juego/.test(n) ? 'ajustable'
+    : /delantal/.test(nn) ? 'delantal'
+    : /cortina/.test(nn) && /bano|teflon|plastica|ducha|alfombra|ganchos/.test(nn) ? 'cortinabano'
+    : /alfombra|antideslizante/.test(nn) ? 'alfombra'
+    : /\bbata/.test(nn) ? 'bata'
+    : /repasador|secaplatos|pano de cocina|rejilla/.test(n) ? 'repasador'
+    : /mantel|manteleria|camino de mesa/.test(n) ? 'mantel'
+    : /cubrecama|acolchado|frazada|edredon|quilt|cobertor|plaid|colcha|manta|cover|frazabella|polar/.test(n) ? 'cubrecama'
+    : /sabana|juego/.test(n) ? 'sabanas'
+    : /toalla|toallon|toallita|bano/.test(n) ? 'toalla'
+    : /almohad/.test(n) ? 'almohada' : /cortina/.test(n) ? 'cortina' : 'otro';
   return { r, t, blanco: /blanc/.test(n) };
 }
 const ESCENA_USO = [
@@ -13218,13 +13233,13 @@ function promptGemini(S, canal){
   if(x.t === 'tela') return promptTela(S, canal, x);
   const { r, t, blanco } = x, nombre = r.producto.nombre, medida = r.variante.desc || '', comp = r.producto.composicion || '';
   const tn = canal === 'tn', px = tn ? '1024x1024' : '2000x2000', fondo = tn ? 'pure white #FFFFFF (or light cream #F5F3EF)' : 'pure white seamless background #FFFFFF';
-  const prod = { ajustable: 'fitted sheet', mantel: 'tablecloth', cubrecama: 'bedspread', sabanas: 'sheet set', toalla: 'towel', repasador: 'kitchen towel', bata: 'bathrobe', almohada: 'pillow', cortina: 'curtain', otro: 'textile product' }[t];
+  const prod = { funda: 'pillowcase', protector: 'mattress protector', delantal: 'apron', cortinabano: 'shower curtain', alfombra: 'bath mat', ajustable: 'fitted sheet', mantel: 'tablecloth', cubrecama: 'bedspread', sabanas: 'sheet set', toalla: 'towel', repasador: 'kitchen towel', bata: 'bathrobe', almohada: 'pillow', cortina: 'curtain', otro: 'textile product' }[t];
   // juegos de sabanas: 1 1/2 plaza = 1 funda (3 piezas); 2 1/2, queen y king = 2 fundas (4 piezas)
   const md = normBusqueda(medida + ' ' + nombre), mF = md.match(/(\d)\s*fundas?/), dosFundas = mF ? +mF[1] >= 2 : /2\s*½|2 1\/2|2,5|dos plazas|2 plazas|queen|king|matrimonial/.test(md), nf = mF ? Math.min(2, Math.max(1, +mF[1])) : (dosFundas ? 2 : 1); // si la medida dice cuantas fundas, manda eso
     const panos = panosDeSku(S, medida, nombre) || 1; // cortinas: cantidad de panos
   const nc = normBusqueda(nombre + ' ' + medida), cabezal = /pasabarral|jareta|pasa barral/.test(nc) ? ' HEADING: ROD POCKET (pasabarral): the rod passes THROUGH a sewn fabric tunnel at the top of each panel, so the rod is hidden inside the fabric and the top is softly gathered along the rod. NO rings, NO hooks, NO clips, NO grommets, NO eyelets, NO pinch pleats, NO curtain tape.' : /ollao|ojal|argolla|grommet/.test(nc) ? ' HEADING: metal GROMMETS (eyelets) along the top, the rod passing through them, forming even soft waves. No hooks, no pleats.' : /presilla|trabilla/.test(nc) ? ' HEADING: fabric TAB TOP loops sewn at the top, the rod passing through the loops. No rings, no hooks, no grommets.' : /gancho|cinta|plisad|tabla/.test(nc) ? ' HEADING: pleated curtain tape with hooks on rings or a track, even pleats.' : '';
   const dimsM = (String(medida).replace(/,/g, '.').match(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)/) || []).slice(1).map(Number), ladoMax = dimsM.length ? Math.max(...dimsM) : 0, chica = ladoMax > 0 && ladoMax <= 40;
-  const refTam = { sabanas: 'the mattress and the bed', ajustable: 'the mattress and the bed', cubrecama: 'the bed', mantel: 'the table and the chairs', cortina: 'the window, the rod and the floor', toalla: 'the hands, the sink and the towel bar' }[t] || 'the hands and the surrounding objects';
+  const refTam = { funda: 'the pillow and the bed', protector: 'the mattress', delantal: 'the person wearing it', cortinabano: 'the bathtub and the shower rod', alfombra: 'the bathroom floor and the bathtub', sabanas: 'the mattress and the bed', ajustable: 'the mattress and the bed', cubrecama: 'the bed', mantel: 'the table and the chairs', cortina: 'the window, the rod and the floor', toalla: 'the hands, the sink and the towel bar' }[t] || 'the hands and the surrounding objects';
   const escala = dimsM.length ? ` REAL SIZE: ${dimsM[0]} × ${dimsM[1]} cm${chica ? ` — a SMALL piece, ${ladoMax >= 25 ? 'about the size of a sheet of A4 paper (21 × 29.7 cm) or an open adult hand' : 'smaller than an adult hand'}; never show it as a hand towel or bath towel` : ladoMax <= 80 ? ' — a medium piece, about as long as an adult arm from elbow to fingertips' : ''}. Keep this real size relative to ${refTam}.` : '';
   const escena = {
     mantel: `In this image the tablecloth must be FULLY UNFOLDED AND SPREAD OPEN, never folded. The same tablecloth (${medida}) fully spread over a rectangular dining table of the right size, covering the entire tabletop and hanging about 25 cm on every side, with soft natural folds at the corners. View from above at about 45°, nothing on the table covering the print.`,
@@ -13235,6 +13250,11 @@ function promptGemini(S, canal){
     repasador: `The same kitchen towel (${medida}) hanging OPEN from an oven handle or a hook in a clean kitchen, showing its full size.`,
     bata: `The same bathrobe hanging open on a simple hanger or hook in a clean bathroom, showing its full shape, sleeves and length.`,
     almohada: `The same pillow on a neatly made bed, showing its real size and shape.`,
+    funda: `The same pillowcase (${medida}) on a pillow, lying on a neatly made bed with plain white bedding, showing its real size, the open end and the finishing. Only the pillowcase is this product.`,
+    delantal: `The same apron worn by a person cooking in a clean kitchen (face not shown, from the shoulders down), showing its real size, the pockets and the ties.`,
+    cortinabano: `The same shower curtain hanging OPEN from a shower rod with its rings or hooks in a clean bathroom, showing its full width and length and the print at its real scale.`,
+    alfombra: `The same bath mat lying flat on a clean bathroom floor in front of the shower or the bathtub, showing its real size and shape.`,
+    protector: `The same mattress protector (${medida}) fitted on a bare mattress of that size, smooth and taut, the elastic corners wrapping the mattress; no sheets, no bedding.`,
     cortina: panos >= 2 ? `The curtain has EXACTLY ${panos === 2 ? 'TWO' : panos} identical panels (${medida}): show the ${panos === 2 ? 'two' : panos} panels hanging from the same rod in a bright room, one at each side of the window, framing it, each panel straight and open showing its full length, gathered evenly at the top. Exactly ${panos} panels, never only one, never more. Real proportions of each panel.${cabezal}` : `The same curtain hanging OPEN and straight from a rod in a bright room, showing its full width and length. Exactly one panel.${cabezal}`,
     otro: `The same product in use in a simple, realistic setting that shows its real size.`
   }[t];
@@ -13274,6 +13294,7 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
     `The ${nf === 1 ? 'pillowcase is folded like a napkin into a thin, flat strip' : 'pillowcases are folded like napkins into thin, flat strips'}: crisp, pressed, one third the height of a folded sheet, square corners, empty and completely flat.`,
     `Count before finishing: ${nf === 1 ? '3' : '4'} pieces in total — one flat sheet, one fitted sheet, ${nf === 1 ? 'one pillowcase' : 'two pillowcases'}. Nothing loose, no hanging corners, no extra layers.`,
     `Hems: only the flat sheet and the pillowcases may show the hem line seen in the photo; the fitted sheet never. Straight front view at the height of the stack.`]]);
+  else if(t === 'funda' && packN <= 1) L.push(['MAIN PHOTO', [`ONE single pillowcase only — no sheets, no other pieces, no pillow inside.`, `Folded neatly into a flat rectangle, like linen in a closet: straight sharp edges, clean folds, the hem of the open end visible on one side if it exists in the photo.`, `Empty and completely flat, square corners, no volume.`, `Front view, slightly elevated.`]]);
   else if(packN > 1) L.push(['MAIN PHOTO', [`Use the photo as the exact reference of ONE unit.`, `Show EXACTLY ${packN} identical units: one laid OPEN and flat showing its full design, and the other ${packN - 1} folded in half and neatly stacked in ${packN >= 10 ? 'two piles' : 'one pile'} beside it, with the same lines visible on each fold.`, `SIZE CHECK: all units are the same size${dimsM.length ? ` (${dimsM[0]} × ${dimsM[1]} cm)` : ''}. The open unit is EXACTLY as wide as a folded one and EXACTLY twice its length (it is the same piece unfolded); it must never look bigger, like a bath towel.`, `Count them before finishing: exactly ${packN}.`]]);
   else L.push(['MAIN PHOTO', [`EDIT the photo — do not redraw the product.`, `Keep the ${prod} exactly as it is: same shape, folds, print and finishing.`, `Only: remove room shadows and dark areas so the brightness is even; straighten the outline; smooth small wrinkles; replace the background.`]]);
   // IMAGEN 2 · EN USO
@@ -22463,7 +22484,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v425';
+const APP_VERSION = '2026-10-02-v426';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
