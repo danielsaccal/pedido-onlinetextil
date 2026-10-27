@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v431</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v432</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6158,7 +6158,7 @@ const GRUPOS_INICIO = {
     [['💳 Cuentas corrientes', 'abrirCtaCte()']],
   ] },
   art: { lado: 'int', titulo: '📦 Artículos', titulosColumnas: ['Catálogo', 'Precios', 'Costos', 'Stock', 'Producción'], colorColumnas: { 2: '#2F7A47' }, columnas: [
-    [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['🗂️ Ordenar categorías', 'abrirCategorias()'], ['📷 Fotos de productos', 'abrirActualizarFoto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['🌐 Links de la web', 'abrirLinksWeb()']],
+    [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['🗂️ Ordenar categorías', 'abrirCategorias()'], ['📷 Fotos de productos', 'abrirActualizarFoto()'], ['🗂️ Subir fotos por SKU', 'abrirSubirFotosSku()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['🌐 Links de la web', 'abrirLinksWeb()']],
     [['🏷️ Lista de precios', 'abrirListaPrecios()'], ['📋 Listas de precios por cliente', 'abrirListasPrecios()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']],
     [['💲 Costos de productos (fabrico y reventa)', 'abrirCostosProductos()'], ['💰 Costos de confección', 'abrirConfeccion()']],
     [['📊 Stock y prioridades', 'abrirStock()'], ['📦 Faltantes de stock', 'abrirFaltantes()']],
@@ -6194,7 +6194,7 @@ const GRUPOS_INICIO = {
   ] },
   f: { lado: 'ext', titulo: 'Catálogo', titulosColumnas: ['1 · Productos', '2 · Fotos y textos', '3 · Precios'], columnas: [
     [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['🗂️ Ordenar categorías', 'abrirCategorias()']],
-    [['📷 Fotos de productos', 'abrirActualizarFoto()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['🌐 Links de la web', 'abrirLinksWeb()']],
+    [['📷 Fotos de productos', 'abrirActualizarFoto()'], ['🗂️ Subir fotos por SKU', 'abrirSubirFotosSku()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['🌐 Links de la web', 'abrirLinksWeb()']],
     [['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']]
   ] },
   g: { lado: 'ext', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas', '💲 Costos'], colorColumnas: { 5: '#2F7A47' }, columnas: [
@@ -6301,7 +6301,7 @@ const TAREAS = [
   ['t_cobrar', 'Cobrar', 'cash', [['Cobros', ["abrirCtaCte('recibos').then(", "abrirCtaCte('recibos')", 'abrirCtaCte()', "abrirCtaCte('cheques')"]]]],
   ['t_comprar', 'Comprar', 'buy', [['Comprobantes de compra', ["abrirCompras('compras').then(() => pvElegirProveedor('compra'", "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nc'", "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nd'", "abrirCompras('compras')"]], ['Proveedores', ["abrirCompras('proveedores').then(", 'abrirCompras()']], ['Talleres', ["abrirCompras('talleres')", 'abrirIngresoTaller()']]]],
   ['t_pagar', 'Pagar', 'pay', [['Pagos', ["abrirCompras('pagos').then(", "abrirCompras('pagos')"]], ['Caja y gastos', ['abrirTesoreria().then(() => tsFormCaja())', 'abrirGastos()', 'abrirTesoreria()']]]],
-  ['t_stock', 'Stock y productos', 'box', [['Stock', ['abrirStock()', 'abrirFaltantes()']], ['Productos', ['abrirNuevoProducto()', 'abrirEditarProducto()', 'abrirCategorias()', 'abrirActualizarFoto()', 'abrirReventa()', 'abrirLinksWeb()']], ['Precios', ['abrirListaPrecios()', 'abrirImportarExcel()', 'abrirAumentoMasivo()', 'abrirHistorialPrecios()']], ['Costos', ['abrirCostosProductos()', 'abrirConfeccion()', 'abrirCalculadoraCostos()']]]],
+  ['t_stock', 'Stock y productos', 'box', [['Stock', ['abrirStock()', 'abrirFaltantes()']], ['Productos', ['abrirNuevoProducto()', 'abrirEditarProducto()', 'abrirCategorias()', 'abrirActualizarFoto()', 'abrirSubirFotosSku()', 'abrirReventa()', 'abrirLinksWeb()']], ['Precios', ['abrirListaPrecios()', 'abrirImportarExcel()', 'abrirAumentoMasivo()', 'abrirHistorialPrecios()']], ['Costos', ['abrirCostosProductos()', 'abrirConfeccion()', 'abrirCalculadoraCostos()']]]],
   ['t_producir', 'Producir', 'cut', [['Qué fabrico', ['abrirTelas()', 'abrirArticulosCortes()']], ['Planificar', ['abrirAsistenteOT()', 'abrirTrabajoMedida()']], ['En el taller', ['abrirEnviosTela()', 'abrirDeudaTela()', 'abrirEnProduccion()', 'abrirIngresoTaller()']], ['Consultas', ['abrirHistorialOT()', 'abrirHistorialEntregas()', 'abrirHistorialSku()']]]],
   ['t_difundir', 'Difundir', 'mega', [['Catálogo a clientes', ['abrirCompartirRubro()', 'abrirArmarCatalogo()', 'abrirEnviarCatalogo()']], ['Videos', ['abrirCrearVideo()', 'abrirCompartirVideoProducto()']], ['Redes y anuncios', ['abrirNuevoIngreso()', 'abrirAnuncio()', 'abrirDirectorArte()']], ['Fotos de producto', ['abrirPromptGemini()', 'abrirPromptGeminiLote()']]]],
   ['t_numeros', 'Números', 'chart', [['Resultados', ['abrirResultadoNegocio()', 'abrirRankings()', 'abrirResultadosML()', 'abrirVentasML()']], ['Impuestos', ['abrirIVA()', 'abrirLibroIVA()', 'abrirRetenciones()', 'abrirCierreMes()', 'abrirPuntosVentaFiscales()']], ['Auditoría', ['abrirAuditor()']]]],
@@ -13506,6 +13506,38 @@ async function imagenBolsaLexington(S, colorManual, estampada){
   lx.imageSmoothingQuality = 'high'; lx.drawImage(c, ox, oy, w2, h2);
   return L.toDataURL('image/jpeg', 0.92); }
 async function descargarBolsaLexington(S, colorManual, estampada){ try{ procesando('Armando la imagen en bolsa…'); const u = await imagenBolsaLexington(S, colorManual, estampada); procesando.fin && procesando.fin(); const a = document.createElement('a'); a.href = u; a.download = `${String(S).toUpperCase()}-bolsa-lexington.jpg`; a.click(); dsToast('Imagen en bolsa descargada'); } catch(e){ try{ procesando.fin && procesando.fin(); } catch(x){} alert('No se pudo armar la imagen: ' + e.message); } }
+// ===== Subir fotos por SKU: muchas fotos juntas, el SKU sale del nombre del archivo =====
+let sfsLista = [];
+function sfsSkuDeNombre(nombre){ const base = String(nombre || '').replace(/\.[a-z0-9]{2,5}$/i, '').trim();
+  const prueba = s => { s = String(s || '').toUpperCase().trim(); return s && buscarProductoPorSku(s) ? s : ''; };
+  // 1) nombre completo; 2) sin sufijos " (3)", "-1", "_2", " 4"; 3) la primera palabra antes de - _ espacio o punto
+  return prueba(base) || prueba(base.replace(/[\s_-]*\(\d+\)$/, '').replace(/[\s_-]+\d{1,2}$/, '')) || prueba(base.split(/[\s_.\-()]+/)[0]) || ''; }
+function abrirSubirFotosSku(){ sfsLista = [];
+  document.getElementById('pub-modal').style.display = 'block'; document.getElementById('pub-titulo').textContent = '🗂️ Subir fotos por SKU';
+  document.getElementById('pub-cont').innerHTML = (`<p class="note" style="text-align:left;margin:0 0 8px;">Elija todas las fotos juntas. El SKU se toma del <b>nombre del archivo</b>: <i>KA131J.jpg</i>, <i>KA131J-1.jpg</i>, <i>KA131J_2.png</i>, <i>KA131J (3).jpg</i>. Las fotos no pasan por ninguna IA.</p>
+    <label class="btn btn-gold" style="display:inline-flex;width:auto;cursor:pointer;">Elegir fotos<input type="file" accept="image/*" multiple style="display:none;" onchange="sfsElegir(this)"></label>
+    <div id="sfs-box" style="margin-top:12px;"></div>`); }
+async function sfsElegir(inp){ const sinExt = n => n.replace(/\.[^.]+$/, ''); const F = [...(inp.files || [])].sort((a, b) => sinExt(a.name).localeCompare(sinExt(b.name), 'es', { numeric: true })); // KA131J antes que KA131J-2
+  sfsLista = F.map(f => ({ f, nombre: f.name, sku: sfsSkuDeNombre(f.name), url: URL.createObjectURL(f) })); sfsPintar(); }
+function sfsPintar(){ const box = document.getElementById('sfs-box'); if(!box) return; if(!sfsLista.length){ box.innerHTML = ''; return; }
+  const ok = sfsLista.filter(x => x.sku).length, skus = [...new Set(sfsLista.filter(x => x.sku).map(x => x.sku))];
+  box.innerHTML = `<datalist id="sfs-skus">${Object.keys(window.__todosSku || {}).slice(0, 0).join('')}${(() => { const L = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => L.push(`<option value="${escapeAttr(v.sku)}">${escaparHtml(p.nombre + ' · ' + (v.desc || ''))}</option>`)))); return L.join(''); })()}</datalist>
+    <div style="font-size:.86rem;margin-bottom:8px;"><b>${ok}</b> de ${sfsLista.length} fotos con SKU · ${skus.length} SKU${sfsLista.length - ok ? ` · <span style="color:#A6432F;">${sfsLista.length - ok} sin SKU (escríbalo o se descartan)</span>` : ''}</div>
+    <div style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px;">${sfsLista.map((x, i) => { const r = x.sku ? buscarProductoPorSku(x.sku) : null, ya = x.sku ? (fotosSku[x.sku] || []).length : 0;
+      return `<div style="display:flex;gap:10px;align-items:center;padding:6px 8px;border-bottom:1px solid #F3EFE8;${x.sku ? '' : 'background:#FBEDEA;'}"><img src="${x.url}" style="width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid var(--line);"><div style="flex:1;min-width:0;"><div style="font-size:.78rem;color:#8A8072;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escaparHtml(x.nombre)}</div><div style="font-size:.82rem;">${r ? escaparHtml(r.producto.nombre + ' · ' + (r.variante.desc || '')) + (ya ? ` <span class="note" style="margin:0;">(ya tiene ${ya})</span>` : '') : '<b style="color:#A6432F;">SKU no encontrado</b>'}</div></div>
+        <input list="sfs-skus" value="${escapeAttr(x.sku)}" placeholder="SKU" style="width:110px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;" onchange="sfsLista[${i}].sku=(buscarProductoPorSku(this.value.trim().toUpperCase())?this.value.trim().toUpperCase():'');sfsPintar()"><button type="button" class="btn-mini" title="Quitar" onclick="sfsLista.splice(${i},1);sfsPintar()">✕</button></div>`; }).join('')}</div>
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:10px;font-size:.86rem;"><label><input type="radio" name="sfs-modo" value="agregar" checked> Agregar a las fotos que ya tiene cada SKU</label><label><input type="radio" name="sfs-modo" value="reemplazar"> Reemplazar sus fotos</label></div>
+    <button type="button" class="btn btn-gold" style="margin-top:10px;" ${ok ? '' : 'disabled'} onclick="sfsGuardar(this)">Cargar ${ok} foto${ok === 1 ? '' : 's'} en ${skus.length} SKU</button>`; }
+async function sfsGuardar(b){ const modo = (document.querySelector('input[name=sfs-modo]:checked') || {}).value || 'agregar', G = {};
+  sfsLista.filter(x => x.sku).forEach(x => { (G[x.sku] = G[x.sku] || []).push(x.f); });
+  const S = Object.keys(G); if(modo === 'reemplazar' && !await dsConfirm(`¿Reemplazar las fotos actuales de ${S.length} SKU?\nLas fotos que tenían se borran.`)) return;
+  b.disabled = true; let n = 0, err = [];
+  for(const s of S){ b.textContent = `Cargando ${++n} de ${S.length}…`;
+    try{ const nuevas = []; for(const f of G[s]) nuevas.push(await comprimirImagenAFotoBase64(f));
+      const fotos = (modo === 'reemplazar' ? [] : (fotosSku[s] || [])).concat(nuevas).slice(0, 20);
+      await db.collection('fotos_sku').doc(s).set({ imagenesBase64: fotos, actualizado: new Date().toISOString() }); fotosSku[s] = fotos; } catch(e){ err.push(s + ': ' + e.message); } }
+  sfsLista.forEach(x => { try{ URL.revokeObjectURL(x.url); } catch(e){} }); sfsLista = [];
+  cerrarPublicar(); dsToast(err.length ? `Cargadas con errores: ${err.join(' · ')}` : `Listo: fotos cargadas en ${S.length} SKU`, { ms: 7000 }); }
 // ===== Bosquejo de medidas por SKU (lo dibuja la app, sin IA): ultima imagen de cada SKU =====
 // Los productos de fabricacion propia tienen la medida de CORTE: se muestra la TERMINADA (corte - confeccion).
 const CONFECCION = { cortina: { ancho: 5, alto: 15 }, funda: { ancho: 2, largo: 7 }, plana: { ancho: 2, largo: 10 }, mantel: { ancho: 2, largo: 2 }, otro: { ancho: 2, largo: 2 } };
@@ -14087,6 +14119,7 @@ let permisosActuales = null;
 function permisoDeAccion(f){
   const s = String(f);
   if(/abrirReclamosML/.test(s)) return null; // todos los usuarios
+  if(/abrirSubirFotosSku/.test(s)) return permisoDeAccion('abrirActualizarFoto()');
   if(/abrirUsuarios|abrirCopiaSeguridad/.test(s)) return 'dueno';
   if(/abrirResultadosML|abrirCalculadoraML/.test(s)) return 'resultadosML';
   if(/abrirFacturas/.test(s)) return 'facturas';
@@ -22497,7 +22530,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v431';
+const APP_VERSION = '2026-10-02-v432';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
