@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v453</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v454</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6133,7 +6133,7 @@ function aprovechamientoCorte(c, W){
 const GRUPOS_INICIO = {
   a: { lado: 'ext', titulo: 'Armar pedido', titulosColumnas: ['1 · Elegir productos', '2 · Encontrar rápido'], columnas: [
     [['📚 Catálogo', "irACatalogoDesdeInicio()"]],
-    [['📷 Escanear etiqueta (SKU)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto').click()"], ['🤖 Buscar por foto (IA)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto-producto').click()"], ['📄 Pedido desde una foto', "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)"]]
+    [['📷 Escanear etiqueta (SKU)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto').click()"], ['🤖 Buscar por foto (IA)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto-producto').click()"]]
   ] },
   c: { lado: 'int', titulo: '📣 Difusión y creatividad', titulosColumnas: ['1 · Catálogo a clientes', '2 · Videos', '3 · Redes y anuncios', '4 · Fotos de producto'], columnas: [
     [['🔗 Compartir por rubro (link a la web)', 'abrirCompartirRubro()'], ['📚 Armar catálogo (PDF o imágenes)', 'abrirArmarCatalogo()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()']],
@@ -6142,7 +6142,7 @@ const GRUPOS_INICIO = {
     [['📸 Prompt para Gemini (un SKU)', 'abrirPromptGemini()'], ['📸 Prompts para Gemini en lote', 'abrirPromptGeminiLote()']],
   ] },
   ped: { lado: 'int', titulo: '🛒 Pedidos', titulosColumnas: ['Tomar pedido', 'Seguimiento'], columnas: [
-    [['📚 Tomar pedido (catálogo)', "irACatalogoDesdeInicio()"], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()'], ['📄 Pedido desde una foto', "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)"]],
+    [['📚 Tomar pedido (catálogo)', "irACatalogoDesdeInicio()"], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()']],
     [['📋 Historial de pedidos', 'abrirHistorial()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']],
   ] },
   comp: { lado: 'int', titulo: '🧾 Comprobantes', titulosColumnas: ['Presupuestos', 'Remitos', 'Ventas', 'Cobros', 'Compras', 'Pagos'], columnas: [
@@ -6186,7 +6186,7 @@ const GRUPOS_INICIO = {
     [['🧾 Auditor (IA)', 'abrirAuditor()']],
   ] },
   d: { lado: 'int', titulo: 'Ventas', titulosColumnas: ['1 · Tomar pedidos', '2 · Entregar', '3 · Clientes', '4 · Plata', '5 · Informes y estadísticas'], columnas: [
-    [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['🧾 Presupuestos', 'abrirPresupuestos()'], ['📄 Pedido desde una foto', "abrirPedidoIA(); setTimeout(() => document.getElementById('pia-foto').click(), 100)"], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()'], ['📋 Historial de pedidos', 'abrirHistorial()']],
+    [['📚 Catálogo', "irACatalogoDesdeInicio()"], ['🧾 Presupuestos', 'abrirPresupuestos()'], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()'], ['📋 Historial de pedidos', 'abrirHistorial()']],
     [['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']],
     [['👥 Clientes', 'abrirClientes()']],
     [['💰 Dinero disponible', 'abrirTesoreria()'], ['💳 Cuentas corrientes', 'abrirCtaCte()'], ['🏭 Proveedores y pagos', 'abrirCompras()'], ['🧾 Ventas facturadas', 'abrirFacturas()'], ['💸 Gastos comerciales', 'abrirGastos()'], ['🧾 Auditor (IA)', 'abrirAuditor()']],
@@ -6427,7 +6427,7 @@ async function dashDatos(forzar){
     V.fact12 = meses.map(m => ({ m, ...F[m], tot: F[m].propia + F[m].alberto + F[m].rita }));
     V.margen = vM > 0 ? (vM - cM) / vM * 100 : null;
     // posicion de IVA del mes, por razon social
-    try{ const [md, cfI, mv, bx] = await Promise.all([t(db.collection('ml_detalle').get().catch(() => null)), t(db.collection('config').doc('iva').get().catch(() => null)), t(db.collection('cc_movimientos').get().catch(() => null)), sExt ? Promise.resolve(sExt) : null]);
+    try{ const [md, cfI, mv, bx] = await Promise.all([t(mlDetalleGet().catch(() => null)), t(db.collection('config').doc('iva').get().catch(() => null)), t(db.collection('cc_movimientos').get().catch(() => null)), sExt ? Promise.resolve(sExt) : null]);
       ivDatos = { fact: vf ? vf.docs.map(d => d.data()) : [], compras: (pvCompras || []).map(x => x), det: md ? md.docs.map(d => d.data()) : [], res, cfg: cfI && cfI.exists ? cfI.data() : {}, movs: mv ? mv.docs.map(d => d.data()) : (ccMovs || []), banco: bx ? bx.docs.map(d => d.data()) : [] };
       if(typeof cargarCfgFiscal === 'function') await cargarCfgFiscal(); V.iva = calcIVA(new Date().toISOString().slice(0, 10)); } catch(e){ console.error(e); }
     // ultimas actividades
@@ -8197,7 +8197,7 @@ async function abrirIVA(){ await cargarCfgFiscal();
   if(!esDueno()){ alert('Solo el dueño puede ver la posición de IVA.'); return; }
   mostrarPaso('step-iva'); const f = document.getElementById('iv-f'); if(!f.value) f.value = ccHoy();
   document.getElementById('iv-body').innerHTML = '<p class="empty-msg">Cargando…</p>';
-  const [vf, cp, md, rs, cf, mv, bx] = await Promise.all([db.collection('ventas_facturadas').get(), db.collection('compras').get(), db.collection('ml_detalle').get().catch(() => ({ docs: [] })), db.collection('config').doc('ml_resumen_mensual').get(), db.collection('config').doc('iva').get(), db.collection('cc_movimientos').get().catch(() => ({ docs: [] })), db.collection('teso_extractos').get().catch(() => ({ docs: [] }))]);
+  const [vf, cp, md, rs, cf, mv, bx] = await Promise.all([db.collection('ventas_facturadas').get(), db.collection('compras').get(), mlDetalleGet().catch(() => ({ docs: [] })), db.collection('config').doc('ml_resumen_mensual').get(), db.collection('config').doc('iva').get(), db.collection('cc_movimientos').get().catch(() => ({ docs: [] })), db.collection('teso_extractos').get().catch(() => ({ docs: [] }))]);
   ivDatos = { fact: vf.docs.map(d => d.data()), compras: cp.docs.map(d => d.data()), det: md.docs.map(d => d.data()), res: rs.exists ? (rs.data().m || {}) : {}, cfg: cf.exists ? cf.data() : {}, movs: mv.docs.map(d => d.data()), banco: bx.docs.map(d => d.data()) };
   renderIVA();
 }
@@ -8488,7 +8488,7 @@ function pvRenderProveedor(r){ if(window.__pvFactProv !== r.p._id){ pvFactVer = 
     ${multiRZ || rzv ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;font-size:.78rem;"><button type="button" class="btn-mini" style="${!rzv ? 'border-color:var(--purple);font-weight:700;' : ''}" onclick="pvRzVer='';renderCompras()">Todas</button>${rzCon.map(([k, z]) => `<button type="button" class="btn-mini" style="${rzv === k ? 'border-color:' + RZ_COLOR[k] + ';font-weight:700;' : ''}" onclick="pvRzVer='${k}';renderCompras()"><span style="color:${RZ_COLOR[k]};">●</span> ${k[0].toUpperCase() + k.slice(1)} ${fmtMon(z.saldo, m)}</button>`).join('')}</div>` : ''}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center;"><button type="button" class="btn btn-gold" style="width:auto;padding:8px 14px;" onclick="pvFormPago('${p._id}')">Orden de pago</button>
       ${menu('+ Comprobante', [['Factura de compra', `pvFormCompra('${p._id}')`], ['Nota de crédito', `pvFormCompra('${p._id}', true)`], ['Nota de débito', `pvFormCompra('${p._id}', 'nd')`]])}
-      ${menu('⋯', [['Estado de cuenta', `pvEstadoCuenta('${p._id}')`], ['Filtrar por factura', `window.__pvVerFiltro=!window.__pvVerFiltro;renderCompras()`], ['Datos del proveedor', `pvFormProveedor('${p._id}')`]])}</div>
+      ${menu('⋯', [['Estado de cuenta (PDF)', `pvEstadoCuenta('${p._id}')`], ['Descargar Excel', `ctaExcel('pv','${p._id}')`], ['Enviar por email', `ctaEmail('pv','${p._id}')`], ['Filtrar por factura', `window.__pvVerFiltro=!window.__pvVerFiltro;renderCompras()`], ['Datos del proveedor', `pvFormProveedor('${p._id}')`]])}</div>
     ${window.__pvVerFiltro || pvFactVer ? htmlFiltroFactura(fuente.facts.filter(f => !f.nc), pvFactVer, 'pvFiltrarFactura', v => fmtMon(v, m)) : ''}
     ${(() => { const F = fuente.facts.filter(f => !f.nc), aCuenta = [];
       const filasV = filas.map(f => { const fis = f.f ? esFiscalCompra(f.f) : undefined; let det = '', sub = '';
@@ -8942,6 +8942,22 @@ function vencHtml(L, f$, que){ const hoy = new Date().toISOString().slice(0, 10)
   const re = { vencidas: 'Vencidas', semana: 'Vencen en 7 días', todas: 'Todas' }, rendir = window.__vencRender || '';
   return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">${['vencidas', 'semana', 'todas'].map(k => `<button type="button" onclick="window.__vencFil='${k}';${que === 'cobrar' ? 'renderCtaCte()' : 'renderCompras()'}" style="text-align:left;background:#fff;border:1px solid ${fil === k ? 'var(--purple)' : 'var(--line)'};border-radius:12px;padding:9px 14px;cursor:pointer;"><div style="font-size:.76rem;color:#6B6258;">${re[k]}</div><div style="font:700 1.1rem Arial;color:${k === 'vencidas' && G[k].length ? '#A6432F' : '#2B2622'};">${f$(tot(G[k]))}</div><div style="font-size:.72rem;color:#A89E90;">${G[k].length} comprobante${G[k].length === 1 ? '' : 's'}</div></button>`).join('')}</div>
     ${M.length ? `<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;">${M.map(x => { const d = dias(x.vto); return `<div onclick="${x.ir}" style="display:flex;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid #F3EFE8;font-size:.84rem;cursor:pointer;"><span style="width:70px;color:${d < 0 ? '#A6432F' : '#6B6258'};font-weight:${d < 0 ? 700 : 400};">${String(x.vto).split('-').reverse().join('/').slice(0, 5)}</span><b style="flex:1;min-width:0;">${escaparHtml(x.quien)}</b><span style="color:#8A8072;font-size:.78rem;">${escaparHtml(x.num)}</span><span style="width:110px;font-size:.74rem;color:${d < 0 ? '#A6432F' : '#9A7B12'};">${d < 0 ? 'vencida hace ' + (-d) + ' d' : d === 0 ? 'vence hoy' : 'vence en ' + d + ' d'}</span><b style="width:120px;text-align:right;">${(x.fmt || f$)(x.pend)}</b></div>`; }).join('')}</div>` : `<p class="empty-msg">Nada ${fil === 'vencidas' ? 'vencido' : 'por ' + (que === 'cobrar' ? 'cobrar' : 'pagar')} en esta lista.</p>`}`; }
+// estado de cuenta: movimientos en orden cronologico (cliente o proveedor)
+function ctaMovs(tipo, k){ if(tipo === 'cc'){ const c = ccCalcular()[k]; if(!c) return null; const F = c.facts.map(f => ({ fecha: f.fecha, comp: (f.esNC ? 'Nota de crédito ' : 'Factura ') + String(f.numero).replace(/^NC\s+/, ''), debe: f.importe > 0 ? f.importe : 0, haber: f.importe < 0 ? -f.importe : 0, pend: f.importe > 0 ? f.pendiente : null }));
+      const M = c.movs.map(m => ({ fecha: m.fecha, comp: ({ cobro: 'Recibo', sena: 'Seña', ajuste: 'Ajuste', inicial: 'Saldo inicial' }[m.tipo] || m.tipo) + (m.numero ? ' ' + String(m.numero).padStart(8, '0') : ''), debe: (m.tipo === 'ajuste' || m.tipo === 'inicial') && m.importe > 0 ? m.importe : 0, haber: m.tipo === 'cobro' || m.tipo === 'sena' ? m.importe + Object.values(m.retenciones || {}).reduce((x, y) => x + (+y || 0), 0) : ((m.tipo === 'ajuste' || m.tipo === 'inicial') && m.importe < 0 ? -m.importe : 0), pend: null }));
+      const L = F.concat(M).sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))); let s = 0; L.forEach(r => { s += r.debe - r.haber; r.saldo = Math.round(s * 100) / 100; });
+      const d = (ccClientesDB || []).find(x => [ccClave(x.razonSocial || ''), ccClave(`${x.apellido || ''} ${x.nombre || ''}`), ccClave(`${x.nombre || ''} ${x.apellido || ''}`)].includes(k)) || {};
+      return { nombre: c.nombre, email: d.email || '', saldo: c.saldo, L }; }
+  const r = pvCalcular()[k]; if(!r) return null; const L = [...r.facts.map(f => ({ fecha: f.fecha, comp: (f.nc ? 'Nota de crédito ' : f.nd ? 'Nota de débito ' : 'Factura ') + (f.tipo || '') + ' ' + (f.numero || ''), debe: f.nc ? 0 : f.importe, haber: f.nc ? f.importe : 0, pend: f.nc ? null : f.pendiente })), ...r.pagos.map(x => ({ fecha: x.fecha, comp: 'Orden de pago ' + String(x.numero || '').padStart(5, '0'), debe: 0, haber: +x.aplicadoMon || 0, pend: null }))].sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+  let s = 0; L.forEach(x => { s += x.debe - x.haber; x.saldo = Math.round(s * 100) / 100; }); return { nombre: r.p.nombre, email: r.p.email || '', saldo: r.saldo, L }; }
+function ctaExcel(tipo, k){ const D = ctaMovs(tipo, k); if(!D) return; const f = s => String(s || '').split('-').reverse().join('/');
+  const filas = [['Estado de cuenta · ' + D.nombre], ['al ' + new Date().toLocaleDateString('es-AR')], [], ['Fecha', 'Comprobante', 'Debe', 'Haber', 'Saldo', 'Pendiente']].concat(D.L.map(r => [f(r.fecha), r.comp, r.debe || '', r.haber || '', r.saldo, r.pend == null ? '' : r.pend])).concat([[], ['', 'Saldo', '', '', D.saldo]]);
+  const ws = XLSX.utils.aoa_to_sheet(filas); ws['!cols'] = [{ wch: 11 }, { wch: 34 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Estado de cuenta');
+  XLSX.writeFile(wb, `Estado de cuenta - ${D.nombre.replace(/[\\/:*?"<>|]/g, '')}.xlsx`); }
+async function ctaEmail(tipo, k){ const D = ctaMovs(tipo, k); if(!D) return; const f = s => String(s || '').split('-').reverse().join('/'), $ = v => formatPrice(v);
+  const pend = D.L.filter(r => r.pend > 0.5), cuerpo = `Estimados ${D.nombre}:\n\nLes enviamos el estado de su cuenta al ${new Date().toLocaleDateString('es-AR')}.\n\nSaldo: ${$(D.saldo)}\n${pend.length ? '\nComprobantes pendientes:\n' + pend.map(r => `· ${f(r.fecha)} · ${r.comp} · pendiente ${$(r.pend)}`).join('\n') + '\n' : ''}\nSaludos cordiales,\nOnLineTextil`;
+  if(!D.email && !await dsConfirm('No tiene un email cargado. ¿Abrir el correo igual, para escribir la dirección?')) return;
+  location.href = `mailto:${encodeURIComponent(D.email)}?subject=${encodeURIComponent('Estado de cuenta · ' + D.nombre)}&body=${encodeURIComponent(cuerpo)}`; }
 // ===== Cuenta corriente: vista cronologica (por defecto) y "por comprobante" (como TFactura), para clientes y proveedores =====
 function ccVista(){ try{ return localStorage.getItem('olt_cc_vista') || 'crono'; } catch(e){ return 'crono'; } }
 function ccSetVista(v, fn){ try{ localStorage.setItem('olt_cc_vista', v); } catch(e){} (window[fn] || renderCtaCte)(); }
@@ -8977,7 +8993,7 @@ function renderCtaCteCliente(c){ if(window.__ccFactCli !== c.k){ ccFactVer = '';
     <div class="meta" style="font-size:.76rem;margin-bottom:10px;">${(() => { const d = (ccClientesDB || []).find(x => [ccClave(x.razonSocial || ''), ccClave(`${x.apellido || ''} ${x.nombre || ''}`), ccClave(`${x.nombre || ''} ${x.apellido || ''}`)].includes(c.k)) || {}; return [d.cuit ? 'CUIT ' + d.cuit : '', d.condicionIva, 'plazo ' + ccPlazoCli(c) + ' días'].filter(Boolean).map(escaparHtml).join(' · '); })()}</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center;"><button type="button" class="btn btn-gold" style="width:auto;padding:8px 14px;" onclick="ccFormCobro('${K}','cobro')">Registrar cobro</button>
       ${menuMini('+ Movimiento', [['Seña', `ccFormCobro('${K}','sena')`], ['Ajuste / saldo inicial', `ccFormAjuste('${K}')`]])}
-      ${menuMini('⋯', [['Resumen de cuenta', `ccResumenPDF('${K}')`], ['Enviar por WhatsApp', `ccWhatsapp('${K}')`], ['Filtrar por factura', `window.__ccVerFiltro=!window.__ccVerFiltro;renderCtaCte()`], ...(pend.length > 1 ? [['Todas las pendientes fueron de contado', `ccMarcarContado(${escapeAttr(JSON.stringify(pend.map(f => f.id)))})`]] : [])])}</div>
+      ${menuMini('⋯', [['Resumen de cuenta (PDF)', `ccResumenPDF('${K}')`], ['Descargar Excel', `ctaExcel('cc','${K}')`], ['Enviar por email', `ctaEmail('cc','${K}')`], ['Enviar por WhatsApp', `ccWhatsapp('${K}')`], ['Filtrar por factura', `window.__ccVerFiltro=!window.__ccVerFiltro;renderCtaCte()`], ...(pend.length > 1 ? [['Todas las pendientes fueron de contado', `ccMarcarContado(${escapeAttr(JSON.stringify(pend.map(f => f.id)))})`]] : [])])}</div>
     ${grupoHtml}${sucHtml}${window.__ccVerFiltro || ccFactVer ? htmlFiltroFactura(c.facts, ccFactVer, 'ccFiltrarFactura') : ''}
     ${(() => { const plazo = ccPlazoCli(c), F = c.facts.filter(f => f.importe > 0), hoyI = new Date().toISOString().slice(0, 10);
       const txtMov = m => (m.tipo === 'sena' ? 'Seña' : 'Recibo') + ' ' + String(m.fecha).split('-').reverse().join('/') + (m.medio ? ' · ' + m.medio : '');
@@ -9170,7 +9186,7 @@ let rkFilas = [], rkTab = 'productos', rkOrden = 'gan', rkBuscar = '';
 async function abrirRankings(){
   mostrarPaso('step-rankings'); document.getElementById('rk-body').innerHTML = '<p class="empty-msg">Cargando…</p>';
   rnDatos = null; await datosRN();
-  const sd = await db.collection('ml_detalle').get().catch(() => ({ docs: [] }));
+  const sd = await mlDetalleGet().catch(() => ({ docs: [] }));
   rkFilas = [];
   // facturadas: cada renglon
   rnDatos.facturas.forEach(f => { if(f.razon && f.razon !== 'propia') return; const m = String(f.fecha || '').split('/'); if(m.length !== 3) return; const per = m[2] + '-' + m[1];
@@ -13680,10 +13696,12 @@ async function sfsGuardar(b){ const modo = (document.querySelector('input[name=s
       await db.collection('fotos_sku').doc(s).set({ imagenesBase64: fotos, actualizado: new Date().toISOString() }); fotosSku[s] = fotos; } catch(e){ err.push(s + ': ' + e.message); } }
   sfsLista.forEach(x => { try{ URL.revokeObjectURL(x.url); } catch(e){} }); sfsLista = [];
   cerrarPublicar(); dsToast(err.length ? `Cargadas con errores: ${err.join(' · ')}` : `Listo: fotos cargadas en ${S.length} SKU`, { ms: 7000 }); }
+// reportes de ML guardados (pesados): una sola lectura cada 10 minutos para toda la app
+function mlDetalleGet(){ if(window.__mlDet && Date.now() - (window.__mlDetT || 0) < 6e5) return window.__mlDet; window.__mlDetT = Date.now(); window.__mlDet = db.collection('ml_detalle').get(); window.__mlDet.catch(() => { window.__mlDet = null; }); return window.__mlDet; }
 // ===== Fugas de plata por SKU: margen negativo, reintegros, devoluciones y stock antiguo en Full =====
 let fgDatos = null, fgSt = { cta: 'Alberto', per: '', abiertos: {} };
 const fgCap = s => { s = String(s || '').toLowerCase(); return s.charAt(0).toUpperCase() + s.slice(1); };
-async function fgCargar(){ const [det, full] = await Promise.all([db.collection('ml_detalle').get().catch(() => null), db.collection('config').doc('full_stock_antiguo').get().catch(() => null)]);
+async function fgCargar(){ const [det, full] = await Promise.all([mlDetalleGet().catch(() => null), db.collection('config').doc('full_stock_antiguo').get().catch(() => null)]);
   const F = []; if(det) det.docs.forEach(d => { const x = d.data(), cta = fgCap(x.cuenta); String(x.csv || '').split('\n').slice(1).forEach(l => { const f = l.split(';'); if(!f[2]) return;
     F.push({ fecha: recISO(f[0]), cuenta: cta, op: f[2], estado: f[4] || '', sku: String(f[6] || f[5] || '').split(/\s+x\s+/i)[0].trim().toUpperCase(), skuMl: f[5] || '', precio: +f[8] || 0, neto: +f[12] || 0, resultado: f[14] === '' || f[14] == null ? null : +f[14] }); }); });
   fgDatos = { F, full: full && full.exists ? full.data() : {} }; return fgDatos; }
@@ -13721,7 +13739,7 @@ function fgPintar(){ const box = document.getElementById('pub-cont'); if(!box ||
         return `<div style="display:grid;grid-template-columns:1fr 110px 110px 110px 110px 110px;gap:8px;padding:8px 12px;border-bottom:1px solid #F3EFE8;font-size:.82rem;cursor:pointer;align-items:center;" onclick="fgSt.abiertos['${g.sku}']=!fgSt.abiertos['${g.sku}'];fgPintar()"><div style="min-width:0;"><b>${escaparHtml(g.sku)}</b>${al}<div style="font-size:.72rem;color:#A89E90;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escaparHtml(nom)}</div></div><span style="text-align:right;">${v(g.margen)}</span><span style="text-align:right;">${v(g.reint)}</span><span style="text-align:right;">${v(g.devol)}</span><span style="text-align:right;">${v(g.full)}</span><b style="text-align:right;">${v(g.total)}</b></div>
           ${ab ? `<div style="background:#FBF9F6;padding:6px 12px 8px 24px;border-bottom:1px solid #F3EFE8;font-size:.76rem;">${g.items.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))).map(it => `<div style="display:flex;gap:10px;padding:2px 0;"><span style="color:#8A8072;width:46px;">${String(it.fecha).slice(8, 10)}/${String(it.fecha).slice(5, 7)}</span><span style="width:6px;height:14px;border-radius:2px;background:${col(it.cuenta)};"></span><span style="flex:1;">${escaparHtml(it.tipo)}${it.op ? ' · venta ' + escaparHtml(it.op) : ''}</span><span style="color:#A6432F;">${formatPrice(it.monto)}</span></div>`).join('') || '<span class="note">Sin pérdidas en el período; aviso de Full próximo.</span>'}</div>` : ''}`; }).join('')}</div>`
       : '<p class="empty-msg">Sin fugas de plata en este período.</p>'}
-    <p class="note" style="text-align:left;margin-top:8px;">Tocar un SKU muestra cada venta, reintegro o cargo. Margen negativo: venta que, después de cargos de ML y costo, dejó pérdida. Devoluciones y anulaciones: el neto de la venta anulada, si quedó negativo. Stock antiguo: lo que ML va a cobrar según el último reporte de Full cargado.</p>`; }
+    <details style="margin-top:8px;font-size:.8rem;color:#6B6258;"><summary style="cursor:pointer;font-weight:600;">ⓘ Qué es cada columna</summary><div style="padding:6px 2px;line-height:1.6;"><b>Margen neg.:</b> ventas en las que, después de lo que cobró ML y del costo del producto, perdió plata.<br><b>Reintegros:</b> plata que ML le devolvió al comprador, que se quedó con el producto (pérdida directa).<br><b>Devoluciones:</b> ventas anuladas en las que la mercadería volvió, pero quedó plata en contra (envíos o cargos que ML no devolvió).<br><b>Stock antiguo:</b> lo que Full le cobra por mercadería que lleva muchos meses en su depósito (según el último reporte cargado).<br><b>Total:</b> la suma de las cuatro. Tocar un SKU muestra cada venta o cargo que lo forma.</div></details>`; }
 // reporte "Cargos por stock antiguo" de Full (Excel de ML), por cuenta
 async function fgSubirFull(inp, cta){ const f = inp.files && inp.files[0]; if(!f) return; try{ procesando('Leyendo el reporte de Full…');
     const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' }), ws = wb.Sheets[wb.SheetNames[0]], R = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
@@ -14783,7 +14801,7 @@ function recCuenta(c){ window.__recCta = c; const col = RZ_COLOR[c.toLowerCase()
   const v = document.getElementById('da-venta'); if(v){ v.style.borderColor = col; } }
 function recQuitarColor(){ const t = document.getElementById('da-texto'); if(t){ t.style.background = ''; t.style.borderColor = ''; t.style.boxShadow = ''; } }
 async function recContexto(){ const nv = ((document.getElementById('da-venta') || {}).value || '').replace(/\D/g, ''); let fila = '';
-  if(nv){ try{ const s2 = await db.collection('ml_detalle').get(); for(const d of s2.docs){ const x = d.data(); if(String(x.cuenta || '').toLowerCase() !== String(window.__recCta || '').toLowerCase()) continue; const L = String(x.csv || '').split('\n'), cab = L[0]; const f = L.find(l => l.split(';')[2] === nv); if(f){ fila = cab + '\n' + f; break; } } } catch(e){} }
+  if(nv){ try{ const s2 = await mlDetalleGet(); for(const d of s2.docs){ const x = d.data(); if(String(x.cuenta || '').toLowerCase() !== String(window.__recCta || '').toLowerCase()) continue; const L = String(x.csv || '').split('\n'), cab = L[0]; const f = L.find(l => l.split(';')[2] === nv); if(f){ fila = cab + '\n' + f; break; } } } catch(e){} }
   const sku = fila ? (fila.split('\n')[1].split(';')[6] || fila.split('\n')[1].split(';')[5]) : '';
   return `Cuenta: ${window.__recCta} (usar SOLO datos de esta cuenta; nunca mencionar otras cuentas, razones sociales ni al titular).\n` + (nv ? `N.º de venta: ${nv}\n` : '') + (fila ? `Datos de la venta (desde la app):\n${fila}\n` : nv ? 'La venta no está cargada en la app.\n' : '') + (sku && buscarProductoPorSku(sku) ? `Ficha del producto:\n${fichaDA(sku)}\n` : '') + `FORMATO OBLIGATORIO: 1) Análisis de las pruebas (fotos/captura) 2) Estrategia en 2-3 líneas 3) Respuesta para pegar en ML de hasta 300 caracteres, como persona común, sin citar leyes, sin admitir culpa 4) Qué adjuntar 5) Próximo paso y plazo. Si falta un dato clave, preguntalo primero.\n\n`; }
 // version GRATIS: la app arma el texto completo (reglas + datos de la venta) para pegar en Gemini o ChatGPT gratuitos, junto con las capturas
@@ -14815,7 +14833,7 @@ async function recGuardarCaso(){ const cta = window.__recCta; if(!cta) return; c
 function recBotonCasos(){ if(window.__recEnPanel) try{ recPintarCasos(); } catch(e){} }
 // estado automatico desde ml_detalle: reintegro (fila negativa, Cancelado / Parcialmente devuelto) = perdido; 30 dias sin reintegro = ganado
 async function recActualizarEstados(){ await (recCasos ? null : recCargarCasos()); const abiertos = recCasos.filter(c => c.venta && c.origen !== 'manual' && (c.estado === 'abierto' || c.estado === 'perdido'));
-  let det = null; try{ det = await db.collection('ml_detalle').get(); } catch(e){ return 0; }
+  let det = null; try{ det = await mlDetalleGet(); } catch(e){ return 0; }
   const M = {}, PQ = {}; det.docs.forEach(d => { const x = d.data(), cta = String(x.cuenta || '').toLowerCase(); String(x.csv || '').split('\n').slice(1).forEach(l => { const f = l.split(';'); if(!f[2]) return; const k = cta + '|' + f[2], fila = { fecha: f[0], tipo: f[3], estado: f[4], precio: +f[8] || 0, neto: +f[12] || 0, sku: f[6] || f[5] || '', cr: String(f[18] || '') }; (M[k] = M[k] || []).push(fila); const pq = String(f[17] || '').replace(/\D/g, ''); if(pq && pq !== f[2]){ PQ[cta + '|' + pq] = k; } }); });
   let n = 0;
   // casos nuevos desde el reporte: toda venta con fila de reintegro (Cancelado / Parcialmente devuelto con monto negativo)
@@ -14856,7 +14874,8 @@ function recPintarCasos(mes){ const box = document.getElementById(window.__recEn
   const ST = { abierto: ['#FFF8E1', '#9A7B12', 'Abierto'], ganado: ['#E9F5EC', '#2F7A47', 'Ganado'], perdido: ['#FBEDEA', '#A6432F', 'Perdido'], acuerdo: ['#EEF3FA', '#2E5A8C', 'Acuerdo'] };
   const fil = window.__recFil || 'todos', DF = D.filter(c => fil === 'todos' ? true : fil === 'abiertos' ? c.estado === 'abierto' : fil === 'parcial' ? c.parcial : fil === 'total' ? (c.estado === 'perdido' && !c.parcial) : fil === 'cargos' ? c.cargosRecTotal > 0 : c.estado === fil);
   box.innerHTML = `<h3 style="font:700 1rem Arial;margin:0 0 8px;color:#3D2B4E;">Reclamos, devoluciones y reintegros</h3><div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;font-size:.85rem;flex-wrap:wrap;">${[['todos', 'Todos'], ['abiertos', 'Abiertos'], ['parcial', 'Reintegros parciales'], ['total', 'Reembolsos totales'], ['cargos', 'Con cargos para reclamar'], ['ganado', 'Ganados']].map(([k, t]) => `<button type="button" class="btn-mini" style="${fil === k ? 'border-color:var(--purple);font-weight:700;' : ''}${k === 'cargos' ? 'color:#A6432F;' : ''}" onclick="window.__recFil='${k}';recPintarCasos()">${t} (${k === 'todos' ? D.length : D.filter(c => k === 'abiertos' ? c.estado === 'abierto' : k === 'parcial' ? c.parcial : k === 'total' ? (c.estado === 'perdido' && !c.parcial) : k === 'cargos' ? c.cargosRecTotal > 0 : c.estado === k).length})</button>`).join('')}<span style="margin-left:12px;">Mes:</span><select onchange="recPintarCasos(this.value)" style="padding:5px 8px;border:1px solid var(--line);border-radius:8px;">${(meses.length ? meses : [mes]).map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${new Date(m + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</option>`).join('')}</select><span class="note" style="margin:0 0 0 auto;">El estado se completa solo con los reportes de ventas de ML que carga en Resultados ML.</span></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">${res('Alberto') || ''}${res('Rita') || ''}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;">${res('Alberto') || ''}${res('Rita') || ''}</div>
+    <details style="margin-bottom:10px;font-size:.8rem;color:#6B6258;"><summary style="cursor:pointer;font-weight:600;">ⓘ Qué es cada cosa</summary><div style="padding:6px 2px;line-height:1.6;"><b>Reintegro parcial:</b> ML le devolvió una parte al comprador y el comprador se quedó con el producto: pérdida directa.<br><b>Reembolso total / Reembolsado:</b> la venta se anuló y la mercadería vuelve; se muestra el neto de la operación (venta + anulación), que a veces queda a favor.<br><b>Cargos no devueltos:</b> envíos o cargos de devolución que ML no le reintegró en una venta anulada: se pueden reclamar.<br><b>Perdidos sin pruebas:</b> reintegros en los que el comprador no mandó fotos ni pruebas (márquelo en "pruebas").<br><b>Apelado:</b> tíldelo cuando pida revisión; si ML devuelve la plata, la app lo detecta sola en el próximo reporte.</div></details>
     ${DF.length ? `<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;">${DF.map(c => { const [bg, fg, tx] = ST[c.estado] || ST.abierto, dias = Math.floor((Date.now() - new Date(c.fecha + 'T12:00:00').getTime()) / 864e5), r = c.venta ? null : null;
       return `<div style="display:grid;grid-template-columns:6px 46px 1fr 110px 150px ${dueno ? '100px' : ''};gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid #F3EFE8;font-size:.82rem;"><span style="width:6px;height:32px;border-radius:3px;background:${col(c.cuenta)};"></span><span style="color:#8A8072;">${String(c.fecha).slice(8, 10)}/${String(c.fecha).slice(5, 7)}</span>
         <div style="min-width:0;"><b>${escaparHtml(c.venta || 'sin N.º de venta')}</b> · <select onchange="recSet('${c._id}', { motivo: this.value })" style="border:none;background:transparent;font-size:.8rem;color:#3D2B4E;font-weight:600;">${['manchado', 'roto', 'faltante', 'producto distinto', 'arrepentimiento', 'cancelación', 'reintegro parcial', 'reembolso total', 'otro'].map(m => `<option ${c.motivo === m ? 'selected' : ''}>${m}</option>`).join('')}</select><div style="color:#A89E90;font-size:.74rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escaparHtml([c.sku, (buscarProductoPorSku(c.sku || '') || { producto: {} }).producto.nombre, c.texto].filter(Boolean).join(' · '))}</div>${c.cargosRecTotal > 0 ? `<div style="font-size:.74rem;color:#A6432F;font-weight:600;">Cargos no devueltos: ${(c.cargosRec || []).map(([n, v]) => escaparHtml(n.replace(/^cargo por /i, '')) + ' ' + formatPrice(v)).join(' · ')} → reclamable</div>` : ''}</div>
@@ -22859,7 +22878,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v453';
+const APP_VERSION = '2026-10-02-v454';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
