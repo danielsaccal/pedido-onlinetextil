@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v451</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v452</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -8792,7 +8792,7 @@ async function abrirCtaCte(tab){ if(typeof tab === 'string'){ ccTab = tab; ccCli
   ccClientesDB = sc.docs.map(d => d.data());
   ccFacts = sf.docs.map(d => ({ _id: d.id, ...d.data() })).filter(f => !f.razon || f.razon === 'propia').map(f => { const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0); const tot = Math.round((f.total || n0 * 1.21) * 100) / 100;
     return { id: f._id, numero: (f.esNC ? 'NC ' : f.esND ? 'ND ' : '') + (f.tipo || '') + ' ' + f.numero + (f.facturaRef ? ' (s/ ' + f.facturaRef.numero + ')' : ''), fecha: ccFechaISO(f.fecha), cliente: String(f.cliente || 'Sin nombre').replace(/^\s*\d+\s*-\s*/, ''), importe: f.esNC ? -tot : tot, esNC: !!f.esNC, ref: f.facturaRef ? f.facturaRef.id : null, condicion: f.condicion || '' }; })
-    .filter(f => !ccCfg.inicio || f.fecha >= ccCfg.inicio);
+    .filter(f => !ccCfg.inicio || f.fecha >= ccCfg.inicio); ccFacts = ccFacts.concat(ccFactsTF(ccFacts));
   if(!ccCfg.inicio){ ccTab = 'config'; }
   renderCtaCte();
 }
@@ -8807,7 +8807,7 @@ function ccCalcular(){
   const cli = k => C[k] = C[k] || { k, nombre: k, facts: [], movs: [], saldo: 0 };
   const contadoCli = new Set(ccClientesDB.filter(x => x.condicion === 'contado').flatMap(x => [ccClave(x.razonSocial || ''), ccClave(`${x.apellido || ''} ${x.nombre || ''}`), ccClave(`${x.nombre || ''} ${x.apellido || ''}`)]).filter(Boolean));
   ccFacts.forEach(f => { if(/consumidor final/i.test(f.cliente)) return; /* mostrador: siempre contado */ if(f.condicion === 'contado') return; /* comprobante de contado */ if(f.condicion !== 'ctacte' && contadoCli.has(ccClave(f.cliente))) return; /* cliente de contado (salvo que el comprobante diga cuenta corriente) */ const al = AL[ccClave(f.cliente)], c = cli(al ? al.main : ccClave(f.cliente)); if(!c._nom) c.nombre = al ? ((ccClientesDB.find(x => ccClave(x.razonSocial || `${x.apellido || ''} ${x.nombre || ''}`.trim()) === al.main) || {}).razonSocial || f.cliente) : f.cliente; if(ccCfg.contado && ccCfg.contado[f.id]) return; c.facts.push({ ...f, pendiente: f.importe, sucursal: al ? al.suc : '' }); });
-  ccMovs.forEach(m => { const c = cli(mainDe(m.nombre || m.cliente) || m.cliente); if(m.nombre) m.nombre = sinCod(m.nombre); if(m.nombre){ c.nombre = m.nombre; c._nom = true; } c.movs.push(m); });
+  ccMovs.forEach(m => { if(m.tipo === 'factura_tf') return; /* va como factura */ const c = cli(mainDe(m.nombre || m.cliente) || m.cliente); if(m.nombre) m.nombre = sinCod(m.nombre); if(m.nombre){ c.nombre = m.nombre; c._nom = true; } c.movs.push(m); });
   Object.values(C).forEach(c => {
     c.facts.sort((a, b) => a.fecha.localeCompare(b.fecha));
     const debe = c.facts.reduce((a, f) => a + f.importe, 0) + c.movs.filter(m => m.tipo === 'ajuste' || m.tipo === 'inicial').reduce((a, m) => a + m.importe, 0);
@@ -8855,7 +8855,7 @@ function renderCtaCte(){
   const caja = (t, v, col) => `<div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff;"><small class="note" style="margin:0;">${t}</small><div style="font-weight:800;font-size:1.25rem;color:${col || 'inherit'};">${v}</div></div>`;
   document.getElementById('cc-tot').innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">${caja('A cobrar', formatPrice(tot))}${caja('Vencido', formatPrice(venc), venc > 0 ? '#A6432F' : '')}${caja('Cheques en cartera', formatPrice(totCh) + ` <small class="note">(${cheques.length})</small>`)}</div>`;
   const tabs = [['clientes', '👥 Clientes'], ['recibos', '🧾 Recibos'], ['cheques', '💵 Cheques'], ['log', '🕒 Registro de cambios'], ['config', '⚙️ Ajustes']];
-  document.getElementById('cc-tabs').innerHTML = tabs.map(([k, t]) => `<button type="button" onclick="ccTab='${k}';ccCli=null;renderCtaCte()" style="padding:7px 12px;border-radius:999px;border:1px solid ${ccTab === k ? 'var(--purple)' : 'var(--line)'};background:${ccTab === k ? 'var(--purple)' : '#fff'};color:${ccTab === k ? '#fff' : 'var(--purple)'};font-weight:700;cursor:pointer;">${t}</button>`).join('');
+  document.getElementById('cc-tabs').innerHTML = (esDueno() ? `<label class="btn-mini" style="float:right;cursor:pointer;">📥 Importar de TFactura<input type="file" accept=".xlsx,.xls" style="display:none;" onchange="ccImportarTF(this)"></label>` : '') + tabs.map(([k, t]) => `<button type="button" onclick="ccTab='${k}';ccCli=null;renderCtaCte()" style="padding:7px 12px;border-radius:999px;border:1px solid ${ccTab === k ? 'var(--purple)' : 'var(--line)'};background:${ccTab === k ? 'var(--purple)' : '#fff'};color:${ccTab === k ? '#fff' : 'var(--purple)'};font-weight:700;cursor:pointer;">${t}</button>`).join('');
   const box = document.getElementById('cc-body');
   if(ccTab === 'config'){
     box.innerHTML = `<div style="max-width:520px;">${!ccCfg.inicio ? '<p style="background:#FFF8E6;border:1px solid #EBD9A8;border-radius:12px;padding:10px;">Para empezar, elija desde qué fecha se toman las facturas como cuenta corriente. Las anteriores no se cuentan; si un cliente ya debía algo, cárguelo como <b>saldo inicial</b>.</p>' : ''}
@@ -8891,10 +8891,48 @@ function htmlFiltroFactura(facts, sel, fnCambio, fmtM){ fmtM = fmtM || formatPri
       </table><p class="note" style="text-align:left;margin:6px 0 0;">${f.pendiente > 0.5 ? `Pendiente: <b>${fmtM(f.pendiente)}</b>` : '✓ Cancelada'}</p></div>` : '');
 }
 function ccFiltrarFactura(v){ ccFactVer = v; renderCtaCte(); }
+// ===== Importar cuentas corrientes desde TFactura ("Composición de saldos de clientes", Excel) =====
+// facturas/NC/ND importadas: viven en cc_movimientos (tipo factura_tf) y solo cuentan para la cuenta corriente (no IVA, no estadisticas)
+function ccFactsTF(base){ const ya = new Set((base || []).map(f => normBusqueda(f.numero).replace(/\s+/g, ''))); return (ccMovs || []).filter(m => m.tipo === 'factura_tf').map(m => ({ id: m._id, numero: (m.esNC ? 'NC ' : m.esND ? 'ND ' : '') + (m.letra || '') + ' ' + m.numero, fecha: m.fecha, cliente: m.nombre || m.cliente, importe: m.esNC ? -Math.abs(m.importe) : Math.abs(m.importe), esNC: !!m.esNC, ref: m.ref || '', condicion: 'ctacte', tf: true, vto: m.vto || '' })).filter(f => !ya.has(normBusqueda(f.numero).replace(/\s+/g, ''))); }
+function tfNum(v){ if(typeof v === 'number') return v; const s = String(v || '').replace(/[^\d,.-]/g, ''); if(!s) return 0; return /,\d{1,2}$/.test(s) ? +s.replace(/\./g, '').replace(',', '.') : +s.replace(/,/g, ''); }
+function tfFecha(v){ if(v instanceof Date) return v.toISOString().slice(0, 10); const m = String(v || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : ''; }
+function tfComp(t){ const s = String(t || '').trim(), n = normBusqueda(s), m = s.match(/\b([ABCMX])\s+(\d{4,5}-\d{6,8}|\d{5,8})\b/);
+  return { texto: s, esRecibo: /recibo/.test(n), esNC: /nota de cred|credito de venta|credito de compra/.test(n), esND: /nota de deb|debito de venta|debito de compra/.test(n), letra: m ? m[1] : '', numero: m ? m[2] : (s.match(/(\d{4,5}-\d+|\d{5,})/) || [, ''])[1] }; }
+async function ccImportarTF(inp){ const f = inp.files && inp.files[0]; if(!f) return; inp.value = '';
+  try{ const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: true }), R = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+    const hi = R.findIndex(r => r.some(c => /^cliente$/i.test(String(c).trim())) && r.some(c => /comprobante aplicado/i.test(String(c)))); if(hi < 0) throw new Error('No es el Excel "Composición de saldos de clientes" de TFactura (falta la columna Cliente o Comprobante aplicado).');
+    const H = R[hi].map(c => normBusqueda(String(c))), ix = re => H.findIndex(x => re.test(x));
+    const C = { cli: ix(/^cliente$/), saldo: ix(/total saldo/), comp: ix(/^comprobante$/), fecha: ix(/^fecha$/), vto: ix(/vencimiento/), apl: ix(/comprobante aplicado/), fapl: ix(/fecha aplicacion/), debe: ix(/^debe$/), haber: ix(/^haber$/) };
+    const CL = {}; let actual = null;
+    R.slice(hi + 1).forEach(r => { const cli = String(r[C.cli] || '').trim(); if(!cli) return; const k = ccClave(cli.replace(/^\s*\d+\s*-\s*/, '')); const c = CL[k] = CL[k] || { k, nombre: cli.replace(/^\s*\d+\s*-\s*/, ''), saldoTF: tfNum(r[C.saldo]), facts: [], recibos: {} };
+      const comp = String(r[C.comp] || '').trim(), apl = String(r[C.apl] || '').trim(), debe = tfNum(r[C.debe]), haber = tfNum(r[C.haber]);
+      if(comp && /comprobantes a cuenta/i.test(comp)){ actual = null; return; }
+      if(comp){ const t = tfComp(comp); if(!t.numero) return;
+        if(t.esRecibo){ const rc = c.recibos[t.numero] = c.recibos[t.numero] || { numero: t.numero, fecha: tfFecha(r[C.fecha]), importe: 0, aplica: [] }; rc.importe += Math.abs(haber || debe); actual = null; }
+        else { actual = { ...t, fecha: tfFecha(r[C.fecha]), vto: tfFecha(r[C.vto]), importe: Math.abs(debe || haber) }; c.facts.push(actual); } }
+      else if(apl && actual){ const t = tfComp(apl), imp = Math.abs(haber || debe);
+        if(t.esRecibo){ const rc = c.recibos[t.numero] = c.recibos[t.numero] || { numero: t.numero, fecha: tfFecha(r[C.fapl]), importe: 0, aplica: [] }; rc.importe += imp; rc.aplica.push({ fact: actual, importe: imp }); }
+        else if(t.esNC){ c.facts.push({ ...t, fecha: tfFecha(r[C.fapl]), importe: imp, ref: actual }); } } });
+    const L = Object.values(CL).map(c => { const deb = c.facts.reduce((s, x) => s + (x.esNC ? -x.importe : x.importe), 0), hab = Object.values(c.recibos).reduce((s, x) => s + x.importe, 0); return { ...c, nF: c.facts.length, nR: Object.keys(c.recibos).length, saldoCalc: Math.round((deb - hab) * 100) / 100 }; });
+    window.__tfImp = L; ccPintarImportTF();
+  } catch(e){ alert('No se pudo leer el archivo: ' + e.message); } }
+function ccPintarImportTF(){ const L = window.__tfImp || [], ok = L.filter(c => Math.abs(c.saldoCalc - c.saldoTF) < 1).length;
+  pvModal('📥 Importar cuentas corrientes de TFactura', `<p class="note" style="text-align:left;margin:0 0 8px;">Se van a cargar las facturas, notas de crédito y recibos de cada cliente, con qué recibo canceló qué factura. Solo cuentan para la cuenta corriente (no tocan IVA, stock ni estadísticas). Si vuelve a importar, se reemplazan los mismos comprobantes, sin duplicar.</p>
+    <div style="font-size:.86rem;margin-bottom:6px;"><b>${L.length}</b> clientes · <b>${L.reduce((s, c) => s + c.nF, 0)}</b> facturas y NC · <b>${L.reduce((s, c) => s + c.nR, 0)}</b> recibos · ${ok === L.length ? '<span style="color:#2F7A47;">✓ todos los saldos coinciden con TFactura</span>' : `<span style="color:#A6432F;">${L.length - ok} saldos no coinciden</span>`}</div>
+    <div style="max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:10px;">${L.map(c => `<div style="display:flex;gap:8px;padding:6px 10px;border-bottom:1px solid #F3EFE8;font-size:.82rem;"><b style="flex:1;">${escaparHtml(c.nombre)}</b><span style="color:#8A8072;">${c.nF} fact. · ${c.nR} rec.</span><span style="width:110px;text-align:right;">${formatPrice(c.saldoTF)}</span><span style="width:18px;">${Math.abs(c.saldoCalc - c.saldoTF) < 1 ? '<span style="color:#2F7A47;">✓</span>' : `<span style="color:#A6432F;" title="calculado ${formatPrice(c.saldoCalc)}">≠</span>`}</span></div>`).join('')}</div>
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-gold" style="flex:1;" onclick="ccGuardarImportTF(this)">Importar ${L.length} clientes</button><button class="btn btn-ghost" style="width:auto;" onclick="cerrarPublicar()">Cancelar</button></div>`); }
+async function ccGuardarImportTF(b){ const L = window.__tfImp || []; if(!L.length) return; b.disabled = true; let n = 0;
+  const id = s => String(s).replace(/[^\w-]/g, '_'), ops = [];
+  L.forEach(c => { c.facts.forEach(x => { const fid = 'tf_' + id((x.esNC ? 'NC' : x.esND ? 'ND' : 'FC') + x.letra + x.numero); x._id = fid; ops.push([fid, { tipo: 'factura_tf', cliente: c.k, nombre: c.nombre, letra: x.letra, numero: x.numero, fecha: x.fecha, vto: x.vto || '', importe: x.importe, esNC: !!x.esNC, esND: !!x.esND, ref: x.ref && x.ref._id || '', origen: 'tfactura', importado: new Date().toISOString() }]); });
+    Object.values(c.recibos).forEach(r => { ops.push(['tfrc_' + id(r.numero), { tipo: 'cobro', cliente: c.k, nombre: c.nombre, fecha: r.fecha, importe: Math.round(r.importe * 100) / 100, numero: +String(r.numero).replace(/\D/g, '') || r.numero, medio: '', detalle: 'Recibo X ' + r.numero + ' (TFactura)', aplica: r.aplica.map(a => ({ id: a.fact._id, numero: (a.fact.letra || '') + ' ' + a.fact.numero, importe: Math.round(a.importe * 100) / 100 })), origen: 'tfactura', importado: new Date().toISOString() }]); }); });
+  try{ for(let i = 0; i < ops.length; i += 400){ const bt = db.batch(); ops.slice(i, i + 400).forEach(([k, d]) => bt.set(db.collection('cc_movimientos').doc(k), d)); await bt.commit(); n += Math.min(400, ops.length - i); b.textContent = `Guardando ${n} de ${ops.length}…`; } }
+  catch(e){ alert('No se pudo importar: ' + e.message); b.disabled = false; return; }
+  try{ await ccLog('Importación TFactura', `${L.length} clientes · ${ops.length} comprobantes`); } catch(e){}
+  cerrarPublicar(); dsToast(`Importado: ${L.length} clientes, ${ops.length} comprobantes`, { ms: 7000 }); await abrirCtaCte('clientes'); }
 // ===== Cuenta corriente: vista cronologica (por defecto) y "por comprobante" (como TFactura), para clientes y proveedores =====
 function ccVista(){ try{ return localStorage.getItem('olt_cc_vista') || 'crono'; } catch(e){ return 'crono'; } }
 function ccSetVista(v, fn){ try{ localStorage.setItem('olt_cc_vista', v); } catch(e){} (window[fn] || renderCtaCte)(); }
-function ctaVistaHtml(o){ const f$ = o.fmt || formatPrice, v = ccVista(), ddmm = s => String(s || '').split('-').reverse().join('/').slice(0, 5);
+function ctaVistaHtml(o){ const f$ = o.fmt || formatPrice, v = ccVista(), anioHoy = String(new Date().getFullYear()), ddmm = s => { const x = String(s || '').split('-'); return x.length === 3 ? `${x[2]}/${x[1]}${x[0] !== anioHoy ? '/' + x[0].slice(2) : ''}` : String(s || ''); };
   const kp = (t, val, col, sub) => `<div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:9px 14px;"><div style="font-size:.76rem;color:#6B6258;">${t}</div><div style="font:700 1.15rem Arial;color:${col || '#2B2622'};margin-top:2px;">${f$(val)}</div>${sub ? `<div style="font-size:.72rem;color:#A89E90;">${sub}</div>` : ''}</div>`;
   const seg = `<div style="display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;">${[['crono', 'Cronológica'], ['comp', 'Por comprobante']].map(([k, t]) => `<button type="button" onclick="ccSetVista('${k}','${o.render}')" style="border:none;padding:7px 14px;font-weight:600;font-size:.8rem;cursor:pointer;${v === k ? 'background:#3D2B4E;color:#fff;' : 'background:#fff;color:#6B6258;'}">${t}</button>`).join('')}</div>`;
   const pill = (t, tipo) => `<span style="font-size:.7rem;font-weight:700;padding:1px 8px;border-radius:999px;${tipo === 'r' ? 'background:#FBEDEA;color:#A6432F;' : tipo === 'a' ? 'background:#FFF8E1;color:#9A7B12;' : 'background:#E9F5EC;color:#2F7A47;'}">${t}</span>`;
@@ -8938,7 +8976,7 @@ function renderCtaCteCliente(c){ if(window.__ccFactCli !== c.k){ ccFactVer = '';
         else if(r.f){ const ref = r.f.ref && c.facts.find(x => x.id === r.f.ref); det = ref ? `<span style="color:#2A8C7A;">sobre ${escaparHtml(numF(ref))}</span>` : ''; }
         else if(r.m && (r.m.tipo === 'cobro' || r.m.tipo === 'sena')){ const ap = aplDe(r.m), tot = r.haber, usado = ap.reduce((s, x) => s + x.imp, 0);
           det = ap.length ? `<span style="color:#2A8C7A;">aplicado a ${ap.map(x => escaparHtml(numF(x.f)) + (x.imp < x.f.importe - 0.5 ? ' (parcial)' : '')).join(', ')}</span>` : ''; if(tot - usado > 0.5){ det += `${det ? ' · ' : ''}<span style="color:#9A7B12;font-weight:700;">${ap.length ? 'resto ' + formatPrice(tot - usado) + ' a cuenta' : 'a cuenta (sin aplicar)'}</span>`; aCuenta.push({ fecha: r.fecha, tag: letraComp('recibo', '', undefined), num: r.m.numero ? 'RC ' + String(r.m.numero).padStart(8, '0') : r.t, imp: tot - usado }); }
-          sub = r.det; }
+          sub = String(r.det || '').split(' · ').filter(x => !/^cancela /.test(x)).join(' · '); }
         else sub = r.det;
         const num = r.f ? String(r.f.numero).replace(/^(NC |ND )?[ABCMX]\s+/, '') : (r.m && r.m.numero ? (r.m.tipo === 'sena' ? 'Seña ' : 'RC ') + String(r.m.numero).padStart(8, '0') : r.t);
         return { fecha: r.fecha, tag: letraComp(fam, l, fis), num, det, sub, debe: r.debe, haber: r.haber, saldo: r.saldo, menu: r.m ? menuMini('⋯', [['Borrar', `ccBorrarMov('${r.m._id}')`]], true) : (r.f && r.f.pendiente > 0.5 ? menuMini('⋯', [['Fue de contado (no va a cta. cte.)', `ccMarcarContado('${r.f.id}')`]], true) : '') }; });
@@ -9112,7 +9150,7 @@ async function pintarAvisoCtaCte(){
 async function abrirCtaCteDatos(){
   const [cf, sf, sm] = await Promise.all([db.collection('config').doc('ctacte').get(), db.collection('ventas_facturadas').get(), db.collection('cc_movimientos').get()]);
   ccCfg = { inicio: '', plazo: 30, contado: {}, ...(cf.exists ? cf.data() : {}) }; ccMovs = sm.docs.map(d => ({ _id: d.id, ...d.data() }));
-  ccFacts = sf.docs.map(d => ({ _id: d.id, ...d.data() })).filter(f => !f.razon || f.razon === 'propia').map(f => { const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0); const tot = Math.round((f.total || n0 * 1.21) * 100) / 100; return { id: f._id, numero: (f.esNC ? 'NC ' : '') + (f.tipo || '') + ' ' + f.numero, fecha: ccFechaISO(f.fecha), cliente: String(f.cliente || 'Sin nombre').replace(/^\s*\d+\s*-\s*/, ''), importe: f.esNC ? -tot : tot, esNC: !!f.esNC, condicion: f.condicion || '' }; }).filter(f => !ccCfg.inicio || f.fecha >= ccCfg.inicio);
+  ccFacts = sf.docs.map(d => ({ _id: d.id, ...d.data() })).filter(f => !f.razon || f.razon === 'propia').map(f => { const n0 = (f.items || []).reduce((a, x) => a + (x.neto || 0), 0); const tot = Math.round((f.total || n0 * 1.21) * 100) / 100; return { id: f._id, numero: (f.esNC ? 'NC ' : '') + (f.tipo || '') + ' ' + f.numero, fecha: ccFechaISO(f.fecha), cliente: String(f.cliente || 'Sin nombre').replace(/^\s*\d+\s*-\s*/, ''), importe: f.esNC ? -tot : tot, esNC: !!f.esNC, condicion: f.condicion || '' }; }).filter(f => !ccCfg.inicio || f.fecha >= ccCfg.inicio); ccFacts = ccFacts.concat(ccFactsTF(ccFacts));
 }
 // ===== Rankings de ventas: facturadas, Mercado Libre o ambos (con IVA) =====
 let rkFilas = [], rkTab = 'productos', rkOrden = 'gan', rkBuscar = '';
@@ -22808,7 +22846,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v451';
+const APP_VERSION = '2026-10-02-v452';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
