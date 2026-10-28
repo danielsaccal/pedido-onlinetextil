@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v446</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v447</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6190,7 +6190,7 @@ const GRUPOS_INICIO = {
     [['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']],
     [['👥 Clientes', 'abrirClientes()']],
     [['💰 Dinero disponible', 'abrirTesoreria()'], ['💳 Cuentas corrientes', 'abrirCtaCte()'], ['🏭 Proveedores y pagos', 'abrirCompras()'], ['🧾 Ventas facturadas', 'abrirFacturas()'], ['💸 Gastos comerciales', 'abrirGastos()'], ['🧾 Auditor (IA)', 'abrirAuditor()']],
-    [['📊 Resultado del negocio', 'abrirResultadoNegocio()'], ['🧮 Posición de IVA', 'abrirIVA()'], ['🏆 Rankings de ventas', 'abrirRankings()'], ['📈 Resultados Mercado Libre', 'abrirResultadosML()']]
+    [['📊 Resultado del negocio', 'abrirResultadoNegocio()'], ['💸 Fugas de plata por SKU', 'abrirFugas()'], ['🧮 Posición de IVA', 'abrirIVA()'], ['🏆 Rankings de ventas', 'abrirRankings()'], ['📈 Resultados Mercado Libre', 'abrirResultadosML()']]
   ] },
   f: { lado: 'ext', titulo: 'Catálogo', titulosColumnas: ['1 · Productos', '2 · Fotos y textos', '3 · Precios'], columnas: [
     [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['🗂️ Ordenar categorías', 'abrirCategorias()']],
@@ -6304,7 +6304,7 @@ const TAREAS = [
   ['t_stock', 'Stock y productos', 'box', [['Stock', ['abrirStock()', 'abrirFaltantes()']], ['Productos', ['abrirNuevoProducto()', 'abrirEditarProducto()', 'abrirCategorias()', 'abrirActualizarFoto()', 'abrirSubirFotosSku()', 'abrirReventa()', 'abrirLinksWeb()']], ['Precios', ['abrirListaPrecios()', 'abrirImportarExcel()', 'abrirAumentoMasivo()', 'abrirHistorialPrecios()']], ['Costos', ['abrirCostosProductos()', 'abrirConfeccion()', 'abrirCalculadoraCostos()']]]],
   ['t_producir', 'Producir', 'cut', [['Qué fabrico', ['abrirTelas()', 'abrirArticulosCortes()']], ['Planificar', ['abrirAsistenteOT()', 'abrirTrabajoMedida()']], ['En el taller', ['abrirEnviosTela()', 'abrirDeudaTela()', 'abrirEnProduccion()', 'abrirIngresoTaller()']], ['Consultas', ['abrirHistorialOT()', 'abrirHistorialEntregas()', 'abrirHistorialSku()']]]],
   ['t_difundir', 'Difundir', 'mega', [['Catálogo a clientes', ['abrirCompartirRubro()', 'abrirArmarCatalogo()', 'abrirEnviarCatalogo()']], ['Videos', ['abrirCrearVideo()', 'abrirCompartirVideoProducto()']], ['Redes y anuncios', ['abrirNuevoIngreso()', 'abrirAnuncio()', 'abrirDirectorArte()']], ['Fotos de producto', ['abrirPromptGemini()', 'abrirPromptGeminiLote()']]]],
-  ['t_numeros', 'Números', 'chart', [['Resultados', ['abrirResultadoNegocio()', 'abrirRankings()', 'abrirResultadosML()', 'abrirVentasML()']], ['Impuestos', ['abrirIVA()', 'abrirLibroIVA()', 'abrirRetenciones()', 'abrirCierreMes()', 'abrirPuntosVentaFiscales()']], ['Auditoría', ['abrirAuditor()']]]],
+  ['t_numeros', 'Números', 'chart', [['Resultados', ['abrirResultadoNegocio()', 'abrirFugas()', 'abrirRankings()', 'abrirResultadosML()', 'abrirVentasML()']], ['Impuestos', ['abrirIVA()', 'abrirLibroIVA()', 'abrirRetenciones()', 'abrirCierreMes()', 'abrirPuntosVentaFiscales()']], ['Auditoría', ['abrirAuditor()']]]],
 ];
 const TAR_FUENTES = ['ped', 'comp', 'cli', 'art', 'prov', 'teso', 'imp', 'est', 'c', 'h', 'i', 'k', 'f', 'g', 'd', 'a'];
 function tarBuscar(pref){ for(const exacto of [true, false]) for(const k of TAR_FUENTES){ const g = GRUPOS_INICIO[k]; if(!g) continue; for(const it of (g.columnas || []).flat()){ if(exacto ? it[1] === pref : it[1].startsWith(pref)) return { k, it }; } } return null; }
@@ -6436,6 +6436,13 @@ async function dashDatos(forzar){
     (pvPagos || []).forEach(x => act.push({ f: x.fecha, t: x.creado || '', fam: 'pago', l: '', tit: 'Orden de pago', quien: pn(x.proveedorId), num: 'OP ' + String(x.numero || '').padStart(5, '0'), imp: -(+x.totalARS || 0), go: "abrirCompras('pagos')" }));
     V.act = act.filter(a => a.f).sort((a, b) => String(b.f).localeCompare(String(a.f)) || String(b.t).localeCompare(String(a.t))).slice(0, 6);
   } catch(e){ console.error(e); } }
+  if(dueno){ try{ const [inf, fsa] = await Promise.all([t(db.collection('config').doc('informes').get().catch(() => null)), t(db.collection('config').doc('full_stock_antiguo').get().catch(() => null))]);
+    const I = inf && inf.exists ? { ...inf.data() } : {};
+    try{ const md = ivDatos && ivDatos.det ? ivDatos.det : []; ['alberto', 'rita'].forEach(c => { if(!I['ml_' + c]){ const u = md.filter(x => String(x.cuenta || '').toLowerCase() === c).map(x => x.actualizado || '').sort().pop(); if(u) I['ml_' + c] = u; } }); } catch(e){}
+    V.informes = I;
+    const FS = fsa && fsa.exists ? fsa.data() : {}; let u6 = 0, c6 = 0, cobro = ''; Object.values(FS).forEach(x => { (x.filas || []).forEach(r => { if(r.dias >= 180){ u6 += +r.u || 0; c6 += +r.cargo || 0; } }); cobro = cobro || x.cobro || ''; });
+    if(u6) V.hoy.push([`🏬 ${u6} unidades en Full con más de 6 meses · ${formatPrice(c6)}${cobro ? ' al ' + cobro : ''}`, 'abrirFugas()', false, 'stock']);
+  } catch(e){ console.error(e); } }
   dashCache = V; dashCacheT = Date.now(); return V;
 }
 const dashM = x => x >= 1e6 ? '$ ' + (x / 1e6).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' M' : formatPrice(x || 0);
@@ -6470,6 +6477,12 @@ async function pintarDash(){
         return `<div class="dh-act" onclick="${a.go}"><span class="dh-mut">${String(a.f).slice(8, 10)}/${String(a.f).slice(5, 7)}</span><span class="dh-av" style="${nf ? `border:1.5px dashed ${col};color:${col};background:#fff;` : `background:${col};`}">${escaparHtml(a.l || '$')}</span><div style="min-width:0;"><b style="font-size:.84rem;">${escaparHtml(a.tit)}</b><div class="dh-mut" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escaparHtml(a.quien || '')}</div></div><span class="dh-mut" style="white-space:nowrap;">${escaparHtml(a.num || '')}</span><b style="white-space:nowrap;${a.imp == null ? '' : a.imp >= 0 ? 'color:#2F7A47;' : 'color:#A6432F;'}">${a.imp == null ? formatPrice(a.monto) : (a.imp >= 0 ? '+ ' : '− ') + formatPrice(Math.abs(a.imp))}</b></div>`; }).join('')}</div></div>` : '';
     box.innerHTML = `<div class="dh-top"><span class="dh-hola">${saludo}${nombre ? ', ' + escaparHtml(nombre) : ''}</span>${acc.length ? menuMini('+ Nuevo', acc.map(([t], i) => [sinEmoji(t).replace(/^\+\s*/, ''), `dashUsar(${i})`])).replace('class="btn-mini"', 'class="btn btn-gold"') : ''}</div>
       ${hero}
+      ${(() => { if(!dueno || !V || !V.informes) return ''; const I = V.informes, hoy = new Date().toISOString().slice(0, 10), dias = f => f ? Math.floor((Date.now() - new Date(f).getTime()) / 864e5) : null;
+        const L = [['ml_alberto', 'Ventas de Mercado Libre', 'Alberto', 1, 'Resultados ML', 'abrirResultadosML()'], ['ml_rita', 'Ventas de Mercado Libre', 'Rita', 1, 'Resultados ML', 'abrirResultadosML()'], ['full_alberto', 'Cargos por stock antiguo de Full', 'Alberto', 7, 'Fugas de plata por SKU', 'abrirFugas()'], ['full_rita', 'Cargos por stock antiguo de Full', 'Rita', 7, 'Fugas de plata por SKU', 'abrirFugas()'], ['tfactura', 'Facturas de TFactura', 'Propia', 1, 'Comprobantes → Subir facturas', 'abrirFacturas()']];
+        const pend = L.filter(([k, , , fr]) => { const f = I[k]; return !f || (fr === 1 ? String(f).slice(0, 10) < hoy : dias(f) >= fr); }), ok = L.filter(x => !pend.includes(x));
+        const cta = c => RZ_COLOR[String(c).toLowerCase()] || '#3D2B4E', cuando = f => { const d = dias(f); return d == null ? 'nunca cargado' : d === 0 ? 'cargado hoy' : d === 1 ? 'último cargado ayer' : `último cargado hace ${d} días`; };
+        return `<div class="dh-h"><h3>Informes para cargar</h3><span class="dh-mut">${pend.length ? pend.length + ' pendiente' + (pend.length > 1 ? 's' : '') : ''}</span></div><div class="dh-list" style="margin-bottom:20px;">${pend.map(([k, t, c, fr, donde, fn]) => `<div class="dh-task"><span style="width:6px;height:30px;border-radius:3px;background:${cta(c)};flex:0 0 6px;"></span><div class="dh-tx">${t} · <span style="color:${cta(c)};">${c}</span><div class="dh-mut" style="font-weight:400;">${cuando(I[k])} · se carga ${fr === 1 ? 'todos los días' : 'una vez por semana'} en ${donde}</div></div><button type="button" class="btn btn-gold" style="width:auto;margin-left:auto;" onclick="${fn}">Cargar</button></div>`).join('')}
+          <div class="dh-task" style="color:#A89E90;font-size:.8rem;">${pend.length ? (ok.length ? '✓ Al día: ' + ok.map(([k, t, c]) => `${t.replace('Cargos por stock antiguo de Full', 'stock antiguo de Full').replace('Ventas de Mercado Libre', 'ventas ML')} · ${c}`).join(' · ') : '') : '<span style="color:#2F7A47;font-weight:600;">✓ Informes al día</span>'}</div></div>`; })()}
       <div class="dh-cols${actv ? '' : ' uno'}"><div><div class="dh-h"><h3>Para hacer hoy</h3><span class="dh-mut">${V ? (H.length ? H.length + ' tarea' + (H.length > 1 ? 's' : '') : '') : 'revisando…'}</span></div><div class="dh-list">${V ? tareas : '<div class="dh-task dh-mut">Revisando…</div>'}</div></div>${actv}</div>`;
     window.__dashHoy = V ? V.hoy : []; };
   pintar(dashCache); // lo ultimo calculado al instante
@@ -12781,6 +12794,7 @@ function renderGastos(){
 }
 
 // ===== Ventas facturadas (PDF de TFactura): renglones, costo y ganancia =====
+setTimeout(() => { try{ const o = window.leerFacturasPDF; if(typeof o === 'function' && !o.__inf){ window.leerFacturasPDF = async function(...a){ const r = await o.apply(this, a); try{ await db.collection('config').doc('informes').set({ tfactura: new Date().toISOString() }, { merge: true }); dashCache = null; } catch(e){} return r; }; window.leerFacturasPDF.__inf = 1; } } catch(e){} }, 0);
 let facturas = null, facturasNuevas = [], fcEquiv = null;
 function cargarPdfJs(){
   if(window.pdfjsLib) return Promise.resolve();
@@ -13583,6 +13597,61 @@ async function sfsGuardar(b){ const modo = (document.querySelector('input[name=s
       await db.collection('fotos_sku').doc(s).set({ imagenesBase64: fotos, actualizado: new Date().toISOString() }); fotosSku[s] = fotos; } catch(e){ err.push(s + ': ' + e.message); } }
   sfsLista.forEach(x => { try{ URL.revokeObjectURL(x.url); } catch(e){} }); sfsLista = [];
   cerrarPublicar(); dsToast(err.length ? `Cargadas con errores: ${err.join(' · ')}` : `Listo: fotos cargadas en ${S.length} SKU`, { ms: 7000 }); }
+// ===== Fugas de plata por SKU: margen negativo, reintegros, devoluciones y stock antiguo en Full =====
+let fgDatos = null, fgSt = { cta: 'Alberto', per: '', abiertos: {} };
+const fgCap = s => { s = String(s || '').toLowerCase(); return s.charAt(0).toUpperCase() + s.slice(1); };
+async function fgCargar(){ const [det, full] = await Promise.all([db.collection('ml_detalle').get().catch(() => null), db.collection('config').doc('full_stock_antiguo').get().catch(() => null)]);
+  const F = []; if(det) det.docs.forEach(d => { const x = d.data(), cta = fgCap(x.cuenta); String(x.csv || '').split('\n').slice(1).forEach(l => { const f = l.split(';'); if(!f[2]) return;
+    F.push({ fecha: recISO(f[0]), cuenta: cta, op: f[2], estado: f[4] || '', sku: String(f[6] || f[5] || '').split(/\s+x\s+/i)[0].trim().toUpperCase(), skuMl: f[5] || '', precio: +f[8] || 0, neto: +f[12] || 0, resultado: f[14] === '' || f[14] == null ? null : +f[14] }); }); });
+  fgDatos = { F, full: full && full.exists ? full.data() : {} }; return fgDatos; }
+// suma las perdidas de cada SKU en el periodo (sin contar dos veces una venta que despues se anulo)
+function fgCalcular(cta, per){ const G = {}, enPer = f => !per || (per === 'ult3' ? f >= new Date(Date.now() - 92 * 864e5).toISOString().slice(0, 10) : String(f).slice(0, 7) === per);
+  const add = (sku, k, monto, item) => { if(!sku || !(monto > 0)) return; const g = G[sku] = G[sku] || { sku, margen: 0, reint: 0, devol: 0, full: 0, items: [] }; g[k] += monto; g.items.push(item); };
+  const ops = {}; fgDatos.F.filter(r => cta === 'Ambas' || r.cuenta === cta).forEach(r => { (ops[r.cuenta + '|' + r.op] = ops[r.cuenta + '|' + r.op] || []).push(r); });
+  Object.values(ops).forEach(R => { const neg = R.filter(r => r.neto < 0 && /cancel|devuelt|reembols|anulad/i.test(r.estado)), venta = R.find(r => r.precio > 0) || R[0], sku = venta.sku;
+    if(neg.length){ const f = neg[neg.length - 1].fecha; if(!enPer(f)) return;
+      if(neg.some(r => /parcial/i.test(r.estado))){ const m = -neg.reduce((a, r) => a + r.neto, 0); add(sku, 'reint', m, { tipo: 'Reintegro parcial', fecha: f, op: venta.op, cuenta: venta.cuenta, monto: m }); }
+      else if(R.some(r => r.precio > 0)){ const n = R.reduce((a, r) => a + r.neto, 0); if(n < 0) add(sku, 'devol', -n, { tipo: 'Devolución o anulación (neto)', fecha: f, op: venta.op, cuenta: venta.cuenta, monto: -n }); } return; }
+    R.filter(r => r.precio > 0 && r.resultado != null && r.resultado < 0 && enPer(r.fecha)).forEach(r => add(sku, 'margen', -r.resultado, { tipo: 'Venta con margen negativo', fecha: r.fecha, op: r.op, cuenta: r.cuenta, monto: -r.resultado })); });
+  const alertas = {}; Object.entries(fgDatos.full || {}).filter(([c]) => cta === 'Ambas' || c === cta).forEach(([c, x]) => (x.filas || []).forEach(r => { const sku = String(r.sku || '').split(/\s+x\s+/i)[0].trim().toUpperCase(); if(!sku) return;
+    if(r.cargo > 0) add(sku, 'full', r.cargo, { tipo: `Stock antiguo en Full (${r.dias} días · ${r.u} u.)`, fecha: x.cobro || x.fecha, op: '', cuenta: c, monto: r.cargo });
+    const a = alertas[sku] = alertas[sku] || { mas6: 0, prox: null }; if(r.dias >= 180) a.mas6 += +r.u || 0; else if(r.dias >= 120){ const q = 180 - r.dias; a.prox = a.prox == null ? q : Math.min(a.prox, q); } }));
+  const L = Object.values(G).map(g => ({ ...g, total: g.margen + g.reint + g.devol + g.full, al: alertas[g.sku] })).sort((a, b) => b.total - a.total);
+  Object.keys(alertas).forEach(s => { if(!G[s] && (alertas[s].prox != null)) L.push({ sku: s, margen: 0, reint: 0, devol: 0, full: 0, total: 0, items: [], al: alertas[s] }); });
+  return L; }
+async function abrirFugas(){ if(!esDueno()){ alert('Solo el dueño puede ver las fugas de plata.'); return; }
+  document.getElementById('pub-modal').style.display = 'block'; { const cj = document.getElementById('pub-caja'); if(cj) cj.style.maxWidth = '1100px'; } document.getElementById('pub-titulo').textContent = '💸 Fugas de plata por SKU';
+  document.getElementById('pub-cont').innerHTML = '<p class="empty-msg">Leyendo los reportes de Mercado Libre…</p>'; await fgCargar();
+  if(!fgSt.per){ const ms = [...new Set(fgDatos.F.map(r => String(r.fecha).slice(0, 7)))].sort(); fgSt.per = ms[ms.length - 1] || new Date().toISOString().slice(0, 7); } fgPintar(); }
+function fgPintar(){ const box = document.getElementById('pub-cont'); if(!box || !fgDatos) return; const L = fgCalcular(fgSt.cta, fgSt.per), col = c => RZ_COLOR[String(c).toLowerCase()] || '#3D2B4E';
+  const ms = [...new Set(fgDatos.F.map(r => String(r.fecha).slice(0, 7)))].filter(m => /^\d{4}-\d{2}$/.test(m)).sort().reverse();
+  const S = k => L.reduce((a, g) => a + (g[k] || 0), 0), N = k => L.filter(g => g[k] > 0).length, fu = Object.entries(fgDatos.full || {}).filter(([c]) => fgSt.cta === 'Ambas' || c === fgSt.cta);
+  const tarj = (t, v, sub) => `<div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;"><div style="font-size:.78rem;color:#6B6258;">${t}</div><div style="font:700 1.2rem Arial;color:${v > 0 ? '#A6432F' : '#2F7A47'};margin-top:3px;">${formatPrice(v)}</div><div style="font-size:.72rem;color:#A89E90;">${sub}</div></div>`;
+  const btn = (on, t, f, c) => `<button type="button" class="btn-mini" style="${on ? `border-color:${c || 'var(--purple)'};font-weight:700;color:${c || 'var(--purple)'};` : ''}" onclick="${f}">${t}</button>`;
+  box.innerHTML = `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">${['Alberto', 'Rita', 'Ambas'].map(c => btn(fgSt.cta === c, c, `fgSt.cta='${c}';fgPintar()`, c === 'Ambas' ? '' : col(c))).join('')}
+      <span style="width:10px;"></span><select onchange="fgSt.per=this.value;fgPintar()" style="padding:5px 8px;border:1px solid var(--line);border-radius:8px;">${[['ult3', 'Últimos 3 meses']].concat(ms.map(m => [m, new Date(m + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })])).map(([v, t]) => `<option value="${v}" ${fgSt.per === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <span style="margin-left:auto;display:flex;gap:6px;">${['Alberto', 'Rita'].map(c => `<label class="btn-mini" style="cursor:pointer;border-color:${col(c)};color:${col(c)};">Cargar stock antiguo de Full · ${c}<input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="fgSubirFull(this,'${c}')"></label>`).join('')}</span></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;">${tarj('Ventas con margen negativo', S('margen'), `${L.reduce((a, g) => a + g.items.filter(i => /margen/.test(i.tipo)).length, 0)} ventas · ${N('margen')} SKU`)}${tarj('Reintegros parciales', S('reint'), `${N('reint')} SKU`)}${tarj('Devoluciones y anulaciones (neto)', S('devol'), `${N('devol')} SKU`)}${tarj(`Stock antiguo en Full${fu.length ? ' (al ' + fu.map(([, x]) => x.cobro || '').filter(Boolean)[0] + ')' : ''}`, S('full'), fu.length ? fu.map(([c, x]) => `${c}: cargado ${String(x.fecha || '').slice(8, 10)}/${String(x.fecha || '').slice(5, 7)}`).join(' · ') : 'sin reporte cargado')}</div>
+    ${L.length ? `<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;"><div style="display:grid;grid-template-columns:1fr 110px 110px 110px 110px 110px;gap:8px;padding:8px 12px;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:#A89E90;font-weight:700;border-bottom:1px solid var(--line);"><span>SKU · producto</span><span style="text-align:right;">Margen neg.</span><span style="text-align:right;">Reintegros</span><span style="text-align:right;">Devoluciones</span><span style="text-align:right;">Stock antiguo</span><span style="text-align:right;">Total</span></div>
+      ${L.slice(0, 120).map((g, i) => { const r = buscarProductoPorSku(g.sku), nom = r ? r.producto.nombre + (r.variante.desc ? ' · ' + r.variante.desc : '') : '', v = x => x > 0 ? `<span style="color:#A6432F;">${formatPrice(x)}</span>` : '<span style="color:#D8D0C2;">—</span>', ab = fgSt.abiertos[g.sku];
+        const al = g.al ? (g.al.mas6 ? `<span style="font-size:.68rem;font-weight:700;padding:1px 7px;border-radius:999px;background:#FBEDEA;color:#A6432F;margin-left:6px;">${g.al.mas6} u. +6 meses</span>` : '') + (g.al.prox != null ? `<span style="font-size:.68rem;font-weight:700;padding:1px 7px;border-radius:999px;background:#FFF8E1;color:#9A7B12;margin-left:6px;">pasa a +6 meses en ${g.al.prox} días</span>` : '') : '';
+        return `<div style="display:grid;grid-template-columns:1fr 110px 110px 110px 110px 110px;gap:8px;padding:8px 12px;border-bottom:1px solid #F3EFE8;font-size:.82rem;cursor:pointer;align-items:center;" onclick="fgSt.abiertos['${g.sku}']=!fgSt.abiertos['${g.sku}'];fgPintar()"><div style="min-width:0;"><b>${escaparHtml(g.sku)}</b>${al}<div style="font-size:.72rem;color:#A89E90;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escaparHtml(nom)}</div></div><span style="text-align:right;">${v(g.margen)}</span><span style="text-align:right;">${v(g.reint)}</span><span style="text-align:right;">${v(g.devol)}</span><span style="text-align:right;">${v(g.full)}</span><b style="text-align:right;">${v(g.total)}</b></div>
+          ${ab ? `<div style="background:#FBF9F6;padding:6px 12px 8px 24px;border-bottom:1px solid #F3EFE8;font-size:.76rem;">${g.items.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))).map(it => `<div style="display:flex;gap:10px;padding:2px 0;"><span style="color:#8A8072;width:46px;">${String(it.fecha).slice(8, 10)}/${String(it.fecha).slice(5, 7)}</span><span style="width:6px;height:14px;border-radius:2px;background:${col(it.cuenta)};"></span><span style="flex:1;">${escaparHtml(it.tipo)}${it.op ? ' · venta ' + escaparHtml(it.op) : ''}</span><span style="color:#A6432F;">${formatPrice(it.monto)}</span></div>`).join('') || '<span class="note">Sin pérdidas en el período; aviso de Full próximo.</span>'}</div>` : ''}`; }).join('')}</div>`
+      : '<p class="empty-msg">Sin fugas de plata en este período.</p>'}
+    <p class="note" style="text-align:left;margin-top:8px;">Tocar un SKU muestra cada venta, reintegro o cargo. Margen negativo: venta que, después de cargos de ML y costo, dejó pérdida. Devoluciones y anulaciones: el neto de la venta anulada, si quedó negativo. Stock antiguo: lo que ML va a cobrar según el último reporte de Full cargado.</p>`; }
+// reporte "Cargos por stock antiguo" de Full (Excel de ML), por cuenta
+async function fgSubirFull(inp, cta){ const f = inp.files && inp.files[0]; if(!f) return; try{ procesando('Leyendo el reporte de Full…');
+    const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' }), ws = wb.Sheets[wb.SheetNames[0]], R = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    const hi = R.findIndex(r => r.some(c => /^SKU$/i.test(String(c).trim())) && r.some(c => /cargo total/i.test(String(c)))); if(hi < 0) throw new Error('No reconozco el formato: falta la columna SKU o el cargo total.');
+    const H = R[hi].map(c => normBusqueda(String(c))), ix = re => H.findIndex(x => re.test(x));
+    const c = { sku: ix(/^sku$/), prod: ix(/^producto$/), dias: ix(/antiguedad en dias/), u: ix(/unidades almacenadas/), uc: ix(/unidades con cargos/), cu: ix(/cargo por unidad/), ct: ix(/cargo total/) };
+    const num = v => +String(v).replace(/[^\d,.-]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.') || 0;
+    const filas = R.slice(hi + 1).filter(r => r[c.sku]).map(r => ({ sku: String(r[c.sku]).trim(), prod: String(r[c.prod] || '').slice(0, 90), dias: num(r[c.dias]), u: num(r[c.u]), uc: num(r[c.uc]), cargoU: num(r[c.cu]), cargo: num(r[c.ct]) }));
+    const tit = R.slice(0, hi).map(r => r.join(' ')).join(' '), mc = tit.match(/(\d{1,2}\/\d{1,2}\/\d{4})/), cobro = mc ? mc[1] : '';
+    const d = { fecha: new Date().toISOString(), cobro, total: filas.reduce((a, r) => a + r.cargo, 0), filas, archivo: f.name };
+    await db.collection('config').doc('full_stock_antiguo').set({ [cta]: d }, { merge: true }); await db.collection('config').doc('informes').set({ ['full_' + cta.toLowerCase()]: d.fecha }, { merge: true });
+    if(fgDatos){ fgDatos.full = fgDatos.full || {}; fgDatos.full[cta] = d; } try{ procesando.fin && procesando.fin(); } catch(e){} dsToast(`Stock antiguo de Full · ${cta}: ${filas.length} renglones, ${formatPrice(d.total)}${cobro ? ' al ' + cobro : ''}`, { ms: 7000 }); fgPintar(); dashCache = null;
+  } catch(e){ try{ procesando.fin && procesando.fin(); } catch(x){} alert('No se pudo leer el reporte: ' + e.message); } inp.value = ''; }
 // ===== Bosquejo de medidas por SKU (lo dibuja la app, sin IA): ultima imagen de cada SKU =====
 // Los productos de fabricacion propia tienen la medida de CORTE: se muestra la TERMINADA (corte - confeccion).
 const CONFECCION = { cortina: { ancho: 5, alto: 15 }, funda: { ancho: 2, largo: 7 }, plana: { ancho: 2, largo: 10 }, mantel: { ancho: 2, largo: 2 }, otro: { ancho: 2, largo: 2 } };
@@ -14170,6 +14239,7 @@ function permisoDeAccion(f){
   const s = String(f);
   if(/abrirReclamosML/.test(s)) return null; // todos los usuarios
   if(/abrirSubirFotosSku/.test(s)) return permisoDeAccion('abrirActualizarFoto()');
+  if(/abrirFugas/.test(s)) return permisoDeAccion('abrirResultadosML()');
   if(/abrirUsuarios|abrirCopiaSeguridad/.test(s)) return 'dueno';
   if(/abrirResultadosML|abrirCalculadoraML/.test(s)) return 'resultadosML';
   if(/abrirFacturas/.test(s)) return 'facturas';
@@ -22669,7 +22739,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v446';
+const APP_VERSION = '2026-10-02-v447';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
