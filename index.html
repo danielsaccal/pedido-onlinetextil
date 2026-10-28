@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v444</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v445</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -14616,11 +14616,16 @@ ESCALADA: revisión humana y apelación en plazo → Centro de Ayuda con captura
 let recCasos = null;
 function recISO(f){ const s = String(f || '').trim(), m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : s.slice(0, 10); }
 async function recCargarCasos(){ try{ const s = await db.collection('reclamos').get(); recCasos = s.docs.map(d => ({ _id: d.id, ...d.data() }));
+    for(const c of recCasos.filter(c => !c.venta && recVentaDelTexto(c.texto))){ const v = recVentaDelTexto(c.texto), o = recCasos.find(x => x !== c && x.cuenta === c.cuenta && x.venta === v);
+      try{ if(o){ await db.collection('reclamos').doc(o._id).set({ texto: c.texto, apelado: o.apelado || c.apelado }, { merge: true }); o.texto = c.texto; o.apelado = o.apelado || c.apelado; await db.collection('reclamos').doc(c._id).delete(); c.__borrar = true; }
+        else { await db.collection('reclamos').doc(c._id).set({ venta: v }, { merge: true }); c.venta = v; } } catch(e){} }
+    const vistos = new Set(); recCasos = recCasos.filter(c => { if(c.__borrar) return false; if(c.venta){ const k = c.cuenta + '|' + c.venta; if(vistos.has(k)){ db.collection('reclamos').doc(c._id).delete().catch(() => {}); return false; } vistos.add(k); } return true; });
     recCasos.forEach(c => { const f = recISO(c.fecha); if(f !== c.fecha){ c.fecha = f; db.collection('reclamos').doc(c._id).set({ fecha: f }, { merge: true }).catch(() => {}); } }); } catch(e){ recCasos = recCasos || []; } return recCasos; }
 function recMotivo(t){ const s = normBusqueda(t || ''); return /manch/.test(s) ? 'manchado' : /rot[oa]|agujer|descos|rasgad/.test(s) ? 'roto' : /falt|recibi solo|recibio solo|menos unidades|\d+ de \d+/.test(s) ? 'faltante' : /distint|otro producto|no es el|equivocad|otro color|otra medida/.test(s) ? 'producto distinto' : 'otro'; }
-async function recGuardarCaso(){ const cta = window.__recCta; if(!cta) return; const venta = ((document.getElementById('da-venta') || {}).value || '').replace(/\D/g, ''), texto = ((document.getElementById('da-texto') || {}).value || '').trim();
+function recVentaDelTexto(t){ const m = String(t || '').match(/\b(20000\d{11})\b/); return m ? m[1] : ''; }
+async function recGuardarCaso(){ const cta = window.__recCta; if(!cta) return; const texto = ((document.getElementById('da-texto') || {}).value || '').trim(), venta = ((document.getElementById('da-venta') || {}).value || '').replace(/\D/g, '') || recVentaDelTexto(texto);
   if(!venta && !texto) return; await (recCasos ? null : recCargarCasos());
-  const ya = (recCasos || []).find(c => c.cuenta === cta && venta && c.venta === venta); // un solo caso por venta (aunque ya haya salido del reporte)
+  const ya = (recCasos || []).find(c => c.cuenta === cta && (venta ? c.venta === venta : (!c.venta && c.fecha === new Date().toISOString().slice(0, 10) && c.texto && texto.slice(0, 40) === c.texto.slice(0, 40)))); // un solo caso por venta
   const d = { cuenta: cta, venta, texto: texto.slice(0, 600), motivo: recMotivo(texto), actualizado: new Date().toISOString() };
   if(ya && d.motivo === 'otro' && ya.motivo) delete d.motivo; if(ya && /sin fotos|sin pruebas|no mand|no envi/.test(normBusqueda(texto)) && !ya.pruebas) d.pruebas = 'no';
   try{ if(ya){ await db.collection('reclamos').doc(ya._id).set(d, { merge: true }); Object.assign(ya, d); }
@@ -14670,6 +14675,19 @@ function recPintarCasos(mes){ const box = document.getElementById(window.__recEn
           <label style="display:block;font-size:.72rem;color:#8A8072;margin-top:2px;"><input type="checkbox" ${c.apelado ? 'checked' : ''} onchange="recSet('${c._id}', { apelado: this.checked })"> apelado</label><div style="font-size:.7rem;color:#A89E90;">${escaparHtml(c.auto || (c.estado === 'abierto' ? 'esperando el reporte' : ''))}</div></div>
         ${dueno ? `<div style="text-align:right;font-weight:700;${c.debitado ? 'color:#A6432F;' : c.recuperado ? 'color:#2F7A47;' : 'color:#8A8072;font-weight:400;'}">${c.debitado ? '− ' + formatPrice(c.debitado) : c.monto ? formatPrice(c.monto) : ''}${c.recuperado ? `<div style="color:#2F7A47;font-size:.74rem;">+ ${formatPrice(c.recuperado)}</div>` : ''}</div>` : ''}</div>`; }).join('')}</div>` : '<p class="empty-msg">No hay casos en este mes. Se guardan solos al copiar un reclamo.</p>'}`; }
 async function recSet(id, d){ const c = (recCasos || []).find(x => x._id === id); if(!c) return; try{ await db.collection('reclamos').doc(id).set(d, { merge: true }); Object.assign(c, d); recPintarCasos(); } catch(e){ alert('No se pudo guardar: ' + e.message); } }
+// respuestas listas (sin IA): segun lo que pide el texto
+function recRedactar(texto, c){ const s = normBusqueda(texto || ''), v = (c && c.venta) || recVentaDelTexto(texto) || '';
+  const motivo = (c && c.motivo) || recMotivo(texto), op = v ? `la venta ${v}` : 'esta venta';
+  if(/reputacion|devolver el dinero|devuelvan|reintegr|me descontaron|debit|cobraron/.test(s)) return `Solicito la revisión de ${op}. El reclamo se resolvió con reintegro al comprador sin pruebas de que el producto tuviera un problema y sin afectar mi reputación, pero igual me descontaron el dinero. Pido que me devuelvan ese monto, ya que no hay responsabilidad mía comprobada.`;
+  if(motivo === 'faltante') return `El producto de ${op} salió completo, en paquete cerrado. El comprador no mandó fotos ni pruebas. Pido que verifiquen el peso registrado por Mercado Envíos y le soliciten fotos del paquete con la etiqueta. Sin pruebas, no corresponde reintegro.`;
+  if(motivo === 'manchado' || motivo === 'roto') return `El producto de ${op} salió en perfecto estado, revisado y embolsado. El comprador no presentó pruebas claras del daño. Pido que le soliciten fotos del producto con la etiqueta y el embalaje, y que no se resuelva sin pruebas. Sin pruebas, no corresponde reintegro.`;
+  if(motivo === 'producto distinto') return `En ${op} se envió exactamente el producto publicado (mismo modelo, medida y color). Pido que le soliciten al comprador fotos del producto recibido con su etiqueta y el embalaje. Sin pruebas de un producto distinto, no corresponde reintegro.`;
+  return `Solicito la revisión de ${op} por una persona del equipo de Mercado Libre. No hay pruebas de un problema con el producto. Pido que no se resuelva en mi contra ni se afecte mi reputación sin pruebas concretas.`; }
+async function recRedactarCopiar(){ if(!window.__recCta){ alert('Elija la cuenta: Alberto o Rita.'); return; } const texto = ((document.getElementById('da-texto') || {}).value || '').trim(), venta = ((document.getElementById('da-venta') || {}).value || '').replace(/\D/g, '') || recVentaDelTexto(texto);
+  await (recCasos ? null : recCargarCasos()); const c = (recCasos || []).find(x => x.cuenta === window.__recCta && venta && x.venta === venta);
+  const r = recRedactar(texto, c ? { ...c, venta } : { venta }); let box = document.getElementById('rec-resp'); if(!box){ box = document.createElement('div'); box.id = 'rec-resp'; const cp = document.getElementById('da-rec-copiar'); cp.parentNode.insertBefore(box, cp.nextSibling); }
+  box.innerHTML = `<div style="margin-top:10px;background:#fff;border:1px solid var(--line);border-left:5px solid ${RZ_COLOR[window.__recCta.toLowerCase()]};border-radius:10px;padding:10px 12px;"><div style="font-size:.78rem;color:#8A8072;margin-bottom:4px;">Respuesta para pegar en Mercado Libre (${r.length} caracteres) · revísela antes de enviar</div><textarea id="rec-resp-t" rows="4" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:.9rem;">${escaparHtml(r)}</textarea><button type="button" class="btn btn-gold" style="width:auto;margin-top:6px;" onclick="copiarTexto(document.getElementById('rec-resp-t').value, this)">Copiar respuesta</button></div>`;
+  recGuardarCaso(); }
 async function recCopiarGratis(b){ if(!window.__recCta){ alert('Elija la cuenta: Alberto o Rita.'); return; }
   const txt = REC_REGLAS + '\n\n' + await recContexto() + 'RECLAMO: ' + (((document.getElementById('da-texto') || {}).value || '').trim() || '(ver la captura adjunta)') + '\n(Adjunto la captura del reclamo y las fotos del comprador.)';
   try{ await navigator.clipboard.writeText(txt); dsToast('Copiado y caso guardado. Péguelo en Claude, Gemini o ChatGPT, junto con la captura y las fotos.'); } catch(e){ prompt('Copie este texto:', txt); }
@@ -14693,8 +14711,8 @@ async function abrirChatAgente(agente){
       let rp = document.getElementById('rec-panel'); if(!rp && mn){ rp = document.createElement('div'); rp.id = 'rec-panel'; rp.style.marginTop = '16px'; mn.lastElementChild.appendChild(rp); }
       if(rp){ rp.style.display = agente === 'reclamos' ? '' : 'none'; if(agente === 'reclamos'){ rp.innerHTML = '<p class="empty-msg">Revisando los reportes de ventas…</p>'; window.__recEnPanel = true; recCargarCasos().then(() => recActualizarEstados()).then(() => recPintarCasos()); } else window.__recEnPanel = false; } }
     { const en = document.getElementById('da-enviar'), cf = document.getElementById('da-config'); if(en) en.style.display = agente === 'reclamos' ? 'none' : ''; if(cf) cf.style.display = agente === 'reclamos' ? 'none' : '';
-      let cp = document.getElementById('da-rec-copiar'); if(!cp && en){ cp = document.createElement('button'); cp.id = 'da-rec-copiar'; cp.type = 'button'; cp.className = 'btn btn-gold'; cp.style.width = 'auto'; cp.textContent = 'Copiar para Claude / Gemini / ChatGPT'; cp.onclick = () => recCopiarGratis(cp); en.parentNode.insertBefore(cp, en); }
-      if(cp) cp.style.display = agente === 'reclamos' ? '' : 'none'; }
+      let cp = document.getElementById('da-rec-copiar'); if(!cp && en){ cp = document.createElement('span'); cp.id = 'da-rec-copiar'; cp.style.cssText = 'display:inline-flex;gap:8px;flex-wrap:wrap;'; cp.innerHTML = '<button type="button" class="btn btn-gold" style="width:auto;" onclick="recRedactarCopiar()">Redactar respuesta</button><button type="button" class="btn btn-ghost" style="width:auto;" onclick="recCopiarGratis(this)">Copiar para Claude / Gemini / ChatGPT</button>'; en.parentNode.insertBefore(cp, en); }
+      if(cp) cp.style.display = agente === 'reclamos' ? 'inline-flex' : 'none'; }
     if(agente === 'reclamos') b.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 8px;font-size:.85rem;"><b>Cuenta:</b>${['Alberto', 'Rita'].map(c => `<button type="button" class="btn-mini da-cta" data-c="${c}" onclick="recCuenta('${c}')" style="border-color:${RZ_COLOR[c.toLowerCase()]}!important;color:${RZ_COLOR[c.toLowerCase()]}!important;font-weight:700;">${c}</button>`).join('')}
       <input id="da-venta" inputmode="numeric" placeholder="N.º de venta (opcional)" style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;width:200px;"></div>
       <p class="note" style="text-align:left;margin:0 0 8px;">Sin costo: elija la cuenta, ponga el N.º de venta, escriba el reclamo y toque <b>Copiar</b> y péguelo en <b>Claude</b>, Gemini o ChatGPT, junto con la captura y las fotos.</p>`; }
@@ -22643,7 +22661,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v444';
+const APP_VERSION = '2026-10-02-v445';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
