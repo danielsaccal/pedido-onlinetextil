@@ -1416,7 +1416,6 @@ function armarMenuML(){
   window.__pantallas=[
     ['revisar','⚠️','Ventas para revisar','Números dudosos: confirmalos o corregilos',()=>$('revisarBox')],
     ['diag','🩺','Diagnóstico de costos','Costos viejos dudosos y ventas para revisar',()=>{renderDiagnostico();return $('diagBox');}],
-    ['perdidas','💸','Pérdidas para reclamar','Cancelaciones y devoluciones que te costaron plata',()=>{renderPerdidas();return $('perdidasBox');}],
     ['ranking','🏆','¿Qué productos me dejan más plata?','Ranking y ficha de cada SKU',()=>document.querySelector('details[data-k=ranking]')],
     ['cuotas','💳','Con cuotas o sin cuotas','Qué te deja más, mes por mes',()=>document.querySelector('details[data-k=cuotas]')],
     ['origen','🏭','Fabricado vs reventa','Facturación y ganancia de cada uno',()=>document.querySelector('details[data-k=origen]')],
@@ -1659,16 +1658,24 @@ const __detGuardado={};
 function guardarDetalleML(){
   try{
     const eIn=o=>o.envIn!==undefined?o.envIn:Math.max(o.envio||0,0), r2=x=>x==null?'':Math.round(x);
-    const cab=['fecha','cuenta','operacion','tipo','estado','sku_ml','sku_app','unidades','precio','envio_cobrado','cargos_ml','cadete','le_queda','costo','resultado','para_revisar','logistica','paquete'];
+    const cab=['fecha','cuenta','operacion','tipo','estado','sku_ml','sku_app','unidades','precio','envio_cobrado','cargos_ml','cadete','le_queda','costo','resultado','para_revisar','logistica','paquete','cargos_reclamables'];
     const G={}; allRows().forEach(o=>{ if(o.excl||!o.periodo||o.periodo==='sin-fecha') return; if(!(o.tipo==='Venta'||o.esDevol)) return; (G[o.periodo+'|'+o.cuenta]=G[o.periodo+'|'+o.cuenta]||[]).push(o); });
+    let CR={}; try{ CR=cargosReclamables(); }catch(e){} const crUsado={};
     Object.entries(G).forEach(([k,rs])=>{
       const filas=rs.map(o=>{ const env=eIn(o)||0, c=o.costo!=null?o.costo:(o.costoRev!=null?o.costoRev:(o.costoAj!=null?o.costoAj:null));
-        return [o.fecha,o.cuenta,o.op,o.tipo,o.estado||'',o.sku||'',o.skuBase||'',o.unid||'',r2(o.pcd),r2(env),r2((o.pcd>0?o.pcd:0)+env-(o.neto||0)),r2(o.cad),r2(o.neto),r2(c),c!=null?r2((o.neto||0)-c):'',o.costoRev!=null&&o.revisar?String(o.revisar[0]||'').replace(/[;\n]/g,' '):'',o.log||'',o.paq||''].map(v=>String(v).replace(/[;\n]/g,' ')).join(';'); });
+        return [o.fecha,o.cuenta,o.op,o.tipo,o.estado||'',o.sku||'',o.skuBase||'',o.unid||'',r2(o.pcd),r2(env),r2((o.pcd>0?o.pcd:0)+env-(o.neto||0)),r2(o.cad),r2(o.neto),r2(c),c!=null?r2((o.neto||0)-c):'',o.costoRev!=null&&o.revisar?String(o.revisar[0]||'').replace(/[;\n]/g,' '):'',o.log||'',o.paq||'',(()=>{ const k=o.cuenta+'|'+o.op; if(!CR[k]||crUsado[k]) return ''; crUsado[k]=1; return CR[k].map(([n,v])=>n.replace(/[=|]/g,' ')+'='+v).join('|'); })()].map(v=>String(v).replace(/[;\n]/g,' ')).join(';'); });
       const csv=cab.join(';')+'\n'+filas.join('\n'); if(__detGuardado[k]===csv.length+':'+rs.length) return; __detGuardado[k]=csv.length+':'+rs.length;
       db.collection('ml_detalle').doc(k.replace('|','_')).set({periodo:k.split('|')[0],cuenta:k.split('|')[1],csv:csv.slice(0,900000),filas:rs.length,actualizado:new Date().toISOString()}).then(()=>db.collection('config').doc('informes').set({['ml_'+String(k.split('|')[1]).toLowerCase()]:new Date().toISOString()},{merge:true})).catch(e=>{ delete __detGuardado[k]; avisoGuardadoApp(e); });
     });
   }catch(e){console.error(e);}
 }
+// cargos de envio y devolucion que ML no devolvio en ventas anuladas (para reclamar), por cuenta|operacion
+function cargosReclamables(){ const G={}, out={}; allRows().forEach(o=>{ if(!o.esDevol)return; const k=o.cuenta+'|'+o.op; (G[k]=G[k]||[]).push(o); });
+  const base=k=>norm(k).replace(/^anulacion (del|de la|de los|de) /,'').replace(/^cargo por /,'').replace(/\s+/g,' ').trim();
+  Object.entries(G).forEach(([k,rs])=>{ const cobros=rs.filter(o=>o.pcd>0).length, reint=rs.filter(o=>o.pcd<0&&!esCargoDevol(o)).length; if(!cobros||!reint)return;
+    const cargos={}, nombre={}; rs.forEach(o=>Object.entries(o.cd||{}).forEach(([n,v])=>{ if(!/devoluci|env[ií]o/i.test(n))return; const b=base(n), an=/anulaci/i.test(n); if(!an)nombre[b]=n.trim(); cargos[b]=(cargos[b]||0)+(an?-Math.abs(v):Math.abs(v)); }));
+    const L=Object.entries(cargos).filter(([,v])=>v>0.5).map(([b,v])=>[nombre[b]||b,Math.round(v)]); if(L.length) out[k]=L; });
+  return out; }
 // ===== Perdidas para reclamar: cancelaciones y devoluciones que te costaron plata =====
 function perdidasReclamo(){
   const fc=$('fCuenta').value, G={};
