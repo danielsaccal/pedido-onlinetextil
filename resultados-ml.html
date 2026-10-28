@@ -1388,7 +1388,7 @@ function htmlConfirmadas(){
   const L=K.map(k=>({k,m:CONFIRMADAS[k],o:idx[k]})).sort((a,b)=>String((b.m&&b.m.fecha)||'').localeCompare(String((a.m&&a.m.fecha)||'')));
   return `<details style="margin-top:12px;"><summary style="cursor:pointer;font-size:.88rem;">✓ Ver confirmadas (${L.length})</summary>
     <div style="max-height:50vh;overflow:auto;margin-top:6px;">${L.map(x=>{const [op,sku]=x.k.split('|'),m=x.m&&typeof x.m==='object'?x.m:null;
-      return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line);font-size:.84rem;"><b>${escHtml(sku||'')}</b><span class="meta">${x.o?`${escHtml(x.o.cuenta)} · ${escHtml(x.o.fecha||'')} · ${fmt(x.o.pcd)}`:'venta '+escHtml(op)+' (mes no cargado)'}</span><span class="meta" style="margin-left:auto;">${m?`confirmada por ${escHtml(String(m.por||'').split('@')[0])} · ${new Date(m.fecha).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})}${m.como==='todas'?' · "todas están bien"':''}`:'confirmada antes del registro'}</span><button type="button" style="padding:3px 9px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="deshacerConfirmada('${x.k.replace(/'/g,'')}')">Deshacer</button></div>`;}).join('')}</div></details>`;
+      return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line);font-size:.84rem;"><b>${escHtml(sku||'')}</b><span class="meta">${x.o?`${escHtml(x.o.cuenta)} · ${escHtml(x.o.fecha||'')} · ${fmt(x.o.pcd)}`:'venta '+escHtml(op)+' (mes no cargado)'}</span><span class="meta" style="margin-left:auto;">${m?`confirmada por ${escHtml(nomUsuML(m.por))} · ${new Date(m.fecha).toLocaleString('es-AR',{dateStyle:'short',timeStyle:'short'})}${m.como==='todas'?' · "todas están bien"':''}`:'confirmada antes del registro'}</span><button type="button" style="padding:3px 9px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;" onclick="deshacerConfirmada('${x.k.replace(/'/g,'')}')">Deshacer</button></div>`;}).join('')}</div></details>`;
 }
 async function deshacerConfirmada(k){ if(!confirm('¿Volver a poner esta venta en la lista para revisar?'))return; const prev=CONFIRMADAS[k]; delete CONFIRMADAS[k];
   try{await db.collection('config').doc('ml_confirmadas').set({ops:CONFIRMADAS});}catch(e){CONFIRMADAS[k]=prev;showErr('No se pudo guardar: '+e.message);return;}
@@ -1710,6 +1710,9 @@ function cargosReclamables(){ const G={}, out={}; allRows().forEach(o=>{ if(!o.e
     const cargos={}, nombre={}; rs.forEach(o=>Object.entries(o.cd||{}).forEach(([n,v])=>{ if(!/devoluci|env[ií]o/i.test(n))return; const b=base(n), an=/anulaci/i.test(n); if(!an)nombre[b]=n.trim(); cargos[b]=(cargos[b]||0)+(an?-Math.abs(v):Math.abs(v)); }));
     const L=Object.entries(cargos).filter(([,v])=>v>0.5).map(([b,v])=>[nombre[b]||b,Math.round(v)]); if(L.length) out[k]=L; });
   return out; }
+// nombre de pila de los usuarios (nunca el email en pantalla)
+const USR_NOM_ML={}; setTimeout(()=>{ try{ db.collection('usuarios').get().then(q=>{ q.docs.forEach(d=>{ const n=(d.data()||{}).nombre; if(n) USR_NOM_ML[d.id.toLowerCase()]=n; }); try{ renderRevisar&&renderRevisar(); }catch(e){} }).catch(()=>{}); }catch(e){} }, 1500);
+function nomUsuML(e){ e=String(e||'').toLowerCase(); return USR_NOM_ML[e]||(e?e.split('@')[0]:''); }
 // ===== Perdidas para reclamar: cancelaciones y devoluciones que te costaron plata =====
 function perdidasReclamo(){
   const fc=$('fCuenta').value, G={};
