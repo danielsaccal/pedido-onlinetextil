@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v442</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v443</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -14614,7 +14614,9 @@ ACUSACIONES DE ML: pedí número de envío, valores registrados, quién verific�
 ESCALADA: revisión humana y apelación en plazo → Centro de Ayuda con capturas → COPREC → abogado.`;
 // ===== Casos de reclamos: se guardan solos al copiar; el estado sale de los reportes de ventas de ML =====
 let recCasos = null;
-async function recCargarCasos(){ try{ const s = await db.collection('reclamos').get(); recCasos = s.docs.map(d => ({ _id: d.id, ...d.data() })); } catch(e){ recCasos = recCasos || []; } return recCasos; }
+function recISO(f){ const s = String(f || '').trim(), m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : s.slice(0, 10); }
+async function recCargarCasos(){ try{ const s = await db.collection('reclamos').get(); recCasos = s.docs.map(d => ({ _id: d.id, ...d.data() }));
+    recCasos.forEach(c => { const f = recISO(c.fecha); if(f !== c.fecha){ c.fecha = f; db.collection('reclamos').doc(c._id).set({ fecha: f }, { merge: true }).catch(() => {}); } }); } catch(e){ recCasos = recCasos || []; } return recCasos; }
 function recMotivo(t){ const s = normBusqueda(t || ''); return /manch/.test(s) ? 'manchado' : /rot[oa]|agujer|descos|rasgad/.test(s) ? 'roto' : /falt|recibi solo|recibio solo|menos unidades|\d+ de \d+/.test(s) ? 'faltante' : /distint|otro producto|no es el|equivocad|otro color|otra medida/.test(s) ? 'producto distinto' : 'otro'; }
 async function recGuardarCaso(){ const cta = window.__recCta; if(!cta) return; const venta = ((document.getElementById('da-venta') || {}).value || '').replace(/\D/g, ''), texto = ((document.getElementById('da-texto') || {}).value || '').trim();
   if(!venta && !texto) return; await (recCasos ? null : recCargarCasos());
@@ -14636,7 +14638,7 @@ async function recActualizarEstados(){ await (recCasos ? null : recCargarCasos()
   Object.entries(M).forEach(([k, R]) => { const [cta, op] = k.split('|'), neg = R.filter(r => r.neto < 0 && /cancel|devuelt|reembols|anulad/i.test(r.estado)); if(!neg.length) return;
     const Cta = cta.charAt(0).toUpperCase() + cta.slice(1); if((recCasos || []).some(c => c.cuenta === Cta && c.venta === op)) return;
     const venta = R.filter(r => r.precio > 0).reduce((a, r) => a + r.precio, 0), parcial = neg.some(r => /parcial/i.test(r.estado)), f0 = R.find(r => r.precio > 0) || R[0];
-    nuevos.push({ id: Cta + '_' + op, d: { cuenta: Cta, venta: op, sku: f0.sku || '', texto: '', motivo: parcial ? 'reintegro parcial' : 'reembolso total', fecha: String(neg[neg.length - 1].fecha).slice(0, 10), estado: 'perdido', parcial, debitado: Math.round(-neg.reduce((a, r) => a + r.neto, 0)), monto: Math.round(venta), pruebas: '', apelado: false, origen: 'reporte', auto: 'tomado del reporte de ventas', creado: new Date().toISOString() } }); });
+    nuevos.push({ id: Cta + '_' + op, d: { cuenta: Cta, venta: op, sku: f0.sku || '', texto: '', motivo: parcial ? 'reintegro parcial' : 'reembolso total', fecha: recISO(neg[neg.length - 1].fecha), estado: 'perdido', parcial, debitado: Math.round(-neg.reduce((a, r) => a + r.neto, 0)), monto: Math.round(venta), pruebas: '', apelado: false, origen: 'reporte', auto: 'tomado del reporte de ventas', creado: new Date().toISOString() } }); });
   for(let i = 0; i < nuevos.length; i += 20){ await Promise.all(nuevos.slice(i, i + 20).map(x => db.collection('reclamos').doc(x.id).set(x.d).then(() => { recCasos.push({ _id: x.id, ...x.d }); n++; }).catch(() => {}))); }
   for(const c of abiertos){ const R = M[c.cuenta.toLowerCase() + '|' + c.venta]; if(!R) continue;
     const venta = R.filter(r => r.precio > 0).reduce((a, r) => a + r.precio, 0), neg = R.filter(r => r.neto < 0 && /cancel|devuelt|reembols|anulad/i.test(r.estado)), debit = Math.round(-neg.reduce((a, r) => a + r.neto, 0));
@@ -22641,7 +22643,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v442';
+const APP_VERSION = '2026-10-02-v443';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
