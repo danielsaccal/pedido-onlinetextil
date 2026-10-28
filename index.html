@@ -1816,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v455</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v456</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2768,6 +2768,7 @@ try{ db.enablePersistence({ synchronizeTabs: true }).catch(() => {}); } catch(e)
 async function guardarPedidoEnHistorial(orden){
   try{
     await db.collection('pedidos').doc(orden.numero).set({
+      historial: [pdPaso('Tomado')], tomadoPor: ((firebase.auth().currentUser || {}).email) || '',
       numero: orden.numero,
       fecha: orden.fecha.toISOString(),
       cliente: orden.cliente,
@@ -8963,6 +8964,13 @@ async function ctaEmail(tipo, k){ const D = ctaMovs(tipo, k); if(!D) return; con
   const pend = D.L.filter(r => r.pend > 0.5), cuerpo = `Estimados ${D.nombre}:\n\nLes enviamos el estado de su cuenta al ${new Date().toLocaleDateString('es-AR')}.\n\nSaldo: ${$(D.saldo)}\n${pend.length ? '\nComprobantes pendientes:\n' + pend.map(r => `· ${f(r.fecha)} · ${r.comp} · pendiente ${$(r.pend)}`).join('\n') + '\n' : ''}\nSaludos cordiales,\nOnLineTextil`;
   if(!D.email && !await dsConfirm('No tiene un email cargado. ¿Abrir el correo igual, para escribir la dirección?')) return;
   location.href = `mailto:${encodeURIComponent(D.email)}?subject=${encodeURIComponent('Estado de cuenta · ' + D.nombre)}&body=${encodeURIComponent(cuerpo)}`; }
+// quien hizo cada paso del pedido, con dia y hora
+function pdPaso(paso, detalle){ return { paso, por: ((firebase.auth().currentUser || {}).email) || '', fecha: new Date().toISOString(), ...(detalle ? { detalle } : {}) }; }
+function pdHistHtml(p){ const H = (p.historial || []).slice().sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))); if(!H.length) return '';
+  return `<details style="margin-top:10px;font-size:.8rem;"><summary style="cursor:pointer;font-weight:600;color:#6B6258;">▸ Historial del pedido (${H.length})</summary><div style="padding:6px 2px;">${H.map(x => `<div style="display:flex;gap:10px;padding:3px 0;border-bottom:1px dashed #F1ECE4;"><span style="width:96px;color:#8A8072;">${new Date(x.fecha).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })} ${new Date(x.fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</span><b style="width:150px;">${escaparHtml(x.paso)}</b><span style="flex:1;color:#6B6258;">${escaparHtml(x.detalle || '')}</span><span style="color:#8A8072;">${escaparHtml(String(x.por || '').split('@')[0])}</span></div>`).join('')}</div></details>`; }
+async function pdControlar(num){ const p = pdLista.find(x => x.numero === num); if(!p) return; const paso = pdPaso('Controlado');
+  try{ await db.collection('pedidos').doc(num).set({ control: { por: paso.por, fecha: paso.fecha }, historial: firebase.firestore.FieldValue.arrayUnion(paso) }, { merge: true }); p.control = { por: paso.por, fecha: paso.fecha }; p.historial = [...(p.historial || []), paso]; } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  dsToast(`Pedido ${num} controlado`); pdPintar(); }
 // ===== Preparar pedidos: quien prepara pone lo que hay; quien factura recibe "Pedido para facturar" =====
 let pdLista = [], pdTab = 'preparar', pdSel = null;
 const pdFalta = i => Math.max(0, (+i.cantidad || 0) - (+i.facturada || 0));
@@ -8977,7 +8985,7 @@ function pdPintar(){ const box = document.getElementById('pub-cont'); if(!box) r
   box.innerHTML = `<div style="display:flex;gap:6px;margin-bottom:10px;">${[['preparar', `A preparar (${A.length})`], ['facturar', `Para facturar (${F.length})`]].map(([k, t]) => `<button type="button" class="btn-mini" style="${pdTab === k ? 'background:#3D2B4E!important;color:#fff!important;border-color:#3D2B4E!important;' : ''}font-weight:700;" onclick="pdTab='${k}';pdPintar()">${t}</button>`).join('')}</div>
     ${L.length ? `<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;">${L.map(p => { const nF = (p.items || []).filter(i => pdFalta(i) > 0).length, dias = p.fecha ? Math.floor((Date.now() - new Date(p.fecha).getTime()) / 864e5) : 0;
       return `<div style="display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid #F3EFE8;font-size:.86rem;"><b style="width:70px;">${escaparHtml(p.numero)}</b><div style="flex:1;min-width:0;"><b>${escaparHtml(cli(p))}</b><div style="font-size:.74rem;color:#A89E90;">${p.fecha ? new Date(p.fecha).toLocaleDateString('es-AR') : ''}${dias ? ' · hace ' + dias + ' días' : ''} · ${nF} ${nF === 1 ? 'renglón' : 'renglones'} ${pdTab === 'facturar' ? 'preparados' + ((p.prep || {}).por ? ' por ' + escaparHtml(p.prep.por.split('@')[0]) : '') : 'por preparar'}</div></div><span class="estado-pedido estado-${p.estado || 'pendiente'}">${est[p.estado || 'pendiente'] || p.estado}</span>
-        ${pdTab === 'facturar' ? `<button type="button" class="btn btn-gold" style="width:auto;padding:7px 14px;" onclick="pdFacturar('${escapeAttr(p.numero)}')">Facturar</button><button type="button" class="btn-mini" onclick="pdSel='${escapeAttr(p.numero)}';pdPintar()">Ver</button>` : `<button type="button" class="btn btn-gold" style="width:auto;padding:7px 14px;" onclick="pdSel='${escapeAttr(p.numero)}';pdPintar()">Preparar</button>`}</div>`; }).join('')}</div>` : `<p class="empty-msg">${pdTab === 'facturar' ? 'No hay pedidos para facturar.' : 'No hay pedidos por preparar.'}</p>`}`; }
+        ${pdTab === 'facturar' ? `${p.control ? '<span style="font-size:.72rem;color:#2F7A47;font-weight:700;">✓ controlado</span>' : `<button type="button" class="btn-mini" onclick="pdControlar('${escapeAttr(p.numero)}')">Controlar</button>`}<button type="button" class="btn btn-gold" style="width:auto;padding:7px 14px;" onclick="pdFacturar('${escapeAttr(p.numero)}')">Facturar</button><button type="button" class="btn-mini" onclick="pdSel='${escapeAttr(p.numero)}';pdPintar()">Ver</button>` : `<button type="button" class="btn btn-gold" style="width:auto;padding:7px 14px;" onclick="pdSel='${escapeAttr(p.numero)}';pdPintar()">Preparar</button>`}</div>`; }).join('')}</div>` : `<p class="empty-msg">${pdTab === 'facturar' ? 'No hay pedidos para facturar.' : 'No hay pedidos por preparar.'}</p>`}`; }
 function pdPintarPrep(){ const box = document.getElementById('pub-cont'), p = pdLista.find(x => x.numero === pdSel); if(!p){ pdSel = null; return pdPintar(); }
   const prep = (p.prep && p.prep.items) || {}, c = p.cliente || {}, cli = c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim();
   const pasos = [['pendiente', 'Tomado'], ['preparacion', 'En preparación'], ['para_facturar', 'Listo para facturar'], ['facturado', 'Facturado'], ['entregado', 'Entregado']], ie = Math.max(0, pasos.findIndex(([k]) => k === (p.estado === 'parcial' ? 'preparacion' : (p.estado || 'pendiente'))));
@@ -8988,7 +8996,7 @@ function pdPintarPrep(){ const box = document.getElementById('pub-cont'), p = pd
       ${(p.items || []).map((it, i) => { const f = pdFalta(it); return `<div style="display:grid;grid-template-columns:1fr 70px 70px 150px 110px;gap:8px;padding:8px 12px;border-bottom:1px solid #F3EFE8;font-size:.84rem;align-items:center;${f ? '' : 'opacity:.5;'}"><div><b>${escaparHtml(it.sku)}</b> <span style="color:#A89E90;font-size:.76rem;">${escaparHtml((it.nombreProducto || '') + ' ' + (it.desc || ''))}</span></div><span style="text-align:right;">${it.cantidad}</span><span style="text-align:right;">${f}</span>
         ${f ? `<span style="display:inline-flex;gap:4px;align-items:center;"><button type="button" class="btn-mini" onclick="pdCant(${i},-1)">−</button><input id="pd-q-${i}" type="number" min="0" max="${f}" value="${window.__pdPrep[i]}" oninput="pdCant(${i},0,this.value)" style="width:56px;padding:5px;border:1px solid var(--line);border-radius:7px;text-align:center;font-weight:700;"><button type="button" class="btn-mini" onclick="pdCant(${i},1)">+</button></span><span id="pd-e-${i}" style="font-size:.74rem;font-weight:700;"></span>` : '<span style="color:#2F7A47;font-size:.76rem;">✓ ya facturado</span><span></span>'}</div>`; }).join('')}</div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;"><button type="button" class="btn-mini" onclick="pdTodo()">Todo completo</button><button type="button" class="btn-mini" style="color:#A6432F!important;" onclick="pdCerrar('${escapeAttr(p.numero)}')">Cerrar pedido (sin pendientes)</button><span class="note" style="margin:0;">Lo que falta queda como pendiente de entrega.</span>
-      <button type="button" class="btn btn-gold" style="width:auto;margin-left:auto;" onclick="pdListo('${escapeAttr(p.numero)}')">✓ Listo para facturar</button></div>`;
+      ${p.estado === 'para_facturar' ? `<button type="button" class="btn-mini" style="margin-left:auto;" onclick="pdControlar('${escapeAttr(p.numero)}')">${p.control ? '✓ Controlado por ' + escaparHtml(String(p.control.por).split('@')[0]) : 'Marcar controlado'}</button>` : ''}<button type="button" class="btn btn-gold" style="width:auto;${p.estado === 'para_facturar' ? '' : 'margin-left:auto;'}" onclick="pdListo('${escapeAttr(p.numero)}')">✓ Listo para facturar</button></div>${pdHistHtml(p)}`;
   (p.items || []).forEach((it, i) => pdEtiqueta(i)); }
 function pdEtiqueta(i){ const p = pdLista.find(x => x.numero === pdSel), it = p && p.items[i], e = document.getElementById('pd-e-' + i), q = document.getElementById('pd-q-' + i); if(!it || !e) return; const f = pdFalta(it), v = window.__pdPrep[i];
   e.textContent = v >= f ? '✓ completo' : v === 0 ? 'no hay' : 'faltan ' + (f - v); e.style.color = v >= f ? '#2F7A47' : '#A6432F'; if(q){ q.style.borderColor = v < f ? '#A6432F' : ''; q.style.color = v < f ? '#A6432F' : ''; } }
@@ -8997,11 +9005,12 @@ function pdTodo(){ const p = pdLista.find(x => x.numero === pdSel); if(!p) retur
 async function pdListo(num){ const p = pdLista.find(x => x.numero === num); if(!p) return; const items = {}; window.__pdPrep.forEach((v, i) => { if(v > 0) items[i] = v; });
   if(!Object.keys(items).length){ alert('No hay nada preparado. Si no hay stock de nada, deje el pedido como está o ciérrelo.'); return; }
   const prep = { items, por: ((firebase.auth().currentUser || {}).email) || '', fecha: new Date().toISOString() };
-  try{ await db.collection('pedidos').doc(num).set({ estado: 'para_facturar', prep }, { merge: true }); Object.assign(p, { estado: 'para_facturar', prep }); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  const falt = (p.items || []).filter((it, i) => pdFalta(it) > (items[i] || 0)).length, paso = pdPaso('Preparado', falt ? `faltan ${falt} renglón${falt > 1 ? 'es' : ''}` : 'completo');
+  try{ await db.collection('pedidos').doc(num).set({ estado: 'para_facturar', prep, historial: firebase.firestore.FieldValue.arrayUnion(paso) }, { merge: true }); Object.assign(p, { estado: 'para_facturar', prep, historial: [...(p.historial || []), paso] }); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   dsToast(`Pedido ${num} listo para facturar: se avisó a quien factura`, { ms: 6000 }); pdSel = null; pdPintar(); dashCache = null; }
 async function pdCerrar(num){ const p = pdLista.find(x => x.numero === num); if(!p) return;
   if(!await dsConfirm(`¿Cerrar el pedido ${num}? Lo que falta deja de figurar como pendiente de entrega.`)) return;
-  try{ await db.collection('pedidos').doc(num).set({ estado: 'cerrado', cerrado: { por: ((firebase.auth().currentUser || {}).email) || '', fecha: new Date().toISOString() } }, { merge: true }); p.estado = 'cerrado'; } catch(e){ alert('No se pudo cerrar: ' + e.message); return; }
+  try{ await db.collection('pedidos').doc(num).set({ estado: 'cerrado', cerrado: { por: ((firebase.auth().currentUser || {}).email) || '', fecha: new Date().toISOString() }, historial: firebase.firestore.FieldValue.arrayUnion(pdPaso('Cerrado', 'sin pendientes')) }, { merge: true }); p.estado = 'cerrado'; } catch(e){ alert('No se pudo cerrar: ' + e.message); return; }
   pdSel = null; pdPintar(); dashCache = null; }
 // facturar: abre la factura con el cliente y solo lo preparado (precio y descuentos del pedido)
 async function pdFacturar(num){ const p = pdLista.find(x => x.numero === num) || (historialPedidos || []).find(x => x.numero === num); if(!p || !p.prep) return; const c = p.cliente || {}, cli = c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim();
@@ -9014,7 +9023,7 @@ async function pdRegistrarFactura(fa){ const pf = window.__pedFacturando; window
     const porSku = {}; (fa.items || []).forEach(it => { const s = String(skuDeFactura(it.codigo) || it.sku || it.codigo || '').toUpperCase(); porSku[s] = (porSku[s] || 0) + (+it.cant || 0); });
     pf.L.forEach(x => { const s = String(x.sku).toUpperCase(), q = porSku[s] != null ? Math.min(porSku[s], x.cant) : x.cant; if(porSku[s] != null) porSku[s] -= q; items[x.i].facturada = (+items[x.i].facturada || 0) + q; });
     const falta = items.some(i => pdFalta(i) > 0), num = `${fa.tipo || ''} ${fa.numero}`.trim();
-    await db.collection('pedidos').doc(pf.numero).set({ items, estado: falta ? 'parcial' : 'facturado', prep: null, facturas: [...(p.facturas || []), num] }, { merge: true });
+    await db.collection('pedidos').doc(pf.numero).set({ items, estado: falta ? 'parcial' : 'facturado', prep: null, facturas: [...(p.facturas || []), num], historial: firebase.firestore.FieldValue.arrayUnion(pdPaso(falta ? 'Facturado parcial' : 'Facturado', num)) }, { merge: true });
     dsToast(falta ? `Pedido ${pf.numero}: facturado lo preparado; lo que falta queda pendiente de entrega` : `Pedido ${pf.numero} facturado completo`, { ms: 6000 }); dashCache = null;
   } catch(e){ console.error(e); } }
 // aviso en vivo para quien factura
@@ -16885,10 +16894,11 @@ async function guardarEdicionHistorial(numero){
   const total = subtotal - (subtotal * descuentoPct / 100);
 
   try{
+    nuevosItems.forEach(it => { const o = (p.items || []).find(x => x.sku && x.sku === it.sku); if(o && o.facturada) it.facturada = Math.min(+o.facturada, +it.cantidad || 0); });
     await db.collection('pedidos').doc(numero).set({
       numero, fecha: p.fecha, cliente,
       items: nuevosItems, descuentoPct, observaciones,
-      subtotal, total, bultos
+      subtotal, total, bultos, historial: firebase.firestore.FieldValue.arrayUnion(pdPaso('Modificado', nuevosItems.length + ' renglones'))
     }, { merge: true });
     alert('Pedido ' + numero + ' actualizado (' + nuevosItems.length + ' ítem' + (nuevosItems.length===1?'':'s') + ').');
     cargarHistorial();
@@ -16957,7 +16967,7 @@ function renderHistorial(filtro){
             <b>Transporte:</b> ${p.cliente?.transporte||''}
             ${p.observaciones ? `<br><b>Observaciones:</b> ${p.observaciones}` : ''}
           </div>
-          <table>${itemsRows}</table>
+          <table>${itemsRows}</table>${pdHistHtml(p)}
           ${p.descuentoPct > 0 ? `<p style="text-align:right;margin:6px 0 0;">Subtotal: ${formatPrice(p.subtotal)} — Descuento ${p.descuentoPct}%</p>` : ''}
           <div class="hist-acciones">
             <button class="btn-mini" onclick="event.stopPropagation(); remitoDesdePedido('${p.numero}')">🚚 Remito</button>
@@ -16980,7 +16990,7 @@ document.getElementById('hist-buscador').addEventListener('input', e => renderHi
 async function cambiarEstadoPedido(numero, nuevoEstado, selectEl){
   selectEl.className = 'estado-pedido estado-' + nuevoEstado;
   try{
-    await db.collection('pedidos').doc(numero).update({ estado: nuevoEstado });
+    await db.collection('pedidos').doc(numero).update({ estado: nuevoEstado, historial: firebase.firestore.FieldValue.arrayUnion(pdPaso('Estado: ' + ({ pendiente: 'Tomado', preparacion: 'En preparación', para_facturar: 'Listo para facturar', parcial: 'Pendiente de entrega', facturado: 'Facturado', completo: 'Completo', entregado: 'Entregado', cerrado: 'Cerrado', cancelado: 'Cancelado' }[nuevoEstado] || nuevoEstado))) });
     const p = (historialPedidos || []).find(x => x.numero === numero);
     if(p) p.estado = nuevoEstado;
     if(histModoPend) renderHistorial('');
@@ -16992,7 +17002,7 @@ async function cambiarEstadoPedido(numero, nuevoEstado, selectEl){
 async function cancelarPedidoHistorial(numero){
   if(!await dsConfirm('¿Cancelar el pedido ' + numero + '? Queda marcado como cancelado, no se borra del historial.')) return;
   try{
-    await db.collection('pedidos').doc(numero).update({ estado: 'cancelado' });
+    await db.collection('pedidos').doc(numero).update({ estado: 'cancelado', historial: firebase.firestore.FieldValue.arrayUnion(pdPaso('Cancelado')) });
     const p = (historialPedidos || []).find(x => x.numero === numero);
     if(p) p.estado = 'cancelado';
     renderHistorial(document.getElementById('hist-buscador').value);
@@ -17341,6 +17351,7 @@ async function guardarPedidoManual(){
 
   try{
     await db.collection('pedidos').doc(numero).set({
+      historial: [pdPaso('Tomado', 'cargado a mano')], tomadoPor: ((firebase.auth().currentUser || {}).email) || '',
       numero, fecha: fechaISO, cliente,
       items: [{sku:'', desc: detalle, nombreProducto: 'Cargado manualmente', precio: total, cantidad: 1, nota:''}],
       descuentoPct: 0, observaciones: 'Cargado manualmente por OnLineTextil',
@@ -22944,7 +22955,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v455';
+const APP_VERSION = '2026-10-02-v456';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
