@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v438</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v439</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13299,6 +13299,11 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
     `The ${nf === 1 ? 'pillowcase is folded like a napkin into a thin, flat strip' : 'pillowcases are folded like napkins into thin, flat strips'}: crisp, pressed, one third the height of a folded sheet, square corners, empty and completely flat.`,
     `Count before finishing: ${nf === 1 ? '3' : '4'} pieces in total — one flat sheet, one fitted sheet, ${nf === 1 ? 'one pillowcase' : 'two pillowcases'}. Nothing loose, no hanging corners, no extra layers.`,
     `Hems: only the flat sheet and the pillowcases may show the hem line seen in the photo; the fitted sheet never. Straight front view at the height of the stack.`]]);
+  else if(t === 'cortina'){ const sheer = /voile|gasa|tul|lino|traslucid|sheer/.test(normBusqueda(nombre + ' ' + comp)); L.push(['MAIN PHOTO', [
+    `${panos === 2 ? 'BOTH panels of the curtain (EXACTLY TWO identical panels), hanging side by side' : 'The curtain panel hanging'} from ONE thin straight metal rod${/ROD POCKET/.test(cabezal) ? ' (only its two ends are visible at the sides; the rest of the rod is hidden inside the fabric tunnel)' : ', visible across the top'},${panos === 2 ? ' the two panels slightly separated in the middle,' : ''} straight and open, showing the full length down to the hem, with soft natural vertical folds.`,
+    cabezal ? cabezal.trim() : 'The heading exactly as in the photo.',
+    sheer ? `It is a SHEER, translucent fabric: show its transparency and lightness; define the folds and the outline with soft light-grey shading so the white fabric stands out from the white background (never invisible, never flat).` : `The fabric and its folds clearly defined, with soft natural shading.`,
+    `Hems and side finishing exactly as in the photo. Front view, the whole curtain and the rod inside the frame.`]]); }
   else if(t === 'cubrecama'){ const conFundas = /c\/ ?fundas|con fundas|\bfundas?\b|sham/.test(normBusqueda(nombre + ' ' + medida)); L.push(['MAIN PHOTO', [
     `The same ${prod} folded into a compact rectangle, slightly wider than deep.`,
     `4 to 5 folded layers visible on the front edge and on the right side, soft rounded fold edges, layers slightly misaligned for a natural look, no sharp creases.`,
@@ -22573,7 +22578,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v438';
+const APP_VERSION = '2026-10-02-v439';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
