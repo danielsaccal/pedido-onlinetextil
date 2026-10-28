@@ -113,6 +113,10 @@ header.top p{margin:0;font-size:0.85rem;opacity:0.85;letter-spacing:0.04em;text-
 .estado-pedido.estado-completo{background:#C9DDB8;color:#3D6122;}
 .estado-pedido.estado-cancelado{background:#E0B8B0;color:#7A2E1E;}
 .estado-pedido.estado-entregado{background:#C9DDB8;color:#3D6122;}
+.estado-pedido.estado-preparacion{background:#E6DDF0;color:#4B2F6B;}
+.estado-pedido.estado-para_facturar{background:#D8E8F7;color:#1F4E7A;}
+.estado-pedido.estado-facturado{background:#C9DDB8;color:#3D6122;}
+.estado-pedido.estado-cerrado{background:#E5E1DA;color:#6B6258;}
 .hist-acciones{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);}
 .btn-mini{
   background:var(--cream);border:1px solid var(--line);border-radius:7px;
@@ -1812,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v454</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v455</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6143,7 +6147,7 @@ const GRUPOS_INICIO = {
   ] },
   ped: { lado: 'int', titulo: '🛒 Pedidos', titulosColumnas: ['Tomar pedido', 'Seguimiento'], columnas: [
     [['📚 Tomar pedido (catálogo)', "irACatalogoDesdeInicio()"], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()']],
-    [['📋 Historial de pedidos', 'abrirHistorial()'], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']],
+    [['📋 Historial de pedidos', 'abrirHistorial()'], ['📦 Pedidos a preparar', "abrirPedidosPrep('preparar')"], ['🧾 Pedidos para facturar', "abrirPedidosPrep('facturar')"], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']],
   ] },
   comp: { lado: 'int', titulo: '🧾 Comprobantes', titulosColumnas: ['Presupuestos', 'Remitos', 'Ventas', 'Cobros', 'Compras', 'Pagos'], columnas: [
     [['🧾 Presupuestos', 'abrirPresupuestos()']],
@@ -6268,8 +6272,8 @@ const dsIco2 = k => `<svg viewBox="0 0 24 24">${DS_ICON2[k] || DS_ICON2.comp}</s
 // quita el emoji del comienzo de un texto ("➕ Factura" -> "+ Factura", "📋 Ver" -> "Ver")
 const sinEmoji = t => String(t || '').replace(/^\s*➕\s*/, '+ ').replace(/^\s*(?:\p{Extended_Pictographic}|\p{Emoji_Presentation})(?:\uFE0F|\u200D|\p{Extended_Pictographic})*\s*/u, '');
 function dsToast(msg, opt){ opt = opt || {}; let box = document.getElementById('ds-toasts'); if(!box){ box = document.createElement('div'); box.id = 'ds-toasts'; document.body.appendChild(box); }
-  const t = document.createElement('div'); t.className = 'ds-toast' + (opt.err ? ' err' : ''); t.innerHTML = `<span>${escaparHtml(String(msg))}</span>${opt.deshacer ? '<b>Deshacer</b>' : ''}<span class="x">✕</span>`;
-  const cerrar = () => { t.remove(); }; t.querySelector('.x').onclick = cerrar; if(opt.deshacer) t.querySelector('b').onclick = () => { cerrar(); try{ opt.deshacer(); } catch(e){} };
+  const t = document.createElement('div'); t.className = 'ds-toast' + (opt.err ? ' err' : ''); t.innerHTML = `<span>${escaparHtml(String(msg))}</span>${opt.deshacer ? '<b>Deshacer</b>' : opt.accion ? `<b>${escaparHtml(opt.accion.txt)}</b>` : ''}<span class="x">✕</span>`;
+  const cerrar = () => { t.remove(); }; t.querySelector('.x').onclick = cerrar; if(opt.deshacer || opt.accion) t.querySelector('b').onclick = () => { cerrar(); try{ (opt.deshacer || opt.accion.fn)(); } catch(e){} };
   box.appendChild(t); setTimeout(cerrar, opt.ms || Math.min(9000, 3500 + String(msg).length * 35)); }
 // los avisos del navegador pasan a ser avisos propios (no bloquean; la logica sigue igual)
 (() => { if(window.__alertNativoTest) return; const nativo = window.alert.bind(window); window.__alertNativo = nativo;
@@ -6297,7 +6301,7 @@ function normCondIva(v){ const s = normBusqueda(v || ''); if(!s) return ''; if(/
 function selCondIva(id, val, estilo){ const v = normCondIva(val); return `<select id="${id}" style="${estilo || ''}"><option value="">— elegir —</option>${COND_IVA.map(x => `<option ${v === x ? 'selected' : ''}>${x}</option>`).join('')}${v && !COND_IVA.includes(v) ? `<option selected>${escaparHtml(v)}</option>` : ''}</select>`; }
 // ===== Etapa 3: menu por tareas (usa las mismas opciones y permisos de siempre) =====
 const TAREAS = [
-  ['t_vender', 'Vender', 'sell', [['Antes de vender', ['irACatalogoDesdeInicio()', 'abrirPedidoIA()', 'abrirPresupuestos()']], ['Entregar y facturar', ['abrirPendientesEntrega()', 'abrirRemitos().then(() => rmForm())', 'abrirRemitos()', "abrirFacturas().then(() => fvManual('f'))", "abrirFacturas().then(() => fvManual('nc'))", "abrirFacturas().then(() => fvManual('nd'))", "abrirFacturas().then(() => document.getElementById('fc-rz-se", 'abrirFacturas()', 'abrirHistorial()']], ['Clientes', ['abrirClientes(); setTimeout(() => cliForm()', 'abrirClientes()', 'abrirListasPrecios()']]]],
+  ['t_vender', 'Vender', 'sell', [['Antes de vender', ['irACatalogoDesdeInicio()', 'abrirPedidoIA()', 'abrirPresupuestos()']], ['Entregar y facturar', ["abrirPedidosPrep('preparar')", "abrirPedidosPrep('facturar')", 'abrirPendientesEntrega()', 'abrirRemitos().then(() => rmForm())', 'abrirRemitos()', "abrirFacturas().then(() => fvManual('f'))", "abrirFacturas().then(() => fvManual('nc'))", "abrirFacturas().then(() => fvManual('nd'))", "abrirFacturas().then(() => document.getElementById('fc-rz-se", 'abrirFacturas()', 'abrirHistorial()']], ['Clientes', ['abrirClientes(); setTimeout(() => cliForm()', 'abrirClientes()', 'abrirListasPrecios()']]]],
   ['t_cobrar', 'Cobrar', 'cash', [['Cobros', ["abrirCtaCte('recibos').then(", "abrirCtaCte('recibos')"]], ['Cuentas', ['abrirCtaCte()', "abrirCtaCte('venc')"]]]],
   ['t_comprar', 'Comprar', 'buy', [['Comprobantes de compra', ["abrirCompras('compras').then(() => pvElegirProveedor('compra'", "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nc'", "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nd'", "abrirCompras('compras')"]], ['Proveedores', ["abrirCompras('proveedores').then("]], ['Talleres', ["abrirCompras('talleres')"]]]],
   ['t_pagar', 'Pagar', 'pay', [['Pagos', ["abrirCompras('pagos').then(", "abrirCompras('pagos')"]], ['Cuentas', ['abrirCompras()', "abrirCompras('venc')"]]]],
@@ -6368,6 +6372,7 @@ async function dashDatos(forzar){
   V.nSku = 0; CATALOGO.forEach(c => (c.productos || []).forEach(p => V.nSku += (p.variantes || []).length));
   // ---------- pendientes, agrupados: plata · costos y precios · stock y operacion ----------
   const P = (g, t, f, ml) => V.hoy.push([t, f, !!ml, g]), hoyISO = new Date().toISOString().slice(0, 10), hace = d => new Date(Date.now() - d * 864e5).toISOString();
+  try{ iniciarAvisoPedidos(); if(puede(permisoDeAccion("abrirFacturas()"))){ const pf = await t(db.collection('pedidos').where('estado', '==', 'para_facturar').get().catch(() => null)); if(pf && pf.docs.length) P('plata', `🧾 ${pf.docs.length} pedido${pf.docs.length > 1 ? 's' : ''} para facturar`, "abrirPedidosPrep('facturar')", false); } } catch(e){}
   try{ if(!window.__recAuto){ window.__recAuto = 1; await t(recActualizarEstados().catch(() => 0)); } } catch(e){} // estados de los reclamos, con los reportes ya cargados en Resultados ML
   try{ const rc = await t(db.collection('reclamos').where('estado', '==', 'abierto').get().catch(() => null)); if(rc){ const viejos = rc.docs.map(d => d.data()).filter(c => c.fecha && c.fecha <= hace(2).slice(0, 10)); if(viejos.length) P('plata', `⚖️ ${viejos.length} reclamo${viejos.length > 1 ? 's' : ''} de ML abierto${viejos.length > 1 ? 's' : ''} hace más de 2 días`, 'abrirReclamosML().then(() => recAbrirCasos())', true); } } catch(e){}
   const mesAnt = (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); })();
@@ -8958,6 +8963,67 @@ async function ctaEmail(tipo, k){ const D = ctaMovs(tipo, k); if(!D) return; con
   const pend = D.L.filter(r => r.pend > 0.5), cuerpo = `Estimados ${D.nombre}:\n\nLes enviamos el estado de su cuenta al ${new Date().toLocaleDateString('es-AR')}.\n\nSaldo: ${$(D.saldo)}\n${pend.length ? '\nComprobantes pendientes:\n' + pend.map(r => `· ${f(r.fecha)} · ${r.comp} · pendiente ${$(r.pend)}`).join('\n') + '\n' : ''}\nSaludos cordiales,\nOnLineTextil`;
   if(!D.email && !await dsConfirm('No tiene un email cargado. ¿Abrir el correo igual, para escribir la dirección?')) return;
   location.href = `mailto:${encodeURIComponent(D.email)}?subject=${encodeURIComponent('Estado de cuenta · ' + D.nombre)}&body=${encodeURIComponent(cuerpo)}`; }
+// ===== Preparar pedidos: quien prepara pone lo que hay; quien factura recibe "Pedido para facturar" =====
+let pdLista = [], pdTab = 'preparar', pdSel = null;
+const pdFalta = i => Math.max(0, (+i.cantidad || 0) - (+i.facturada || 0));
+const pdAbierto = p => !['cancelado', 'cerrado', 'facturado', 'completo', 'entregado'].includes(p.estado || 'pendiente') && (p.items || []).some(i => pdFalta(i) > 0);
+async function abrirPedidosPrep(tab){ pdTab = tab || pdTab; pdSel = null; document.getElementById('pub-modal').style.display = 'block'; { const cj = document.getElementById('pub-caja'); if(cj) cj.style.maxWidth = '900px'; }
+  document.getElementById('pub-titulo').textContent = '📦 Pedidos'; document.getElementById('pub-cont').innerHTML = '<p class="empty-msg">Cargando…</p>';
+  try{ const s = await db.collection('pedidos').get(); pdLista = s.docs.map(d => ({ _id: d.id, ...d.data() })); historialPedidos = pdLista; } catch(e){ pdLista = []; } pdPintar(); }
+function pdPintar(){ const box = document.getElementById('pub-cont'); if(!box) return; if(pdSel) return pdPintarPrep();
+  const A = pdLista.filter(p => pdAbierto(p) && (p.estado || 'pendiente') !== 'para_facturar').sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))), F = pdLista.filter(p => p.estado === 'para_facturar').sort((a, b) => String((a.prep || {}).fecha).localeCompare(String((b.prep || {}).fecha)));
+  const L = pdTab === 'facturar' ? F : A, cli = p => { const c = p.cliente || {}; return c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim() || 'Sin cliente'; };
+  const est = { pendiente: 'Tomado', preparacion: 'En preparación', parcial: 'Pendiente de entrega', para_facturar: 'Listo para facturar' };
+  box.innerHTML = `<div style="display:flex;gap:6px;margin-bottom:10px;">${[['preparar', `A preparar (${A.length})`], ['facturar', `Para facturar (${F.length})`]].map(([k, t]) => `<button type="button" class="btn-mini" style="${pdTab === k ? 'background:#3D2B4E!important;color:#fff!important;border-color:#3D2B4E!important;' : ''}font-weight:700;" onclick="pdTab='${k}';pdPintar()">${t}</button>`).join('')}</div>
+    ${L.length ? `<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;">${L.map(p => { const nF = (p.items || []).filter(i => pdFalta(i) > 0).length, dias = p.fecha ? Math.floor((Date.now() - new Date(p.fecha).getTime()) / 864e5) : 0;
+      return `<div style="display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid #F3EFE8;font-size:.86rem;"><b style="width:70px;">${escaparHtml(p.numero)}</b><div style="flex:1;min-width:0;"><b>${escaparHtml(cli(p))}</b><div style="font-size:.74rem;color:#A89E90;">${p.fecha ? new Date(p.fecha).toLocaleDateString('es-AR') : ''}${dias ? ' · hace ' + dias + ' días' : ''} · ${nF} ${nF === 1 ? 'renglón' : 'renglones'} ${pdTab === 'facturar' ? 'preparados' + ((p.prep || {}).por ? ' por ' + escaparHtml(p.prep.por.split('@')[0]) : '') : 'por preparar'}</div></div><span class="estado-pedido estado-${p.estado || 'pendiente'}">${est[p.estado || 'pendiente'] || p.estado}</span>
+        ${pdTab === 'facturar' ? `<button type="button" class="btn btn-gold" style="width:auto;padding:7px 14px;" onclick="pdFacturar('${escapeAttr(p.numero)}')">Facturar</button><button type="button" class="btn-mini" onclick="pdSel='${escapeAttr(p.numero)}';pdPintar()">Ver</button>` : `<button type="button" class="btn btn-gold" style="width:auto;padding:7px 14px;" onclick="pdSel='${escapeAttr(p.numero)}';pdPintar()">Preparar</button>`}</div>`; }).join('')}</div>` : `<p class="empty-msg">${pdTab === 'facturar' ? 'No hay pedidos para facturar.' : 'No hay pedidos por preparar.'}</p>`}`; }
+function pdPintarPrep(){ const box = document.getElementById('pub-cont'), p = pdLista.find(x => x.numero === pdSel); if(!p){ pdSel = null; return pdPintar(); }
+  const prep = (p.prep && p.prep.items) || {}, c = p.cliente || {}, cli = c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim();
+  const pasos = [['pendiente', 'Tomado'], ['preparacion', 'En preparación'], ['para_facturar', 'Listo para facturar'], ['facturado', 'Facturado'], ['entregado', 'Entregado']], ie = Math.max(0, pasos.findIndex(([k]) => k === (p.estado === 'parcial' ? 'preparacion' : (p.estado || 'pendiente'))));
+  window.__pdPrep = (p.items || []).map((it, i) => prep[i] != null ? +prep[i] : pdFalta(it));
+  box.innerHTML = `<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px;"><a href="#" onclick="event.preventDefault();pdSel=null;pdPintar()" style="font-size:.82rem;">← Pedidos</a><b>Pedido ${escaparHtml(p.numero)}</b><span style="color:#A89E90;font-size:.8rem;">${escaparHtml(cli)}${p.tomadoPor ? ' · tomado por ' + escaparHtml(String(p.tomadoPor).split('@')[0]) : ''}</span></div>
+    <div style="display:flex;margin:4px 0 12px;font-size:.74rem;font-weight:700;">${pasos.map(([k, t], i) => `<span style="padding:5px 10px;border:1px solid var(--line);${i === 0 ? 'border-radius:999px 0 0 999px;' : i === pasos.length - 1 ? 'border-radius:0 999px 999px 0;' : ''}${i < ie ? 'background:#E9F5EC;color:#2F7A47;' : i === ie ? 'background:#3D2B4E;color:#fff;' : 'background:#fff;color:#A89E90;'}">${i < ie ? '✓ ' : ''}${t}</span>`).join('')}</div>
+    <div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;"><div style="display:grid;grid-template-columns:1fr 70px 70px 150px 110px;gap:8px;padding:7px 12px;font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:#A89E90;font-weight:700;border-bottom:1px solid var(--line);"><span>SKU · producto</span><span style="text-align:right;">Pidió</span><span style="text-align:right;">Falta</span><span>Preparado</span><span></span></div>
+      ${(p.items || []).map((it, i) => { const f = pdFalta(it); return `<div style="display:grid;grid-template-columns:1fr 70px 70px 150px 110px;gap:8px;padding:8px 12px;border-bottom:1px solid #F3EFE8;font-size:.84rem;align-items:center;${f ? '' : 'opacity:.5;'}"><div><b>${escaparHtml(it.sku)}</b> <span style="color:#A89E90;font-size:.76rem;">${escaparHtml((it.nombreProducto || '') + ' ' + (it.desc || ''))}</span></div><span style="text-align:right;">${it.cantidad}</span><span style="text-align:right;">${f}</span>
+        ${f ? `<span style="display:inline-flex;gap:4px;align-items:center;"><button type="button" class="btn-mini" onclick="pdCant(${i},-1)">−</button><input id="pd-q-${i}" type="number" min="0" max="${f}" value="${window.__pdPrep[i]}" oninput="pdCant(${i},0,this.value)" style="width:56px;padding:5px;border:1px solid var(--line);border-radius:7px;text-align:center;font-weight:700;"><button type="button" class="btn-mini" onclick="pdCant(${i},1)">+</button></span><span id="pd-e-${i}" style="font-size:.74rem;font-weight:700;"></span>` : '<span style="color:#2F7A47;font-size:.76rem;">✓ ya facturado</span><span></span>'}</div>`; }).join('')}</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;"><button type="button" class="btn-mini" onclick="pdTodo()">Todo completo</button><button type="button" class="btn-mini" style="color:#A6432F!important;" onclick="pdCerrar('${escapeAttr(p.numero)}')">Cerrar pedido (sin pendientes)</button><span class="note" style="margin:0;">Lo que falta queda como pendiente de entrega.</span>
+      <button type="button" class="btn btn-gold" style="width:auto;margin-left:auto;" onclick="pdListo('${escapeAttr(p.numero)}')">✓ Listo para facturar</button></div>`;
+  (p.items || []).forEach((it, i) => pdEtiqueta(i)); }
+function pdEtiqueta(i){ const p = pdLista.find(x => x.numero === pdSel), it = p && p.items[i], e = document.getElementById('pd-e-' + i), q = document.getElementById('pd-q-' + i); if(!it || !e) return; const f = pdFalta(it), v = window.__pdPrep[i];
+  e.textContent = v >= f ? '✓ completo' : v === 0 ? 'no hay' : 'faltan ' + (f - v); e.style.color = v >= f ? '#2F7A47' : '#A6432F'; if(q){ q.style.borderColor = v < f ? '#A6432F' : ''; q.style.color = v < f ? '#A6432F' : ''; } }
+function pdCant(i, d, val){ const p = pdLista.find(x => x.numero === pdSel); if(!p) return; const f = pdFalta(p.items[i]); let v = val != null ? Math.round(+val || 0) : (window.__pdPrep[i] || 0) + d; v = Math.max(0, Math.min(f, v)); window.__pdPrep[i] = v; const q = document.getElementById('pd-q-' + i); if(q && (val == null || String(v) !== String(val))) q.value = v; pdEtiqueta(i); }
+function pdTodo(){ const p = pdLista.find(x => x.numero === pdSel); if(!p) return; p.items.forEach((it, i) => { window.__pdPrep[i] = pdFalta(it); const q = document.getElementById('pd-q-' + i); if(q) q.value = window.__pdPrep[i]; pdEtiqueta(i); }); }
+async function pdListo(num){ const p = pdLista.find(x => x.numero === num); if(!p) return; const items = {}; window.__pdPrep.forEach((v, i) => { if(v > 0) items[i] = v; });
+  if(!Object.keys(items).length){ alert('No hay nada preparado. Si no hay stock de nada, deje el pedido como está o ciérrelo.'); return; }
+  const prep = { items, por: ((firebase.auth().currentUser || {}).email) || '', fecha: new Date().toISOString() };
+  try{ await db.collection('pedidos').doc(num).set({ estado: 'para_facturar', prep }, { merge: true }); Object.assign(p, { estado: 'para_facturar', prep }); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  dsToast(`Pedido ${num} listo para facturar: se avisó a quien factura`, { ms: 6000 }); pdSel = null; pdPintar(); dashCache = null; }
+async function pdCerrar(num){ const p = pdLista.find(x => x.numero === num); if(!p) return;
+  if(!await dsConfirm(`¿Cerrar el pedido ${num}? Lo que falta deja de figurar como pendiente de entrega.`)) return;
+  try{ await db.collection('pedidos').doc(num).set({ estado: 'cerrado', cerrado: { por: ((firebase.auth().currentUser || {}).email) || '', fecha: new Date().toISOString() } }, { merge: true }); p.estado = 'cerrado'; } catch(e){ alert('No se pudo cerrar: ' + e.message); return; }
+  pdSel = null; pdPintar(); dashCache = null; }
+// facturar: abre la factura con el cliente y solo lo preparado (precio y descuentos del pedido)
+async function pdFacturar(num){ const p = pdLista.find(x => x.numero === num) || (historialPedidos || []).find(x => x.numero === num); if(!p || !p.prep) return; const c = p.cliente || {}, cli = c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim();
+  const L = Object.entries(p.prep.items).map(([i, q]) => { const it = p.items[+i]; const pu = (parsePrice(it.precio) || 0) * (1 - (it.descuentoItemPct || 0) / 100) * (1 - (p.descuentoPct || 0) / 100); return { i: +i, sku: it.sku, cant: +q, unit: pu }; });
+  window.__pedFacturando = { numero: num, L }; cerrarPublicar(); await abrirFacturas(); fvManual('f');
+  setTimeout(() => { const e = document.getElementById('fv-c'); if(e) e.value = cli; document.getElementById('fv-rows').innerHTML = ''; L.forEach(x => fvFila({ sku: x.sku, cant: x.cant, imp: x.unit * x.cant, unit: x.unit })); const t = document.getElementById('pub-titulo'); if(t) t.textContent = '➕ Factura de venta · pedido ' + num; }, 80); }
+// al guardar la factura: se suma lo facturado a cada renglon; si no falta nada, el pedido queda Facturado; si falta, Pendiente de entrega
+async function pdRegistrarFactura(fa){ const pf = window.__pedFacturando; window.__pedFacturando = null; if(!pf) return;
+  try{ const d = await db.collection('pedidos').doc(pf.numero).get(); if(!d.exists) return; const p = d.data(), items = (p.items || []).map(x => ({ ...x }));
+    const porSku = {}; (fa.items || []).forEach(it => { const s = String(skuDeFactura(it.codigo) || it.sku || it.codigo || '').toUpperCase(); porSku[s] = (porSku[s] || 0) + (+it.cant || 0); });
+    pf.L.forEach(x => { const s = String(x.sku).toUpperCase(), q = porSku[s] != null ? Math.min(porSku[s], x.cant) : x.cant; if(porSku[s] != null) porSku[s] -= q; items[x.i].facturada = (+items[x.i].facturada || 0) + q; });
+    const falta = items.some(i => pdFalta(i) > 0), num = `${fa.tipo || ''} ${fa.numero}`.trim();
+    await db.collection('pedidos').doc(pf.numero).set({ items, estado: falta ? 'parcial' : 'facturado', prep: null, facturas: [...(p.facturas || []), num] }, { merge: true });
+    dsToast(falta ? `Pedido ${pf.numero}: facturado lo preparado; lo que falta queda pendiente de entrega` : `Pedido ${pf.numero} facturado completo`, { ms: 6000 }); dashCache = null;
+  } catch(e){ console.error(e); } }
+// aviso en vivo para quien factura
+let pdAvisoIniciado = false;
+function iniciarAvisoPedidos(){ if(pdAvisoIniciado) return; try{ if(!puede(permisoDeAccion("abrirFacturas()"))) return; } catch(e){ return; } pdAvisoIniciado = true;
+  let vistos = new Set(); try{ vistos = new Set(JSON.parse(localStorage.getItem('olt_ped_avisados') || '[]')); } catch(e){}
+  try{ db.collection('pedidos').where('estado', '==', 'para_facturar').onSnapshot(s => { (s.docs || []).forEach(d => { const p = d.data(), k = d.id + '|' + ((p.prep || {}).fecha || ''); if(vistos.has(k)) return; vistos.add(k);
+      const c = p.cliente || {}; dsToast(`🧾 Pedido para facturar · N.º ${p.numero} · ${c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim()}${(p.prep || {}).por ? ' · preparado por ' + p.prep.por.split('@')[0] : ''}`, { ms: 15000, accion: { txt: 'Facturar →', fn: () => abrirPedidosPrep('facturar') } }); });
+    try{ localStorage.setItem('olt_ped_avisados', JSON.stringify([...vistos].slice(-200))); } catch(e){} }); } catch(e){} }
 // ===== Cuenta corriente: vista cronologica (por defecto) y "por comprobante" (como TFactura), para clientes y proveedores =====
 function ccVista(){ try{ return localStorage.getItem('olt_cc_vista') || 'crono'; } catch(e){ return 'crono'; } }
 function ccSetVista(v, fn){ try{ localStorage.setItem('olt_cc_vista', v); } catch(e){} (window[fn] || renderCtaCte)(); }
@@ -14098,6 +14164,7 @@ async function fvGuardar(tipo){
   facturasNuevas.push(fa); const i = facturasNuevas.length - 1; cerrarPublicar(); renderFacturasNuevas();
   if(fa.yaEsta){ alert('Ya hay un comprobante con el mismo punto de venta y número en esa razón social. No se guardó.'); return; }
   await guardarFactura(i);
+  if(window.__pedFacturando && fa.yaEsta) await pdRegistrarFactura(fa); else if(!fa.yaEsta) window.__pedFacturando = null;
   if(fa.remitoRef && fa.yaEsta){ try{ await db.collection('remitos').doc(fa.remitoRef).set({ facturaRef: { numero: `${fa.tipo} ${fa.numero}` } }, { merge: true }); const r = remitos.find(x => x._id === fa.remitoRef); if(r) r.facturaRef = { numero: `${fa.tipo} ${fa.numero}` }; } catch(e){} }
   window.__rmFacturando = null;
 }
@@ -14368,6 +14435,8 @@ function permisoDeAccion(f){
   if(/abrirSubirFotosSku/.test(s)) return permisoDeAccion('abrirActualizarFoto()');
   if(/abrirFugas/.test(s)) return permisoDeAccion('abrirResultadosML()');
   if(/abrirAlertasPrecio/.test(s)) return permisoDeAccion('abrirAumentoMasivo()');
+  if(/abrirPedidosPrep\('facturar'\)|pdFacturar/.test(s)) return permisoDeAccion('abrirFacturas()');
+  if(/abrirPedidosPrep/.test(s)) return permisoDeAccion('abrirPendientesEntrega()');
   if(/abrirUsuarios|abrirCopiaSeguridad/.test(s)) return 'dueno';
   if(/abrirResultadosML|abrirCalculadoraML/.test(s)) return 'resultadosML';
   if(/abrirFacturas/.test(s)) return 'facturas';
@@ -16844,7 +16913,7 @@ function renderHistorial(filtro){
   const cont = document.getElementById(histModoPend ? 'pe-lista' : 'hist-lista');
   document.getElementById(histModoPend ? 'hist-lista' : 'pe-lista').innerHTML = '';
   let pedidos = historialPedidos || [];
-  if(histModoPend) pedidos = pedidos.filter(p => ['pendiente', 'parcial'].includes(p.estado || 'pendiente')).sort((a, b) => new Date(a.fecha || 0) - new Date(b.fecha || 0));
+  if(histModoPend) pedidos = pedidos.filter(p => ['pendiente', 'parcial', 'preparacion', 'para_facturar'].includes(p.estado || 'pendiente')).sort((a, b) => new Date(a.fecha || 0) - new Date(b.fecha || 0));
   const filtroEstadoEl = document.querySelector('input[name="hist-filtro-estado"]:checked');
   const filtroEstado = histModoPend ? 'todos' : (filtroEstadoEl ? filtroEstadoEl.value : 'todos');
   const filtrados = pedidos.filter(p => {
@@ -16876,10 +16945,7 @@ function renderHistorial(filtro){
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
             <select class="estado-pedido estado-${estado}" onclick="event.stopPropagation()" onchange="event.stopPropagation(); cambiarEstadoPedido('${p.numero}', this.value, this)">
-              <option value="pendiente" ${estado==='pendiente'?'selected':''}>Pendiente</option>
-              <option value="parcial" ${estado==='parcial'?'selected':''}>Parcial</option>
-              <option value="completo" ${estado==='completo'?'selected':''}>Completo</option>
-              <option value="cancelado" ${estado==='cancelado'?'selected':''}>Cancelado</option>
+              ${[['pendiente', 'Tomado'], ['preparacion', 'En preparación'], ['para_facturar', 'Listo para facturar'], ['parcial', 'Pendiente de entrega'], ['facturado', 'Facturado'], ['completo', 'Completo'], ['entregado', 'Entregado'], ['cerrado', 'Cerrado'], ['cancelado', 'Cancelado']].map(([v, t]) => `<option value="${v}" ${estado === v ? 'selected' : ''}>${t}</option>`).join('')}
             </select>
             <div class="tot">${formatPrice(p.total)}</div>
             <span class="hist-chev">▾</span>
@@ -22878,7 +22944,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v454';
+const APP_VERSION = '2026-10-02-v455';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
