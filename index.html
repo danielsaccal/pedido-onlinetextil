@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v439</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v440</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6367,6 +6367,7 @@ async function dashDatos(forzar){
   V.nSku = 0; CATALOGO.forEach(c => (c.productos || []).forEach(p => V.nSku += (p.variantes || []).length));
   // ---------- pendientes, agrupados: plata · costos y precios · stock y operacion ----------
   const P = (g, t, f, ml) => V.hoy.push([t, f, !!ml, g]), hoyISO = new Date().toISOString().slice(0, 10), hace = d => new Date(Date.now() - d * 864e5).toISOString();
+  try{ const rc = await t(db.collection('reclamos').where('estado', '==', 'abierto').get().catch(() => null)); if(rc){ const viejos = rc.docs.map(d => d.data()).filter(c => c.fecha && c.fecha <= hace(2).slice(0, 10)); if(viejos.length) P('plata', `⚖️ ${viejos.length} reclamo${viejos.length > 1 ? 's' : ''} de ML abierto${viejos.length > 1 ? 's' : ''} hace más de 2 días`, 'abrirReclamosML().then(() => recAbrirCasos())', true); } } catch(e){}
   const mesAnt = (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); })();
   const extra = await Promise.all([
     dueno ? t(db.collection('teso_extractos').get().catch(() => null)) : null,
@@ -14610,10 +14611,57 @@ REGLAS: nunca admitir culpa sin prueba; todo dentro de la mensajería de Mercado
 RECLAMOS DE COMPRADORES (manchado, roto, incompleto): revisá el plazo de 60 días; en las fotos del comprador verificá que sea el mismo producto (color, diseño, tejido, medida, etiqueta, embalaje), si el daño parece de uso o lavado, si la foto es de internet; sin pruebas, pedí que ML las solicite (paquete con la etiqueta, embalaje, producto completo) y que no resuelva sin ellas; en faltantes, pedí que ML verifique el peso registrado por Mercado Envíos; en Full, el despacho es de ML; no asumir la devolución sin analizar; si pelear cuesta más que el monto, decilo y recomendá la opción más barata.
 ACUSACIONES DE ML: pedí número de envío, valores registrados, quién verificó, fecha, hora e instrumento; que no apliquen sanciones mientras el reclamo esté abierto.
 ESCALADA: revisión humana y apelación en plazo → Centro de Ayuda con capturas → COPREC → abogado.`;
+// ===== Casos de reclamos: se guardan solos al copiar; el estado sale de los reportes de ventas de ML =====
+let recCasos = null;
+async function recCargarCasos(){ try{ const s = await db.collection('reclamos').get(); recCasos = s.docs.map(d => ({ _id: d.id, ...d.data() })); } catch(e){ recCasos = recCasos || []; } return recCasos; }
+function recMotivo(t){ const s = normBusqueda(t || ''); return /manch/.test(s) ? 'manchado' : /rot[oa]|agujer|descos|rasgad/.test(s) ? 'roto' : /falt|recibi solo|recibio solo|menos unidades|\d+ de \d+/.test(s) ? 'faltante' : /distint|otro producto|no es el|equivocad|otro color|otra medida/.test(s) ? 'producto distinto' : 'otro'; }
+async function recGuardarCaso(){ const cta = window.__recCta; if(!cta) return; const venta = ((document.getElementById('da-venta') || {}).value || '').replace(/\D/g, ''), texto = ((document.getElementById('da-texto') || {}).value || '').trim();
+  if(!venta && !texto) return; await (recCasos ? null : recCargarCasos());
+  const ya = (recCasos || []).find(c => c.cuenta === cta && venta && c.venta === venta && c.estado === 'abierto');
+  const d = { cuenta: cta, venta, texto: texto.slice(0, 600), motivo: recMotivo(texto), actualizado: new Date().toISOString() };
+  try{ if(ya){ await db.collection('reclamos').doc(ya._id).set(d, { merge: true }); Object.assign(ya, d); }
+    else { Object.assign(d, { fecha: new Date().toISOString().slice(0, 10), estado: 'abierto', pruebas: /sin fotos|sin pruebas|no mand|no envi/.test(normBusqueda(texto)) ? 'no' : '', apelado: false, creado: d.actualizado, usuario: ((firebase.auth().currentUser || {}).email) || '' });
+      const r = await db.collection('reclamos').add(d); recCasos.push({ _id: r.id, ...d }); }
+    recBotonCasos(); } catch(e){ console.error(e); } }
+function recBotonCasos(){ const b = document.getElementById('rec-btn-casos'); if(b && recCasos) b.textContent = `Casos (${recCasos.filter(c => c.estado === 'abierto').length} abiertos)`; }
+// estado automatico desde ml_detalle: reintegro (fila negativa, Cancelado / Parcialmente devuelto) = perdido; 30 dias sin reintegro = ganado
+async function recActualizarEstados(){ await (recCasos ? null : recCargarCasos()); const abiertos = recCasos.filter(c => c.venta && c.origen !== 'manual' && (c.estado === 'abierto' || c.estado === 'perdido'));
+  if(!abiertos.length) return 0; let det = null; try{ det = await db.collection('ml_detalle').get(); } catch(e){ return 0; }
+  const M = {}; det.docs.forEach(d => { const x = d.data(), cta = String(x.cuenta || '').toLowerCase(); String(x.csv || '').split('\n').slice(1).forEach(l => { const f = l.split(';'); if(!f[2]) return; const k = cta + '|' + f[2]; (M[k] = M[k] || []).push({ fecha: f[0], tipo: f[3], estado: f[4], precio: +f[8] || 0, neto: +f[12] || 0 }); }); });
+  let n = 0;
+  for(const c of abiertos){ const R = M[c.cuenta.toLowerCase() + '|' + c.venta]; if(!R) continue;
+    const venta = R.filter(r => r.precio > 0).reduce((a, r) => a + r.precio, 0), neg = R.filter(r => r.neto < 0 && /cancel|devuelt|reembols|anulad/i.test(r.estado)), debit = Math.round(-neg.reduce((a, r) => a + r.neto, 0));
+    const recup = c.estado === 'perdido' && c.debitado && debit < c.debitado ? c.debitado - debit : 0, d = {};
+    if(!c.monto && venta) d.monto = Math.round(venta);
+    if(neg.length && (c.estado === 'abierto' || debit !== c.debitado)){ Object.assign(d, { estado: 'perdido', debitado: debit, parcial: neg.some(r => /parcial/i.test(r.estado)), auto: 'detectado en el reporte: ' + (neg.some(r => /parcial/i.test(r.estado)) ? 'reintegro parcial' : 'reembolsada') }); }
+    else if(c.estado === 'abierto' && !neg.length && (Date.now() - new Date(c.fecha + 'T12:00:00').getTime()) / 864e5 >= 30){ Object.assign(d, { estado: 'ganado', auto: '30 días cobrada normal' }); }
+    if(recup){ Object.assign(d, { recuperado: (c.recuperado || 0) + recup, auto: 'recuperado en el reporte' }); }
+    if(Object.keys(d).length){ try{ await db.collection('reclamos').doc(c._id).set(d, { merge: true }); Object.assign(c, d); n++; } catch(e){} } }
+  return n; }
+async function recAbrirCasos(mes){ document.getElementById('pub-modal').style.display = 'block'; { const cj = document.getElementById('pub-caja'); if(cj) cj.style.maxWidth = '980px'; } document.getElementById('pub-titulo').textContent = '⚖️ Casos de reclamos';
+  document.getElementById('pub-cont').innerHTML = '<p class="empty-msg">Revisando los reportes de ventas…</p>'; await recCargarCasos(); await recActualizarEstados(); recPintarCasos(mes); }
+function recPintarCasos(mes){ const box = document.getElementById('pub-cont'); if(!box) return; const C = (recCasos || []).slice().sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  const meses = [...new Set(C.map(c => String(c.fecha).slice(0, 7)))].sort().reverse(); mes = mes || window.__recMes || meses[0] || new Date().toISOString().slice(0, 7); window.__recMes = mes;
+  const D = C.filter(c => String(c.fecha).slice(0, 7) === mes), dueno = esDueno(), col = k => RZ_COLOR[String(k).toLowerCase()] || '#8A8072';
+  const res = cta => { const X = D.filter(c => c.cuenta === cta); if(!X.length) return ''; const per = X.filter(c => c.estado === 'perdido'), ap = X.filter(c => c.apelado), deb = X.reduce((a, c) => a + (+c.debitado || 0), 0), rec = X.reduce((a, c) => a + (+c.recuperado || 0), 0);
+    return `<div style="background:#fff;border:1px solid var(--line);border-left:5px solid ${col(cta)};border-radius:12px;padding:10px 14px;font-size:.82rem;"><b style="color:${col(cta)};">${cta} · ${new Date(mes + '-15').toLocaleDateString('es-AR', { month: 'long' })}</b>
+      ${[['Reclamos', X.length], ['Perdidos sin pruebas del comprador', `<span style="color:#A6432F;">${per.filter(c => c.pruebas === 'no').length}</span>`], ['Apelados / ganados al apelar', `${ap.length} / ${ap.filter(c => c.estado === 'ganado' || c.recuperado).length}`]].concat(dueno ? [['Debitado', `<span style="color:#A6432F;">${formatPrice(deb)}</span>`], ['Recuperado al apelar', `<span style="color:#2F7A47;">${formatPrice(rec)}</span>`]] : []).map(([a, b]) => `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:#6B6258;">${a}</span><b>${b}</b></div>`).join('')}</div>`; };
+  const ST = { abierto: ['#FFF8E1', '#9A7B12', 'Abierto'], ganado: ['#E9F5EC', '#2F7A47', 'Ganado'], perdido: ['#FBEDEA', '#A6432F', 'Perdido'], acuerdo: ['#EEF3FA', '#2E5A8C', 'Acuerdo'] };
+  box.innerHTML = `<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;font-size:.85rem;"><span>Mes:</span><select onchange="recPintarCasos(this.value)" style="padding:5px 8px;border:1px solid var(--line);border-radius:8px;">${(meses.length ? meses : [mes]).map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${new Date(m + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</option>`).join('')}</select><span class="note" style="margin:0 0 0 auto;">El estado se completa solo con los reportes de ventas de ML que carga en Resultados ML.</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">${res('Alberto') || ''}${res('Rita') || ''}</div>
+    ${D.length ? `<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;">${D.map(c => { const [bg, fg, tx] = ST[c.estado] || ST.abierto, dias = Math.floor((Date.now() - new Date(c.fecha + 'T12:00:00').getTime()) / 864e5), r = c.venta ? null : null;
+      return `<div style="display:grid;grid-template-columns:6px 46px 1fr 110px 150px ${dueno ? '100px' : ''};gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid #F3EFE8;font-size:.82rem;"><span style="width:6px;height:32px;border-radius:3px;background:${col(c.cuenta)};"></span><span style="color:#8A8072;">${String(c.fecha).slice(8, 10)}/${String(c.fecha).slice(5, 7)}</span>
+        <div style="min-width:0;"><b>${escaparHtml(c.venta || 'sin N.º de venta')}</b> · ${escaparHtml(c.motivo || 'otro')}<div style="color:#A89E90;font-size:.74rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escaparHtml(c.texto || '')}</div></div>
+        <select onchange="recSet('${c._id}', { pruebas: this.value })" style="padding:3px 6px;border:1px solid var(--line);border-radius:7px;font-size:.78rem;"><option value="" ${!c.pruebas ? 'selected' : ''}>pruebas: ?</option><option value="si" ${c.pruebas === 'si' ? 'selected' : ''}>mandó pruebas</option><option value="no" ${c.pruebas === 'no' ? 'selected' : ''}>no mandó</option></select>
+        <div><select onchange="recSet('${c._id}', { estado: this.value, origen: 'manual', auto: 'marcado a mano' })" style="padding:3px 8px;border-radius:999px;border:none;background:${bg};color:${fg};font-weight:700;font-size:.76rem;">${Object.entries(ST).map(([k, v]) => `<option value="${k}" ${c.estado === k ? 'selected' : ''}>${v[2]}${k === 'abierto' && c.estado === 'abierto' ? ' · ' + dias + ' d' : ''}</option>`).join('')}</select>
+          <label style="display:block;font-size:.72rem;color:#8A8072;margin-top:2px;"><input type="checkbox" ${c.apelado ? 'checked' : ''} onchange="recSet('${c._id}', { apelado: this.checked })"> apelado</label><div style="font-size:.7rem;color:#A89E90;">${escaparHtml(c.auto || (c.estado === 'abierto' ? 'esperando el reporte' : ''))}</div></div>
+        ${dueno ? `<div style="text-align:right;font-weight:700;${c.debitado ? 'color:#A6432F;' : c.recuperado ? 'color:#2F7A47;' : 'color:#8A8072;font-weight:400;'}">${c.debitado ? '− ' + formatPrice(c.debitado) : c.monto ? formatPrice(c.monto) : ''}${c.recuperado ? `<div style="color:#2F7A47;font-size:.74rem;">+ ${formatPrice(c.recuperado)}</div>` : ''}</div>` : ''}</div>`; }).join('')}</div>` : '<p class="empty-msg">No hay casos en este mes. Se guardan solos al copiar un reclamo.</p>'}`; }
+async function recSet(id, d){ const c = (recCasos || []).find(x => x._id === id); if(!c) return; try{ await db.collection('reclamos').doc(id).set(d, { merge: true }); Object.assign(c, d); recPintarCasos(); } catch(e){ alert('No se pudo guardar: ' + e.message); } }
 async function recCopiarGratis(b){ if(!window.__recCta){ alert('Elija la cuenta: Alberto o Rita.'); return; }
   const txt = REC_REGLAS + '\n\n' + await recContexto() + 'RECLAMO: ' + (((document.getElementById('da-texto') || {}).value || '').trim() || '(ver la captura adjunta)') + '\n(Adjunto la captura del reclamo y las fotos del comprador.)';
-  try{ await navigator.clipboard.writeText(txt); dsToast('Copiado. Péguelo en Claude, Gemini o ChatGPT, junto con la captura y las fotos.'); } catch(e){ prompt('Copie este texto:', txt); } }
-async function abrirReclamosML(){ if(!ES_PESTANA_AGENTE && abrirAgenteEnPestana('reclamos')) return; return abrirChatAgente('reclamos'); }
+  try{ await navigator.clipboard.writeText(txt); dsToast('Copiado y caso guardado. Péguelo en Claude, Gemini o ChatGPT, junto con la captura y las fotos.'); } catch(e){ prompt('Copie este texto:', txt); }
+  recGuardarCaso(); }
+async function abrirReclamosML(){ setTimeout(() => recCargarCasos().then(recBotonCasos), 400); if(!ES_PESTANA_AGENTE && abrirAgenteEnPestana('reclamos')) return; return abrirChatAgente('reclamos'); }
 async function abrirDirectorArte(){ if(!ES_PESTANA_AGENTE && abrirAgenteEnPestana('arte')) return; return abrirChatAgente('arte'); }
 async function abrirAuditor(paquetes){ if(!ES_PESTANA_AGENTE && abrirAgenteEnPestana('auditor', paquetes && paquetes.length ? { paq: paquetes.join(',') } : {})) return; await abrirChatAgente('auditor'); if(paquetes && paquetes.length) for(const pq of paquetes) await adjuntarPaqueteAud(pq); }
 async function abrirChatAgente(agente){
@@ -14631,7 +14679,7 @@ async function abrirChatAgente(agente){
       let cp = document.getElementById('da-rec-copiar'); if(!cp && en){ cp = document.createElement('button'); cp.id = 'da-rec-copiar'; cp.type = 'button'; cp.className = 'btn btn-gold'; cp.style.width = 'auto'; cp.textContent = 'Copiar para Claude / Gemini / ChatGPT'; cp.onclick = () => recCopiarGratis(cp); en.parentNode.insertBefore(cp, en); }
       if(cp) cp.style.display = agente === 'reclamos' ? '' : 'none'; }
     if(agente === 'reclamos') b.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 8px;font-size:.85rem;"><b>Cuenta:</b>${['Alberto', 'Rita'].map(c => `<button type="button" class="btn-mini da-cta" data-c="${c}" onclick="recCuenta('${c}')" style="border-color:${RZ_COLOR[c.toLowerCase()]}!important;color:${RZ_COLOR[c.toLowerCase()]}!important;font-weight:700;">${c}</button>`).join('')}
-      <input id="da-venta" inputmode="numeric" placeholder="N.º de venta (opcional)" style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;width:200px;"></div>
+      <input id="da-venta" inputmode="numeric" placeholder="N.º de venta (opcional)" style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;width:200px;"><button type="button" id="rec-btn-casos" class="btn-mini" style="margin-left:auto;" onclick="recAbrirCasos()">Casos</button></div>
       <p class="note" style="text-align:left;margin:0 0 8px;">Sin costo: elija la cuenta, ponga el N.º de venta, escriba el reclamo y toque <b>Copiar</b> y péguelo en <b>Claude</b>, Gemini o ChatGPT, junto con la captura y las fotos.</p>`; }
   pintarDatosAud();
   try{ const d = await db.collection('config').doc('agente').get(); daCfg = d.exists ? d.data() : {}; } catch(e){ daCfg = {}; }
@@ -22578,7 +22626,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v439';
+const APP_VERSION = '2026-10-02-v440';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
