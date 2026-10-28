@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v440</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v441</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6367,6 +6367,7 @@ async function dashDatos(forzar){
   V.nSku = 0; CATALOGO.forEach(c => (c.productos || []).forEach(p => V.nSku += (p.variantes || []).length));
   // ---------- pendientes, agrupados: plata · costos y precios · stock y operacion ----------
   const P = (g, t, f, ml) => V.hoy.push([t, f, !!ml, g]), hoyISO = new Date().toISOString().slice(0, 10), hace = d => new Date(Date.now() - d * 864e5).toISOString();
+  try{ if(!window.__recAuto){ window.__recAuto = 1; await t(recActualizarEstados().catch(() => 0)); } } catch(e){} // estados de los reclamos, con los reportes ya cargados en Resultados ML
   try{ const rc = await t(db.collection('reclamos').where('estado', '==', 'abierto').get().catch(() => null)); if(rc){ const viejos = rc.docs.map(d => d.data()).filter(c => c.fecha && c.fecha <= hace(2).slice(0, 10)); if(viejos.length) P('plata', `⚖️ ${viejos.length} reclamo${viejos.length > 1 ? 's' : ''} de ML abierto${viejos.length > 1 ? 's' : ''} hace más de 2 días`, 'abrirReclamosML().then(() => recAbrirCasos())', true); } } catch(e){}
   const mesAnt = (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); })();
   const extra = await Promise.all([
@@ -22626,7 +22627,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v440';
+const APP_VERSION = '2026-10-02-v441';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
