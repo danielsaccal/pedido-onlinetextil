@@ -233,8 +233,39 @@ details.pleg>.pleg-body{background:#fff;border:1px solid var(--line,#E3DCD2);bor
 .pantallaML>summary{display:none !important}
 .pantallaML>.pleg-body,.pantallaML>.panel{border-top-left-radius:14px !important;border-top-right-radius:14px !important;border-top:1px solid var(--line,#E3DCD2) !important}
 </style>
+
+<style id="estilo-app">
+/* ===== mismo formato que la app: menu lateral, encabezado compacto, pocas cosas a la vista ===== */
+body{background:#F7F5F1}
+#sbML{position:fixed;left:0;top:0;bottom:0;width:220px;background:#fff;border-right:1px solid #ECE6DD;padding:18px 12px;box-sizing:border-box;overflow:auto;z-index:60;font-family:Arial,Helvetica,sans-serif}
+#sbML .lg{font:700 18px Georgia,serif;color:#3D2B4E;margin:0 8px 16px;display:block;text-decoration:none}
+#sbML a.it{display:block;padding:8px 10px;border-radius:8px;color:#6B6258;font-size:14px;text-decoration:none}#sbML a.it:hover{background:#F7F4EF}
+#sbML .sub a{display:block;padding:5px 8px 5px 18px;font-size:13px;color:#6B6258;text-decoration:none;border-radius:6px}#sbML .sub a.on{background:#F1ECF5;color:#3D2B4E;font-weight:700}
+#sbML .grp{padding:8px 10px;border-radius:8px;background:#F1ECF5;color:#3D2B4E;font-weight:700;font-size:14px;margin-top:2px}
+@media(min-width:901px){ body{padding-left:220px} #bandaCuenta{margin-left:0} }
+@media(max-width:900px){ #sbML{display:none} }
+header.top{text-align:left!important;padding:12px 26px 14px!important;display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}
+header.top::after{display:none}
+header.top>div:first-child{order:3;margin:0 0 0 auto!important}
+header.top h1{font:700 1.35rem Georgia,serif!important;margin:0!important}
+header.top .sub{display:none}
+header.top .load{order:4;width:100%;justify-content:flex-start!important;margin:2px 0 0!important}
+#bandaCuenta{font-size:.78rem!important;padding:4px 10px!important;letter-spacing:.04em!important}
+main{max-width:1080px!important}
+/* accesos: 4 en lista, el resto plegado */
+#menuML{display:block!important;margin:14px 0}
+#menuML .lst{background:#fff;border:1px solid #ECE6DD;border-radius:14px;overflow:hidden}
+#menuML .lst .mt{width:100%;border:none!important;border-bottom:1px solid #F3EFE8!important;border-radius:0!important;flex-direction:row!important;align-items:center;gap:12px!important;padding:12px 16px!important;box-shadow:none!important;transform:none!important;background:#fff}
+#menuML .lst .mt:last-child{border-bottom:none!important}#menuML .lst .mt:hover{background:#FBF9F6}
+#menuML .mt .ic{width:32px;height:32px;border-radius:9px;background:#F5F1EB;display:inline-flex;align-items:center;justify-content:center;font-size:1rem!important;flex:0 0 32px}
+#menuML .mt b{font-size:.92rem!important;color:#2B2622!important}#menuML .mt .ds{display:block;font-size:.76rem;color:#A89E90}
+#menuML .mt .cnt{margin-left:auto;align-self:center!important}
+#menuML details{margin-top:12px}#menuML details>summary{cursor:pointer;color:#6B6258;font-size:.86rem;font-weight:600;list-style:none;padding:4px 2px}#menuML details>summary::-webkit-details-marker{display:none}#menuML details>summary::marker{content:""}
+#menuML details .lst{margin-top:8px}
+</style>
 </head>
 <body>
+<nav id="sbML"><a class="lg" href="./">OnLineTextil</a><a class="it" href="./">Inicio</a><a class="it" href="./?ir=vender">Vender</a><a class="it" href="./?ir=cobrar">Cobrar</a><a class="it" href="./?ir=comprar">Comprar</a><a class="it" href="./?ir=pagar">Pagar</a><a class="it" href="./?ir=stock">Stock y productos</a><a class="it" href="./?ir=producir">Producir</a><a class="it" href="./?ir=difundir">Difundir</a><div class="grp">Números</div><div class="sub"><a href="./?ir=negocio">Resultado del negocio</a><a href="./?ir=fugas">Fugas de plata por SKU</a><a class="on" href="#">Resultados Mercado Libre</a><a href="./?ir=iva">Posición de IVA</a><a href="./?ir=reclamos">Reclamos ML / MP</a></div></nav>
 <div id="bandaCuenta" style="position:sticky;top:0;z-index:50;text-align:center;font:800 .95rem system-ui,sans-serif;letter-spacing:.06em;padding:7px 10px;color:#fff;background:#6B6258;">Viendo: AMBAS CUENTAS</div>
 <header class="top">
   <div style="display:flex;gap:8px;justify-content:center;margin-bottom:6px;"><a href="./" style="color:#fff;border:1px solid rgba(255,255,255,.45);border-radius:10px;padding:5px 12px;text-decoration:none;font-size:.85rem;">← Volver a la app</a></div>
@@ -1433,7 +1464,10 @@ function armarMenuML(){
 function pintarMenuML(){
   const m=$('menuML'); if(!m)return;
   const nRev=(document.querySelectorAll('#revisarBox div[style*="border-bottom"]')||[]).length;
-  m.innerHTML=window.__pantallas.map(([k,ic,t,d])=>`<button type="button" class="mt" onclick="abrirPantallaML('${k}')"><span class="ic">${ic}</span><b>${t}</b>${d?`<span>${d}</span>`:''}${k==='revisar'&&nRev?`<span class="cnt">${nRev}</span>`:''}</button>`).join('');
+  const PRIN=['revisar','ranking','desglose','lista'];
+  const bt=([k,ic,t,d])=>`<button type="button" class="mt" onclick="abrirPantallaML('${k}')"><span class="ic">${ic}</span><span style="text-align:left;"><b>${t}</b>${d?`<span class="ds">${d}</span>`:''}</span>${k==='revisar'&&nRev?`<span class="cnt">${nRev} pendientes</span>`:''}</button>`;
+  const A=window.__pantallas.filter(x=>PRIN.includes(x[0])).sort((a,b)=>PRIN.indexOf(a[0])-PRIN.indexOf(b[0])), B=window.__pantallas.filter(x=>!PRIN.includes(x[0]));
+  m.innerHTML=`<div class="lst">${A.map(bt).join('')}</div><details><summary>▸ Más análisis (${B.map(x=>x[2].replace(/^¿|\?$/g,'').toLowerCase()).slice(0,4).join(', ')}…)</summary><div class="lst">${B.map(bt).join('')}</div></details>`;
 }
 function abrirPantallaML(k,sinScroll){
   const p=window.__pantallas.find(x=>x[0]===k); if(!p)return; const el=p[4](); if(!el)return;
