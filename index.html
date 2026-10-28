@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v449</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v450</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13628,10 +13628,10 @@ function fgPintar(){ const box = document.getElementById('pub-cont'); if(!box ||
   const ms = [...new Set(fgDatos.F.map(r => String(r.fecha).slice(0, 7)))].filter(m => /^\d{4}-\d{2}$/.test(m)).sort().reverse();
   const S = k => L.reduce((a, g) => a + (g[k] || 0), 0), N = k => L.filter(g => g[k] > 0).length, fu = Object.entries(fgDatos.full || {}).filter(([c]) => fgSt.cta === 'Ambas' || c === fgSt.cta);
   const tarj = (t, v, sub) => `<div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;"><div style="font-size:.78rem;color:#6B6258;">${t}</div><div style="font:700 1.2rem Arial;color:${v > 0 ? '#A6432F' : '#2F7A47'};margin-top:3px;">${formatPrice(v)}</div><div style="font-size:.72rem;color:#A89E90;">${sub}</div></div>`;
-  const btn = (on, t, f, c) => `<button type="button" class="btn-mini" style="${on ? `border-color:${c || 'var(--purple)'};font-weight:700;color:${c || 'var(--purple)'};` : ''}" onclick="${f}">${t}</button>`;
+  const btn = (on, t, f, c) => `<button type="button" class="btn-mini" style="font-weight:700;${c ? `border-color:${c}!important;` : ''}${on ? `background:${c || '#3D2B4E'}!important;color:#fff!important;border-color:${c || '#3D2B4E'}!important;` : `color:${c || '#6B6258'}!important;`}" onclick="${f}">${t}</button>`;
   box.innerHTML = `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">${['Alberto', 'Rita', 'Ambas'].map(c => btn(fgSt.cta === c, c, `fgSt.cta='${c}';fgPintar()`, c === 'Ambas' ? '' : col(c))).join('')}
       <span style="width:10px;"></span><select onchange="fgSt.per=this.value;fgPintar()" style="padding:5px 8px;border:1px solid var(--line);border-radius:8px;">${[['ult3', 'Últimos 3 meses']].concat(ms.map(m => [m, new Date(m + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })])).map(([v, t]) => `<option value="${v}" ${fgSt.per === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
-      <span style="margin-left:auto;display:flex;gap:6px;">${['Alberto', 'Rita'].map(c => `<label class="btn-mini" style="cursor:pointer;border-color:${col(c)};color:${col(c)};">Cargar stock antiguo de Full · ${c}<input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="fgSubirFull(this,'${c}')"></label>`).join('')}</span></div>
+      <span style="margin-left:auto;display:flex;gap:6px;">${['Alberto', 'Rita'].map(c => `<label class="btn-mini" style="cursor:pointer;border-color:${col(c)}!important;color:${col(c)}!important;font-weight:700;">Cargar stock antiguo de Full · ${c}<input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="fgSubirFull(this,'${c}')"></label>`).join('')}</span></div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;">${tarj('Ventas con margen negativo', S('margen'), `${L.reduce((a, g) => a + g.items.filter(i => /margen/.test(i.tipo)).length, 0)} ventas · ${N('margen')} SKU`)}${tarj('Reintegros parciales', S('reint'), `${N('reint')} SKU`)}${tarj('Devoluciones y anulaciones (neto)', S('devol'), `${N('devol')} SKU`)}${tarj(`Stock antiguo en Full${fu.length ? ' (al ' + fu.map(([, x]) => x.cobro || '').filter(Boolean)[0] + ')' : ''}`, S('full'), fu.length ? fu.map(([c, x]) => `${c}: cargado ${String(x.fecha || '').slice(8, 10)}/${String(x.fecha || '').slice(5, 7)}`).join(' · ') : 'sin reporte cargado')}</div>
     ${L.length ? `<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;"><div style="display:grid;grid-template-columns:1fr 110px 110px 110px 110px 110px;gap:8px;padding:8px 12px;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:#A89E90;font-weight:700;border-bottom:1px solid var(--line);"><span>SKU · producto</span><span style="text-align:right;">Margen neg.</span><span style="text-align:right;">Reintegros</span><span style="text-align:right;">Devoluciones</span><span style="text-align:right;">Stock antiguo</span><span style="text-align:right;">Total</span></div>
       ${L.slice(0, 120).map((g, i) => { const r = buscarProductoPorSku(g.sku), nom = r ? r.producto.nombre + (r.variante.desc ? ' · ' + r.variante.desc : '') : '', v = x => x > 0 ? `<span style="color:#A6432F;">${formatPrice(x)}</span>` : '<span style="color:#D8D0C2;">—</span>', ab = fgSt.abiertos[g.sku];
@@ -22759,8 +22759,14 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
     }
     if(ir){ history.replaceState(null, '', location.pathname);
       setTimeout(async () => {
+        for(let k = 0; k < 60 && (typeof rolActual === 'undefined' || !rolActual); k++) await new Promise(r => setTimeout(r, 150)); // espera el usuario y su rol
         if(ir === 'completar'){ await abrirProductosFabrico(); const b = document.getElementById('pf-buscar'); if(b){ b.value = q.get('sku') || ''; renderProductosFabrico(); } try{ completarSkuPf(String(q.get('sku') || '').toUpperCase()); } catch(e){} }
         else if(ir === 'telas'){ await abrirTelas(); const b = document.getElementById('tl-buscar'); if(b){ b.value = q.get('q') || ''; renderTelas(); } }
+        else if(/^(vender|cobrar|comprar|pagar|stock|producir|difundir)$/.test(ir)){ try{ irInicio(); sbAbierto = 't_' + ir; pintarBarraLateral(); pintarCategoria('t_' + ir); } catch(e){} }
+        else if(ir === 'negocio'){ try{ abrirResultadoNegocio(); } catch(e){} }
+        else if(ir === 'fugas'){ try{ abrirFugas(); } catch(e){} }
+        else if(ir === 'iva'){ try{ abrirIVA(); } catch(e){} }
+        else if(ir === 'reclamos'){ try{ abrirReclamosML(); } catch(e){} }
         else if(ir === 'reventa'){ await abrirCostosReventa(); const b = document.getElementById('cr-buscar'); if(b){ b.value = q.get('sku') || ''; renderCostosReventa(); } }
       }, 300); } } catch(e){ console.error(e); }
   // las descripciones de lo que se fabrica se mantienen solas al dia (sin tener que tocar ningun boton)
@@ -22771,7 +22777,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v449';
+const APP_VERSION = '2026-10-02-v450';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
