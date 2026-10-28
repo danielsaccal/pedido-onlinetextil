@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v443</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v444</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -14596,7 +14596,7 @@ const DA_CANALES = ['Mercado Libre', 'Tienda Nube', 'Post 1:1', 'Post 4:5', 'His
 let daAgente = 'arte';
 // los agentes se abren en otra pestana, para seguir usando la app en esta
 const ES_PESTANA_AGENTE = new URLSearchParams(location.search).get('agente');
-function abrirAgenteEnPestana(agente, extra){ const q = new URLSearchParams({ agente, ...(extra || {}) }); const w = window.open(location.pathname + '?' + q.toString(), 'agente-' + agente); if(!w) return false; try{ w.focus(); } catch(e){} return true; }
+function abrirAgenteEnPestana(agente, extra){ const q = new URLSearchParams({ agente, ...(extra || {}), v: (typeof APP_VERSION !== 'undefined' ? APP_VERSION : Date.now()) }); const w = window.open(location.pathname + '?' + q.toString(), 'agente-' + agente); if(!w) return false; try{ w.focus(); } catch(e){} return true; }
 function recCuenta(c){ window.__recCta = c; const col = RZ_COLOR[c.toLowerCase()];
   document.querySelectorAll('.da-cta').forEach(x => { const on = x.dataset.c === c, cc = RZ_COLOR[x.dataset.c.toLowerCase()]; x.style.cssText = `border-color:${cc}!important;font-weight:700;${on ? `background:${cc}!important;color:#fff!important;` : `color:${cc}!important;`}`; });
   const t = document.getElementById('da-texto'); if(t){ t.style.background = col + '14'; t.style.borderColor = col; t.style.boxShadow = `inset 4px 0 0 ${col}`; }
@@ -14640,7 +14640,7 @@ async function recActualizarEstados(){ await (recCasos ? null : recCargarCasos()
     const venta = R.filter(r => r.precio > 0).reduce((a, r) => a + r.precio, 0), parcial = neg.some(r => /parcial/i.test(r.estado)), f0 = R.find(r => r.precio > 0) || R[0];
     nuevos.push({ id: Cta + '_' + op, d: { cuenta: Cta, venta: op, sku: f0.sku || '', texto: '', motivo: parcial ? 'reintegro parcial' : 'reembolso total', fecha: recISO(neg[neg.length - 1].fecha), estado: 'perdido', parcial, debitado: Math.round(-neg.reduce((a, r) => a + r.neto, 0)), monto: Math.round(venta), pruebas: '', apelado: false, origen: 'reporte', auto: 'tomado del reporte de ventas', creado: new Date().toISOString() } }); });
   for(let i = 0; i < nuevos.length; i += 20){ await Promise.all(nuevos.slice(i, i + 20).map(x => db.collection('reclamos').doc(x.id).set(x.d).then(() => { recCasos.push({ _id: x.id, ...x.d }); n++; }).catch(() => {}))); }
-  for(const c of abiertos){ const R = M[c.cuenta.toLowerCase() + '|' + c.venta]; if(!R) continue;
+  for(const c of abiertos){ const R = M[c.cuenta.toLowerCase() + '|' + c.venta] || M[c.cuenta.toLowerCase() + '|' + (window.__recPaq || {})[c.venta]]; if(!R) continue;
     const venta = R.filter(r => r.precio > 0).reduce((a, r) => a + r.precio, 0), neg = R.filter(r => r.neto < 0 && /cancel|devuelt|reembols|anulad/i.test(r.estado)), debit = Math.round(-neg.reduce((a, r) => a + r.neto, 0));
     const recup = c.estado === 'perdido' && c.debitado && debit < c.debitado ? c.debitado - debit : 0, d = {};
     if(!c.monto && venta) d.monto = Math.round(venta);
@@ -22643,7 +22643,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v443';
+const APP_VERSION = '2026-10-02-v444';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
@@ -22654,7 +22654,7 @@ async function revisarVersionNueva(){
       d.id = 'aviso-version';
       d.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:500;background:#3D2150;color:#fff;padding:12px 16px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.3);display:flex;gap:12px;align-items:center;font-size:14px;max-width:92vw;';
       d.innerHTML = '<span>Hay una versión nueva de la app.</span><button type="button" style="background:#F2D16B;border:none;border-radius:16px;padding:8px 14px;font-weight:700;cursor:pointer;">Actualizar</button>';
-      d.querySelector('button').onclick = () => { location.replace(location.pathname + '?v=' + Date.now() + location.hash); };
+      d.querySelector('button').onclick = () => { const q = new URLSearchParams(location.search); q.set('v', m[1] + '-' + Date.now()); location.replace(location.pathname + '?' + q.toString() + location.hash); };
       document.body.appendChild(d);
     }
   } catch(e){ /* sin conexion: se vuelve a intentar despues */ }
