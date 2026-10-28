@@ -1812,7 +1812,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v447</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v448</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6159,7 +6159,7 @@ const GRUPOS_INICIO = {
   ] },
   art: { lado: 'int', titulo: '📦 Artículos', titulosColumnas: ['Catálogo', 'Precios', 'Costos', 'Stock', 'Producción'], colorColumnas: { 2: '#2F7A47' }, columnas: [
     [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['🗂️ Ordenar categorías', 'abrirCategorias()'], ['📷 Fotos de productos', 'abrirActualizarFoto()'], ['🗂️ Subir fotos por SKU', 'abrirSubirFotosSku()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['🌐 Links de la web', 'abrirLinksWeb()']],
-    [['🏷️ Lista de precios', 'abrirListaPrecios()'], ['📋 Listas de precios por cliente', 'abrirListasPrecios()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']],
+    [['🏷️ Lista de precios', 'abrirListaPrecios()'], ['📋 Listas de precios por cliente', 'abrirListasPrecios()'], ['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🚨 Alertas de precio', 'abrirAlertasPrecio()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']],
     [['💲 Costos de productos (fabrico y reventa)', 'abrirCostosProductos()'], ['💰 Costos de confección', 'abrirConfeccion()']],
     [['📊 Stock y prioridades', 'abrirStock()'], ['📦 Faltantes de stock', 'abrirFaltantes()']],
     [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['📋 Nueva orden de trabajo', 'abrirAsistenteOT()'], ['📏 Trabajo a medida', 'abrirTrabajoMedida()'], ['🚚 Ingreso a los talleres', 'abrirEnviosTela()'], ['⏳ Tela pendiente de entrega', 'abrirDeudaTela()'], ['🏭 Productos en producción', 'abrirEnProduccion()'], ['📥 Entregas del taller', 'abrirIngresoTaller()'], ['📦 Historial de órdenes', 'abrirHistorialOT()'], ['🗂️ Historial de entregas', 'abrirHistorialEntregas()'], ['🔎 ¿Cuándo hice este SKU?', 'abrirHistorialSku()']],
@@ -6195,7 +6195,7 @@ const GRUPOS_INICIO = {
   f: { lado: 'ext', titulo: 'Catálogo', titulosColumnas: ['1 · Productos', '2 · Fotos y textos', '3 · Precios'], columnas: [
     [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['🗂️ Ordenar categorías', 'abrirCategorias()']],
     [['📷 Fotos de productos', 'abrirActualizarFoto()'], ['🗂️ Subir fotos por SKU', 'abrirSubirFotosSku()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['🌐 Links de la web', 'abrirLinksWeb()']],
-    [['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']]
+    [['📥 Importar precios (Excel)', 'abrirImportarExcel()'], ['📈 Aumentar precios masivamente', 'abrirAumentoMasivo()'], ['🚨 Alertas de precio', 'abrirAlertasPrecio()'], ['🗂️ Historial de precios', 'abrirHistorialPrecios()']]
   ] },
   g: { lado: 'ext', titulo: 'Producción', titulosColumnas: ['1 · Qué fabrico', '2 · Planificar', '3 · En el taller', '4 · Recibir', 'Consultas', '💲 Costos'], colorColumnas: { 5: '#2F7A47' }, columnas: [
     [['🧵 Telas', 'abrirTelas()'], ['✂️ Artículos y cortes', 'abrirArticulosCortes()'], ['💰 Costos de confección', 'abrirConfeccion()']],
@@ -6301,7 +6301,7 @@ const TAREAS = [
   ['t_cobrar', 'Cobrar', 'cash', [['Cobros', ["abrirCtaCte('recibos').then(", "abrirCtaCte('recibos')", 'abrirCtaCte()', "abrirCtaCte('cheques')"]]]],
   ['t_comprar', 'Comprar', 'buy', [['Comprobantes de compra', ["abrirCompras('compras').then(() => pvElegirProveedor('compra'", "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nc'", "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nd'", "abrirCompras('compras')"]], ['Proveedores', ["abrirCompras('proveedores').then(", 'abrirCompras()']], ['Talleres', ["abrirCompras('talleres')", 'abrirIngresoTaller()']]]],
   ['t_pagar', 'Pagar', 'pay', [['Pagos', ["abrirCompras('pagos').then(", "abrirCompras('pagos')"]], ['Caja y gastos', ['abrirTesoreria().then(() => tsFormCaja())', 'abrirGastos()', 'abrirTesoreria()']]]],
-  ['t_stock', 'Stock y productos', 'box', [['Stock', ['abrirStock()', 'abrirFaltantes()']], ['Productos', ['abrirNuevoProducto()', 'abrirEditarProducto()', 'abrirCategorias()', 'abrirActualizarFoto()', 'abrirSubirFotosSku()', 'abrirReventa()', 'abrirLinksWeb()']], ['Precios', ['abrirListaPrecios()', 'abrirImportarExcel()', 'abrirAumentoMasivo()', 'abrirHistorialPrecios()']], ['Costos', ['abrirCostosProductos()', 'abrirConfeccion()', 'abrirCalculadoraCostos()']]]],
+  ['t_stock', 'Stock y productos', 'box', [['Stock', ['abrirStock()', 'abrirFaltantes()']], ['Productos', ['abrirNuevoProducto()', 'abrirEditarProducto()', 'abrirCategorias()', 'abrirActualizarFoto()', 'abrirSubirFotosSku()', 'abrirReventa()', 'abrirLinksWeb()']], ['Precios', ['abrirListaPrecios()', 'abrirImportarExcel()', 'abrirAumentoMasivo()', 'abrirAlertasPrecio()', 'abrirHistorialPrecios()']], ['Costos', ['abrirCostosProductos()', 'abrirConfeccion()', 'abrirCalculadoraCostos()']]]],
   ['t_producir', 'Producir', 'cut', [['Qué fabrico', ['abrirTelas()', 'abrirArticulosCortes()']], ['Planificar', ['abrirAsistenteOT()', 'abrirTrabajoMedida()']], ['En el taller', ['abrirEnviosTela()', 'abrirDeudaTela()', 'abrirEnProduccion()', 'abrirIngresoTaller()']], ['Consultas', ['abrirHistorialOT()', 'abrirHistorialEntregas()', 'abrirHistorialSku()']]]],
   ['t_difundir', 'Difundir', 'mega', [['Catálogo a clientes', ['abrirCompartirRubro()', 'abrirArmarCatalogo()', 'abrirEnviarCatalogo()']], ['Videos', ['abrirCrearVideo()', 'abrirCompartirVideoProducto()']], ['Redes y anuncios', ['abrirNuevoIngreso()', 'abrirAnuncio()', 'abrirDirectorArte()']], ['Fotos de producto', ['abrirPromptGemini()', 'abrirPromptGeminiLote()']]]],
   ['t_numeros', 'Números', 'chart', [['Resultados', ['abrirResultadoNegocio()', 'abrirFugas()', 'abrirRankings()', 'abrirResultadosML()', 'abrirVentasML()']], ['Impuestos', ['abrirIVA()', 'abrirLibroIVA()', 'abrirRetenciones()', 'abrirCierreMes()', 'abrirPuntosVentaFiscales()']], ['Auditoría', ['abrirAuditor()']]]],
@@ -6442,6 +6442,7 @@ async function dashDatos(forzar){
     V.informes = I;
     const FS = fsa && fsa.exists ? fsa.data() : {}; let u6 = 0, c6 = 0, cobro = ''; Object.values(FS).forEach(x => { (x.filas || []).forEach(r => { if(r.dias >= 180){ u6 += +r.u || 0; c6 += +r.cargo || 0; } }); cobro = cobro || x.cobro || ''; });
     if(u6) V.hoy.push([`🏬 ${u6} unidades en Full con más de 6 meses · ${formatPrice(c6)}${cobro ? ' al ' + cobro : ''}`, 'abrirFugas()', false, 'stock']);
+    await t(cargarMargenes()); const ap = alertasPrecio(); if(ap.length) V.hoy.push([`🚨 ${ap.length} SKU con precio por debajo del margen mínimo`, 'abrirAlertasPrecio()', false, 'costos']);
   } catch(e){ console.error(e); } }
   dashCache = V; dashCacheT = Date.now(); return V;
 }
@@ -13652,6 +13653,32 @@ async function fgSubirFull(inp, cta){ const f = inp.files && inp.files[0]; if(!f
     await db.collection('config').doc('full_stock_antiguo').set({ [cta]: d }, { merge: true }); await db.collection('config').doc('informes').set({ ['full_' + cta.toLowerCase()]: d.fecha }, { merge: true });
     if(fgDatos){ fgDatos.full = fgDatos.full || {}; fgDatos.full[cta] = d; } try{ procesando.fin && procesando.fin(); } catch(e){} dsToast(`Stock antiguo de Full · ${cta}: ${filas.length} renglones, ${formatPrice(d.total)}${cobro ? ' al ' + cobro : ''}`, { ms: 7000 }); fgPintar(); dashCache = null;
   } catch(e){ try{ procesando.fin && procesando.fin(); } catch(x){} alert('No se pudo leer el reporte: ' + e.message); } inp.value = ''; }
+// ===== Alertas de precio: precio de lista por debajo del costo + margen minimo (reventa 20 %, fabricacion 30 %) =====
+let MARGEN_MIN = { reventa: 20, fabricacion: 30 };
+async function cargarMargenes(){ try{ const d = await db.collection('config').doc('margenes').get(); if(d.exists) MARGEN_MIN = { ...MARGEN_MIN, ...d.data() }; } catch(e){} return MARGEN_MIN; }
+function alertasPrecio(){ const L = []; (CATALOGO || []).forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => { const S = String(v.sku || '').toUpperCase(); if(!S) return;
+    const precio = parsePrice(v.precio); if(!(precio > 0)) return; let costo = null; try{ costo = costoVentaSku(S); } catch(e){} if(!(costo > 0)) return;
+    const fab = esFabricadoSku(S, p.nombre), m = (fab ? +MARGEN_MIN.fabricacion : +MARGEN_MIN.reventa) / 100, min = costo * (1 + m);
+    if(precio < min - 0.5) L.push({ S, p, v, cat: c.categoria, costo, precio, min, nuevo: Math.ceil(min / 10) * 10, fab, margen: (precio / costo - 1) * 100 }); }))); return L.sort((a, b) => a.margen - b.margen); }
+let apSel = new Set();
+async function abrirAlertasPrecio(){ await cargarMargenes(); apSel = new Set(); document.getElementById('pub-modal').style.display = 'block'; { const cj = document.getElementById('pub-caja'); if(cj) cj.style.maxWidth = '1000px'; } document.getElementById('pub-titulo').textContent = '🚨 Alertas de precio'; apPintar(); }
+function apPintar(){ const box = document.getElementById('pub-cont'); if(!box) return; const L = alertasPrecio();
+  box.innerHTML = `<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:.86rem;"><span>Margen mínimo sobre el costo:</span><label>Reventa <input type="number" min="0" step="1" value="${MARGEN_MIN.reventa}" style="width:64px;padding:4px 6px;border:1px solid var(--line);border-radius:7px;" onchange="apMargen('reventa', this.value)"> %</label><label>Fabricación <input type="number" min="0" step="1" value="${MARGEN_MIN.fabricacion}" style="width:64px;padding:4px 6px;border:1px solid var(--line);border-radius:7px;" onchange="apMargen('fabricacion', this.value)"> %</label><span class="note" style="margin:0 0 0 auto;">Precio de la lista general contra el costo actual (los dos con IVA), por unidad de venta.</span></div>
+    ${L.length ? `<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;"><b style="color:#A6432F;">${L.length} SKU por debajo del mínimo</b><button type="button" class="btn-mini" onclick="L_=alertasPrecio();apSel=new Set(L_.map(x=>x.S));apPintar()">Marcar todos</button><button type="button" class="btn-mini" onclick="apSel=new Set();apPintar()">Ninguno</button><button type="button" class="btn btn-gold" style="width:auto;margin-left:auto;" ${apSel.size ? '' : 'disabled'} onclick="apSubir()">Subir ${apSel.size || ''} al precio mínimo</button></div>
+    <div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;max-height:58vh;overflow-y:auto;"><div style="display:grid;grid-template-columns:28px 1fr 90px 100px 100px 100px 80px;gap:8px;padding:8px 12px;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:#A89E90;font-weight:700;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;"><span></span><span>SKU · producto</span><span>Tipo</span><span style="text-align:right;">Costo</span><span style="text-align:right;">Precio actual</span><span style="text-align:right;">Precio mínimo</span><span style="text-align:right;">Margen</span></div>
+      ${L.map(x => `<div style="display:grid;grid-template-columns:28px 1fr 90px 100px 100px 100px 80px;gap:8px;padding:7px 12px;border-bottom:1px solid #F3EFE8;font-size:.82rem;align-items:center;"><input type="checkbox" ${apSel.has(x.S) ? 'checked' : ''} onchange="this.checked?apSel.add('${x.S}'):apSel.delete('${x.S}');apPintar()"><div style="min-width:0;"><b>${escaparHtml(x.S)}</b><div style="font-size:.72rem;color:#A89E90;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escaparHtml(x.p.nombre + (x.v.desc ? ' · ' + x.v.desc : ''))}</div></div><span style="font-size:.76rem;color:#6B6258;">${x.fab ? 'Fabricación' : 'Reventa'} · ${x.fab ? MARGEN_MIN.fabricacion : MARGEN_MIN.reventa} %</span><span style="text-align:right;">${formatPrice(x.costo)}</span><span style="text-align:right;color:#A6432F;font-weight:700;">${formatPrice(x.precio)}</span><span style="text-align:right;">${formatPrice(x.nuevo)}</span><span style="text-align:right;color:${x.margen < 0 ? '#A6432F' : '#9A7B12'};font-weight:700;">${x.margen.toLocaleString('es-AR', { maximumFractionDigits: 1 })} %</span></div>`).join('')}</div>
+    <p class="note" style="text-align:left;margin-top:8px;">"Subir al precio mínimo" lleva el precio de lista al costo + el margen mínimo, redondeado hacia arriba a $ 10. Queda en el historial de precios y se puede volver atrás desde ahí.</p>` : '<p class="empty-msg" style="color:#2F7A47;">✓ Ningún SKU por debajo del margen mínimo.</p>'}`; }
+async function apMargen(k, v){ MARGEN_MIN[k] = Math.max(0, +v || 0); try{ await db.collection('config').doc('margenes').set({ [k]: MARGEN_MIN[k] }, { merge: true }); } catch(e){} apSel = new Set(); apPintar(); dashCache = null; }
+async function apSubir(){ const L = alertasPrecio().filter(x => apSel.has(x.S)); if(!L.length) return;
+  if(!await dsConfirm(`¿Subir ${L.length} precio${L.length > 1 ? 's' : ''} de lista al mínimo?\nEjemplo: ${L[0].S} de ${formatPrice(L[0].precio)} a ${formatPrice(L[0].nuevo)}.`)) return;
+  const porProd = new Map(); L.forEach(x => { if(!porProd.has(x.p)) porProd.set(x.p, []); porProd.get(x.p).push(x); }); let ok = 0; const mal = [];
+  for(const [producto, cambios] of porProd){ const ant = cambios.map(c => c.v.precio), nue = cambios.map(c => normalizarPrecioAArgentino(c.nuevo)); cambios.forEach((c, i) => { c.v.precio = nue[i]; });
+    try{ if(producto._editKey && String(producto._editKey).startsWith('nuevo-')) await db.collection('productos_nuevos').doc(producto._docId).update({ variantes: producto.variantes });
+      else await db.collection('productos_editados').doc(producto._editKey).set({ nombre: producto.nombre, composicion: producto.composicion, variantes: producto.variantes, metros: producto.metros || null }, { merge: true });
+      cambios.forEach((c, i) => registrarCambioPrecio(c.v.sku, ant[i], nue[i])); ok += cambios.length; }
+    catch(e){ cambios.forEach((c, i) => { c.v.precio = ant[i]; }); mal.push(producto.nombre); } }
+  apSel = new Set(); apPintar(); dashCache = null; try{ renderCatalogo((document.getElementById('buscador') || {}).value || ''); } catch(e){}
+  dsToast(mal.length ? `Se subieron ${ok}; no se pudieron guardar: ${mal.join(', ')}` : `Listo: ${ok} precio${ok > 1 ? 's' : ''} subido${ok > 1 ? 's' : ''} al mínimo`, { ms: 7000 }); }
 // ===== Bosquejo de medidas por SKU (lo dibuja la app, sin IA): ultima imagen de cada SKU =====
 // Los productos de fabricacion propia tienen la medida de CORTE: se muestra la TERMINADA (corte - confeccion).
 const CONFECCION = { cortina: { ancho: 5, alto: 15 }, funda: { ancho: 2, largo: 7 }, plana: { ancho: 2, largo: 10 }, mantel: { ancho: 2, largo: 2 }, otro: { ancho: 2, largo: 2 } };
@@ -14240,6 +14267,7 @@ function permisoDeAccion(f){
   if(/abrirReclamosML/.test(s)) return null; // todos los usuarios
   if(/abrirSubirFotosSku/.test(s)) return permisoDeAccion('abrirActualizarFoto()');
   if(/abrirFugas/.test(s)) return permisoDeAccion('abrirResultadosML()');
+  if(/abrirAlertasPrecio/.test(s)) return permisoDeAccion('abrirAumentoMasivo()');
   if(/abrirUsuarios|abrirCopiaSeguridad/.test(s)) return 'dueno';
   if(/abrirResultadosML|abrirCalculadoraML/.test(s)) return 'resultadosML';
   if(/abrirFacturas/.test(s)) return 'facturas';
@@ -22739,7 +22767,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v447';
+const APP_VERSION = '2026-10-02-v448';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
