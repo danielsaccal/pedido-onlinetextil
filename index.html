@@ -1816,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v459</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 29/10 v460</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2405,7 +2405,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <div id="cr-import" style="display:none;"></div>
       <details id="cr-kits" style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;background:#FBF9F4;">
         <summary style="cursor:pointer;font-weight:700;color:var(--purple);">🧩 Juegos armados con otros SKU <span class="note" id="cr-kits-n" style="margin:0;"></span></summary>
-        <p class="note" style="text-align:left;margin:6px 0;">Ej: <b>GR140J = GR140B + GR140C</b> (toalla + toallón). El costo del juego es la suma de sus partes, y se actualiza solo. Si lleva 2 de algo: <b>GR140B x2 + GR140C</b>.</p>
+        <p class="note" style="text-align:left;margin:6px 0;">Ej: <b>GR140J = GR140B + GR140C</b> (toallón + toalla). El costo del juego es la suma de sus partes, y se actualiza solo. Si lleva 2 de algo: <b>GR140B x2 + GR140C</b>.</p>
         <div id="cr-kits-lista"></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center;">
           <input id="kit-sku" placeholder="SKU del juego" style="width:130px;padding:8px;border:1px solid var(--line);border-radius:10px;text-transform:uppercase;">
@@ -13430,8 +13430,28 @@ async function rmFacturar(id){
     const t = document.getElementById('pub-titulo'); if(t) t.textContent = '➕ Factura de venta · remito R ' + r.numero; }, 80);
 }
 // ===== Prompt para Gemini con plantilla fija (sin IA, sin creditos): 3 imagenes por SKU =====
+// juego toalla + toallon: medidas desde la descripcion ("Set: Toallon 150x80 + Toalla 50x85") o desde las partes del juego (Costos -> juego armado)
+function pgDims(t){ const m = String(t || '').replace(/,/g, '.').match(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)/); return m ? [+m[1], +m[2]] : null; }
+function pgSetToallas(S, r){
+  const tx = normBusqueda(r ? (r.variante.desc || '') + ' ' + r.producto.nombre : ''), mb = tx.match(/toallon\s*(\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?)/), mc = tx.match(/toalla\b\s*(\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?)/);
+  let b = mb ? pgDims(mb[1]) : null, c = mc ? pgDims(mc[1]) : null;
+  if(!(b && c) && typeof kitsDatos !== 'undefined' && kitsDatos && kitsDatos[String(S).toUpperCase()]){
+    partesKit(kitsDatos[String(S).toUpperCase()]).forEach(p => { const q = buscarProductoPorSku(p.sku); if(!q) return; const d = normBusqueda((q.variante.desc || '') + ' ' + q.producto.nombre), dm = pgDims(q.variante.desc || '');
+      if(!dm) return; if(/toallon/.test(d) && !b) b = dm; else if(/toalla\b/.test(d) && !c) c = dm; });
+  }
+  if(!(b && c)) return null;
+  const bL = Math.max(...b), bW = Math.min(...b), cL = Math.max(...c), cW = Math.min(...c);
+  const bw = Math.round(bL / 3), bd = Math.round(bW / 2); let hw = Math.round(cL / 2), hl = 4, tercios = false;
+  if(hw > bw * 0.92){ hw = Math.round(cL / 3); hl = 6; tercios = true; }
+  return { b: `${b[0]} × ${b[1]} cm`, c: `${c[0]} × ${c[1]} cm`, bw, bd, hw, hd: Math.round(cW / 2), hl, tercios, pct: Math.round(hw / bw * 100) };
+}
 function tipoProductoPG(S){
-  const r = buscarProductoPorSku(S); if(!r) return null; const cat = normBusqueda((CATALOGO[r.ci] || {}).categoria || ''), n = normBusqueda(r.producto.nombre + ' ' + cat);
+  let r = buscarProductoPorSku(S);
+  if(!r && typeof kitsDatos !== 'undefined' && kitsDatos && kitsDatos[String(S).toUpperCase()]){ // juego que solo existe como juego armado: se arma con sus partes
+    const ps = partesKit(kitsDatos[String(S).toUpperCase()]).map(p => buscarProductoPorSku(p.sku)).filter(Boolean);
+    if(ps.length){ const st = pgSetToallas(S, null); r = Object.assign({}, ps[0], { variante: { sku: String(S).toUpperCase(), desc: st ? `Set: Toallón ${st.b} + Toalla ${st.c}` : ps.map(q => q.variante.desc || '').join(' + ') } }); }
+  }
+  if(!r) return null; const cat = normBusqueda((CATALOGO[r.ci] || {}).categoria || ''), n = normBusqueda(r.producto.nombre + ' ' + cat);
   const nn = normBusqueda(r.producto.nombre);
   const t = (/\btelas?\b/.test(cat) || r.producto.metros) && !/mantel|cortina/.test(nn) ? 'tela'
     : /funda/.test(nn) && /almohad/.test(nn) && !/juego/.test(nn) ? 'funda'
@@ -13448,7 +13468,8 @@ function tipoProductoPG(S){
     : /sabana|juego/.test(n) ? 'sabanas'
     : /toalla|toallon|toallita|bano/.test(n) ? 'toalla'
     : /almohad/.test(n) ? 'almohada' : /cortina/.test(n) ? 'cortina' : 'otro';
-  return { r, t, blanco: /blanc/.test(n) };
+  const setT = pgSetToallas(S, r);
+  return { r, t: setT ? 'toalla' : t, blanco: /blanc/.test(n), setT };
 }
 const ESCENA_USO = [
   [/sabana/, 'a made bed with a fitted sheet, a flat sheet folded back at the head and a pillowcase, all sewn from this fabric'],
@@ -13497,7 +13518,7 @@ For all images: no text, no logos, no watermark, no props over the fabric.${anch
 function promptGemini(S, canal){
   const x = tipoProductoPG(S); if(!x) return '';
   if(x.t === 'tela') return promptTela(S, canal, x);
-  const { r, t, blanco } = x, nombre = r.producto.nombre, medida = r.variante.desc || '', comp = r.producto.composicion || '';
+  const { r, t, blanco, setT } = x, nombre = r.producto.nombre, medida = r.variante.desc || '', comp = r.producto.composicion || '';
   const tn = canal === 'tn', px = tn ? '1024x1024' : '2000x2000', fondo = tn ? 'pure white #FFFFFF (or light cream #F5F3EF)' : 'pure white seamless background #FFFFFF';
   let prod = { funda: 'pillowcase', protector: 'mattress protector', delantal: 'apron', cortinabano: 'shower curtain', alfombra: 'bath mat', ajustable: 'fitted sheet', mantel: 'tablecloth', cubrecama: 'bedspread', sabanas: 'sheet set', toalla: 'towel', repasador: 'kitchen towel', bata: 'bathrobe', almohada: 'pillow', cortina: 'curtain', otro: 'textile product' }[t];
   // juegos de sabanas: 1 1/2 plaza = 1 funda (3 piezas); 2 1/2, queen y king = 2 fundas (4 piezas)
@@ -13514,7 +13535,7 @@ function promptGemini(S, canal){
     ajustable: `ONLY the same fitted sheet (${medida}) fitted tightly on a bare mattress of that size, the elastic corners wrapping the mattress, smooth and taut, no flat sheet, no pillowcases, no duvet, no other bedding. A plain pillow without case may be omitted. View from the foot of the bed at about 30°, so the corner and the mattress height are visible.`,
     sabanas: `The same sheet set (${medida}) on a made ${dosFundas ? 'double' : 'single'} bed of that size: fitted sheet on the mattress, flat sheet folded back about 30 cm at the head, ${dosFundas ? 'TWO pillows in the two matching pillowcases' : 'ONE pillow in the matching pillowcase'}. Neat hotel-style making, smooth with soft natural folds. View from the foot of the bed at about 30°.`,
     cubrecama: `In this image the bedspread must be FULLY UNFOLDED, laid over a bed of the right size (${medida}), covering the bed and hanging naturally on the sides, with matching pillow shams if the set includes them. View from the foot of the bed at about 30°.`,
-    toalla: chica ? `The same small towel (${medida}) shown at its REAL small size on a bathroom counter next to the sink: one unit laid OPEN and flat showing its full design, plus a few more units folded in a small stack beside it; a bar of soap or a hand nearby as a size reference. Do not hang it on a towel bar.` : `The same towel (${medida}) hanging OPEN on a simple towel bar in a clean bathroom, showing its full size, with natural soft folds.`,
+    toalla: setT ? `The same towel set in a clean bathroom: the bath towel (${setT.b}) hanging OPEN on a towel bar showing its full size, and the hand towel (${setT.c}) neatly folded on a shelf or on the counter next to the sink. Both with exactly the same border as in the photo.` : chica ? `The same small towel (${medida}) shown at its REAL small size on a bathroom counter next to the sink: one unit laid OPEN and flat showing its full design, plus a few more units folded in a small stack beside it; a bar of soap or a hand nearby as a size reference. Do not hang it on a towel bar.` : `The same towel (${medida}) hanging OPEN on a simple towel bar in a clean bathroom, showing its full size, with natural soft folds.`,
     repasador: `The same kitchen towel (${medida}) hanging OPEN from an oven handle or a hook in a clean kitchen, showing its full size.`,
     bata: `The same bathrobe hanging open on a simple hanger or hook in a clean bathroom, showing its full shape, sleeves and length.`,
     almohada: `The same pillow on a neatly made bed, showing its real size and shape.`,
@@ -13537,19 +13558,20 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
   const pc = (window.__pgColores || {})[String(S).toUpperCase()] || 'foto', numTxt = { 2: 'TWO', 3: 'THREE', 4: 'FOUR', 6: 'SIX', 10: 'TEN', 12: 'TWELVE', 24: 'TWENTY-FOUR' }[packN] || String(packN);
   const pack = packN > 1 ? ` SALES UNIT: this product is sold as a pack of ${packN} units${packN === 12 ? ' (one dozen)' : packN === 6 ? ' (half a dozen)' : ''}. In IMAGE 1, use the photo only as an exact reference of ONE unit (same fabric, size, finishing) and show EXACTLY ${numTxt} (${packN}) units, all the same product and size, neatly arranged together (folded and stacked or fanned out in tidy rows) so all ${packN} can be counted: exactly ${packN}, no more, no less. ${pc === 'blancas' ? `All ${packN} units are natural clean WHITE (#FFFFFF), identical.` : pc === 'surtidas' ? `The ${packN} units are in ASSORTED colors: ${packN} clearly different solid colors chosen at random (no two alike, no white). Each unit is ONE single solid color, never two-tone, striped in other colors or color-blocked; only the design lines of the photo (in white) are kept. Each unit keeps exactly the same design and size as the photo.` : `The units have exactly the colors and prints shown in the photo.`} In IMAGE 2 show several units in use (not just one).` : '';
   // ===== Armado final: un mensaje por imagen, ordenado y corto (Gemini trabaja mejor de a una) =====
-  const SEP = '\n\n──────────\n\n', esToalla = /toall|rizo|felpa|toallon/.test(normBusqueda(nombre + ' ' + comp));
+  const SEP = '\n\n──────────\n\n', esToalla = t === 'toalla' || /toall|rizo|felpa|toallon/.test(normBusqueda(nombre + ' ' + comp));
   const fmt = (extra, escenaUso) => escenaUso ? `FORMAT: square 1:1, ${px}. Realistic photo of the real scene (not a white background), natural soft daylight, the product as the clear protagonist. ${extra || 'No text, no logos, no watermark.'}` : `FORMAT: square 1:1, ${px}. ${fondo === 'pure white seamless background #FFFFFF' ? 'Pure white seamless background (#FFFFFF)' : 'Background: ' + fondo}, soft diffused studio light, no hard shadows, soft contact shadow, product centered filling 85–95% of the frame. ${extra || 'No text, no logos, no watermark, no props.'}`;
-  const tamano = dimsM.length ? `${dimsM[0]} × ${dimsM[1]} cm${chica ? (ladoMax >= 25 ? ', about the size of an A4 sheet of paper' : ', smaller than an adult hand') : ''}` : '';
+  const tamano = setT ? `bath towel ${setT.b} and hand towel ${setT.c}` : dimsM.length ? `${dimsM[0]} × ${dimsM[1]} cm${chica ? (ladoMax >= 25 ? ', about the size of an A4 sheet of paper' : ', smaller than an adult hand') : ''}` : '';
   if(t === 'cubrecama'){ const nq = normBusqueda(nombre); prod = /frazad|polar|manta|plaid|frazabella/.test(nq) ? 'blanket' : /edredon|acolchado|nordic|duvet/.test(nq) ? 'comforter' : /colcha|pique|cover/.test(nq) ? 'bedspread' : 'quilt'; }
   const CONF_FUNDA = 'open end finished with a simple folded hem about 4–5 cm wide, held by ONE straight line of stitching (single topstitch) along the inner edge of the hem; NO flap, NO envelope, NO buttons, NO zipper, NO piping; the other three sides are closed with plain seams on the inside (not visible), with sharp straight edges';
   const conFunda = t === 'funda' || (t === 'sabanas' && fab);
   const reglas = [
     `PRODUCT: ${nombre} — ${medida}${comp ? ' — ' + comp : ''}.`,
     `The attached photo shows the REAL product. In every image keep from it:`,
-    `• COLOR: exactly as in the photo, corrected to neutral daylight; never warmer, yellower or duller. White stays pure white (#FFFFFF), never cream or ivory.`,
+    `• COLOR: exactly as in the photo, corrected to neutral daylight; never warmer, yellower, duller, lighter or darker. White stays pure white (#FFFFFF), never cream or ivory.`,
     `• FABRIC: ${esToalla ? 'terry loop pile (soft cotton loops), never waffle or flat weave' : 'the same weave and texture as in the photo, never another weave'}.`,
     `• DESIGN: the same lines, stripes, borders and prints, in the same places, same direction and thickness; nothing added, removed or moved; no invented bands, stitching or fringes.`,
     `• REALISM: the product must look exactly as it really is — same quality, thickness and finishing; never embellish it or make it look more luxurious than it is.`,
+    esToalla ? `• BORDER: study the border of the photo from the towel end inward and copy it element by element — number of bands, width of each band, terry gaps between bands, end hem and texture of each band (ribbed, flat, jacquard, lines). Same count and same relative widths; never merge, add, remove or simplify bands.` : '',
     tamano ? `• REAL SIZE: ${tamano}; keep this size relative to ${refTam}.` : '',
     conFunda ? `• PILLOWCASE CONSTRUCTION (always, even if the photo shows only the fabric): ${CONF_FUNDA}.` : '',
     packN > 1 ? `• SALES UNIT: pack of ${packN} units${packN === 12 ? ' (one dozen)' : ''}. ${/^lista:/.test(pc) ? `Use ONLY these colors, ${(() => { const cs = pc.slice(6).split(',').map(s => s.trim()).filter(Boolean); const rep = Math.max(1, Math.floor(packN / cs.length)); return cs.length ? `${rep} unit${rep > 1 ? 's' : ''} of each: ${cs.join(', ')}` : ''; })()} — no other colors; each unit ONE solid color.` : pc === 'blancas' ? `All ${packN} units are pure white and identical.` : pc === 'surtidas' ? `The ${packN} units are in ${packN} clearly different solid colors (no white, no two alike); each unit is ONE solid color, never two-tone; the design lines stay as in the photo.` : 'The units have the colors and prints of the photo.'}` : ''
@@ -13577,6 +13599,15 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
     `The quilting or stitching pattern exactly as in the photo.`,
     conFundas ? `${nf === 2 ? 'Two pillow shams' : 'One pillow sham'} of the set lying flat on top${nf === 2 ? ', with a slight offset between them' : ''}, same color and stitching, flat flange border visible, rotated about 8–10° counterclockwise, shifted toward the upper-left, slightly overhanging the back edge, covering about 70% of the top surface. Empty and flat, no pillow inside.` : `No pillow shams, no pillows, nothing on top.`,
     `Camera: front view, elevated about 30–35°, centered. Soft light from the upper left.`]]); }
+  else if(setT) L.push(['MAIN PHOTO', [
+    `A towel set: EXACTLY TWO pieces — one bath towel at the bottom and one hand towel on top. No other towels.`,
+    `Bath towel (${setT.b}): folded in half lengthwise, then in thirds → a compact rectangle about ${setT.bw} cm wide × ${setT.bd} cm deep, 6 layers.`,
+    `Hand towel (${setT.c}): folded in half lengthwise, then ${setT.tercios ? 'in thirds' : 'in half'} → about ${setT.hw} cm wide × ${setT.hd} cm deep, ${setT.hl} layers; visibly shorter (about ${setT.pct}% of the bath towel width) and shallower.`,
+    `The hand towel rests on top, aligned with the LEFT edge of the bath towel, centered in depth. Soft rounded folded edges facing left; the border visible on the RIGHT end of the front face of both towels.`,
+    `Real terry thickness: soft, not exaggerated.`,
+    `If the photo shows only one of the two towels, the other one is the same product line: same color, same terry and the SAME border with the same real width in cm (not scaled down).`,
+    `If a second photo with a fold reference is attached, copy ONLY its fold and arrangement — never its color, border, tags, labels or brand.`,
+    `Camera: low three-quarter view, about 15° above the product, centered. Soft light from the left.`]]);
   else if(t === 'funda' && packN > 1 && packN <= 4) L.push(['MAIN PHOTO', [`EXACTLY ${packN === 2 ? 'TWO' : packN} identical pillowcases — no sheets, no other pieces, no pillow inside.`, `Each one folded neatly into the same flat rectangle, like linen in a closet: straight sharp edges, clean folds, empty and completely flat.`, `Stacked one on top of the other, the upper one slightly shifted back so all ${packN} are clearly visible and can be counted; on each one the 4–5 cm hem of the open end with its single stitch line is visible on the same side.`, `Count before finishing: exactly ${packN} pillowcases. Front view, slightly elevated.`]]);
   else if(t === 'funda' && packN <= 1) L.push(['MAIN PHOTO', [`ONE single pillowcase only — no sheets, no other pieces, no pillow inside.`, `Laid FLAT and UNFOLDED on the background, so it is clearly recognizable as a pillowcase: a long rectangle in its real proportion${dimsM.length ? ` (${dimsM[0]} × ${dimsM[1]} cm, ${(Math.max(...dimsM) / Math.min(...dimsM)).toFixed(1).replace('.', ',')} times longer than wide)` : ''}, horizontal.`, `The OPEN END on the right, slightly opened so the opening can be seen: the 4–5 cm hem band with its single straight stitch line clearly visible; no flap. The other three sides closed, straight and clean (seams inside, not visible).`, `Smooth and empty, no volume, no wrinkles except a few soft natural ones.`, `View from above, slightly angled.`]]);
   else if(packN > 1) L.push(['MAIN PHOTO', [`Use the photo as the exact reference of ONE unit.`, `Show EXACTLY ${packN} identical units: one laid OPEN and flat showing its full design, and the other ${packN - 1} folded in half and neatly stacked in ${packN >= 10 ? 'two piles' : 'one pile'} beside it, with the same lines visible on each fold.`, `SIZE CHECK: all units are the same size${dimsM.length ? ` (${dimsM[0]} × ${dimsM[1]} cm)` : ''}. The open unit is EXACTLY as wide as a folded one and EXACTLY twice its length (it is the same piece unfolded); it must never look bigger, like a bath towel.`, `Count them before finishing: exactly ${packN}.`]]);
@@ -13603,7 +13634,7 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
   return L.map(([tit, lin, ext, uso], k) => `Generate ONE image (image ${k + 1} of ${N}). Attach the photo of the real product to this message if it is not already in this chat.\n\n${reglas}\n\nIMAGE ${k + 1} of ${N} – ${tit}\n${lin.filter(Boolean).join('\n')}\n\n${fmt(ext, uso)}`).join(SEP);
 }
 function copiarTexto(t, btn){ navigator.clipboard.writeText(t).then(() => { if(btn){ const o = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(() => btn.textContent = o, 1500); } }).catch(() => prompt('Copie el texto:', t)); }
-async function abrirPromptGemini(S){ await cargarDatosFabricacion(); try{ if(telasDatos === null) await cargarTelas(); } catch(e){}
+async function abrirPromptGemini(S){ await cargarDatosFabricacion(); try{ if(telasDatos === null) await cargarTelas(); } catch(e){} try{ if(kitsDatos === null) await cargarKits(); } catch(e){}
   pvModal('📸 Prompt para Gemini', `<input id="pg-s" data-ac="sku" value="${escapeAttr(S || '')}" placeholder="SKU o nombre del producto" autocomplete="off" oninput="pgPintar()" onchange="pgPintar()" style="padding:9px;border:1px solid var(--line);border-radius:10px;width:100%;box-sizing:border-box;">
     <div style="display:flex;gap:6px;margin:8px 0;"><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pg-c" value="ml" checked onchange="pgPintar()"> Mercado Libre</label><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pg-c" value="tn" onchange="pgPintar()"> Tienda Nube</label></div>
     <div id="pg-res"></div>`);
@@ -13618,7 +13649,7 @@ function pgPintar(){ const S = (document.getElementById('pg-s').value || '').tri
   let esPack = false; try{ esPack = cantUnidadVenta(unidadVentaSku(S) || '') > 1 || /\bx\s*\d{1,2}\b|docena/.test(normBusqueda(rr.producto.nombre + ' ' + (rr.variante.desc || ''))); } catch(e){}
   const pcv = (window.__pgColores || {})[S] || 'foto';
   const selColores = esPack ? `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:0 0 8px;font-size:.85rem;"><b>Unidades del pack:</b>${[['foto', 'Como en la foto'], ['blancas', 'Blancas'], ['surtidas', 'Surtidas']].map(([v, tx]) => `<button type="button" class="btn-mini" style="${pcv === v ? 'border-color:var(--purple);font-weight:700;' : ''}" onclick="pgSetColores('${S}','${v}')">${tx}</button>`).join('')}<input id="pg-clista" placeholder="o escriba los colores: blanco, amarillo patito, azul francia…" value="${/^lista:/.test(pcv) ? escapeAttr(pcv.slice(6)) : ''}" style="flex:1;min-width:220px;padding:5px 8px;border:1px solid ${/^lista:/.test(pcv) ? 'var(--purple)' : 'var(--line)'};border-radius:8px;" onchange="pgSetColores('${S}', this.value.trim() ? 'lista:' + this.value.trim() : 'foto')"></div>` : '';
-  box.innerHTML = t ? `${selPanos}${selColores}<p class="note" style="text-align:left;margin:0 0 6px;">En Gemini: chat nuevo → suba UNA foto real del producto → pegue el texto.${esFabricadoSku(S, rr ? rr.producto.nombre : '') ? ' · Fabricación propia: la imagen 4 es la bolsa LEXINGTON (con la descripción completa de la bolsa; no hace falta otra foto).' : ''}</p><textarea id="pg-txt" oninput="window.__pgTxt=this.value" style="width:100%;height:240px;box-sizing:border-box;font-size:.78rem;border:1px solid var(--line);border-radius:10px;padding:8px;">${escaparHtml(t)}</textarea>${(() => { const P = pgPartes(t); return P.length > 1 ? `<div style="margin-top:8px;"><b style="font-size:.82rem;">Gemini: pida de a UNA imagen, en el mismo chat</b><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${P.map((x, i) => `<button type="button" class="btn ${i === 0 ? 'btn-gold' : 'btn-ghost'}" style="width:auto;" onclick="copiarTexto(pgPartes(window.__pgTxt)[${i}], this)">${i + 1}. Copiar imagen ${i + 1}${i === 0 ? ' (con la foto)' : ''}</button>`).join('')}</div><p class="note" style="text-align:left;margin:6px 0 0;">1) Chat nuevo, suba la foto y pegue la imagen 1. 2) Cuando la termine, pegue la imagen 2 en el mismo chat, y así.</p></div>` : ''; })()}
+  box.innerHTML = t ? `${selPanos}${selColores}<p class="note" style="text-align:left;margin:0 0 6px;">En Gemini: chat nuevo → suba UNA foto real del producto → pegue el texto.${(() => { const xx = tipoProductoPG(S); return xx && xx.setT ? ' · Juego toalla + toallón: alcanza con la foto de una pieza; si quiere, sume una 2.ª foto con el doblez de referencia.' : ''; })()}${esFabricadoSku(S, rr ? rr.producto.nombre : '') ? ' · Fabricación propia: la imagen 4 es la bolsa LEXINGTON (con la descripción completa de la bolsa; no hace falta otra foto).' : ''}</p><textarea id="pg-txt" oninput="window.__pgTxt=this.value" style="width:100%;height:240px;box-sizing:border-box;font-size:.78rem;border:1px solid var(--line);border-radius:10px;padding:8px;">${escaparHtml(t)}</textarea>${(() => { const P = pgPartes(t); return P.length > 1 ? `<div style="margin-top:8px;"><b style="font-size:.82rem;">Gemini: pida de a UNA imagen, en el mismo chat</b><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${P.map((x, i) => `<button type="button" class="btn ${i === 0 ? 'btn-gold' : 'btn-ghost'}" style="width:auto;" onclick="copiarTexto(pgPartes(window.__pgTxt)[${i}], this)">${i + 1}. Copiar imagen ${i + 1}${i === 0 ? ' (con la foto)' : ''}</button>`).join('')}</div><p class="note" style="text-align:left;margin:6px 0 0;">1) Chat nuevo, suba la foto y pegue la imagen 1. 2) Cuando la termine, pegue la imagen 2 en el mismo chat, y así.</p></div>` : ''; })()}
     <button type="button" class="btn btn-ghost" style="width:100%;margin-top:8px;" onclick="copiarTexto(window.__pgTxt, this)">Copiar todo junto</button>` : '<p class="note">Ese SKU no está en el catálogo.</p>'; }
 // separa el prompt en un mensaje por imagen (Gemini descarga mejor de a una)
 function pgPartes(t){ t = String(t || ''); if(t.includes('──────────')) return t.split(/\n*──────────\n*/).map(s => s.trim()).filter(Boolean); const ms = [...t.matchAll(/(^|\n)\s*(IMAGE \d+\s*[–-][^\n]*)/g)]; if(ms.length < 2) return [t];
@@ -13626,7 +13657,7 @@ function pgPartes(t){ t = String(t || ''); if(t.includes('───────�
   const bloques = ini.map((s, i) => t.slice(s, i + 1 < ini.length ? ini[i + 1] : (pf >= 0 ? pf : t.length)).trim());
   return bloques.map((b, i) => i === 0 ? `${cab.replace(/generate these \d+ images, one after another, in this order/i, 'generate ONE image (more will follow in this same chat)')}\n\n${b}\n\n${pie}`.trim() : `Same product, same attached photo and same rules as before (design, texture, real size, colors and quantity). Now generate ONLY this image:\n\n${b}\n\n${pie}`.trim()); }
 // lote: todos los SKU de un producto, de una categoria o de una busqueda
-async function abrirPromptGeminiLote(){ await cargarDatosFabricacion(); try{ if(telasDatos === null) await cargarTelas(); } catch(e){}
+async function abrirPromptGeminiLote(){ await cargarDatosFabricacion(); try{ if(telasDatos === null) await cargarTelas(); } catch(e){} try{ if(kitsDatos === null) await cargarKits(); } catch(e){}
   const cats = [...new Set(CATALOGO.map(c => c.categoria).filter(Boolean))];
   pvModal('📸 Prompts para Gemini en lote', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><label>Categoría<select id="pl-cat" onchange="plPintar()" style="padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;"><option value="">Todas</option>${cats.map(c => `<option>${escaparHtml(c)}</option>`).join('')}</select></label><label>Buscar<input id="pl-q" oninput="clearTimeout(window.__plT);window.__plT=setTimeout(plPintar,250)" placeholder="ej.: mantel, century" style="padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;"></label></div>
     <div style="display:flex;gap:6px;margin:8px 0;"><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pl-c" value="ml" checked onchange="plPintar()"> Mercado Libre</label><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pl-c" value="tn" onchange="plPintar()"> Tienda Nube</label><label class="btn-mini" style="cursor:pointer;margin-left:auto;"><input type="checkbox" id="pl-uno" checked onchange="plPintar()"> uno por producto (no por medida)</label></div>
@@ -23032,7 +23063,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v459';
+const APP_VERSION = '2026-10-29-v460';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
