@@ -1816,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v458</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v459</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6160,7 +6160,7 @@ const GRUPOS_INICIO = {
   ] },
   cli: { lado: 'int', titulo: '👥 Clientes', titulosColumnas: ['Fichas', 'Cuentas corrientes'], columnas: [
     [['➕ Cliente nuevo', 'abrirClientes(); setTimeout(() => cliForm(), 300)'], ['👥 Clientes', 'abrirClientes()']],
-    [['💳 Cuentas corrientes de clientes', 'abrirCtaCte()'], ['📅 Cobranzas a realizar', "abrirCtaCte('venc')"]],
+    [['💳 Cuentas corrientes de clientes', 'abrirCtaCte()'], ['📅 Cobranzas a realizar', "abrirCtaCte('venc')"], ['📞 Clientes para recuperar', 'abrirClientesRecuperar()']],
   ] },
   art: { lado: 'int', titulo: '📦 Artículos', titulosColumnas: ['Catálogo', 'Precios', 'Costos', 'Stock', 'Producción'], colorColumnas: { 2: '#2F7A47' }, columnas: [
     [['➕ Agregar producto', 'abrirNuevoProducto()'], ['✏️ Editar producto', 'abrirEditarProducto()'], ['🗂️ Ordenar categorías', 'abrirCategorias()'], ['📷 Fotos de productos', 'abrirActualizarFoto()'], ['🗂️ Subir fotos por SKU', 'abrirSubirFotosSku()'], ['📝 Descripciones de reventa', 'abrirReventa()'], ['🌐 Links de la web', 'abrirLinksWeb()']],
@@ -6302,7 +6302,7 @@ function normCondIva(v){ const s = normBusqueda(v || ''); if(!s) return ''; if(/
 function selCondIva(id, val, estilo){ const v = normCondIva(val); return `<select id="${id}" style="${estilo || ''}"><option value="">— elegir —</option>${COND_IVA.map(x => `<option ${v === x ? 'selected' : ''}>${x}</option>`).join('')}${v && !COND_IVA.includes(v) ? `<option selected>${escaparHtml(v)}</option>` : ''}</select>`; }
 // ===== Etapa 3: menu por tareas (usa las mismas opciones y permisos de siempre) =====
 const TAREAS = [
-  ['t_vender', 'Vender', 'sell', [['Antes de vender', ['irACatalogoDesdeInicio()', 'abrirPedidoIA()', 'abrirPresupuestos()']], ['Entregar y facturar', ["abrirPedidosPrep('preparar')", "abrirPedidosPrep('facturar')", 'abrirPendientesEntrega()', 'abrirRemitos().then(() => rmForm())', 'abrirRemitos()', "abrirFacturas().then(() => fvManual('f'))", "abrirFacturas().then(() => fvManual('nc'))", "abrirFacturas().then(() => fvManual('nd'))", "abrirFacturas().then(() => document.getElementById('fc-rz-se", 'abrirFacturas()', 'abrirHistorial()']], ['Clientes', ['abrirClientes(); setTimeout(() => cliForm()', 'abrirClientes()', 'abrirListasPrecios()']]]],
+  ['t_vender', 'Vender', 'sell', [['Antes de vender', ['irACatalogoDesdeInicio()', 'abrirPedidoIA()', 'abrirPresupuestos()', 'abrirClientesRecuperar()']], ['Entregar y facturar', ["abrirPedidosPrep('preparar')", "abrirPedidosPrep('facturar')", 'abrirPendientesEntrega()', 'abrirRemitos().then(() => rmForm())', 'abrirRemitos()', "abrirFacturas().then(() => fvManual('f'))", "abrirFacturas().then(() => fvManual('nc'))", "abrirFacturas().then(() => fvManual('nd'))", "abrirFacturas().then(() => document.getElementById('fc-rz-se", 'abrirFacturas()', 'abrirHistorial()']], ['Clientes', ['abrirClientes(); setTimeout(() => cliForm()', 'abrirClientes()', 'abrirListasPrecios()']]]],
   ['t_cobrar', 'Cobrar', 'cash', [['Cobros', ["abrirCtaCte('recibos').then(", "abrirCtaCte('recibos')"]], ['Cuentas', ['abrirCtaCte()', "abrirCtaCte('venc')"]]]],
   ['t_comprar', 'Comprar', 'buy', [['Comprobantes de compra', ["abrirCompras('compras').then(() => pvElegirProveedor('compra'", "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nc'", "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nd'", "abrirCompras('compras')"]], ['Proveedores', ["abrirCompras('proveedores').then("]], ['Talleres', ["abrirCompras('talleres')"]]]],
   ['t_pagar', 'Pagar', 'pay', [['Pagos', ["abrirCompras('pagos').then(", "abrirCompras('pagos')"]], ['Cuentas', ['abrirCompras()', "abrirCompras('venc')"]]]],
@@ -6404,7 +6404,7 @@ async function dashDatos(forzar){
   const vars = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => vars.push(v))));
   const sinPrecio = vars.filter(v => v.precio !== 'Consultar' && !(parsePrice(v.precio) > 0)).length; if(sinPrecio) P('costos', `🏷️ ${sinPrecio} productos sin precio de lista`, 'abrirListaPrecios()');
   if(dueno){
-    let sinCosto = 0; vars.forEach(v => { try{ if(costoUnidadSku(String(v.sku).toUpperCase()) == null) sinCosto++; } catch(e){} }); if(sinCosto) P('costos', `💲 ${sinCosto} SKU sin costo cargado`, 'abrirCostosProductos()'); if(dueno){ try{ const cr = await t(db.collection('config').doc('costo_revisado').get().catch(() => null)); window.__costoRevisado = cr && cr.exists ? cr.data() : {}; const ci = costosIncompletos().length; if(ci) P('costos', `🧵 ${ci} SKU fabricado${ci > 1 ? 's' : ''} con el costo incompleto`, 'abrirCostoIncompleto()'); } catch(e){} }
+    let sinCosto = 0; vars.forEach(v => { try{ if(costoUnidadSku(String(v.sku).toUpperCase()) == null) sinCosto++; } catch(e){} }); if(sinCosto) P('costos', `💲 ${sinCosto} SKU sin costo cargado`, 'abrirCostosProductos()'); if(dueno){ try{ const cr = await t(db.collection('config').doc('costo_revisado').get().catch(() => null)); window.__costoRevisado = cr && cr.exists ? cr.data() : {}; const ci = costosIncompletos().length; if(ci) P('costos', `🧵 ${ci} SKU fabricado${ci > 1 ? 's' : ''} con el costo incompleto`, 'abrirCostoIncompleto()'); const pd = preciosDudosos().length; if(pd) P('costos', `🔢 ${pd} precio${pd > 1 ? 's' : ''} guardado${pd > 1 ? 's' : ''} con formato distinto`, 'abrirPreciosDudosos()'); } catch(e){} }
     if(typeof ccPend !== 'undefined' && ccPend.length) P('costos', `💲 ${ccPend.length} SKU cambiaron de costo (revisar el precio)`, 'abrirRevisarCostos()');
     if(vf){ let sinC = 0, rev2 = 0; vf.docs.forEach(d => { const f = normFactura(d.data()); if(f.razon && f.razon !== 'propia') return; if(ccFechaISO(f.fecha) < hace(60).slice(0, 10)) return; (f.items || []).forEach((it, i) => { try{ const c = costoItemFactura(it, f); if(c == null) sinC++; else if(renglonRevFactura(f, i, (it.neto || 0) * factorIvaFactura(f) * signoFact(f), c)) rev2++; } catch(e){} }); });
       if(sinC || rev2) P('costos', `🧾 Facturas de los últimos 60 días: ${[sinC ? sinC + ' renglones sin costo' : '', rev2 ? rev2 + ' para revisar' : ''].filter(Boolean).join(' y ')}`, 'abrirFacturas()'); }
@@ -6492,6 +6492,7 @@ async function pintarDash(){
         return `<div class="dh-h"><h3>Fuera de Mercado Libre</h3><span class="dh-mut">${new Date(a.m + '-15').toLocaleDateString('es-AR', { month: 'long' })}</span></div><div class="dh-list" style="margin-bottom:20px;"><div class="dh-task" style="gap:18px;flex-wrap:wrap;">
           <div><div class="dh-mut" style="font-weight:400;">Vendido fuera de ML</div><b style="font-size:1.2rem;">${formatPrice(a.propia)}</b>${dv != null ? ` <span style="font-size:.78rem;color:${dv >= 0 ? '#2F7A47' : '#A6432F'};">${dv >= 0 ? '▲' : '▼'} ${f1(Math.abs(dv))} %</span>` : ''}</div>
           <div><div class="dh-mut" style="font-weight:400;">Contado</div><b>${formatPrice(a.ctdo)}</b></div><div><div class="dh-mut" style="font-weight:400;">Cuenta corriente</div><b>${formatPrice(a.ctacte)}</b></div>
+          <div><div class="dh-mut" style="font-weight:400;">Para crecer</div><a href="#" onclick="event.preventDefault();abrirClientesRecuperar()" style="font-weight:700;color:#3D2B4E;text-decoration:none;">📞 Clientes para recuperar →</a></div>
           <div style="margin-left:auto;text-align:right;"><div class="dh-mut" style="font-weight:400;">Peso de ML en el total</div><b style="font-size:1.2rem;color:${meta == null ? '#2B2622' : ok ? '#2F7A47' : '#A6432F'};">${f1(pa)} %</b>${meta != null ? `<div class="dh-mut" style="font-weight:400;">meta: ${f1(meta)} % (1 punto menos que el mes pasado)</div>` : ''}</div></div></div>`; })()}
       ${(() => { if(!dueno || !V || !V.informes) return ''; const I = V.informes, hoy = new Date().toISOString().slice(0, 10), dias = f => f ? Math.floor((Date.now() - new Date(f).getTime()) / 864e5) : null;
         const L = [['ml_alberto', 'Ventas de Mercado Libre', 'Alberto', 1, 'Resultados ML', 'abrirResultadosML()'], ['ml_rita', 'Ventas de Mercado Libre', 'Rita', 1, 'Resultados ML', 'abrirResultadosML()'], ['full_alberto', 'Cargos por stock antiguo de Full', 'Alberto', 7, 'Fugas de plata por SKU', 'abrirFugas()'], ['full_rita', 'Cargos por stock antiguo de Full', 'Rita', 7, 'Fugas de plata por SKU', 'abrirFugas()'], ['tfactura', 'Facturas de TFactura', 'Propia', 1, 'Comprobantes → Subir facturas', 'abrirFacturas()']];
@@ -9047,6 +9048,40 @@ function iniciarAvisoPedidos(){ if(pdAvisoIniciado) return; try{ if(!puede(permi
   try{ db.collection('pedidos').where('estado', '==', 'para_facturar').onSnapshot(s => { (s.docs || []).forEach(d => { const p = d.data(), k = d.id + '|' + ((p.prep || {}).fecha || ''); if(vistos.has(k)) return; vistos.add(k);
       const c = p.cliente || {}; dsToast(`🧾 Pedido para facturar · N.º ${p.numero} · ${c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim()}${(p.prep || {}).por ? ' · preparado por ' + nomUsu(p.prep.por) : ''}`, { ms: 15000, accion: { txt: 'Facturar →', fn: () => abrirPedidosPrep('facturar') } }); });
     try{ localStorage.setItem('olt_ped_avisados', JSON.stringify([...vistos].slice(-200))); } catch(e){} }); } catch(e){} }
+// ===== Clientes para recuperar: dormidos (+60 dias sin comprar) y atrasados en su recompra (facturas de la razon propia) =====
+async function clientesRecuperar(){ const [sf, sc] = await Promise.all([db.collection('ventas_facturadas').get().catch(() => null), db.collection('clientes').get().catch(() => null)]);
+  const CL = sc ? sc.docs.map(d => ({ _id: d.id, ...d.data() })) : [], cl = k => CL.find(x => [ccClave(x.razonSocial || ''), ccClave(`${x.apellido || ''} ${x.nombre || ''}`), ccClave(`${x.nombre || ''} ${x.apellido || ''}`), ccClave(x.fantasia || '')].includes(k)) || null;
+  const hoy = new Date(), hace365 = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10), G = {};
+  (sf ? sf.docs.map(d => d.data()) : []).forEach(f => { if(f.razon && f.razon !== 'propia') return; if(f.esNC) return; const k = ccClave(String(f.cliente || '').replace(/^\s*\d+\s*-\s*/, '')); if(!k || /consumidor final|mostrador/.test(k)) return;
+    const m = String(f.fecha || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/), iso = m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : String(f.fecha || '').slice(0, 10); if(!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return;
+    const g = G[k] = G[k] || { k, nombre: String(f.cliente || '').replace(/^\s*\d+\s*-\s*/, ''), fechas: [], tot12: 0, skus: {} }; g.fechas.push(iso); if(iso >= hace365) g.tot12 += +f.total || 0; (f.items || []).forEach(it => { const s = String(skuDeFactura(it.codigo) || '').toUpperCase(); if(s) g.skus[s] = (g.skus[s] || 0) + (+it.cant || 1); }); });
+  const dd = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5), hoyI = hoy.toISOString().slice(0, 10);
+  const L = Object.values(G).map(g => { const F = [...new Set(g.fechas)].sort(), ult = F[F.length - 1], dias = dd(ult, hoyI), ints = F.slice(1).map((x, i) => dd(F[i], x)).filter(x => x > 3), cada = ints.length >= 2 ? Math.round(ints.reduce((a, b) => a + b, 0) / ints.length) : null;
+    const c = cl(g.k); return { ...g, ult, dias, cada, n: F.length, tel: c ? (c.telefono || c.whatsapp || '') : '', cli: c }; }).filter(x => x.n >= 2 && x.tot12 > 0);
+  const dormidos = L.filter(x => x.dias > 60).sort((a, b) => b.tot12 - a.tot12), atrasados = L.filter(x => x.dias <= 60 && x.cada && x.dias > x.cada * 1.5).sort((a, b) => b.tot12 - a.tot12);
+  return { dormidos, atrasados }; }
+function crMensaje(x){ const tops = Object.entries(x.skus).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([s]) => { const r = buscarProductoPorSku(s); return r ? r.producto.nombre : s; });
+  return `Hola ${x.nombre}, ¿cómo están? Les escribo de OnLineTextil.${tops.length ? ` Tenemos stock de ${tops.join(', ')} y novedades que les pueden interesar.` : ' Tenemos novedades que les pueden interesar.'} ¿Les paso el catálogo actualizado?`; }
+async function abrirClientesRecuperar(){ pvModal('📞 Clientes para recuperar', '<p class="empty-msg">Revisando las facturas…</p>'); const R = await clientesRecuperar(); window.__crDatos = R;
+  const fila = (x, tipo) => `<div style="display:flex;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid #F3EFE8;font-size:.84rem;"><div style="flex:1;min-width:0;"><b>${escaparHtml(x.nombre)}</b><div style="font-size:.74rem;color:#A89E90;">última compra hace <b style="color:${tipo === 'd' ? '#A6432F' : '#9A7B12'};">${x.dias} días</b>${x.cada ? ' · compra cada ~' + x.cada + ' días' : ''} · ${x.n} compras</div></div><b style="width:120px;text-align:right;">${formatPrice(x.tot12)}<div style="font-size:.7rem;color:#A89E90;font-weight:400;">últimos 12 meses</div></b>
+    <button type="button" class="btn-mini" onclick="crWhatsapp('${tipo}',${tipo === 'd' ? window.__crDatos.dormidos.indexOf(x) : window.__crDatos.atrasados.indexOf(x)})">WhatsApp</button></div>`;
+  const bloque = (t, L, tipo, nota) => `<div style="font-weight:700;color:#3D2B4E;margin:10px 0 6px;">${t} (${L.length}) <span style="font-weight:400;color:#A89E90;font-size:.78rem;">${nota}</span></div>${L.length ? `<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;">${L.slice(0, 40).map(x => fila(x, tipo)).join('')}</div>` : '<p class="note">Ninguno.</p>'}`;
+  document.getElementById('pub-cont').innerHTML = `<p class="note" style="text-align:left;margin:0;">Clientes que compraron al menos 2 veces en el último año (facturas de su razón social), ordenados por lo que compraban.</p>${bloque('Atrasados en su recompra', R.atrasados, 'a', 'pasó 1,5 veces su frecuencia habitual')}${bloque('Dormidos', R.dormidos, 'd', 'más de 60 días sin comprar')}`; }
+function crWhatsapp(tipo, i){ const x = (window.__crDatos || {})[tipo === 'd' ? 'dormidos' : 'atrasados'][i]; if(!x) return; const msg = crMensaje(x), tel = String(x.tel || '').replace(/\D/g, '');
+  if(tel){ window.open(`https://wa.me/${tel.length <= 10 ? '549' + tel : tel}?text=${encodeURIComponent(msg)}`, '_blank'); } else { copiarTexto(msg); dsToast('Sin teléfono cargado: el mensaje quedó copiado para pegarlo en WhatsApp', { ms: 6000 }); } }
+// ===== Precios guardados con formato distinto al estandar ("10.939,80"): se muestran como se leen y se normalizan =====
+function preciosDudosos(){ const L = []; (CATALOGO || []).forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => { const s = String(v.precio == null ? '' : v.precio).trim(); if(!s || /^consultar$/i.test(s)) return;
+    if(typeof v.precio === 'string' && /^\d{1,3}(\.\d{3})*,\d{2}$/.test(s)) return; const n = parsePrice(s); L.push({ p, v, sku: v.sku, guardado: s, lee: n }); }))); return L; }
+function abrirPreciosDudosos(){ const L = preciosDudosos();
+  pvModal('🔢 Precios con formato distinto', `<p class="note" style="text-align:left;margin:0 0 8px;">Estos precios no están guardados en el formato estándar (por ejemplo <b>10.939,80</b>). La app los lee como se ve en la columna "Se lee como". Si están bien, <b>Normalizar</b> los guarda en el formato correcto para que nunca se lean mal.</p>
+    ${L.length ? `<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;max-height:50vh;overflow-y:auto;">${L.map(x => `<div style="display:flex;gap:10px;align-items:center;padding:7px 12px;border-bottom:1px solid #F3EFE8;font-size:.84rem;"><b style="width:110px;">${escaparHtml(x.sku || '')}</b><span style="flex:1;color:#8A8072;">${escaparHtml(x.p.nombre)}</span><span style="width:120px;color:#A6432F;">guardado: ${escaparHtml(x.guardado)}</span><b style="width:130px;text-align:right;color:${x.lee == null ? '#A6432F' : '#2F7A47'};">${x.lee == null ? 'no se puede leer' : formatPrice(x.lee)}</b></div>`).join('')}</div>
+      <button type="button" class="btn btn-gold" style="margin-top:10px;" onclick="normalizarPrecios(this)">Normalizar ${L.filter(x => x.lee != null).length} precios</button>` : '<p class="empty-msg" style="color:#2F7A47;">✓ Todos los precios están en el formato estándar.</p>'}`); }
+async function normalizarPrecios(b){ const L = preciosDudosos().filter(x => x.lee != null); if(!L.length) return; b.disabled = true; const porProd = new Map(); L.forEach(x => { if(!porProd.has(x.p)) porProd.set(x.p, []); porProd.get(x.p).push(x); }); let ok = 0;
+  for(const [producto, xs] of porProd){ const ant = xs.map(x => x.v.precio); xs.forEach(x => { x.v.precio = normalizarPrecioAArgentino(x.lee); });
+    try{ if(producto._editKey && String(producto._editKey).startsWith('nuevo-')) await db.collection('productos_nuevos').doc(producto._docId).update({ variantes: producto.variantes });
+      else if(producto._editKey) await db.collection('productos_editados').doc(producto._editKey).set({ nombre: producto.nombre, composicion: producto.composicion, variantes: producto.variantes, metros: producto.metros || null }, { merge: true }); ok += xs.length; }
+    catch(e){ xs.forEach((x, i) => { x.v.precio = ant[i]; }); } }
+  dsToast(`Listo: ${ok} precios normalizados (el valor no cambió)`); abrirPreciosDudosos(); dashCache = null; }
 // ===== Costo de produccion incompleto: SKU fabricados sin confeccion o sin avios/bolsa =====
 function costosIncompletos(){ const ok = (window.__costoRevisado || {}), L = [];
   (CATALOGO || []).forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => { const S = String(v.sku || '').toUpperCase(); if(!S || ok[S]) return; let art = null; try{ art = articuloDeSku(S); } catch(e){} if(!art) return;
@@ -10101,6 +10136,9 @@ function cambiarStockLista(sku, campo, valor){
   box.querySelector('button').textContent = `💾 Guardar stock (${n} SKU)`;
 }
 async function guardarStock(){
+  { const D = Object.entries(stockPend).filter(([, p]) => p.stock !== undefined).map(([sku, p]) => { const x = stockDatos.skus[sku] || {}; return { sku, d: (numAr(p.stock) || 0) - (+x.stock || 0) }; }).filter(x => Math.abs(x.d) > 0.001);
+    if(D.length){ const mas = D.filter(x => x.d > 0).reduce((a, x) => a + x.d, 0), menos = -D.filter(x => x.d < 0).reduce((a, x) => a + x.d, 0); let val = 0; D.forEach(x => { try{ const c = costoUnidadSku(x.sku); if(c != null) val += c * x.d; } catch(e){} });
+      if(!await dsConfirm(`Guardar el conteo: ${D.length} SKU con diferencia.\nSobran ${mas.toLocaleString('es-AR')} unid. y faltan ${menos.toLocaleString('es-AR')} unid.${val ? `\nValor de la diferencia (a costo): ${val < 0 ? '−' : ''}${formatPrice(Math.abs(val))}` : ''}\n¿Confirmar?`)) return; } }
   const movs = [];
   Object.entries(stockPend).forEach(([sku, p]) => {
     const x = stockDatos.skus[sku] || { stock: 0, minimo: 0 };
@@ -14483,6 +14521,7 @@ function permisoDeAccion(f){
   if(/abrirFugas/.test(s)) return permisoDeAccion('abrirResultadosML()');
   if(/abrirAlertasPrecio/.test(s)) return permisoDeAccion('abrirAumentoMasivo()');
   if(/abrirPedidosPrep\('facturar'\)|pdFacturar/.test(s)) return permisoDeAccion('abrirFacturas()');
+  if(/abrirClientesRecuperar/.test(s)) return permisoDeAccion('abrirCtaCte()');
   if(/abrirPedidosPrep/.test(s)) return permisoDeAccion('abrirPendientesEntrega()');
   if(/abrirUsuarios|abrirCopiaSeguridad/.test(s)) return 'dueno';
   if(/abrirResultadosML|abrirCalculadoraML/.test(s)) return 'resultadosML';
@@ -22993,7 +23032,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v458';
+const APP_VERSION = '2026-10-02-v459';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
