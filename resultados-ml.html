@@ -1619,15 +1619,20 @@ async function aplicarCostoTodas(sku, nUV){
   document.body.appendChild(m);
   m.querySelector('#cm-ok').onclick=async()=>{
     const sel=[...m.querySelectorAll('.cm-r:checked')].map(c=>hs[+c.value]); if(hs.length&&!sel.length){alert('No tildó ningún registro.');return;}
-    m.remove(); procesando('Corrigiendo el costo…');
-    try{
-      if(hs.length){ const sinId=sel.filter(x=>!x.id); if(sinId.length) throw new Error('faltan datos del historial: recargue la página (Ctrl + Shift + R) y vuelva a intentar');
-        const lote=db.batch(); sel.forEach(x=>lote.set(db.collection('historial_costos').doc(x.id),{costo:n,costoAnterior:x.costo,corregido:new Date().toISOString()},{merge:true})); await lote.commit(); sel.forEach(x=>x.costo=n); }
-      else{ const r=await db.collection('historial_costos').add({sku,fecha:'2000-01-01',costo:n,desglose:{reventa:true,desde:'resultados-ml corregir'},creado:Date.now()}); COSTOS[sku]=[{id:r&&r.id,fecha:'2000-01-01',costo:n,creado:Date.now()}]; }
-      const ultimo=(COSTOS[sku]||[]).slice(-1)[0];
-      if(!hs.length||sel.includes(ultimo)){ const d=await db.collection('config').doc('costos_reventa').get(); const c=d.exists?(d.data().c||{}):{}; if(c[sku]!==undefined||!hs.length){ c[sku]=nUV; await db.collection('config').doc('costos_reventa').set({c,actualizado:new Date().toISOString()}); } }
+    m.remove();
+    // se aplica al instante en pantalla y se guarda en segundo plano (si falla, se avisa y se vuelve atras)
+    if(hs.length&&sel.some(x=>!x.id)){alert('Faltan datos del historial: recargue la página (Ctrl + Shift + R) y vuelva a intentar.');return;}
+    const antes=sel.map(x=>x.costo), ultimo=(COSTOS[sku]||[]).slice(-1)[0], tocaActual=!hs.length||sel.includes(ultimo);
+    if(hs.length) sel.forEach(x=>x.costo=n); else COSTOS[sku]=[{id:null,fecha:'2000-01-01',costo:n,creado:Date.now()}];
+    aplicarCostos(); render(); if(window.__pantallaML==='diag')renderDiagnostico();
+    procesando('Guardando el costo…');
+    (async()=>{ try{
+      if(hs.length){ const lote=db.batch(); sel.forEach(x=>lote.set(db.collection('historial_costos').doc(x.id),{costo:n,costoAnterior:antes[sel.indexOf(x)],corregido:new Date().toISOString()},{merge:true})); await lote.commit(); }
+      else{ const r=await db.collection('historial_costos').add({sku,fecha:'2000-01-01',costo:n,desglose:{reventa:true,desde:'resultados-ml corregir'},creado:Date.now()}); if(COSTOS[sku]&&COSTOS[sku][0])COSTOS[sku][0].id=r&&r.id; }
+      if(tocaActual){ const d=await db.collection('config').doc('costos_reventa').get(); const c=d.exists?(d.data().c||{}):{}; if(c[sku]!==undefined||!hs.length){ await db.collection('config').doc('costos_reventa').set({c:{[sku]:nUV},actualizado:new Date().toISOString()},{merge:true}); } } // solo si el SKU es de reventa (los fabricados toman el costo de produccion)
       procesando.listo('✓ '+(hs.length?sel.length+' registro(s) corregidos':'Costo creado'));
-    }catch(e){procesando.error(e.message);alert('No se pudo guardar: '+e.message);return;}
+    }catch(e){ if(hs.length) sel.forEach((x,k)=>x.costo=antes[k]); else delete COSTOS[sku]; aplicarCostos(); render(); procesando.error(e.message); alert('No se pudo guardar: '+e.message+'. Se volvió al costo anterior.'); } })();
+    return;
     render(); if(window.__pantallaML==='diag')renderDiagnostico();
   };
 }
@@ -1639,13 +1644,12 @@ async function corregirDudosos(skus){
   const ventas=filas.reduce((a,f)=>a+f.g.n,0);
   const det=cambios.slice(0,25).map(c=>`${c.s} · ${c.x.fecha.split('-').reverse().join('/')}: ${fmt(c.x.costo)} → ${fmt(c.nuevo)}`).join('\n')+(cambios.length>25?`\n… y ${cambios.length-25} más`:'');
   if(!confirm(`Se van a corregir ${cambios.length} registro(s) del historial de ${filas.length} SKU (${ventas} ventas se recalculan):\n\n${det}\n\n¿Aplicar?`))return;
-  procesando('Corrigiendo costos…');
+  const ant=cambios.map(c=>c.x.costo); cambios.forEach(c=>{c.x.costo=c.nuevo;}); aplicarCostos(); render(); if(window.__pantallaML==='diag')renderDiagnostico();
+  procesando('Guardando los costos…');
   try{
     for(let i=0;i<cambios.length;i+=400){const lote=db.batch();cambios.slice(i,i+400).forEach(c=>lote.set(db.collection('historial_costos').doc(c.x.id),{costo:c.nuevo,costoAnterior:c.x.costo,corregido:new Date().toISOString()},{merge:true}));await lote.commit();}
-    cambios.forEach(c=>{c.x.costo=c.nuevo;});
     procesando.listo('✓ '+cambios.length+' registros corregidos');
-  }catch(e){procesando.error(e.message);alert('No se pudo corregir: '+e.message);return;}
-  render(); if(window.__pantallaML==='diag')renderDiagnostico();
+  }catch(e){cambios.forEach((c,k)=>{c.x.costo=ant[k];});aplicarCostos();render();procesando.error(e.message);alert('No se pudo corregir: '+e.message+'. Se volvió a los costos anteriores.');return;}
 }
 // ===== Stock: las ventas del reporte descuentan stock (Full si salio de Full; si no, local y deposito) desde la fecha de inicio del control =====
 // se guarda lo ya aplicado por cuenta y mes (ml_stock_aplicado): si se vuelve a cargar el reporte, solo se aplica la diferencia
