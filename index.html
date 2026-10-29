@@ -1816,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v457</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/10 v458</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6404,7 +6404,7 @@ async function dashDatos(forzar){
   const vars = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => vars.push(v))));
   const sinPrecio = vars.filter(v => v.precio !== 'Consultar' && !(parsePrice(v.precio) > 0)).length; if(sinPrecio) P('costos', `🏷️ ${sinPrecio} productos sin precio de lista`, 'abrirListaPrecios()');
   if(dueno){
-    let sinCosto = 0; vars.forEach(v => { try{ if(costoUnidadSku(String(v.sku).toUpperCase()) == null) sinCosto++; } catch(e){} }); if(sinCosto) P('costos', `💲 ${sinCosto} SKU sin costo cargado`, 'abrirCostosProductos()');
+    let sinCosto = 0; vars.forEach(v => { try{ if(costoUnidadSku(String(v.sku).toUpperCase()) == null) sinCosto++; } catch(e){} }); if(sinCosto) P('costos', `💲 ${sinCosto} SKU sin costo cargado`, 'abrirCostosProductos()'); if(dueno){ try{ const cr = await t(db.collection('config').doc('costo_revisado').get().catch(() => null)); window.__costoRevisado = cr && cr.exists ? cr.data() : {}; const ci = costosIncompletos().length; if(ci) P('costos', `🧵 ${ci} SKU fabricado${ci > 1 ? 's' : ''} con el costo incompleto`, 'abrirCostoIncompleto()'); } catch(e){} }
     if(typeof ccPend !== 'undefined' && ccPend.length) P('costos', `💲 ${ccPend.length} SKU cambiaron de costo (revisar el precio)`, 'abrirRevisarCostos()');
     if(vf){ let sinC = 0, rev2 = 0; vf.docs.forEach(d => { const f = normFactura(d.data()); if(f.razon && f.razon !== 'propia') return; if(ccFechaISO(f.fecha) < hace(60).slice(0, 10)) return; (f.items || []).forEach((it, i) => { try{ const c = costoItemFactura(it, f); if(c == null) sinC++; else if(renglonRevFactura(f, i, (it.neto || 0) * factorIvaFactura(f) * signoFact(f), c)) rev2++; } catch(e){} }); });
       if(sinC || rev2) P('costos', `🧾 Facturas de los últimos 60 días: ${[sinC ? sinC + ' renglones sin costo' : '', rev2 ? rev2 + ' para revisar' : ''].filter(Boolean).join(' y ')}`, 'abrirFacturas()'); }
@@ -6425,9 +6425,9 @@ async function dashDatos(forzar){
   if(dueno){ try{
     // facturacion de los ultimos 12 meses: facturas de la razon propia + ventas de ML de Alberto y Rita
     const meses = []; { const d = new Date(); d.setDate(1); for(let k = 11; k >= 0; k--){ const x = new Date(d.getFullYear(), d.getMonth() - k, 1); meses.push(x.toISOString().slice(0, 7)); } }
-    const F = {}; meses.forEach(m => F[m] = { propia: 0, alberto: 0, rita: 0 });
+    const F = {}; meses.forEach(m => F[m] = { propia: 0, alberto: 0, rita: 0, ctdo: 0, ctacte: 0 });
     let vM = 0, cM = 0; const act = [];
-    if(vf) vf.docs.forEach(d => { const f = normFactura(d.data()), iso = ccFechaISO(f.fecha), m = iso.slice(0, 7), rz = f.razon || 'propia'; if(F[m] && rz === 'propia') F[m].propia += (f.esNC ? -1 : 1) * (+f.total || 0);
+    if(vf) vf.docs.forEach(d => { const f = normFactura(d.data()), iso = ccFechaISO(f.fecha), m = iso.slice(0, 7), rz = f.razon || 'propia'; if(F[m] && rz === 'propia'){ const imp = (f.esNC ? -1 : 1) * (+f.total || 0); F[m].propia += imp; F[m][/cta|corriente/i.test(String(f.condicion || '')) ? 'ctacte' : 'ctdo'] += imp; }
       if(m === mes && rz === 'propia') (f.items || []).forEach(it => { try{ const c = costoItemFactura(it, f); if(c == null) return; vM += (it.neto || 0) * factorIvaFactura(f) * signoFact(f); cM += c; } catch(e){} });
       act.push({ f: iso, t: f.creado || '', fam: f.esNC ? 'ncv' : f.esND ? 'ndv' : 'venta', l: f.tipo || '', fis: esFiscalVenta(f), tit: f.esNC ? 'Nota de crédito' : f.esND ? 'Nota de débito' : 'Factura de venta', quien: String(f.cliente || '').replace(/^\s*\d+\s*-\s*/, ''), num: f.numero || '', imp: (f.esNC ? -1 : 1) * (+f.total || 0), go: 'abrirFacturas()' }); });
     Object.values(res).forEach(x => { const k = String(x.cuenta || '').toLowerCase(); if(F[x.periodo] && (k === 'alberto' || k === 'rita')) F[x.periodo][k] += (x.vendido || 0) + (x.envios || 0); if(x.periodo === mes && (k === 'alberto' || k === 'rita') && x.vendido){ vM += x.vendido - (x.vendSinCosto || 0); cM += x.costo || 0; } });
@@ -6486,6 +6486,13 @@ async function pintarDash(){
         return `<div class="dh-act" onclick="${a.go}"><span class="dh-mut">${String(a.f).slice(8, 10)}/${String(a.f).slice(5, 7)}</span><span class="dh-av" style="${nf ? `border:1.5px dashed ${col};color:${col};background:#fff;` : `background:${col};`}">${escaparHtml(a.l || '$')}</span><div style="min-width:0;"><b style="font-size:.84rem;">${escaparHtml(a.tit)}</b><div class="dh-mut" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escaparHtml(a.quien || '')}</div></div><span class="dh-mut" style="white-space:nowrap;">${escaparHtml(a.num || '')}</span><b style="white-space:nowrap;${a.imp == null ? '' : a.imp >= 0 ? 'color:#2F7A47;' : 'color:#A6432F;'}">${a.imp == null ? formatPrice(a.monto) : (a.imp >= 0 ? '+ ' : '− ') + formatPrice(Math.abs(a.imp))}</b></div>`; }).join('')}</div></div>` : '';
     box.innerHTML = `<div class="dh-top"><span class="dh-hola">${saludo}${nombre ? ', ' + escaparHtml(nombre) : ''}</span>${acc.length ? menuMini('+ Nuevo', acc.map(([t], i) => [sinEmoji(t).replace(/^\+\s*/, ''), `dashUsar(${i})`])).replace('class="btn-mini"', 'class="btn btn-gold"') : ''}</div>
       ${hero}
+      ${(() => { if(!dueno || !V || !V.fact12) return ''; const L = V.fact12, a = L[L.length - 1], b = L[L.length - 2]; if(!a || !a.tot) return '';
+        const pML = x => x.tot ? (x.alberto + x.rita) / x.tot * 100 : null, pa = pML(a), pb = b ? pML(b) : null, meta = pb != null ? Math.max(0, pb - 1) : null, ok = meta != null && pa <= meta + 0.05;
+        const dv = b && b.propia ? (a.propia - b.propia) / b.propia * 100 : null, f1 = v => v.toLocaleString('es-AR', { maximumFractionDigits: 1 });
+        return `<div class="dh-h"><h3>Fuera de Mercado Libre</h3><span class="dh-mut">${new Date(a.m + '-15').toLocaleDateString('es-AR', { month: 'long' })}</span></div><div class="dh-list" style="margin-bottom:20px;"><div class="dh-task" style="gap:18px;flex-wrap:wrap;">
+          <div><div class="dh-mut" style="font-weight:400;">Vendido fuera de ML</div><b style="font-size:1.2rem;">${formatPrice(a.propia)}</b>${dv != null ? ` <span style="font-size:.78rem;color:${dv >= 0 ? '#2F7A47' : '#A6432F'};">${dv >= 0 ? '▲' : '▼'} ${f1(Math.abs(dv))} %</span>` : ''}</div>
+          <div><div class="dh-mut" style="font-weight:400;">Contado</div><b>${formatPrice(a.ctdo)}</b></div><div><div class="dh-mut" style="font-weight:400;">Cuenta corriente</div><b>${formatPrice(a.ctacte)}</b></div>
+          <div style="margin-left:auto;text-align:right;"><div class="dh-mut" style="font-weight:400;">Peso de ML en el total</div><b style="font-size:1.2rem;color:${meta == null ? '#2B2622' : ok ? '#2F7A47' : '#A6432F'};">${f1(pa)} %</b>${meta != null ? `<div class="dh-mut" style="font-weight:400;">meta: ${f1(meta)} % (1 punto menos que el mes pasado)</div>` : ''}</div></div></div>`; })()}
       ${(() => { if(!dueno || !V || !V.informes) return ''; const I = V.informes, hoy = new Date().toISOString().slice(0, 10), dias = f => f ? Math.floor((Date.now() - new Date(f).getTime()) / 864e5) : null;
         const L = [['ml_alberto', 'Ventas de Mercado Libre', 'Alberto', 1, 'Resultados ML', 'abrirResultadosML()'], ['ml_rita', 'Ventas de Mercado Libre', 'Rita', 1, 'Resultados ML', 'abrirResultadosML()'], ['full_alberto', 'Cargos por stock antiguo de Full', 'Alberto', 7, 'Fugas de plata por SKU', 'abrirFugas()'], ['full_rita', 'Cargos por stock antiguo de Full', 'Rita', 7, 'Fugas de plata por SKU', 'abrirFugas()'], ['tfactura', 'Facturas de TFactura', 'Propia', 1, 'Comprobantes → Subir facturas', 'abrirFacturas()']];
         const pend = L.filter(([k, , , fr]) => { const f = I[k]; return !f || (fr === 1 ? String(f).slice(0, 10) < hoy : dias(f) >= fr); }), ok = L.filter(x => !pend.includes(x));
@@ -8873,6 +8880,7 @@ function renderCtaCte(){
   if(ccTab === 'config'){
     box.innerHTML = `<div style="max-width:520px;">${!ccCfg.inicio ? '<p style="background:#FFF8E6;border:1px solid #EBD9A8;border-radius:12px;padding:10px;">Para empezar, elija desde qué fecha se toman las facturas como cuenta corriente. Las anteriores no se cuentan; si un cliente ya debía algo, cárguelo como <b>saldo inicial</b>.</p>' : ''}
       <div class="field"><label>Facturas desde</label><input type="date" id="cc-ini" value="${ccCfg.inicio || ''}"></div>
+      <div class="field"><label>Tasa mensual para el costo de financiar (%)</label><input id="cc-tasa" inputmode="decimal" value="${String(ccCfg.tasa || 1.8).replace('.', ',')}"></div>
       <div class="field"><label>Plazo habitual (días, para marcar lo vencido)</label><input id="cc-plazo" inputmode="numeric" value="${ccCfg.plazo || 30}"></div>
       <button class="btn btn-gold" style="width:auto;padding:10px 18px;" onclick="ccGuardarCfg()">Guardar</button></div>`; return; }
   if(ccTab === 'log'){ box.innerHTML = '<p class="empty-msg">Cargando…</p>'; db.collection('cc_log').get().then(s => { const L2 = s.docs.map(d => d.data()).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))).slice(0, 200);
@@ -9039,6 +9047,26 @@ function iniciarAvisoPedidos(){ if(pdAvisoIniciado) return; try{ if(!puede(permi
   try{ db.collection('pedidos').where('estado', '==', 'para_facturar').onSnapshot(s => { (s.docs || []).forEach(d => { const p = d.data(), k = d.id + '|' + ((p.prep || {}).fecha || ''); if(vistos.has(k)) return; vistos.add(k);
       const c = p.cliente || {}; dsToast(`🧾 Pedido para facturar · N.º ${p.numero} · ${c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim()}${(p.prep || {}).por ? ' · preparado por ' + nomUsu(p.prep.por) : ''}`, { ms: 15000, accion: { txt: 'Facturar →', fn: () => abrirPedidosPrep('facturar') } }); });
     try{ localStorage.setItem('olt_ped_avisados', JSON.stringify([...vistos].slice(-200))); } catch(e){} }); } catch(e){} }
+// ===== Costo de produccion incompleto: SKU fabricados sin confeccion o sin avios/bolsa =====
+function costosIncompletos(){ const ok = (window.__costoRevisado || {}), L = [];
+  (CATALOGO || []).forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => { const S = String(v.sku || '').toUpperCase(); if(!S || ok[S]) return; let art = null; try{ art = articuloDeSku(S); } catch(e){} if(!art) return;
+    let c2 = null; try{ c2 = costosDeSku(S); } catch(e){} if(!c2) return; const falta = [];
+    if(!(c2.confeccion > 0)) falta.push('confección del taller'); if(!(c2.insumos > 0)) falta.push('avíos y bolsa');
+    if(!c2.porTela.some(x => x.total != null)) return; // sin precio de tela ya figura en "SKU sin costo"
+    if(falta.length) L.push({ S, nombre: p.nombre + (v.desc ? ' · ' + v.desc : ''), art, falta }); }))); return L; }
+async function abrirCostoIncompleto(){ try{ const d = await db.collection('config').doc('costo_revisado').get(); window.__costoRevisado = d.exists ? d.data() : {}; } catch(e){ window.__costoRevisado = window.__costoRevisado || {}; }
+  const L = costosIncompletos(); pvModal('🧵 Costos de fabricación incompletos', `<p class="note" style="text-align:left;margin:0 0 8px;">Estos SKU que fabrica tienen costo de tela, pero les falta una parte. El costo y el margen quedan por debajo de lo real. Si alguno no lleva avíos o bolsa, toque <b>Está bien así</b>.</p>
+    ${L.length ? `<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;">${L.map(x => `<div style="display:flex;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid #F3EFE8;font-size:.84rem;"><div style="flex:1;min-width:0;"><b>${escaparHtml(x.S)}</b> <span style="color:#A89E90;font-size:.76rem;">${escaparHtml(x.nombre)}</span><div style="font-size:.74rem;color:#A6432F;">Falta: ${x.falta.join(' y ')} · artículo ${escaparHtml(String(x.art).replace(/^ficha:/, ''))}</div></div><button type="button" class="btn-mini" onclick="cerrarPublicar();abrirArticulosCortes()">Completar</button><button type="button" class="btn-mini" onclick="ciMarcar('${x.S}')">Está bien así</button></div>`).join('')}</div>` : '<p class="empty-msg" style="color:#2F7A47;">✓ Todos los SKU fabricados tienen su costo completo.</p>'}`); }
+async function ciMarcar(S){ window.__costoRevisado = window.__costoRevisado || {}; window.__costoRevisado[S] = true; try{ await db.collection('config').doc('costo_revisado').set({ [S]: true }, { merge: true }); } catch(e){} abrirCostoIncompleto(); dashCache = null; }
+// ===== Dias de cobro (con la fecha en que la plata esta disponible) y costo de financiar =====
+function ccDiasCobro(c){ const plazo = ccPlazoCli(c), tasa = (+ccCfg.tasa || 1.8) / 100, hoy = new Date();
+  const txtMov = m => (m.tipo === 'sena' ? 'Seña' : 'Recibo') + ' ' + String(m.fecha).split('-').reverse().join('/') + (m.medio ? ' · ' + m.medio : ''), fd = {};
+  (c.movs || []).forEach(m => { if(m.tipo === 'cobro' || m.tipo === 'sena') fd[txtMov(m)] = (m.cheque && m.cheque.fechaCobro) || m.fecha; });
+  const dd = (a, b) => Math.max(0, Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5)); let sP = 0, sD = 0;
+  c.facts.filter(f => f.importe > 0 && f.pendiente <= 0.5 && (f.apl || []).length).forEach(f => { const fin = f.apl.map(a => fd[a.txt] || a.fecha).sort().pop(); const d = dd(f.fecha, fin); sP += f.importe; sD += f.importe * d; });
+  const prom = sP ? Math.round(sD / sP) : null;
+  const costo = c.facts.filter(f => f.importe > 0 && f.pendiente > 0.5).reduce((s, f) => s + f.pendiente * dd(f.fecha, hoy.toISOString().slice(0, 10)) * tasa / 30, 0);
+  return { prom, plazo, atraso: prom != null ? prom - plazo : null, costo: Math.round(costo), tasa: tasa * 100 }; }
 // ===== Cuenta corriente: vista cronologica (por defecto) y "por comprobante" (como TFactura), para clientes y proveedores =====
 function ccVista(){ try{ return localStorage.getItem('olt_cc_vista') || 'crono'; } catch(e){ return 'crono'; } }
 function ccSetVista(v, fn){ try{ localStorage.setItem('olt_cc_vista', v); } catch(e){} (window[fn] || renderCtaCte)(); }
@@ -9092,12 +9120,14 @@ function renderCtaCteCliente(c){ if(window.__ccFactCli !== c.k){ ccFactVer = '';
         return { fecha: r.fecha, tag: letraComp(fam, l, fis), num, det, sub, debe: r.debe, haber: r.haber, saldo: r.saldo, menu: r.m ? menuMini('⋯', [['Borrar', `ccBorrarMov('${r.m._id}')`]], true) : (r.f && r.f.pendiente > 0.5 ? menuMini('⋯', [['Fue de contado (no va a cta. cte.)', `ccMarcarContado('${r.f.id}')`]], true) : '') }; });
       const comps = F.slice().sort((x, y) => String(y.fecha).localeCompare(String(x.fecha))).map(f => { const [l, fis] = fiscalDe(f.numero); return { fecha: f.fecha, vto: ccSumaDias(f.fecha, plazo), tag: letraComp('venta', l, fis), num: String(f.numero).replace(/^[ABCMX]\s+/, ''), total: f.importe, pend: f.pendiente, vencida: f.vencida, lineas: (f.apl || []).map(x => ({ txt: x.txt, imp: x.imp })), accion: f.pendiente > 0.5 ? `<a href="#" onclick="event.preventDefault();ccFormCobro('${K}','cobro')" style="font-size:.76rem;margin-left:8px;">Cobrar</a>` : '' }; });
       const pendT = F.reduce((s, f) => s + Math.max(0, f.pendiente || 0), 0), aT = Math.max(0, Math.round((pendT - c.saldo) * 100) / 100);
-      return ctaVistaHtml({ render: 'renderCtaCte', filas: filasV, comps, aCuenta: aT > 0.5 ? aCuenta : [], aCuentaTot: aT, saldo: c.saldo, vencido: c.vencido || 0, nVenc, verbo: 'cobros' }); })()}`;
+      const dc = ccDiasCobro(c), lineaDC = `<div style="font-size:.8rem;color:#6B6258;margin:-2px 0 10px;">${dc.prom != null ? `Paga en promedio a <b style="color:${dc.atraso > 0 ? '#A6432F' : '#2F7A47'};">${dc.prom} días</b> (plazo ${dc.plazo}${dc.atraso > 0 ? ' · ' + dc.atraso + ' de atraso' : ''})` : 'Todavía sin facturas canceladas para calcular los días de cobro'}${dc.costo > 0 ? ` · financiar lo pendiente le cuesta <b>${formatPrice(dc.costo)}</b> (${dc.tasa.toLocaleString('es-AR', { maximumFractionDigits: 2 })} % mensual)` : ''} <span title="Se toma la fecha en que la plata está disponible: con cheque, la fecha de cobro del cheque." style="cursor:help;">ⓘ</span></div>`;
+      return lineaDC + ctaVistaHtml({ render: 'renderCtaCte', filas: filasV, comps, aCuenta: aT > 0.5 ? aCuenta : [], aCuentaTot: aT, saldo: c.saldo, vencido: c.vencido || 0, nVenc, verbo: 'cobros' }); })()}`;
 }
 async function ccGuardarCfg(){
   const ini = document.getElementById('cc-ini').value, pl = Math.max(1, Math.round(numAr(document.getElementById('cc-plazo').value) || 30));
   if(!ini){ alert('Elija la fecha de inicio.'); return; }
-  try{ await db.collection('config').doc('ctacte').set({ ...ccCfg, inicio: ini, plazo: pl }); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  const tasa = Math.max(0, numAr((document.getElementById('cc-tasa') || {}).value || '1,8') || 1.8);
+  try{ await db.collection('config').doc('ctacte').set({ ...ccCfg, inicio: ini, plazo: pl, tasa }); ccCfg.tasa = tasa; } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
   await ccLog('Ajustes', `inicio ${ini} · plazo ${pl} días`); ccTab = 'clientes'; abrirCtaCte();
 }
 async function ccMarcarContado(id){
@@ -13285,7 +13315,8 @@ async function rmCambiarBaja(){ const nuevo = stockDatos.bajaCon === 'remito' ? 
 function rmForm(pre){
   pre = pre || {}; const inp = 'padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;box-sizing:border-box;';
   const skus = []; CATALOGO.forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => skus.push(v.sku))));
-  pvModal('🚚 Remito', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+  const rl = pre.letra === 'R' ? 'R' : 'X';
+  pvModal('🚚 Remito', `<div id="rm-ban">${bannerComp('remito', rl, rl === 'R')}</div><div style="display:flex;gap:6px;align-items:center;margin:-6px 0 10px;font-size:.84rem;">${[['R', 'R · con CAI (fiscal)'], ['X', 'X · interno']].map(([v, t]) => `<label style="display:inline-flex;gap:4px;align-items:center;border:1px solid var(--line);border-radius:999px;padding:4px 10px;cursor:pointer;"><input type="radio" name="rm-letra" value="${v}" ${rl === v ? 'checked' : ''} onchange="document.getElementById('rm-ban').innerHTML=bannerComp('remito','${v}',${v === 'R'})"> ${t}</label>`).join('')}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     <label style="grid-column:1/-1;">Cliente<input id="rm-c" value="${escapeAttr(pre.cliente || '')}" list="rm-cl" onchange="rmDatosCliente(this.value);sucursalesDe(this.value, 'rm-suc', { dir: 'rm-d', transp: 'rm-t', tel: 'rm-tel' })" style="${inp}"></label><div id="rm-suc" style="grid-column:1/-1;"></div><div id="rm-ped" style="grid-column:1/-1;"></div>
     <label>CUIT<input id="rm-cuit" value="${escapeAttr(pre.cuit || '')}" style="${inp}"></label><label>Condición frente al IVA${selCondIva('rm-iva', pre.condicionIva, inp)}</label>
     <label>Contacto / teléfono<input id="rm-tel" value="${escapeAttr(pre.tel || '')}" style="${inp}"></label><label>Orden de compra del cliente (opcional)<input id="rm-oc" value="${escapeAttr(pre.oc || '')}" style="${inp}"></label><datalist id="rm-cl">${(listaClientes || []).map(c => c.razonSocial || `${c.apellido || ''} ${c.nombre || ''}`.trim()).filter(Boolean).map(n => `<option value="${escapeAttr(n)}">`).join('')}</datalist>
@@ -13319,7 +13350,7 @@ async function rmGuardar(pedido){
   if(!g('rm-c') || !items.length){ alert('Complete el cliente y al menos un renglón con cantidad.'); return; }
   if(!__previa && await mesBloqueado(g('rm-f'))) return;
   try{ const numero = __previa ? '(borrador)' : await (async () => { const ref = db.collection('config').doc('remito_num'), d0 = await ref.get(), n = ((d0.exists && d0.data().n) || 0) + 1; await ref.set({ n }); return n; })();
-    const r = { cuit: g('rm-cuit'), condicionIva: g('rm-iva'), tel: g('rm-tel'), oc: g('rm-oc'), valor: numAr(g('rm-vd')) || 0, sucursal: window.__sucElegida || '', numero, fecha: g('rm-f') || ccHoy(), cliente: g('rm-c'), transporte: g('rm-t'), direccion: g('rm-d'), bultos: Math.max(1, Math.round(numAr(g('rm-b')) || 1)), obs: g('rm-o'), items, pedido: pedido || '', creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
+    const r = { letra: ((document.querySelector('input[name=rm-letra]:checked') || {}).value) || 'X', cuit: g('rm-cuit'), condicionIva: g('rm-iva'), tel: g('rm-tel'), oc: g('rm-oc'), valor: numAr(g('rm-vd')) || 0, sucursal: window.__sucElegida || '', numero, fecha: g('rm-f') || ccHoy(), cliente: g('rm-c'), transporte: g('rm-t'), direccion: g('rm-d'), bultos: Math.max(1, Math.round(numAr(g('rm-b')) || 1)), obs: g('rm-o'), items, pedido: pedido || '', creado: new Date().toISOString(), creadoPor: (firebase.auth().currentUser || {}).email || '' };
     if(__previa){ __previa(r); return; }
     if(stockDatos === null) await cargarStock();
     if(stockDatos.bajaCon === 'remito'){ const movs = items.filter(x => x.sku && skuControlado(x.sku)).map(x => ({ sku: x.sku, cantidad: -(x.cant * divisorVenta(x.sku)) })); await moverStockVarios(movs, 'remito', 'R ' + numero); r.stockAplicado = movs.length > 0; }
@@ -13953,7 +13984,7 @@ function bannerComp(fam, letra, fiscal, extra, rz, rol){ const [txt, col] = COMP
   const emisor = rzk ? `<div style="margin-left:auto;background:#fff;border:3px solid ${rzc};border-radius:10px;padding:6px 14px;text-align:right;color:${rzc};min-width:170px;"><div style="font-size:.64rem;letter-spacing:.1em;font-weight:700;opacity:.8;">${escaparHtml(rol || 'EMITE')}</div><div style="font:800 1.15rem Arial;line-height:1.15;">${escaparHtml(rzk.toUpperCase())}</div>${rzNom.toLowerCase() !== rzk ? `<div style="font-size:.72rem;font-weight:600;">${escaparHtml(rzNom)}${rzCuit ? ' · ' + escaparHtml(rzCuit) : ''}</div>` : ''}</div>` : '';
   return `<div style="display:flex;align-items:center;gap:14px;border-radius:12px;padding:10px 14px;margin:0 0 14px;${nf ? `background:repeating-linear-gradient(135deg,#fff,#fff 10px,${col}14 10px,${col}14 20px);border:2px dashed ${col};` : `background:${col};`}color:${nf ? col : '#fff'};">
     ${letra ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:8px;font:800 28px Arial;${nf ? `border:2px dashed ${col};background:#fff;` : 'background:#fff;color:' + col + ';'}">${escaparHtml(letra)}</span>` : ''}
-    <div><div style="font:800 1.05rem Arial;letter-spacing:.04em;text-transform:uppercase;">${escaparHtml(txt)}</div><div style="font-size:.82rem;opacity:.9;">${fiscal === undefined ? '' : nf ? 'SIN CAE · no fiscal · no va al IVA' : 'FISCAL · con CAE · va al IVA'}${extra ? (fiscal === undefined ? '' : ' · ') + escaparHtml(extra) : ''}</div></div>${emisor}</div>`; }
+    <div><div style="font:800 1.05rem Arial;letter-spacing:.04em;text-transform:uppercase;">${escaparHtml(txt)}</div><div style="font-size:.82rem;opacity:.9;">${fiscal === undefined ? '' : fam === 'remito' ? (nf ? 'X · INTERNO · sin CAI' : 'R · con CAI') : nf ? 'SIN CAE · no fiscal · no va al IVA' : 'FISCAL · con CAE · va al IVA'}${extra ? (fiscal === undefined ? '' : ' · ') + escaparHtml(extra) : ''}</div></div>${emisor}</div>`; }
 document.addEventListener('keydown', e => { if((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')){ e.preventDefault(); try{ abrirBuscador(); } catch(x){} } });
 document.addEventListener('click', e => { document.querySelectorAll('details.pv-menu[open]').forEach(d => { if(!d.contains(e.target)) d.open = false; }); });
 document.addEventListener('change', e => { if(e.target && (e.target.name === 'fv-cond' || e.target.name === 'fv-fis')){ try{ fvTot(); } catch(x){} } });
@@ -22962,7 +22993,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-02-v457';
+const APP_VERSION = '2026-10-02-v458';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
