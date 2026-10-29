@@ -2413,17 +2413,20 @@ $('csv').onclick=()=>{
 let DL=null;
 if(window.claude&&window.claude.use){$('csv').hidden=true;window.claude.use('downloads').then(d=>{DL=d;$('csv').hidden=!d;}).catch(()=>{});}
 
+// ningun paso del arranque puede dejar la pantalla en "Cargando…": cada uno tiene tope de tiempo y sigue si falla
+const conTope=(p,ms,def)=>Promise.race([Promise.resolve(p).catch(e=>{console.warn(e);return def;}),new Promise(r=>setTimeout(()=>{console.warn('tope de tiempo');r(def);},ms))]);
+let __arranqueOk=false; setTimeout(()=>{ if(__arranqueOk) return; const c=$('cargando'); if(c&&!c.hidden){ c.innerHTML='Está tardando más de lo normal. <button type="button" class="btn" style="margin-left:8px;" onclick="location.reload()">Reintentar</button>'; } }, 30000);
 firebase.auth().onAuthStateChanged(async u=>{
   if(!u){location.replace('./');return;}
   try{const d=await db.collection('usuarios').doc(String(u.email).toLowerCase()).get();
     if(!d.exists||d.data().rol!=='dueño'){$('cargando').textContent='Solo el dueño puede ver los resultados de Mercado Libre.';return;}}catch(e){}
-  NAMES=(await idbApp('nombres_sku'))||{};
-  MOTIVOS=(await idbApp('motivos_sin_costo'))||{};
-  TIPO=(await idbApp('tipo_sku'))||{};
-  KITS=(await idbApp('kits_sku'))||{};
-  try{UV=(await idbApp('unidad_venta_sku'))||{};}catch(e){UV={};}
+  NAMES=(await conTope(idbApp('nombres_sku'),6000,null))||{};
+  MOTIVOS=(await conTope(idbApp('motivos_sin_costo'),4000,null))||{};
+  TIPO=(await conTope(idbApp('tipo_sku'),4000,null))||{};
+  KITS=(await conTope(idbApp('kits_sku'),4000,null))||{};
+  UV=(await conTope(idbApp('unidad_venta_sku'),4000,null))||{};
   {const s=$('modoCosto');if(s)s.value=MODO_COSTO;}
-  try{const s=await db.collection('historial_costos').get();const m={};s.docs.forEach(x=>{const v=x.data();const k=String(v.sku||'').toUpperCase();(m[k]=m[k]||[]).push({id:x.id,fecha:v.fecha,costo:+v.costo,creado:+v.creado||0});});
+  try{const s=await conTope(db.collection('historial_costos').get(),20000,{docs:[]});const m={};s.docs.forEach(x=>{const v=x.data();const k=String(v.sku||'').toUpperCase();(m[k]=m[k]||[]).push({id:x.id,fecha:v.fecha,costo:+v.costo,creado:+v.creado||0});});
     let ult={};try{const u=await db.collection('config').doc('costos_ultimo').get();ult=u.exists?(u.data().c||{}):{};}catch(e){}
     // un solo costo por dia: el ultimo cargado; sin hora de carga, el que coincide con el costo actual
     Object.entries(m).forEach(([k,a])=>{a.sort((x,y)=>x.fecha.localeCompare(y.fecha)||x.creado-y.creado);
@@ -2431,14 +2434,14 @@ firebase.auth().onAuthStateChanged(async u=>{
         const elegir=(x.creado&&prev.creado)?x:(ult[k]!=null&&Math.abs(x.costo-ult[k])<0.5?x:(ult[k]!=null&&Math.abs(prev.costo-ult[k])<0.5?prev:x));porDia[porDia.length-1]=elegir;}else porDia.push(x);});
       m[k]=porDia;});
     COSTOS=m;}catch(e){}
-  await cargarZonas();
+  await conTope(cargarZonas(),10000);
   procesando('Cargando los meses guardados…');
-  await cargarReclamos();
-  await cargarEquivalencias();
-  await cargarConfirmadas();
-  await cargarUnidades();
-  try{ await load(); }catch(e){ showErr('No se pudieron leer los meses: '+(e.message||e)); }
-  $('cargando').hidden=true;
+  await conTope(cargarReclamos(),10000);
+  await conTope(cargarEquivalencias(),10000);
+  await conTope(cargarConfirmadas(),10000);
+  await conTope(cargarUnidades(),10000);
+  try{ await conTope(load(),60000); }catch(e){ showErr('No se pudieron leer los meses: '+(e.message||e)); }
+  __arranqueOk=true; $('cargando').hidden=true;
   try{ render(); }catch(e){ console.error(e); showErr('Error al mostrar los resultados: '+(e.message||e)+' — envíe una captura de este mensaje.'); }
   procesando.fin(); try{ pintarBarraMeses(); }catch(e){}
   { const {sel}=periodosACargar(), ult=sel.slice().sort().pop(); if(ult&&$('resMes')&&[...$('resMes').options].some(o=>o.value===ult)){ $('resMes').value=ult; try{renderResumen();}catch(e){} } }
