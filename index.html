@@ -1816,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 29/10 v461</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 29/10 v462</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6625,9 +6625,10 @@ function telaNuevaForm(codigo){ return new Promise(resolve => {
       <div class="field" style="margin:0;"><label>Ancho (cm) *</label><input id="tn-ancho" type="number" step="0.1"></div>
       <div class="field" style="margin:0;"><label>Calidad (hilos)</label><input id="tn-hilos" type="number"></div>
       <div class="field" style="margin:0;"><label>Rendimiento (m/kg)</label><input id="tn-mkg" inputmode="decimal"></div>
-      <div class="field" style="margin:0;"><label>Precio</label><div style="display:flex;gap:4px;"><input id="tn-precio" inputmode="decimal" style="min-width:0;"><select id="tn-precio-u" style="width:auto;"><option value="m">por metro</option><option value="kg">por kilo</option></select></div></div>
     </div>
-    ${usos.length ? `<div class="field" style="margin:8px 0 0;"><label>Usos</label><div style="display:flex;gap:8px;flex-wrap:wrap;">${usos.map(u => `<label style="display:inline-flex;gap:4px;align-items:center;font-size:.84rem;"><input type="checkbox" class="tn-uso" value="${escapeAttr(u)}"> ${escaparHtml(u)}</label>`).join('')}</div></div>` : ''}
+    <div class="field" style="margin:8px 0 0;"><label>Precio</label><div style="display:flex;gap:6px;flex-wrap:wrap;"><select id="tn-mon" style="width:auto;flex:0 0 auto;"><option value="ARS">$ pesos</option><option value="USD">US$ dólares</option></select><input id="tn-precio" inputmode="decimal" placeholder="0,00" style="flex:1;min-width:120px;"><select id="tn-precio-u" style="width:auto;flex:0 0 auto;"><option value="m">por metro</option><option value="kg">por kilo</option></select></div>
+      <div class="note" style="text-align:left;margin:4px 0 0;">${tipoCambioTelas() ? 'En dólares se convierte a pesos con el tipo de cambio de Telas: $ ' + tipoCambioTelas().toLocaleString('es-AR') + '.' : 'En dólares: cargue el tipo de cambio en Telas para ver el costo en pesos.'}</div></div>
+    ${usos.length ? `<div class="field" style="margin:8px 0 0;"><label>Usos</label><div style="display:flex;gap:6px;flex-wrap:wrap;">${usos.map(u => `<span style="display:inline-flex;gap:5px;align-items:center;font-size:.84rem;white-space:nowrap;border:1px solid var(--line);border-radius:999px;padding:4px 10px;cursor:pointer;" onclick="if(event.target.tagName!=='INPUT'){const c=this.querySelector('input');c.checked=!c.checked;}"><input type="checkbox" class="tn-uso" value="${escapeAttr(u)}" style="width:15px;height:15px;margin:0;">${escaparHtml(u.charAt(0).toUpperCase() + u.slice(1).toLowerCase())}</span>`).join('')}</div></div>` : ''}
     <div class="field" style="margin:8px 0 0;"><label>Notas</label><input id="tn-notas"></div>
     <p class="error" id="tn-err" style="display:none;"></p>
     <div style="display:flex;gap:8px;margin-top:12px;"><button type="button" class="btn btn-gold" style="flex:1;" id="tn-ok">Guardar tela y seguir</button><button type="button" class="btn btn-ghost" style="width:auto;" id="tn-no">Cancelar</button></div></div>`;
@@ -6635,8 +6636,9 @@ function telaNuevaForm(codigo){ return new Promise(resolve => {
   ov.querySelector('#tn-no').onclick = () => { ov.remove(); resolve(false); };
   ov.querySelector('#tn-ok').onclick = async () => { const g = id => (ov.querySelector('#' + id) || {}).value || '', er = ov.querySelector('#tn-err');
     const t = { nombre: g('tn-nombre').trim(), color: g('tn-color'), composicion: g('tn-comp'), proveedor: g('tn-prov').trim(), ancho: parseFloat(g('tn-ancho')) || null, hilos: parseInt(g('tn-hilos'), 10) || null,
-      mPorKg: parseFloat(String(g('tn-mkg')).replace(',', '.')) || null, precio: numAr(g('tn-precio')) || null, precioUnidad: g('tn-precio-u') || 'm', usos: [...ov.querySelectorAll('.tn-uso:checked')].map(x => x.value), notas: g('tn-notas').trim(), alta: new Date().toISOString(), altaDesde: 'envío a taller' };
+      mPorKg: parseFloat(String(g('tn-mkg')).replace(',', '.')) || null, precio: g('tn-mon') === 'USD' ? null : (numAr(g('tn-precio')) || null), precioUsd: g('tn-mon') === 'USD' ? (numAr(g('tn-precio')) || null) : null, precioUnidad: g('tn-precio-u') || 'm', usos: [...ov.querySelectorAll('.tn-uso:checked')].map(x => x.value), notas: g('tn-notas').trim(), alta: new Date().toISOString(), altaDesde: 'envío a taller' };
     if(!t.ancho){ er.textContent = 'Falta el ancho.'; er.style.display = 'block'; return; }
+    if(t.precioUsd > 0 && tipoCambioTelas()) t.precio = Math.round(t.precioUsd * tipoCambioTelas() * 100) / 100; // igual que en Telas
     try{ const nuevas = { ...telasDatos.telas, [codigo]: t }; await db.collection('config').doc('telas').set({ ...telasDatos, telas: nuevas }); telasDatos.telas = nuevas;
       try{ const dl = document.getElementById('lista-telas'); if(dl && !dl.querySelector(`option[value="${codigo}"]`)) dl.insertAdjacentHTML('beforeend', `<option value="${escapeAttr(codigo)}">${escaparHtml(t.nombre || '')}</option>`); } catch(e){}
       ov.remove(); dsToast(`Tela ${codigo} cargada en Telas`); resolve(true); }
@@ -23095,7 +23097,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-29-v461';
+const APP_VERSION = '2026-10-29-v462';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
