@@ -1816,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 29/10 v460</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 29/10 v461</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6611,6 +6611,36 @@ function partidasEnTalleres(){
   return [...(enviosTela || []), ...sueltas].sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
 }
 function asignadoEnvio(id){ return Math.round(ordenesDeEnvio(id).reduce((s, o) => s + (+o.metrosTotales || 0), 0) * 100) / 100; }
+// tela que todavia no esta cargada: se da de alta con sus caracteristicas sin salir de la pantalla
+function telaNuevaForm(codigo){ return new Promise(resolve => {
+  const ov = document.createElement('div'); ov.id = 'tn-ov'; ov.style.cssText = 'position:fixed;inset:0;background:rgba(20,8,35,.55);z-index:900;display:flex;align-items:center;justify-content:center;padding:12px;';
+  const usos = (telasDatos && telasDatos.usos) || [];
+  ov.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:620px;width:100%;max-height:90vh;overflow:auto;padding:16px 18px;">
+    <b style="font-size:1.05rem;color:#3D2B4E;">🧵 Tela nueva: ${escaparHtml(codigo)}</b><p class="note" style="text-align:left;margin:4px 0 10px;">Esta tela no está cargada. Complete sus datos y se guarda en Telas; después sigue el envío.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;">
+      <div class="field" style="margin:0;"><label>Nombre</label><input id="tn-nombre" placeholder="ej: Percal 200 hilos"></div>
+      <div class="field" style="margin:0;"><label>Proveedor</label><input id="tn-prov" list="lista-proveedores-tela"></div>
+      <div class="field" style="margin:0;"><label>Color</label><select id="tn-color">${opcionesColorTela('')}</select></div>
+      <div class="field" style="margin:0;"><label>Composición</label><select id="tn-comp"><option value="">—</option>${COMPOSICIONES_TELA.map(c => `<option>${c}</option>`).join('')}</select></div>
+      <div class="field" style="margin:0;"><label>Ancho (cm) *</label><input id="tn-ancho" type="number" step="0.1"></div>
+      <div class="field" style="margin:0;"><label>Calidad (hilos)</label><input id="tn-hilos" type="number"></div>
+      <div class="field" style="margin:0;"><label>Rendimiento (m/kg)</label><input id="tn-mkg" inputmode="decimal"></div>
+      <div class="field" style="margin:0;"><label>Precio</label><div style="display:flex;gap:4px;"><input id="tn-precio" inputmode="decimal" style="min-width:0;"><select id="tn-precio-u" style="width:auto;"><option value="m">por metro</option><option value="kg">por kilo</option></select></div></div>
+    </div>
+    ${usos.length ? `<div class="field" style="margin:8px 0 0;"><label>Usos</label><div style="display:flex;gap:8px;flex-wrap:wrap;">${usos.map(u => `<label style="display:inline-flex;gap:4px;align-items:center;font-size:.84rem;"><input type="checkbox" class="tn-uso" value="${escapeAttr(u)}"> ${escaparHtml(u)}</label>`).join('')}</div></div>` : ''}
+    <div class="field" style="margin:8px 0 0;"><label>Notas</label><input id="tn-notas"></div>
+    <p class="error" id="tn-err" style="display:none;"></p>
+    <div style="display:flex;gap:8px;margin-top:12px;"><button type="button" class="btn btn-gold" style="flex:1;" id="tn-ok">Guardar tela y seguir</button><button type="button" class="btn btn-ghost" style="width:auto;" id="tn-no">Cancelar</button></div></div>`;
+  document.body.appendChild(ov); setTimeout(() => { const e = ov.querySelector('#tn-nombre'); if(e) e.focus(); }, 30);
+  ov.querySelector('#tn-no').onclick = () => { ov.remove(); resolve(false); };
+  ov.querySelector('#tn-ok').onclick = async () => { const g = id => (ov.querySelector('#' + id) || {}).value || '', er = ov.querySelector('#tn-err');
+    const t = { nombre: g('tn-nombre').trim(), color: g('tn-color'), composicion: g('tn-comp'), proveedor: g('tn-prov').trim(), ancho: parseFloat(g('tn-ancho')) || null, hilos: parseInt(g('tn-hilos'), 10) || null,
+      mPorKg: parseFloat(String(g('tn-mkg')).replace(',', '.')) || null, precio: numAr(g('tn-precio')) || null, precioUnidad: g('tn-precio-u') || 'm', usos: [...ov.querySelectorAll('.tn-uso:checked')].map(x => x.value), notas: g('tn-notas').trim(), alta: new Date().toISOString(), altaDesde: 'envío a taller' };
+    if(!t.ancho){ er.textContent = 'Falta el ancho.'; er.style.display = 'block'; return; }
+    try{ const nuevas = { ...telasDatos.telas, [codigo]: t }; await db.collection('config').doc('telas').set({ ...telasDatos, telas: nuevas }); telasDatos.telas = nuevas;
+      try{ const dl = document.getElementById('lista-telas'); if(dl && !dl.querySelector(`option[value="${codigo}"]`)) dl.insertAdjacentHTML('beforeend', `<option value="${escapeAttr(codigo)}">${escaparHtml(t.nombre || '')}</option>`); } catch(e){}
+      ov.remove(); dsToast(`Tela ${codigo} cargada en Telas`); resolve(true); }
+    catch(e){ er.textContent = 'No se pudo guardar: ' + e.message; er.style.display = 'block'; } }; }); }
 async function guardarEnvioTela(){
   const err = document.getElementById('et-error'); err.style.display = 'none';
   const d = {
@@ -6622,6 +6652,8 @@ async function guardarEnvioTela(){
     creado: new Date().toISOString(),
   };
   if(!d.taller || !d.skuTela || !(d.metros > 0)){ err.textContent = 'Complete taller, código de tela y metros.'; err.style.display = 'block'; return; }
+  try{ if(telasDatos === null) await cargarTelas(); } catch(e){}
+  if(telasDatos && telasDatos.telas && !telasDatos.telas[d.skuTela]){ if(!await telaNuevaForm(d.skuTela)) return; }
   const ft = document.getElementById('et-foto').files[0];
   if(ft){ try{ d.remitoFoto = await fotoRemito(ft); } catch(e){ err.textContent = 'No se pudo leer la foto.'; err.style.display = 'block'; return; } }
   try{
@@ -23063,7 +23095,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-29-v460';
+const APP_VERSION = '2026-10-29-v461';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
