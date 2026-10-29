@@ -1816,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 29/10 v462</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 29/10 v463</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -1918,7 +1918,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
               <span style="display:flex;gap:6px;">
                 <button type="button" class="btn-mini" onclick="const d=document.getElementById('ac-mas'); d.open=true; d.scrollIntoView({behavior:'smooth', block:'start'});" title="Editar piezas, anchos, confección y empaque">✏️</button>
                 <button type="button" class="btn-mini" onclick="renombrarAC()" title="Cambiar el nombre">🔤</button>
-                <button type="button" class="btn-mini" onclick="unirArticuloAbiertoAC()" title="Unir con otro artículo">🔀</button>
+                <button type="button" class="btn-mini" onclick="abrirHistorialArticulo(acArticulo)" title="Cambios guardados y volver a una versión anterior">🕒</button><button type="button" class="btn-mini" onclick="unirArticuloAbiertoAC()" title="Unir con otro artículo">🔀</button>
                 <button type="button" class="btn-mini" onclick="borrarAC()" title="Borrar">🗑️</button>
               </span>
             </div>
@@ -3535,6 +3535,7 @@ async function cargarTablaConsumo(){
     tablaConsumo = doc.exists ? doc.data() : {};
     migrarTextosCorte();
     sembrarBatasMicrofibra();
+    tcUltimoGuardado = tcFoto();
   } catch(e){
     console.error('Error cargando la tabla de consumo:', e);
     tablaConsumo = tablaConsumo || {};
@@ -4962,9 +4963,50 @@ function refrescarArticulosInstruccion(seleccionar){
   if(sel._sync) sel._sync();
   renderListaInstrucciones();
 }
-async function guardarTablaYConsumo(){
+function nombreTelaOT(sku){ try{ const t = telasDatos && telasDatos.telas && telasDatos.telas[String(sku || '').toUpperCase()]; return t && t.nombre ? ` (${t.nombre})` : ''; } catch(e){ return ''; } }
+// cada cambio en un articulo queda guardado (antes y despues) para poder volver atras; y se avisa si un costo salta mas de 50 %
+let tcUltimoGuardado = null;
+function tcFoto(){ return JSON.stringify({ a: (tablaConsumo || {}).articulos || {}, i: (tablaConsumo || {}).instrucciones || {}, e: (tablaConsumo || {}).empaque || {} }); }
+function skusDeArticulo(art){ const L = []; (CATALOGO || []).forEach(c => (c.productos || []).forEach(p => (p.variantes || []).forEach(v => { const S = String(v.sku || '').toUpperCase(); try{ if(S && articuloDeSku(S) === art) L.push(S); } catch(e){} }))); return L; }
+async function guardarTablaYConsumo(opt){
+  opt = opt || {};
+  if(tcUltimoGuardado && !opt.sinControl){ try{
+    const viejo = JSON.parse(tcUltimoGuardado), nuevo = JSON.parse(tcFoto()), arts = [...new Set([...Object.keys(viejo.a), ...Object.keys(nuevo.a), ...Object.keys(viejo.i), ...Object.keys(nuevo.i), ...Object.keys(viejo.e), ...Object.keys(nuevo.e)])];
+    const cambiados = arts.filter(a => JSON.stringify([viejo.a[a], viejo.i[a], viejo.e[a]]) !== JSON.stringify([nuevo.a[a], nuevo.i[a], nuevo.e[a]]));
+    if(cambiados.length && cambiados.length <= 15){
+      // costos antes y despues del cambio
+      const ahoraA = tablaConsumo.articulos, ahoraI = tablaConsumo.instrucciones, ahoraE = tablaConsumo.empaque, saltos = [];
+      const skus = [...new Set(cambiados.flatMap(skusDeArticulo))], cDesp = {}, cAntes = {};
+      skus.forEach(S => { try{ cDesp[S] = costoVentaSku(S); } catch(e){} });
+      tablaConsumo.articulos = viejo.a; tablaConsumo.instrucciones = viejo.i; tablaConsumo.empaque = viejo.e;
+      skus.forEach(S => { try{ cAntes[S] = costoVentaSku(S); } catch(e){} });
+      tablaConsumo.articulos = ahoraA; tablaConsumo.instrucciones = ahoraI; tablaConsumo.empaque = ahoraE;
+      skus.forEach(S => { const a = cAntes[S], d = cDesp[S]; if(a > 0 && d > 0 && Math.abs(d / a - 1) > 0.5) saltos.push(`${S}: ${formatPrice(a)} → ${formatPrice(d)} (${d > a ? '+' : ''}${Math.round((d / a - 1) * 100)} %)`); });
+      if(saltos.length && !await dsConfirm(`Con este cambio, el costo de ${saltos.length} SKU cambia más de 50 %:\n\n${saltos.slice(0, 12).join('\n')}${saltos.length > 12 ? '\n…' : ''}\n\n¿Guardar igual? (si fue un error, toque Cancelar y no se guarda)`)){
+        tablaConsumo.articulos = viejo.a; tablaConsumo.instrucciones = viejo.i; tablaConsumo.empaque = viejo.e;
+        try{ if(typeof renderListaAC === 'function') renderListaAC(); if(acArticulo) abrirArticuloAC(acArticulo); } catch(e){}
+        throw new Error('Cancelado: el cambio no se guardó.'); }
+      const por = ((firebase.auth().currentUser || {}).email) || '', fecha = new Date().toISOString();
+      cambiados.forEach(a => db.collection('articulos_historial').add({ articulo: a, antes: { articulo: viejo.a[a] || null, instrucciones: viejo.i[a] || null, empaque: viejo.e[a] || null }, despues: { articulo: nuevo.a[a] || null, instrucciones: nuevo.i[a] || null, empaque: nuevo.e[a] || null }, fecha, por }).catch(() => {}));
+    } } catch(e){ if(/^Cancelado/.test(e.message)) throw e; console.error(e); } }
   await db.collection('config').doc('tabla_consumo_telas').set(JSON.parse(JSON.stringify(tablaConsumo)));
+  tcUltimoGuardado = tcFoto();
 }
+async function abrirHistorialArticulo(art){ pvModal('🕒 Cambios de ' + art, '<p class="empty-msg">Cargando…</p>'); let L = [];
+  try{ const s = await db.collection('articulos_historial').where('articulo', '==', art).get(); L = s.docs.map(d => ({ _id: d.id, ...d.data() })).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha))); } catch(e){}
+  try{ await cargarNombresUsuarios(); } catch(e){}
+  document.getElementById('pub-cont').innerHTML = L.length ? `<p class="note" style="text-align:left;margin:0 0 8px;">Cada vez que se guardó un cambio en este artículo. <b>Volver a esta versión</b> deja el artículo como estaba <b>antes</b> de ese cambio (con sus cortes, medidas e instrucciones).</p>
+    <div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;">${L.slice(0, 40).map(x => `<div style="display:flex;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid #F3EFE8;font-size:.84rem;"><span style="width:120px;color:#6B6258;">${new Date(x.fecha).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}</span><span style="flex:1;color:#6B6258;">${escaparHtml(nomUsu(x.por))}</span><button type="button" class="btn-mini" onclick="volverVersionArticulo('${x._id}')">Volver a esta versión</button></div>`).join('')}</div>`
+    : '<p class="empty-msg">Todavía no hay cambios guardados de este artículo (se registran desde ahora).</p>';
+  window.__histArt = L; }
+async function volverVersionArticulo(id){ const x = (window.__histArt || []).find(y => y._id === id); if(!x) return; const art = x.articulo;
+  if(!await dsConfirm(`¿Dejar "${art}" como estaba antes del cambio del ${new Date(x.fecha).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}?`)) return;
+  const A = x.antes || {}; tablaConsumo.articulos = tablaConsumo.articulos || {}; tablaConsumo.instrucciones = tablaConsumo.instrucciones || {}; tablaConsumo.empaque = tablaConsumo.empaque || {};
+  if(A.articulo) tablaConsumo.articulos[art] = A.articulo; else delete tablaConsumo.articulos[art];
+  if(A.instrucciones) tablaConsumo.instrucciones[art] = A.instrucciones; else delete tablaConsumo.instrucciones[art];
+  if(A.empaque) tablaConsumo.empaque[art] = A.empaque; else delete tablaConsumo.empaque[art];
+  try{ await guardarTablaYConsumo({ sinControl: true }); } catch(e){ alert('No se pudo volver: ' + e.message); return; }
+  cerrarPublicar(); dsToast(`"${art}" volvió a la versión anterior`); try{ renderListaAC(); abrirArticuloAC(art); } catch(e){} }
 async function nuevoArticuloInstruccion(){
   const nombre = (prompt('Nombre del artículo nuevo (ej: Acolchado 2 1/2):') || '').trim();
   if(!nombre) return;
@@ -15827,7 +15869,7 @@ async function generarOrdenTrabajoCompletaReal(){
   const lineas = [
     `🧵 ORDEN DE TRABAJO ${numeroFormateado}`,
     `Taller: ${taller}`,
-    `Tela: ${skuTela} · ${metrosTotales} m entregados`,
+    `Tela: ${skuTela}${nombreTelaOT(skuTela)} · ${metrosTotales} m entregados`,
     ...(anchoComunOT(renglones) ? [`Ancho de tela: ${anchoComunOT(renglones)} cm`] : []),
     ...(comprobante ? [`Comprobante: ${comprobante}`] : []),
     '',
@@ -15945,7 +15987,7 @@ function compartirOrdenTrabajo(modo){
 }
 
 // ===== PDF de la orden de trabajo (texto + bosquejos) =====
-function limpiarPDF(t){ return String(t == null ? '' : t).replace(/≈/g, '~').replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu, '').replace(/\s+/g, ' ').trim(); }
+function limpiarPDF(t){ return String(t == null ? '' : t).replace(/≈/g, '~').replace(/→/g, ':').replace(/[–—]/g, '-').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu, '').replace(/[^\x00-\xFF]/g, '').replace(/\s+/g, ' ').trim(); }
 function numPDF(n){ return String(Math.round((+n || 0) * 100) / 100).replace('.', ','); }
 async function generarPDFOrden(o){
   const { jsPDF } = window.jspdf;
@@ -15962,7 +16004,7 @@ async function generarPDFOrden(o){
   let y = 31;
   const dato = (k, v) => { if(!v && v !== 0) return; doc.setFont('helvetica', 'bold'); doc.text(k, M, y); doc.setFont('helvetica', 'normal'); doc.text(limpiarPDF(v), M + 34, y); y += 6; };
   dato('Taller:', o.taller);
-  dato('Tela:', `${o.skuTela || ''} · ${numPDF(o.metrosTotales)} m entregados`);
+  dato('Tela:', `${o.skuTela || ''}${nombreTelaOT(o.skuTela)} · ${numPDF(o.metrosTotales)} m entregados`);
   if(ancho) dato('Ancho de tela:', ancho + ' cm');
   dato('Comprobante:', o.comprobante);
   y += 2;
@@ -16245,7 +16287,7 @@ function renderHistorialOT(filtro){
         </div>
         <div class="hist-body">
           <div style="margin-bottom:8px;line-height:1.5;">
-            <b>Tela:</b> ${escaparHtml(o.skuTela||'')} — ${o.metrosTotales||0} m entregados
+            <b>Tela:</b> ${escaparHtml((o.skuTela||'') + nombreTelaOT(o.skuTela))} — ${o.metrosTotales||0} m entregados
             ${o.comprobante ? `<br><b>Comprobante:</b> ${escaparHtml(o.comprobante)}` : ''}
             ${o.notaGeneral ? `<br><b>Nota:</b> ${escaparHtml(o.notaGeneral)}` : ''}
             ${o.merma ? `<br><b>Merma:</b> ${escaparHtml(textoMerma(o.merma))}` : ''}
@@ -16301,7 +16343,7 @@ function compartirTextoOrdenGuardada(docId, modo){
   const lineas = [
     `🧵 ORDEN DE TRABAJO ${orden.numero}`,
     `Taller: ${orden.taller}`,
-    `Tela: ${orden.skuTela} · ${orden.metrosTotales} m entregados`,
+    `Tela: ${orden.skuTela}${nombreTelaOT(orden.skuTela)} · ${orden.metrosTotales} m entregados`,
     ...(anchoComunOT(orden.renglones) ? [`Ancho de tela: ${anchoComunOT(orden.renglones)} cm`] : []),
     ...(orden.comprobante ? [`Comprobante: ${orden.comprobante}`] : []),
     '',
@@ -23097,7 +23139,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-29-v462';
+const APP_VERSION = '2026-10-29-v463';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
