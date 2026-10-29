@@ -1072,6 +1072,7 @@ function renderResumen(){
       ${cc.length?`<div class="rchips"><span title="Resultado sobre todo lo que entró">${entro>0?(res/entro*100).toLocaleString('es-AR',{maximumFractionDigits:1}):'–'} % sobre lo que entró</span><span title="Resultado sobre el costo de lo vendido">${costo>0?(res/costo*100).toLocaleString('es-AR',{maximumFractionDigits:1}):'–'} % sobre el costo</span></div>`:''}
     </div>
   </div>
+  ${htmlCalcML(r,vs,cc.length?costo:null)}
   <details class="res-det" ${wasOpen?'open':''}><summary>Ver detalle</summary>
   <span class="res-cta">${vs.length.toLocaleString('es-AR')} ventas${fc?' · cuenta '+fc:' · todas las cuentas'} · incluye todo lo que ML cobró en el mes</span>
   <table class="res">
@@ -1941,6 +1942,40 @@ function renderCuotas(){
     ${ps.length>1?`<b style="font-size:.9rem;color:#3d1466;">Mes por mes</b> <small class="meta">(ganancia sobre el costo)</small>
     <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;margin-top:6px;"><tr style="color:#8A8072;font-size:.75rem;text-transform:uppercase;"><td style="padding:6px;">Mes</td><td style="padding:6px;text-align:right;">💵 Sin cuotas</td><td style="padding:6px;text-align:right;">💳 Con cuotas</td><td style="padding:6px;text-align:center;">Deja más</td></tr>${filas}</table></div>`:''}
     <p class="note" style="margin-top:6px;">Ganancia por venta (lo que te quedó − costo), sin los cargos generales del mes. Respeta la cuenta elegida arriba.</p>`;
+}
+// ===== Como se calcula: del precio al resultado, de cada $100 y cargos sueltos (con los filtros del resumen) =====
+function calcAbierto(){try{return localStorage.getItem('ml.calcCerrado')!=='1';}catch(e){return true;}}
+function htmlCalcML(r,vs,costo){
+  const an=r.filter(o=>!vs.includes(o)&&(o.pcd<0||(o.tipo==='Venta'&&!(o.pcd>0)&&o.neto)||(o.esDevol&&o.tipo!=='Venta'))), su=r.filter(o=>!vs.includes(o)&&!an.includes(o));
+  const S=(A,f)=>A.reduce((a,o)=>a+(f(o)||0),0), V=S(vs,o=>o.pcd); if(!(V>0))return '';
+  const cad=-S(vs,o=>o.cad), acrV=S(vs,o=>o.neto)+cad, cargos=V-acrV, anul=-S(an,o=>o.neto), acred=acrV-cad-anul, gan=costo!=null?acred-costo:null;
+  const G={}; su.forEach(o=>{const k=/publicidad|ads|mclick|publicac/i.test(o.tipo)?'Publicidad':/almacen/i.test(o.tipo)?'Almacenamiento Full':/colecta/i.test(o.tipo)?'Colecta Full':/antig/i.test(o.tipo)?'Stock antiguo Full':/reten|percep|impuest/i.test(o.tipo)?'Retenciones de la cuenta (IIBB, SIRCREB)':/env/i.test(o.tipo)?'Envíos sueltos':o.tipo||'Otros';G[k]=(G[k]||0)+(o.neto||0);});
+  const sL=Object.entries(G).filter(([,v])=>Math.round(v)!==0).sort((a,b)=>a[1]-b[1]), sT=sL.reduce((a,[,v])=>a+v,0), res=gan!=null?gan+sT:null;
+  const f=v=>fmt(Math.abs(v)), pc=v=>(Math.abs(v)/V*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1});
+  const sc=v=>Math.max(0,Math.min(100,v/V*100));
+  const fila=(t,izq,ancho,col,val,cls,raya)=>`<div style="display:contents;"><div style="font-size:.86rem;${cls?'font-weight:800;':''}">${t}</div><div style="height:22px;position:relative;">${raya?`<i style="position:absolute;inset:0;border-radius:5px;background:repeating-linear-gradient(90deg,${col}33 0 8px,#fff 8px 16px);border:1px solid ${col}55;"></i>`:`<i style="position:absolute;top:0;height:100%;left:${izq}%;width:${ancho}%;background:${col};border-radius:5px;"></i>`}</div><div style="text-align:right;font-weight:700;color:${col};font-size:.9rem;">${val}</div></div>`;
+  const sep='<div style="grid-column:1/-1;border-top:1px dashed var(--line,#E3DCD2);"></div>';
+  let a=V; const w=[fila('Ventas (lo que pagó el comprador)',0,sc(V),'#5b2a86',fmt(V))];
+  [['− Comisión, cuotas, cargo fijo, envío y retenciones de cada venta',cargos,'#A6432F'],['− Cadete del Flex',cad,'#C46B4C'],['− Anulaciones y reintegros',anul,'#D08A6A']].forEach(([t,v,c])=>{if(Math.round(v)===0)return;w.push(fila(t,sc(a-v),sc(Math.abs(v)),c,(v<0?'+ ':'− ')+f(v)));a-=v;});
+  w.push(sep,fila('= Le acreditó ML por las ventas',0,sc(acred),'#2E5A8C',fmt(acred),1));
+  w.push(costo!=null?fila('− Costo de la mercadería (si la mercadería volvió, no se resta)',sc(acred-costo),sc(costo),'#8A8072','− '+f(costo)):fila('− Costo de la mercadería',0,100,'#8A8072','falta cargar',0,1));
+  w.push(sep,gan!=null?fila('= Ganancia por ventas <small class="meta">(Fabricado vs reventa)</small>',0,sc(Math.max(0,gan)),'#7B4F9E',fmt(gan),1):fila('= Ganancia por ventas',0,100,'#7B4F9E','–',1,1));
+  if(sL.length)w.push(fila('− Cargos sueltos del mes',gan!=null?sc(Math.max(0,gan+sT)):0,sc(Math.abs(sT)),'#A6432F','− '+f(sT)));
+  w.push(sep,res!=null?fila('= Resultado del mes',0,sc(Math.max(0,res)),res<0?'#A6432F':'#2F7A47',fmt(res),1):fila('= Resultado del mes',0,100,'#2F7A47','–',1,1));
+  const P=[['Comisión (cargo por vender)',-S(vs,o=>o.vender),'#A6432F'],['Cargo fijo por unidad',-S(vs,o=>o.unidad),'#C46B4C'],['Cuotas',-S(vs,o=>o.cuotas),'#D08A6A'],['Cadete del Flex',cad,'#B79A5B'],['Retenciones de la venta',-S(vs,o=>o.ret),'#8A8072']].filter(x=>x[1]>0.5);
+  const usado=P.reduce((s,x)=>s+x[1],0), bon=cargos-(usado-cad), queda=V-usado+(-bon);
+  const barra=P.map(([t,v,c])=>`<div title="${t}" style="width:${sc(v)}%;background:${c};color:#fff;font-size:.68rem;font-weight:700;display:flex;align-items:center;justify-content:center;">${v/V>0.04?pc(v):''}</div>`).join('')+`<div style="flex:1;background:#2F7A47;color:#fff;font-size:.74rem;font-weight:700;display:flex;align-items:center;justify-content:center;">le quedan $ ${pc(queda)}</div>`;
+  const ley=P.map(([t,v,c])=>`<div style="display:flex;gap:8px;align-items:center;font-size:.8rem;padding:2px 0;"><span style="width:11px;height:11px;border-radius:3px;background:${c};"></span><span style="flex:1;">${t}</span><b>$ ${pc(v)}</b></div>`).join('')
+    +(Math.abs(bon)>0.5?`<div style="display:flex;gap:8px;align-items:center;font-size:.8rem;padding:2px 0;"><span style="width:11px;height:11px;border-radius:3px;background:#2E5A8C;"></span><span style="flex:1;">${bon<0?'Bonificación de envíos y otros ajustes (suma)':'Envíos y otros cargos'}</span><b style="color:${bon<0?'#2F7A47':'#A6432F'};">${bon<0?'+':'−'} $ ${pc(bon)}</b></div>`:'')
+    +`<div style="display:flex;gap:8px;align-items:center;font-size:.82rem;padding:3px 0;border-top:1px solid var(--line,#E3DCD2);margin-top:3px;"><span style="width:11px;height:11px;border-radius:3px;background:#2F7A47;"></span><b style="flex:1;">Le queda antes del costo del producto</b><b style="color:#2F7A47;">$ ${pc(queda)}</b></div>`;
+  const tS=sL.map(([k,v])=>`<div style="display:flex;justify-content:space-between;font-size:.82rem;padding:4px 0;border-bottom:1px solid #F3EFE8;"><span>${k}</span><b>${f(v)}</b></div>`).join('')+(sL.length?`<div style="display:flex;justify-content:space-between;font-size:.84rem;padding:5px 0;"><b>Total</b><b>${f(sT)}</b></div>`:'<p class="note">Sin cargos sueltos.</p>');
+  return `<details ${calcAbierto()?'open':''} ontoggle="try{localStorage.setItem('ml.calcCerrado',this.open?'0':'1')}catch(e){}" style="margin:16px 0 6px;"><summary style="cursor:pointer;font-weight:700;color:#3d1466;">Cómo se calcula</summary>
+    <div style="background:#fff;border:1px solid var(--line,#E3DCD2);border-radius:14px;padding:14px 16px;margin-top:8px;"><b style="font-size:.9rem;color:#3d1466;">Del precio de venta al resultado</b>
+      <div style="display:grid;grid-template-columns:minmax(180px,280px) 1fr 150px;gap:6px 12px;align-items:center;margin-top:8px;">${w.join('')}</div>
+      <p class="note" style="margin-top:8px;">Hasta <b>Ganancia por ventas</b> llega <b>Fabricado vs reventa</b>; hasta <b>Resultado del mes</b>, este resumen.</p></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:12px;">
+      <div style="background:#fff;border:1px solid var(--line,#E3DCD2);border-radius:14px;padding:14px 16px;"><b style="font-size:.9rem;color:#3d1466;">De cada $ 100 que paga el comprador</b><div style="display:flex;height:30px;border-radius:8px;overflow:hidden;margin:8px 0;">${barra}</div>${ley}${Math.round(anul)?`<p class="note" style="margin-top:6px;">Antes de las anulaciones, que restan $ ${pc(anul)} más.</p>`:''}</div>
+      <div style="background:#fff;border:1px solid var(--line,#E3DCD2);border-radius:14px;padding:14px 16px;"><b style="font-size:.9rem;color:#3d1466;">Cargos sueltos del mes</b><div style="margin-top:6px;">${tS}</div><p class="note" style="margin-top:6px;">No tienen SKU: no se asignan a un producto. Por eso Fabricado vs reventa no los resta y el resumen sí.</p></div></div></details>`;
 }
 // ===== Fabricado vs reventa (y telas, juegos armados), por mes y por logistica =====
 function renderOrigen(){
