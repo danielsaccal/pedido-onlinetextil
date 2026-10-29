@@ -1959,7 +1959,7 @@ function htmlCalcML(r,vs,costo){
   const an=r.filter(o=>!vs.includes(o)&&(o.pcd<0||(o.tipo==='Venta'&&!(o.pcd>0)&&o.neto)||(o.esDevol&&o.tipo!=='Venta'))), su=r.filter(o=>!vs.includes(o)&&!an.includes(o));
   const S=(A,f)=>A.reduce((a,o)=>a+(f(o)||0),0), V=S(vs,o=>o.pcd); if(!(V>0))return '';
   const cad=-S(vs,o=>o.cad), acrV=S(vs,o=>o.neto)+cad, cargos=V-acrV, anul=-S(an,o=>o.neto), acred=acrV-cad-anul, gan=costo!=null?acred-costo:null;
-  const G={}; su.forEach(o=>{const k=/publicidad|ads|mclick|publicac/i.test(o.tipo)?'Publicidad':/almacen/i.test(o.tipo)?'Almacenamiento Full':/colecta/i.test(o.tipo)?'Colecta Full':/antig/i.test(o.tipo)?'Stock antiguo Full':/reten|percep|impuest/i.test(o.tipo)?'Retenciones de la cuenta (IIBB, SIRCREB)':/env/i.test(o.tipo)?'Envíos sueltos':o.tipo||'Otros';G[k]=(G[k]||0)+(o.neto||0);});
+  const G={}; su.forEach(o=>{const k=/publicidad|ads|mclick|publicac/i.test(o.tipo)?'Publicidad':/almacen/i.test(o.tipo)?'Almacenamiento Full':/colecta/i.test(o.tipo)?'Colecta Full':/antig/i.test(o.tipo)?'Stock antiguo Full':/reten|percep|impuest/i.test(o.tipo)?'Percepciones de IVA e IIBB (factura mensual de ML)':/env/i.test(o.tipo)?'Envíos sueltos':o.tipo||'Otros';G[k]=(G[k]||0)+(o.neto||0);});
   const sL=Object.entries(G).filter(([,v])=>Math.round(v)!==0).sort((a,b)=>a[1]-b[1]), sT=sL.reduce((a,[,v])=>a+v,0), res=gan!=null?gan+sT:null;
   const f=v=>fmt(Math.abs(v)), pc=v=>(Math.abs(v)/V*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1});
   const sc=v=>Math.max(0,Math.min(100,v/V*100));
