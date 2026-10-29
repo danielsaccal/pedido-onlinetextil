@@ -649,7 +649,7 @@ function marcarRaros(){
     const am=porMes[clave(o)+'|'+o.periodo], at=porSku[clave(o)];
     const base=am&&am.length>=3?am:at; if(!base||base.length<3)continue;
     const m=med(base), p=o.pcd/o.unid;
-    if(m>0&&p<m*0.75)o.raro={med:m,pct:1-p/m};
+    if(m>0&&p<m*0.75&&!CONFIRMADAS[String(o.op||'')+'|'+String(o.skuBaseML||o.skuBase)])o.raro={med:m,pct:1-p/m};
   }
 }
 function applyCadeteBase(){
@@ -1379,8 +1379,14 @@ async function confirmarTodasSku(s){
 async function confirmarVenta(op,sku){
   CONFIRMADAS[String(op)+'|'+sku]={por:((firebase.auth().currentUser||{}).email||''),fecha:new Date().toISOString(),como:'una'};
   try{await db.collection('config').doc('ml_confirmadas').set({ops:CONFIRMADAS});}catch(e){showErr('No se pudo guardar: '+e.message);return;}
-  render();
+  allRows().forEach(x=>{ if(String(x.op)===String(op)&&String(x.skuBaseML||x.skuBase)===String(sku)) x.raro=null; });
+  try{ aplicarCostos(); }catch(e){} render(); alertOk('✓ Venta marcada como bien: sale de la lista');
 }
+// cambiar el SKU desde el detalle de una venta: solo esta venta o todas las de ese SKU de la cuenta
+function cambiarSkuAca(btn,op,cta,sku){ const w=btn.closest('.corr-wrap'); let c=w.querySelector('.sku-form'); if(c){c.remove();return;}
+  c=document.createElement('div'); c.className='sku-form'; c.style.cssText='display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px;background:#FAF8F5;border:1px solid var(--line);border-radius:10px;padding:8px;';
+  c.innerHTML=`<span style="font-size:.84rem;">En ML figura <b>${escHtml(sku)}</b>. SKU correcto en la app:</span><input placeholder="ej: TT120C o TT120C x 2" list="eqSinMatch" style="width:170px;height:30px;padding:3px 8px;border:1px solid var(--line);border-radius:8px;text-transform:uppercase;" onclick="event.stopPropagation()"><button type="button" style="padding:5px 10px;border-radius:8px;border:none;background:#3d1466;color:#fff;font-weight:700;cursor:pointer;" onclick="event.stopPropagation();skuSoloVenta('${op}','${sku}',this.parentElement.querySelector('input').value)">Solo esta venta</button><button type="button" style="padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:#3d1466;font-weight:700;cursor:pointer;" onclick="event.stopPropagation();aplicarCambioSku('${cta}','${sku}',this.parentElement.querySelector('input').value)">Todas las de ${escHtml(sku)}</button>`;
+  w.appendChild(c); c.querySelector('input').focus(); }
 const escHtml=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // confirmadas: quien, cuando y deshacer
 function htmlConfirmadas(){
@@ -2375,7 +2381,7 @@ function card(o){
     ${L.map(x=>fila(x[0],x[1])).join('')}${L2.map(x=>fila(x[0],x[1],x[2])).join('')}${fila('Le queda',o.neto,'sum')}
     ${o.costo!=null?fila(`Costo <small class="meta">(${fmt2(o.costo/o.unid)} c/u${MODO_COSTO==='actual'?', actual':', a la fecha'})</small>`,-o.costo):''}
     ${o.costo==null&&o.costoRev!=null?fila(`Costo <small class="meta">(${fmt2(o.costoRev/o.unid)} c/u · ${o.unid} unid.)</small>`,-o.costoRev):''}
-    ${o.tipo==='Venta'&&o.pcd>0&&o.skuBase?`<div class="corr-wrap" style="margin:4px 0 6px;"><button type="button" style="padding:3px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:.8rem;" onclick="event.stopPropagation();pedirCorregirCosto(this,'${String(o.skuBase).replace(/'/g,'')}')">✏️ Corregir costo de ${o.skuBase}</button></div>`:''}
+    ${o.tipo==='Venta'&&o.pcd>0&&o.skuBase?`<div class="corr-wrap" style="margin:4px 0 6px;display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start;">${(o.raro||o.revisar)&&!CONFIRMADAS[String(o.op||'')+'|'+String(o.skuBaseML||o.skuBase)]?`<button type="button" style="padding:3px 10px;border-radius:8px;border:1px solid #BFE3CB;background:#EEF8F1;color:#2F7A47;font-weight:700;cursor:pointer;font-size:.8rem;" onclick="event.stopPropagation();confirmarVenta('${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">✓ Está bien</button>`:''}<button type="button" style="padding:3px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:.8rem;" onclick="event.stopPropagation();cambiarSkuAca(this,'${o.op}','${o.cuenta}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')">🔁 Cambiar SKU</button><button type="button" style="padding:3px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:.8rem;" onclick="event.stopPropagation();pedirCorregirCosto(this,'${String(o.skuBase).replace(/'/g,'')}')">✏️ Corregir costo de ${o.skuBase}</button></div>`:''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px;">
       ${chip('Le queda',fmt(o.neto)+(o.pct!=null?` · ${pctf(o.pct)}`:''),'#3d1466')}
       ${o.costo!=null?chip('Ganancia',fmt(o.gan)+(o.ganPct!=null?` · ${pctf(o.ganPct)} s/costo`:''),o.gan<0?'#A6432F':'#2F7A47'):(o.costoRev!=null?chip('Ganancia (para revisar)',fmt(o.ganRev)+(o.ganPctRev!=null?` · ${pctf(o.ganPctRev)} s/costo`:''),'#A6432F')+`<button type="button" onclick="event.stopPropagation();confirmarVenta('${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')" style="align-self:center;padding:8px 12px;border-radius:10px;border:1px solid #BFDCC8;background:#EEF6F0;color:#2F7A47;font-weight:700;cursor:pointer;">✓ Está bien, contarla</button>`:(o.tipo==='Venta'&&o.pcd>0?chip('Ganancia','sin costo cargado','#8A8072'):''))}
