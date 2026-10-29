@@ -1949,11 +1949,18 @@ function renderOrigen(){
   sel.innerHTML=ps.map(p=>`<option value="${p}" ${p===cur?'selected':''}>${p==='sin-fecha'?'Sin fecha':mesTxt(p)}</option>`).join('')+(ps.length>1?`<option value="todo" ${cur==='todo'?'selected':''}>Todos los meses</option>`:'');
   const fc=$('fCuenta').value, lg=$('ogLog').value;
   const logDe=o=>o.log==='Flex'||o.log==='Full'?o.log:'Correo';
-  const vs=allRows().filter(o=>o.tipo==='Venta'&&o.pcd>0&&(cur==='todo'||o.periodo===cur)&&(!fc||o.cuenta===fc)&&(!lg||logDe(o)===lg));
+  const enF=o=>(cur==='todo'||o.periodo===cur)&&(!fc||o.cuenta===fc)&&(!lg||logDe(o)===lg);
+  const vs=allRows().filter(o=>o.tipo==='Venta'&&o.pcd>0&&enF(o));
+  // anulaciones y reintegros: se restan de su origen (igual que en el resumen del mes)
+  const an=allRows().filter(o=>!o.excl&&enF(o)&&(o.pcd<0||(o.tipo==='Venta'&&!(o.pcd>0)&&o.neto)||(o.esDevol&&o.tipo!=='Venta')));
   const NOM={fab:'🏭 Fabricado',rev:'🛒 Reventa',tela:'🧵 Telas',kit:'🧩 Juegos armados',x:'❓ Sin identificar'};
   const G={};
   vs.forEach(o=>{const t=TIPO[String(o.skuBase||'').toUpperCase()]||'x';const g=G[t]||(G[t]={t,n:0,unid:0,vend:0,quedo:0,costo:0,gan:0,nC:0});
     g.n++;g.unid+=o.unid||0;g.vend+=o.pcd;g.quedo+=o.neto||0;if(o.costo!=null){g.costo+=o.costo;g.gan+=o.gan;g.nC++;}});
+  const ventaDe={}; allRows().forEach(o=>{if(o.tipo==='Venta'&&o.pcd>0)ventaDe[o.cuenta+'|'+o.op]=o;});
+  an.forEach(o=>{const s=ventaDe[o.cuenta+'|'+o.op],t=TIPO[String((s||o).skuBase||'').toUpperCase()]||'x';const g=G[t]||(G[t]={t,n:0,unid:0,vend:0,quedo:0,costo:0,gan:0,nC:0});
+    g.nAn=(g.nAn||0)+(o.pcd<0?1:0);g.vend+=Math.min(0,o.pcd||0);g.unid-=o.uDev||0;g.quedo+=o.neto||0;
+    if(s?s.costo!=null:o.costoAj!=null){g.gan+=(o.neto||0)-(o.costoAj||0);g.costo+=o.costoAj||0;}else if(!s&&o.neto){g.gan+=o.neto;g.nC=g.nC||1;}});
   const gs=['fab','rev','tela','kit','x'].map(t=>G[t]).filter(Boolean);
   const tV=gs.reduce((a,g)=>a+g.vend,0), tG=gs.reduce((a,g)=>a+Math.max(0,g.gan),0), tGn=gs.reduce((a,g)=>a+g.gan,0);
   const pc=(v,t)=>t>0?Math.round(v/t*100):0;
@@ -1962,12 +1969,12 @@ function renderOrigen(){
     <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.9rem;">
       <tr style="color:#8A8072;font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;"><td style="padding:6px;">Origen</td><td style="padding:6px;">Facturación</td><td style="padding:6px;">Ganancia</td></tr>
       ${gs.map(g=>`<tr style="border-top:1px solid var(--line,#E3DCD2);">
-        <td style="padding:8px 6px;"><b>${NOM[g.t]}</b><small class="meta" style="display:block;">${g.n.toLocaleString('es-AR')} ventas · ${g.unid.toLocaleString('es-AR')} unid.</small></td>
+        <td style="padding:8px 6px;"><b>${NOM[g.t]}</b><small class="meta" style="display:block;">${g.n.toLocaleString('es-AR')} ventas · ${g.unid.toLocaleString('es-AR')} unid.${g.nAn?` · ${g.nAn} anulada${g.nAn>1?'s':''} o con reintegro (restadas)`:''}</small></td>
         <td style="padding:8px 6px;min-width:150px;"><b>${fmt(g.vend)}</b> <span class="meta">${pc(g.vend,tV)} %</span>${barra(pc(g.vend,tV),'#5b2a86')}</td>
         <td style="padding:8px 6px;min-width:150px;">${g.nC?`<b class="${g.gan<0?'neg':'pos'}">${fmt(g.gan)}</b> <span class="meta">${g.gan>0&&tG>0?pc(g.gan,tG)+' %':''}${g.costo>0?' · '+pctf(g.gan/g.costo)+' s/costo':''}</span>${barra(g.gan>0?pc(g.gan,tG):0,'#2F7A47')}${g.nC<g.n?`<small class="meta" style="display:block;">${g.n-g.nC} sin costo</small>`:''}`:'<span class="meta">sin costo cargado</span>'}</td></tr>`).join('')}
       <tr style="border-top:2px solid #3d1466;font-weight:800;"><td style="padding:8px 6px;">Total</td><td style="padding:8px 6px;">${fmt(tV)}</td><td style="padding:8px 6px;" class="${tGn<0?'neg':''}">${fmt(tGn)}</td></tr>
     </table></div>
-    <p class="note" style="margin-top:6px;">El % de ganancia es la participación en la ganancia total. La ganancia es por venta (me quedó − costo), sin los cargos sueltos del mes.${gs.some(g=>g.t==='x')?' "Sin identificar": SKU que no están en la app (ver 🔍).':''}</p>`;
+    <p class="note" style="margin-top:6px;">El % de ganancia es la participación en la ganancia total. La ganancia es por venta: lo que acreditó ML (ya sin comisión, cuotas, cargo fijo, envío y retenciones de la venta) − el cadete del Flex − el costo; se restan las anulaciones y reintegros. No incluye los cargos sueltos del mes (publicidad, Full, stock antiguo).${gs.some(g=>g.t==='x')?' "Sin identificar": SKU que no están en la app (ver 🔍).':''}</p>`;
 }
 // accion directa para cada SKU sin costo: emparejar, cargar costo o abrir la pantalla de la app que corresponde
 function accionFaltante(g,t,det){
