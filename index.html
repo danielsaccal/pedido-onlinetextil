@@ -1816,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 29/10 v463</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/10 v464</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -7734,10 +7734,14 @@ function calidadesTela(){
       x.colores.forEach((y, kc) => lista.push({ clave: x.clave + '#' + kc, etiqueta: x.base + ' · ' + y.color.toLowerCase(), codigos: y.codigos }));
     }
   });
-  return lista.sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, 'es'));
+  lista.sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, 'es'));
+  // ademas, cada tela por su SKU (para elegir una tela puntual, con su propio precio)
+  Object.entries((telasDatos && telasDatos.telas) || {}).sort((a, b) => a[0].localeCompare(b[0])).forEach(([c, t]) => lista.push({ clave: 'sku:' + c, etiqueta: c + ' — ' + etiquetaCalidad(t) + (t.color ? ' · ' + String(t.color).toLowerCase() : ''), codigos: [c] }));
+  return lista;
 }
 function telaCumpleCalidad(t, clave){
   if(!t || !clave) return false;
+  if(String(clave).startsWith('sku:')) return !!(telasDatos && telasDatos.telas && telasDatos.telas[String(clave).slice(4)] === t);
   const [base, color] = String(clave).split('#');
   return claveCalidad(t) === base && (!color || normBusqueda(t.color || '') === color);
 }
@@ -7771,8 +7775,8 @@ function compCorta(t){
   return t.composicion === 'Algodón' ? '100% alg.' : t.composicion === 'Poliéster' ? '100% pol.' : t.composicion === 'Mezcla' ? 'alg./pol.' : '';
 }
 function opcionesCalidad(sel){
-  const lista = calidadesTela();
-  if(sel && !lista.some(q => q.clave === sel)){ const base = String(sel).split('#')[0]; if(lista.some(x => x.clave === base)) sel = base; }
+  const todas = calidadesTela(), lista = todas.filter(q => !q.clave.startsWith('sku:')), porSku = todas.filter(q => q.clave.startsWith('sku:'));
+  if(sel && !todas.some(q => q.clave === sel)){ const base = String(sel).split('#')[0]; if(lista.some(x => x.clave === base)) sel = base; }
   // agrupadas por nombre de tela, con un texto corto: "200 hilos · 70% alg. 30% pol. · blanco"
   const grupos = new Map();
   lista.forEach(q => {
@@ -7784,7 +7788,8 @@ function opcionesCalidad(sel){
   });
   grupos.forEach(xs => xs.forEach(x => { if(xs.filter(y => y.txt === x.txt).length > 1) x.repetido = true; }));
   return '<option value="">— sin calidad —</option>' + [...grupos].sort((a, b) => a[0].localeCompare(b[0], 'es')).map(([g, xs]) =>
-    `<optgroup label="${escapeAttr(g)}">` + xs.map(x => { const { q, txt } = x; return `<option value="${escapeAttr(q.clave)}" ${q.clave === sel ? 'selected' : ''} title="${escapeAttr(q.codigos.join(', '))}">${escaparHtml(txt)} (${x.repetido ? escaparHtml(q.codigos.join(', ')) : q.codigos.length + ' tela' + (q.codigos.length === 1 ? '' : 's')})</option>`; }).join('') + '</optgroup>').join('');
+    `<optgroup label="${escapeAttr(g)}">` + xs.map(x => { const { q, txt } = x; return `<option value="${escapeAttr(q.clave)}" ${q.clave === sel ? 'selected' : ''} title="${escapeAttr(q.codigos.join(', '))}">${escaparHtml(txt)} (${x.repetido ? escaparHtml(q.codigos.join(', ')) : q.codigos.length + ' tela' + (q.codigos.length === 1 ? '' : 's')})</option>`; }).join('') + '</optgroup>').join('')
+    + (porSku.length ? `<optgroup label="UNA TELA PUNTUAL (por SKU)">` + porSku.map(q => `<option value="${escapeAttr(q.clave)}" ${q.clave === sel ? 'selected' : ''}>${escaparHtml(q.etiqueta)}</option>`).join('') + '</optgroup>' : '');
 }
 // en la orden: con el articulo y la tela entregada, el SKU que corresponde
 function skuPorArticuloYTela(articuloValor, codTela){
@@ -23139,7 +23144,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-29-v463';
+const APP_VERSION = '2026-10-30-v464';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
