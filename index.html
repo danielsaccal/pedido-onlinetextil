@@ -1816,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/10 v464</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/10 v465</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6262,7 +6262,7 @@ const GRUPOS_INICIO = {
     [['📐 Tabla de consumo (anterior)', 'abrirTablaConsumo()'], ['✂️ Instrucciones de corte (anterior)', 'abrirInstruccionesCorte()'], ['🧩 Fichas por SKU (anterior)', 'abrirFichasArticulos()']]
   ] },
   k: { lado: 'int', titulo: 'Agentes IA', titulosColumnas: ['1 · Agentes'], columnas: [
-    [['🎨 Director de arte', 'abrirDirectorArte()'], ['🧾 Auditor contable', 'abrirAuditor()'], ['⚖️ Reclamos ML / MP', 'abrirReclamosML()']],
+    [['🎨 Director de arte', 'abrirDirectorArte()'], ['🧾 Auditor contable', 'abrirAuditor()'], ['⚖️ Reclamos ML / MP', 'abrirReclamosML()'], ['📮 Reclamos para hacer hoy', 'abrirReclamosHoy()']],
   ] },
 };
 // ===== Buscador con sugerencias en los campos de texto: escribe una parte (ej. "jorg") y ofrece todo lo que la contiene =====
@@ -6416,6 +6416,7 @@ async function dashDatos(forzar){
   // ---------- pendientes, agrupados: plata · costos y precios · stock y operacion ----------
   const P = (g, t, f, ml) => V.hoy.push([t, f, !!ml, g]), hoyISO = new Date().toISOString().slice(0, 10), hace = d => new Date(Date.now() - d * 864e5).toISOString();
   try{ await t(cargarNombresUsuarios()); } catch(e){}
+  try{ const rr = await t(db.collection('reclamos').get().catch(() => null)); if(rr){ const L = recParaReclamar(rr.docs.map(d => ({ _id: d.id, ...d.data() }))); if(L.length) P('plata', `⚖️ ${L.length} reclamo${L.length > 1 ? 's' : ''} para hacer a Mercado Libre · ${formatPrice(L.reduce((a, x) => a + x.monto, 0))}`, 'abrirReclamosHoy()', true); } } catch(e){}
   try{ iniciarAvisoPedidos(); if(puede(permisoDeAccion("abrirFacturas()"))){ const pf = await t(db.collection('pedidos').where('estado', '==', 'para_facturar').get().catch(() => null)); if(pf && pf.docs.length) P('plata', `🧾 ${pf.docs.length} pedido${pf.docs.length > 1 ? 's' : ''} para facturar`, "abrirPedidosPrep('facturar')", false); } } catch(e){}
   try{ if(!window.__recAuto){ window.__recAuto = 1; await t(recActualizarEstados().catch(() => 0)); } } catch(e){} // estados de los reclamos, con los reportes ya cargados en Resultados ML
   try{ const rc = await t(db.collection('reclamos').where('estado', '==', 'abierto').get().catch(() => null)); if(rc){ const viejos = rc.docs.map(d => d.data()).filter(c => c.fecha && c.fecha <= hace(2).slice(0, 10)); if(viejos.length) P('plata', `⚖️ ${viejos.length} reclamo${viejos.length > 1 ? 's' : ''} de ML abierto${viejos.length > 1 ? 's' : ''} hace más de 2 días`, 'abrirReclamosML().then(() => recAbrirCasos())', true); } } catch(e){}
@@ -9129,6 +9130,24 @@ function iniciarAvisoPedidos(){ if(pdAvisoIniciado) return; try{ if(!puede(permi
   try{ db.collection('pedidos').where('estado', '==', 'para_facturar').onSnapshot(s => { (s.docs || []).forEach(d => { const p = d.data(), k = d.id + '|' + ((p.prep || {}).fecha || ''); if(vistos.has(k)) return; vistos.add(k);
       const c = p.cliente || {}; dsToast(`🧾 Pedido para facturar · N.º ${p.numero} · ${c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim()}${(p.prep || {}).por ? ' · preparado por ' + nomUsu(p.prep.por) : ''}`, { ms: 15000, accion: { txt: 'Facturar →', fn: () => abrirPedidosPrep('facturar') } }); });
     try{ localStorage.setItem('olt_ped_avisados', JSON.stringify([...vistos].slice(-200))); } catch(e){} }); } catch(e){} }
+// ===== Reclamos para hacer hoy: lo que hay que reclamarle a ML, venta por venta (para quien opera Mercado Libre) =====
+function recParaReclamar(L){ return (L || recCasos || []).map(c => { const cargos = c.cargosRecTotal > 0 && !c.cargosReclamado, parcial = c.estado === 'perdido' && c.parcial && c.pruebas !== 'si' && !c.apelado;
+    if(!cargos && !parcial) return null; return { c, tipo: cargos ? 'cargos' : 'parcial', monto: cargos ? +c.cargosRecTotal : (+c.debitado || 0) }; }).filter(Boolean).sort((a, b) => b.monto - a.monto); }
+function recTextoReclamo(x){ const c = x.c, v = c.venta ? `la venta ${c.venta}` : 'esta venta';
+  if(x.tipo === 'cargos') return `Sobre ${v}: la venta se anuló, pero no me devolvieron ${(c.cargosRec || []).map(([n, m]) => n.toLowerCase() + ' (' + formatPrice(m) + ')').join(' y ')}. Pido que me reintegren esos cargos, ya que la venta no se concretó.`;
+  return `No corresponde que me descuenten dinero en ${v}. El comprador no aportó fotos ni ninguna prueba del problema. Pido que se revierta el reintegro aplicado sin pruebas y que una persona revise el caso.`; }
+async function abrirReclamosHoy(){ pvModal('⚖️ Reclamos para hacer hoy', '<p class="empty-msg">Cargando…</p>'); await recCargarCasos(); try{ await cargarNombresUsuarios(); } catch(e){} recPintarHoy(); }
+function recPintarHoy(){ const box = document.getElementById('pub-cont'); if(!box) return; const L = recParaReclamar(), col = k => RZ_COLOR[String(k).toLowerCase()] || '#8A8072';
+  box.innerHTML = L.length ? `<p class="note" style="text-align:left;margin:0 0 8px;">Para cada venta: <b>Copiar reclamo</b>, pegarlo en Mercado Libre (en la venta o en el reclamo) y tocar <b>✓ Reclamado</b>. Si ML devuelve la plata, la app lo detecta sola en el próximo reporte.</p>
+    <div style="font-size:.86rem;margin-bottom:6px;"><b>${L.length}</b> por reclamar · <b>${formatPrice(L.reduce((a, x) => a + x.monto, 0))}</b> en juego</div>
+    <div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;">${L.map((x, i) => { const c = x.c, r = buscarProductoPorSku(c.sku || ''); return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 12px;border-bottom:1px solid #F3EFE8;font-size:.84rem;"><span style="width:6px;height:34px;border-radius:3px;background:${col(c.cuenta)};"></span>
+      <div style="flex:1;min-width:200px;"><b style="color:${col(c.cuenta)};">${escaparHtml(c.cuenta)}</b> · <b>${escaparHtml(c.venta || '')}</b><div style="font-size:.74rem;color:#A89E90;">${escaparHtml([c.sku, r ? r.producto.nombre : ''].filter(Boolean).join(' · '))}</div><div style="font-size:.76rem;color:#A6432F;font-weight:600;">${x.tipo === 'cargos' ? 'Cargos no devueltos en venta anulada' : 'Reintegro parcial sin pruebas del comprador'}</div></div>
+      <b style="width:100px;text-align:right;">${formatPrice(x.monto)}</b><button type="button" class="btn-mini" onclick="copiarTexto(recTextoReclamo(recParaReclamar()[${i}]), this)">Copiar reclamo</button><button type="button" class="btn-mini" style="color:#2F7A47!important;border-color:#BFE3CB!important;font-weight:700;" onclick="recMarcarReclamado(${i})">✓ Reclamado</button></div>`; }).join('')}</div>`
+    : '<p class="empty-msg" style="color:#2F7A47;">✓ No hay reclamos pendientes para hoy.</p>'; }
+async function recMarcarReclamado(i){ const x = recParaReclamar()[i]; if(!x) return; const c = x.c, por = ((firebase.auth().currentUser || {}).email) || '', fecha = new Date().toISOString();
+  const d = x.tipo === 'cargos' ? { cargosReclamado: { por, fecha } } : { apelado: true, reclamado: { por, fecha } };
+  try{ await db.collection('reclamos').doc(c._id).set(d, { merge: true }); Object.assign(c, d); } catch(e){ alert('No se pudo guardar: ' + e.message); return; }
+  dsToast(`Venta ${c.venta}: reclamo asentado`); recPintarHoy(); dashCache = null; }
 // ===== Clientes para recuperar: dormidos (+60 dias sin comprar) y atrasados en su recompra (facturas de la razon propia) =====
 async function clientesRecuperar(){ const [sf, sc] = await Promise.all([db.collection('ventas_facturadas').get().catch(() => null), db.collection('clientes').get().catch(() => null)]);
   const CL = sc ? sc.docs.map(d => ({ _id: d.id, ...d.data() })) : [], cl = k => CL.find(x => [ccClave(x.razonSocial || ''), ccClave(`${x.apellido || ''} ${x.nombre || ''}`), ccClave(`${x.nombre || ''} ${x.apellido || ''}`), ccClave(x.fantasia || '')].includes(k)) || null;
@@ -14628,7 +14647,7 @@ let permisosActuales = null;
 // que permiso hace falta para cada pantalla
 function permisoDeAccion(f){
   const s = String(f);
-  if(/abrirReclamosML/.test(s)) return null; // todos los usuarios
+  if(/abrirReclamosML|abrirReclamosHoy/.test(s)) return null; // todos los usuarios
   if(/abrirSubirFotosSku/.test(s)) return permisoDeAccion('abrirActualizarFoto()');
   if(/abrirFugas/.test(s)) return permisoDeAccion('abrirResultadosML()');
   if(/abrirAlertasPrecio/.test(s)) return permisoDeAccion('abrirAumentoMasivo()');
@@ -15148,7 +15167,7 @@ function recPintarCasos(mes){ const box = document.getElementById(window.__recEn
         <div style="min-width:0;"><b>${escaparHtml(c.venta || 'sin N.º de venta')}</b> · <select onchange="recSet('${c._id}', { motivo: this.value })" style="border:none;background:transparent;font-size:.8rem;color:#3D2B4E;font-weight:600;">${['manchado', 'roto', 'faltante', 'producto distinto', 'arrepentimiento', 'cancelación', 'reintegro parcial', 'reembolso total', 'otro'].map(m => `<option ${c.motivo === m ? 'selected' : ''}>${m}</option>`).join('')}</select><div style="color:#A89E90;font-size:.74rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escaparHtml([c.sku, (buscarProductoPorSku(c.sku || '') || { producto: {} }).producto.nombre, c.texto].filter(Boolean).join(' · '))}</div>${c.cargosRecTotal > 0 ? `<div style="font-size:.74rem;color:#A6432F;font-weight:600;">Cargos no devueltos: ${(c.cargosRec || []).map(([n, v]) => escaparHtml(n.replace(/^cargo por /i, '')) + ' ' + formatPrice(v)).join(' · ')} → reclamable</div>` : ''}</div>
         <select onchange="recSet('${c._id}', { pruebas: this.value })" style="padding:3px 6px;border:1px solid var(--line);border-radius:7px;font-size:.78rem;"><option value="" ${!c.pruebas ? 'selected' : ''}>pruebas: ?</option><option value="si" ${c.pruebas === 'si' ? 'selected' : ''}>mandó pruebas</option><option value="no" ${c.pruebas === 'no' ? 'selected' : ''}>no mandó</option></select>
         <div><select onchange="recSet('${c._id}', { estado: this.value, origen: 'manual', auto: 'marcado a mano' })" style="padding:3px 8px;border-radius:999px;border:none;background:${bg};color:${fg};font-weight:700;font-size:.76rem;">${Object.entries(ST).map(([k, v]) => `<option value="${k}" ${c.estado === k ? 'selected' : ''}>${k === 'perdido' && c.estado === 'perdido' ? (c.parcial ? 'Reintegro parcial' : 'Reembolsado') : v[2]}${k === 'abierto' && c.estado === 'abierto' ? ' · ' + dias + ' d' : ''}</option>`).join('')}</select>
-          <label style="display:block;font-size:.72rem;color:#8A8072;margin-top:2px;"><input type="checkbox" ${c.apelado ? 'checked' : ''} onchange="recSet('${c._id}', { apelado: this.checked })"> apelado</label><div style="font-size:.7rem;color:#A89E90;">${escaparHtml(c.auto || (c.estado === 'abierto' ? 'esperando el reporte' : ''))}</div></div>
+          <label style="display:block;font-size:.72rem;color:#8A8072;margin-top:2px;"><input type="checkbox" ${c.apelado ? 'checked' : ''} onchange="recSet('${c._id}', { apelado: this.checked })"> apelado</label><div style="font-size:.7rem;color:#A89E90;">${escaparHtml(c.auto || (c.estado === 'abierto' ? 'esperando el reporte' : ''))}</div>${(c.reclamado || c.cargosReclamado) ? `<div style="font-size:.7rem;color:#2F7A47;">reclamado por ${escaparHtml(nomUsu((c.reclamado || c.cargosReclamado).por))} el ${new Date((c.reclamado || c.cargosReclamado).fecha).toLocaleDateString('es-AR')}</div>` : ''}</div>
         ${dueno ? (c.estado === 'perdido' && !c.parcial && c.netoOp != null ? `<div style="text-align:right;font-size:.78rem;color:#8A8072;">venta anulada<div style="font-weight:700;font-size:.86rem;white-space:nowrap;color:${c.netoOp >= 0 ? '#2F7A47' : '#A6432F'};">neto ${c.netoOp >= 0 ? '+ ' : '− '}${formatPrice(Math.abs(c.netoOp))}</div></div>` : `<div style="text-align:right;font-weight:700;${c.debitado ? 'color:#A6432F;' : c.recuperado ? 'color:#2F7A47;' : 'color:#8A8072;font-weight:400;'}">${c.debitado ? '− ' + formatPrice(c.debitado) : c.monto ? formatPrice(c.monto) : ''}${c.recuperado ? `<div style="color:#2F7A47;font-size:.74rem;">+ ${formatPrice(c.recuperado)}</div>` : ''}</div>`) : ''}</div>`; }).join('')}</div>` : '<p class="empty-msg">No hay casos en este mes. Se guardan solos al copiar un reclamo.</p>'}`; }
 async function recSet(id, d){ const c = (recCasos || []).find(x => x._id === id); if(!c) return; try{ await db.collection('reclamos').doc(id).set(d, { merge: true }); Object.assign(c, d); recPintarCasos(); } catch(e){ alert('No se pudo guardar: ' + e.message); } }
 // respuestas listas (sin IA): segun lo que pide el texto
@@ -23144,7 +23163,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-30-v464';
+const APP_VERSION = '2026-10-30-v465';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
