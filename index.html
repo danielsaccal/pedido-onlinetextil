@@ -1816,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 30/10 v466</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 31/10 v467</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6398,7 +6398,7 @@ function sbUsar(i){ const it = (window.__sbItems || [])[i]; if(!it) return; docu
 let dashCache = null, dashCacheT = 0, dashRun = 0;
 async function dashDatos(forzar){
   if(!forzar && dashCache && Date.now() - dashCacheT < 60000) return dashCache;
-  const V = { hoy: [] }, mes = new Date().toISOString().slice(0, 7), dueno = esDueno();
+  const mesHoy = new Date().toISOString().slice(0, 7), mes = (window.__dashMes && window.__dashMes < mesHoy) ? window.__dashMes : mesHoy, V = { hoy: [], mes }, dueno = esDueno();
   const t = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r(null), ms || 15000))]); // nada queda "cargando" para siempre
   const [rs, vf] = await Promise.all([t(db.collection('config').doc('ml_resumen_mensual').get().catch(() => null)), dueno ? t(db.collection('ventas_facturadas').get().catch(() => null)) : null]);
   const res = rs && rs.exists ? (rs.data().m || {}) : {};
@@ -6479,7 +6479,7 @@ async function dashDatos(forzar){
     // posicion de IVA del mes, por razon social
     try{ const [md, cfI, mv, bx] = await Promise.all([t(mlDetalleGet().catch(() => null)), t(db.collection('config').doc('iva').get().catch(() => null)), t(db.collection('cc_movimientos').get().catch(() => null)), sExt ? Promise.resolve(sExt) : null]);
       ivDatos = { fact: vf ? vf.docs.map(d => d.data()) : [], compras: (pvCompras || []).map(x => x), det: md ? md.docs.map(d => d.data()) : [], res, cfg: cfI && cfI.exists ? cfI.data() : {}, movs: mv ? mv.docs.map(d => d.data()) : (ccMovs || []), banco: bx ? bx.docs.map(d => d.data()) : [] };
-      if(typeof cargarCfgFiscal === 'function') await cargarCfgFiscal(); V.iva = calcIVA(new Date().toISOString().slice(0, 10)); } catch(e){ console.error(e); }
+      if(typeof cargarCfgFiscal === 'function') await cargarCfgFiscal(); V.iva = calcIVA(mes === mesHoy ? new Date().toISOString().slice(0, 10) : new Date(+mes.slice(0, 4), +mes.slice(5, 7), 0, 12).toISOString().slice(0, 10)); } catch(e){ console.error(e); }
     // ultimas actividades
     (ccMovs || []).filter(m => m.tipo === 'cobro' || m.tipo === 'sena').forEach(m => act.push({ f: m.fecha, t: m.creado || '', fam: 'recibo', l: '', tit: m.tipo === 'sena' ? 'Seña' : 'Cobro', quien: (m.nombre || m.cliente || '') + (m.medio ? ' · ' + m.medio : ''), num: '', imp: +m.importe || 0, go: "abrirCtaCte('recibos')" }));
     const pn = id => ((pvProv || []).find(x => x._id === id) || {}).nombre || '';
@@ -6510,7 +6510,7 @@ async function pintarDash(){
     const tareas = H.length ? H.map((x, i) => { const [bg, col, ic] = icoT(x[3]), t = sinEmoji(x[0]); return `<div class="dh-task"><span class="dh-ic" style="background:${bg};color:${col};"><svg viewBox="0 0 24 24">${ic}</svg></span><div class="dh-tx">${escaparHtml(t)}</div><button type="button" class="btn btn-ghost" style="width:auto;margin-left:auto;${x[2] ? 'background:#FFE600!important;border-color:#E6CF00!important;color:#2D3277!important;' : ''}" onclick="dashHoy(${i})">${/pago/i.test(t) ? 'Pagar' : /cobro|vencid/i.test(t) ? 'Cobrar' : /pedido/i.test(t) ? 'Entregar' : /devoluc|revisar/i.test(t) ? 'Revisar' : 'Ver'}</button></div>`; }).join('') : `<div class="dh-task" style="justify-content:center;color:#2F7A47;font-weight:600;">✓ Todo al día</div>`;
     const fM = x => x >= 1e6 ? '$ ' + (x / 1e6).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + ' M' : formatPrice(x || 0);
     let hero = '';
-    if(dueno && V && V.fact12){ const L = V.fact12, act = L[L.length - 1], ant = L[L.length - 2] || { tot: 0 }, mx = Math.max(1, ...L.map(x => x.tot)), dv = ant.tot ? (act.tot - ant.tot) / ant.tot * 100 : null, tot = act.tot || 0;
+    if(dueno && V && V.fact12){ const L = V.fact12, iM = Math.max(1, L.findIndex(x => x.m === V.mes)), act = L[iM] || L[L.length - 1], ant = L[iM - 1] || { tot: 0 }, mx = Math.max(1, ...L.map(x => x.tot)), dv = ant.tot ? (act.tot - ant.tot) / ant.tot * 100 : null, tot = act.tot || 0;
       const nm = new Date(act.m + '-15').toLocaleDateString('es-AR', { month: 'long' }), nma = new Date(ant.m + '-15').toLocaleDateString('es-AR', { month: 'long' });
       const barras = L.map((x, k) => { const hh = Math.max(2, x.tot / mx * 90); return `<rect x="${k * 22}" y="${96 - hh}" width="14" height="${hh}" rx="3" fill="${k === L.length - 1 ? '#3D2B4E' : '#DDD5E6'}"><title>${new Date(x.m + '-15').toLocaleDateString('es-AR', { month: 'short', year: '2-digit' })}: ${formatPrice(x.tot)}</title></rect>`; }).join('');
       const pc = k => tot > 0 ? Math.round(act[k] / tot * 100) : 0;
@@ -6527,9 +6527,9 @@ async function pintarDash(){
         <div class="dh-card" onclick="abrirResultadoNegocio()"><div class="dh-t">Margen bruto del mes</div>${mg != null ? `<div class="dh-v">${mg.toLocaleString('es-AR', { maximumFractionDigits: 1 })} %</div><svg viewBox="0 0 120 120" style="width:92px;height:92px;display:block;margin:8px auto 0;"><circle cx="60" cy="60" r="46" fill="none" stroke="#F1ECE4" stroke-width="14"/><circle cx="60" cy="60" r="46" fill="none" stroke="#3D2B4E" stroke-width="14" stroke-linecap="round" stroke-dasharray="${Math.max(0, Math.min(1, mg / 100)) * C} 999" transform="rotate(-90 60 60)"/><text x="60" y="66" text-anchor="middle" font-family="Arial" font-weight="700" font-size="18" fill="#3D2B4E">${Math.round(mg)} %</text></svg><div class="dh-mut" style="text-align:center;">ventas − costo de mercadería</div>` : '<div class="dh-mut" style="margin-top:8px;">Falta costo cargado en las ventas del mes.</div>'}</div></div>`; }
     const actv = dueno && V && (V.act || []).length ? `<div><div class="dh-h"><h3>Últimas actividades</h3><a href="#" onclick="event.preventDefault();abrirFacturas()">Ver todas →</a></div><div class="dh-list">${V.act.map(a => { const col = (COMP_COLOR[a.fam] || [, '#8A8072'])[1], nf = a.fis === false;
         return `<div class="dh-act" onclick="${a.go}"><span class="dh-mut">${String(a.f).slice(8, 10)}/${String(a.f).slice(5, 7)}</span><span class="dh-av" style="${nf ? `border:1.5px dashed ${col};color:${col};background:#fff;` : `background:${col};`}">${escaparHtml(a.l || '$')}</span><div style="min-width:0;"><b style="font-size:.84rem;">${escaparHtml(a.tit)}</b><div class="dh-mut" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escaparHtml(a.quien || '')}</div></div><span class="dh-mut" style="white-space:nowrap;">${escaparHtml(a.num || '')}</span><b style="white-space:nowrap;${a.imp == null ? '' : a.imp >= 0 ? 'color:#2F7A47;' : 'color:#A6432F;'}">${a.imp == null ? formatPrice(a.monto) : (a.imp >= 0 ? '+ ' : '− ') + formatPrice(Math.abs(a.imp))}</b></div>`; }).join('')}</div></div>` : '';
-    box.innerHTML = `<div class="dh-top"><span class="dh-hola">${saludo}${nombre ? ', ' + escaparHtml(nombre) : ''}</span>${acc.length ? menuMini('+ Nuevo', acc.map(([t], i) => [sinEmoji(t).replace(/^\+\s*/, ''), `dashUsar(${i})`])).replace('class="btn-mini"', 'class="btn btn-gold"') : ''}</div>
+    box.innerHTML = `<div class="dh-top"><span class="dh-hola">${saludo}${nombre ? ', ' + escaparHtml(nombre) : ''}</span>${dueno && V && V.fact12 ? `<select onchange="window.__dashMes=this.value;dashCache=null;irInicio()" title="Mes de los números del Inicio" style="margin-left:auto;margin-right:10px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;font-weight:600;">${V.fact12.slice().reverse().map(x => `<option value="${x.m}" ${x.m === V.mes ? 'selected' : ''}>${new Date(x.m + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</option>`).join('')}</select>` : ''}${acc.length ? menuMini('+ Nuevo', acc.map(([t], i) => [sinEmoji(t).replace(/^\+\s*/, ''), `dashUsar(${i})`])).replace('class="btn-mini"', 'class="btn btn-gold"') : ''}</div>
       ${hero}
-      ${(() => { if(!dueno || !V || !V.fact12) return ''; const L = V.fact12, a = L[L.length - 1], b = L[L.length - 2]; if(!a || !a.tot) return '';
+      ${(() => { if(!dueno || !V || !V.fact12) return ''; const L = V.fact12, iM = Math.max(1, L.findIndex(x => x.m === V.mes)), a = L[iM] || L[L.length - 1], b = L[iM - 1]; if(!a || !a.tot) return '';
         const pML = x => x.tot ? (x.alberto + x.rita) / x.tot * 100 : null, pa = pML(a), pb = b ? pML(b) : null, meta = pb != null ? Math.max(0, pb - 1) : null, ok = meta != null && pa <= meta + 0.05;
         const dv = b && b.propia ? (a.propia - b.propia) / b.propia * 100 : null, f1 = v => v.toLocaleString('es-AR', { maximumFractionDigits: 1 });
         return `<div class="dh-h"><h3>Fuera de Mercado Libre</h3><span class="dh-mut">${new Date(a.m + '-15').toLocaleDateString('es-AR', { month: 'long' })}</span></div><div class="dh-list" style="margin-bottom:20px;"><div class="dh-task" style="gap:18px;flex-wrap:wrap;">
@@ -23164,7 +23164,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-10-30-v466';
+const APP_VERSION = '2026-10-31-v467';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
