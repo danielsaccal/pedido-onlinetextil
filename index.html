@@ -1816,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/11 v468</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/11 v469</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -14458,9 +14458,17 @@ function renderFacturas(){
     <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;"><small class="note">Costo de los productos</small><div style="font-weight:800;font-size:1.2rem;color:#D97A3A;">${formatPrice(C)}</div><small class="note">sin impuestos ni costos de logística</small></div>
     <div style="background:${GAN < 0 ? '#FDEBE7' : '#EEF6F0'};border-radius:12px;padding:10px;"><small class="note">Ganancia ${fcModoIva === 'con' ? '(con IVA)' : '(sin IVA)'}</small><div style="font-weight:800;font-size:1.2rem;color:${GAN < 0 ? '#A6432F' : '#2F7A47'};">${formatPrice(GAN)}</div><small class="note">${C > 0 ? Math.round(GAN / C * 100) + ' % sobre el costo' : ''}${nRevT ? ` · ⚠️ ${nRevT} renglones para revisar (incluidos)` : ''}</small></div></div>` : '';
   setTimeout(() => { const bar = document.getElementById('fc-barra'); if(bar) bar.style.display = L.length ? 'flex' : 'none'; actualizarSelFact(); }, 0);
-  document.getElementById('fc-lista').innerHTML = L.length ? L.map(f => `<details style="border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:6px;background:#fff;"><summary style="cursor:pointer;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><input type="checkbox" class="fc-sel" value="${escapeAttr(f._id || String(f.numero).replace(/\//g, '-'))}" onclick="event.stopPropagation();" onchange="actualizarSelFact()" style="width:18px;height:18px;">${chipRZ(f.razon)}${etiquetaComp(f.esNC ? 'ncv' : f.esND ? 'ndv' : 'venta', f.tipo || '', esFiscalVenta(f))}<b style="flex:1;">▸ ${f.esNC ? '<span style="color:#A6432F;">NC</span> ' : ''}${escaparHtml(f.tipo || '')} ${escaparHtml(f.numero)} · ${escaparHtml(f.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(f.cliente || '')}</span><span style="text-align:right;"><b style="font-size:.9rem;">${formatPrice(f.total || (f.neto || 0) * 1.21)}</b>${esFiscalVenta(f) ? `<small class="note" style="display:block;margin:0;">sin IVA ${formatPrice((f.total || (f.neto || 0) * 1.21) / 1.21)}</small>` : ''}</span><button type="button" class="btn-mini" title="Quitar de la app" onclick="event.preventDefault();event.stopPropagation();borrarFactura('${escapeAttr(f._id || f.numero)}')">🗑️</button></summary>${`<div style="text-align:right;margin:4px 0;"><button type="button" class="btn-mini" onclick="imprimirFacturaGuardadaAsync('${escapeAttr(f._id || String(f.numero).replace(/\//g, '-'))}')">🖨️ Imprimir</button></div>` + tablaFactura(f, true, (f._id || String(f.numero).replace(/\//g, '-')))}</details>`).join('') : '<p class="empty-msg">Todavía no guardaste facturas.</p>';
+  document.getElementById('fc-lista').innerHTML = L.length ? L.map(f => `<details data-mes="${ccFechaISO(f.fecha).slice(0, 7)}" style="border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:6px;background:#fff;"><summary style="cursor:pointer;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><input type="checkbox" class="fc-sel" value="${escapeAttr(f._id || String(f.numero).replace(/\//g, '-'))}" onclick="event.stopPropagation();" onchange="actualizarSelFact()" style="width:18px;height:18px;">${chipRZ(f.razon)}${etiquetaComp(f.esNC ? 'ncv' : f.esND ? 'ndv' : 'venta', f.tipo || '', esFiscalVenta(f))}<b style="flex:1;">▸ ${f.esNC ? '<span style="color:#A6432F;">NC</span> ' : ''}${escaparHtml(f.tipo || '')} ${escaparHtml(f.numero)} · ${escaparHtml(f.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(f.cliente || '')}</span><span style="text-align:right;"><b style="font-size:.9rem;">${formatPrice(f.total || (f.neto || 0) * 1.21)}</b>${esFiscalVenta(f) ? `<small class="note" style="display:block;margin:0;">sin IVA ${formatPrice((f.total || (f.neto || 0) * 1.21) / 1.21)}</small>` : ''}</span><button type="button" class="btn-mini" title="Quitar de la app" onclick="event.preventDefault();event.stopPropagation();borrarFactura('${escapeAttr(f._id || f.numero)}')">🗑️</button></summary>${`<div style="text-align:right;margin:4px 0;"><button type="button" class="btn-mini" onclick="imprimirFacturaGuardadaAsync('${escapeAttr(f._id || String(f.numero).replace(/\//g, '-'))}')">🖨️ Imprimir</button></div>` + tablaFactura(f, true, (f._id || String(f.numero).replace(/\//g, '-')))}</details>`).join('') : '<p class="empty-msg">Todavía no guardaste facturas.</p>';
+  if(!mes && !fq) fcAgruparPorMes();
 }
 
+// facturas de meses anteriores: plegadas por mes (el mes actual queda a la vista)
+function fcAgruparPorMes(){ const box = document.getElementById('fc-lista'); if(!box) return; const hoy = new Date().toISOString().slice(0, 7), G = {};
+  [...box.querySelectorAll(':scope > details[data-mes]')].forEach(d => { const m = d.dataset.mes || 'sin fecha'; if(m === hoy) return; (G[m] = G[m] || []).push(d); });
+  Object.keys(G).sort().reverse().forEach(m => { const ds = G[m], grp = document.createElement('details'); grp.className = 'fc-mesgrp'; grp.style.cssText = 'margin:10px 0 6px;';
+    const nom = /^\d{4}-\d{2}$/.test(m) ? new Date(m + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }) : m;
+    grp.innerHTML = `<summary style="cursor:pointer;font-weight:700;color:#3D2B4E;padding:6px 2px;">${nom.charAt(0).toUpperCase() + nom.slice(1)} <span style="font-weight:400;color:#A89E90;">· ${ds.length} comprobante${ds.length > 1 ? 's' : ''}</span></summary>`;
+    ds[0].before(grp); ds.forEach(d => grp.appendChild(d)); }); }
 // ===== Precio sugerido minimo en Mercado Libre (con los cargos reales de tus ventas: config/ml_parametros) =====
 let mlParam = null;
 async function cargarParametrosML(){ if(mlParam !== null) return mlParam; try{ const d = await db.collection('config').doc('ml_parametros').get(); mlParam = d.exists ? d.data() : false; } catch(e){ mlParam = false; } return mlParam; }
@@ -23180,7 +23188,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-01-v468';
+const APP_VERSION = '2026-11-01-v469';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
