@@ -1816,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/11 v470</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/11 v471</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2465,7 +2465,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0;font-size:.88rem;"><b>Son:</b><label><input type="radio" name="fc-fis" value="auto" checked> Según el punto de venta</label><label><input type="radio" name="fc-fis" value="si"> Todas fiscales (con CAE)</label><label><input type="radio" name="fc-fis" value="no"> Todas NO fiscales</label></div>
       <label class="btn btn-gold" style="display:block;text-align:center;cursor:pointer;margin:10px 0;">📄 Subir facturas (PDF o Excel de TFactura)<input type="file" id="fc-file" accept="application/pdf,.pdf,.xlsx,.xls,.csv" multiple style="display:none;" onchange="leerFacturasPDF(this)"></label>
       <div id="fc-nuevas"></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 8px;align-items:center;"><b style="color:var(--purple);">Facturas guardadas</b><input id="fc-q" placeholder="🔍 Buscar por número, cliente o SKU" oninput="clearTimeout(window.__fcQ);window.__fcQ=setTimeout(renderFacturas,250)" style="flex:1;min-width:200px;padding:8px;border:1px solid var(--line);border-radius:10px;"><select id="fc-fisf" onchange="renderFacturas()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"><option value="">Fiscales y no fiscales</option><option value="si">Solo fiscales</option><option value="no">Solo no fiscales</option></select><select id="fc-rzf" onchange="renderFacturas()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"><option value="">Todas las razones sociales</option><option value="propia">Propia</option><option value="alberto">Alberto</option><option value="rita">Rita</option></select><select id="fc-mes" onchange="renderFacturas()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"></select></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 8px;align-items:center;"><b style="color:var(--purple);">Facturas guardadas</b><input id="fc-q" placeholder="🔍 Buscar por número, cliente o SKU" oninput="clearTimeout(window.__fcQ);window.__fcQ=setTimeout(renderFacturas,250)" style="flex:1;min-width:200px;padding:8px;border:1px solid var(--line);border-radius:10px;"><select id="fc-fisf" onchange="renderFacturas()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"><option value="">Fiscales y no fiscales</option><option value="si">Solo fiscales</option><option value="no">Solo no fiscales</option></select><select id="fc-rzf" onchange="renderFacturas()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"><option value="">Todas las razones sociales</option><option value="propia">Propia</option><option value="alberto">Alberto</option><option value="rita">Rita</option></select><select id="fc-mes" onchange="window.__fcMes=this.value;renderFacturas()" style="padding:8px;border:1px solid var(--line);border-radius:10px;"></select></div>
       <div id="fc-resumen"></div>
       <button type="button" class="btn-mini" style="margin:6px 0;" onclick="enviarAAuditar(['facturas'], (document.getElementById('fc-mes') || {}).value)">🧾 Enviar a auditar</button>
       <div id="fc-barra" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
@@ -14448,7 +14448,7 @@ async function borrarFactura(id){ { const f0 = (facturas || []).find(f => (f._id
   facturasNuevas.forEach(fa => { if(!fa.error) fa.yaEsta = (facturas || []).some(x => claveComprobante(x) === claveComprobante(fa)); });
   renderFacturasNuevas(); renderFacturas(); }
 function renderFacturas(){
- const mes = document.getElementById('fc-mes').value; window.__fcMes = mes; const rzf = (document.getElementById('fc-rzf') || {}).value || '';
+ const mes = document.getElementById('fc-mes').value, rzf = (document.getElementById('fc-rzf') || {}).value || '';
   const fq = ((document.getElementById('fc-q') || {}).value || '').trim();
   const fisf = (document.getElementById('fc-fisf') || {}).value || '';
   const L = (facturas || []).filter(f => !fisf || (esFiscalVenta(f) ? 'si' : 'no') === fisf).filter(f => !rzf || (f.razon || 'propia') === rzf).filter(f => !fq || coincideBusqueda(`${f.tipo || ''} ${f.numero || ''} ${String(f.numero || '').replace(/^0+|-0+/g, ' ')} ${f.cliente || ''} ${(f.items || []).map(it => it.codigo).join(' ')}`, fq)).filter(f => !mes || (f.fecha || '').split('/').reverse().slice(0, 2).join('-') === mes).sort((a, b) => String(b.fecha).split('/').reverse().join('').localeCompare(String(a.fecha).split('/').reverse().join('')));
@@ -23189,7 +23189,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-01-v470';
+const APP_VERSION = '2026-11-01-v471';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
