@@ -1816,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/11 v469</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/11 v470</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13316,8 +13316,9 @@ async function abrirFacturas(){ setTimeout(pintarSelectorRZFacturas, 0); cargarC
   document.getElementById('fc-lista').innerHTML = '<p class="empty-msg">Cargando…</p>';
   await prepararCostosFacturas();
   const s = await db.collection('ventas_facturadas').get(); facturas = s.docs.map(d => normFactura({ _id: d.id, ...d.data() }));
-  const meses = [...new Set(facturas.map(f => (f.fecha || '').split('/').reverse().slice(0, 2).join('-')))].filter(Boolean).sort().reverse();
-  document.getElementById('fc-mes').innerHTML = '<option value="">Todos los meses</option>' + meses.map(m => `<option value="${m}">${new Date(m + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</option>`).join('');
+  const mesHoy = new Date().toISOString().slice(0, 7), meses = [...new Set([mesHoy, ...facturas.map(f => (f.fecha || '').split('/').reverse().slice(0, 2).join('-'))])].filter(x => /^\d{4}-\d{2}$/.test(x)).sort().reverse();
+  const elegido = window.__fcMes != null ? window.__fcMes : mesHoy; // por defecto, el mes en curso
+  document.getElementById('fc-mes').innerHTML = '<option value="">Todos los meses</option>' + meses.map(m => `<option value="${m}" ${m === elegido ? 'selected' : ''}>${new Date(m + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</option>`).join('');
   renderFacturasNuevas(); renderFacturas();
 }
 function pintarSelectorRZFacturas(){ const b = document.getElementById('fc-rz-sel'); if(b && !document.getElementById('fc-rz')) b.innerHTML = selectorRZ('fc-rz', 'propia'); }
@@ -14447,7 +14448,7 @@ async function borrarFactura(id){ { const f0 = (facturas || []).find(f => (f._id
   facturasNuevas.forEach(fa => { if(!fa.error) fa.yaEsta = (facturas || []).some(x => claveComprobante(x) === claveComprobante(fa)); });
   renderFacturasNuevas(); renderFacturas(); }
 function renderFacturas(){
- const mes = document.getElementById('fc-mes').value, rzf = (document.getElementById('fc-rzf') || {}).value || '';
+ const mes = document.getElementById('fc-mes').value; window.__fcMes = mes; const rzf = (document.getElementById('fc-rzf') || {}).value || '';
   const fq = ((document.getElementById('fc-q') || {}).value || '').trim();
   const fisf = (document.getElementById('fc-fisf') || {}).value || '';
   const L = (facturas || []).filter(f => !fisf || (esFiscalVenta(f) ? 'si' : 'no') === fisf).filter(f => !rzf || (f.razon || 'propia') === rzf).filter(f => !fq || coincideBusqueda(`${f.tipo || ''} ${f.numero || ''} ${String(f.numero || '').replace(/^0+|-0+/g, ' ')} ${f.cliente || ''} ${(f.items || []).map(it => it.codigo).join(' ')}`, fq)).filter(f => !mes || (f.fecha || '').split('/').reverse().slice(0, 2).join('-') === mes).sort((a, b) => String(b.fecha).split('/').reverse().join('').localeCompare(String(a.fecha).split('/').reverse().join('')));
@@ -23188,7 +23189,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-01-v469';
+const APP_VERSION = '2026-11-01-v470';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
