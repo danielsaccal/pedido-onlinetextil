@@ -1022,10 +1022,14 @@ function renderResumen(){
     envIn:S(eIn), dev:S(o=>o.pcd)-recibi,
     vender:S(o=>o.vender), unidad:S(o=>o.unidad), cuotas:S(o=>o.cuotas),
     envOut:S(eOut), cad:S(o=>o.cad), full:S(o=>o.full), ads:S(o=>o.ads), imp:S(o=>o.ret)+S(o=>o.otros)};
+  // de lo que no tiene categoria fija: envios de devoluciones y otros cargos de ML salen de Impuestos (solo cambia el renglon; el total es el mismo)
+  { const esImp=n=>/percep|reten|impuest|iibb|\biva\b|sircreb/i.test(n), esDev=n=>/devoluci/i.test(n); let dE=0, oM=0;
+    r.forEach(o=>Object.entries(o.cd||{}).forEach(([n,v])=>{ if(CAT[String(n).trim()]||esImp(n)||!v) return; if(esDev(n)) dE+=-v; else oM+=-v; }));
+    L.devEnv=dE; L.otrosML=oM; L.imp-=dE+oM; }
   const quedo=S(o=>o.neto);
   const pc=v=>recibi>0?(v/recibi*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+' %':'';
   // cada renglon se despliega en sus cargos, y cada cargo en sus movimientos (fecha, venta, monto)
-  const catDe=n=>{n=String(n).trim();const c=CAT[n]||'otros';return c==='otros'?'imp':c;};
+  const catDe=n=>{n=String(n).trim();const c=CAT[n];if(c)return c;if(/percep|reten|impuest|iibb|\biva\b|sircreb/i.test(n))return 'imp';return /devoluci/i.test(n)?'devenv':'otrosml';};
   const detDe=cat=>{const G={};r.forEach(o=>Object.entries(o.cd||{}).forEach(([n,val])=>{if(catDe(n)!==cat||!val)return;const k=String(n).trim().replace(/^Anulación (del|de la|de) /,'');const g=G[k]=G[k]||{n:k.charAt(0).toUpperCase()+k.slice(1),tot:0,items:[]};g.tot+=-val;g.items.push({f:o.fecha,op:o.tipo==='Venta'?o.op:'',sku:o.skuBase||'',t:o.tipo,m:-val});}));
     if(cat==='imp'){const it=r.filter(o=>o.ret).map(o=>({f:o.fecha,op:o.op,sku:o.skuBase||'',t:o.tipo,m:o.ret}));if(it.length)G.__r={n:'Retenciones de IIBB de cada venta',tot:it.reduce((a,x)=>a+x.m,0),items:it};}
     return Object.values(G).filter(g=>Math.round(g.tot)!==0).sort((a,b)=>a.tot-b.tot);};
@@ -1099,9 +1103,11 @@ function renderResumen(){
     ${row('Costo por unidad vendida',L.unidad,'out','','unidad')}
     ${row('Cuotas sin interés',L.cuotas,'out','','cuotas')}
     ${row('Envíos pagados a ML',L.envOut,'out')}
+    ${row('Envíos de devoluciones',L.devEnv,'out','Lo que ML cobró por el envío de las devoluciones','devenv')}
     ${row('Cadete Flex',L.cad,'out')}
     ${row('Full',L.full,'out','Colecta, almacenamiento, retiros y stock antiguo','full')}
     ${row('Publicidad',L.ads,'out','Product Ads','ads')}
+    ${row('Otros cargos de ML',L.otrosML,'out','Cargos que la app todavía no clasifica','otrosml')}
     ${row('Impuestos',L.imp,'out','Retenciones y percepciones','imp')}
   </table>
   <div class="res-fin"><span>Me quedó</span><div class="v"><b>${fmt(quedo)}</b><em><strong>${pc(quedo)}</strong> de lo recibido por ventas</em></div></div>
