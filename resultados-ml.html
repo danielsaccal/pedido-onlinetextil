@@ -484,7 +484,7 @@ const CAT={'Cargo por vender':'vender','Anulación del cargo por vender':'vender
 'Costo por ofrecer cuotas':'cuotas','Anulación del costo por ofrecer cuotas':'cuotas',
 'Cargo por envíos de Mercado Libre':'envio','Anulación del cargo por envíos de Mercado Libre':'envio',
 'Cargo por Envíos Flex':'envio','Anulación del cargo por Mercado Envíos Flex':'envio',
-'Cargo por servicio de colecta Full':'full','Cargo por servicio de almacenamiento Full':'full','Cargo por stock antiguo en Full':'full',
+'Cargo por servicio de colecta Full':'full','Cargo por servicio de almacenamiento Full':'full','Cargo por stock antiguo en Full':'full','Cargo por retiro de stock Full':'full',
 'Cargo por campaña de publicidad de Product Ads':'ads'};
 function parseCargos(d){
   const out={vender:0,unidad:0,cuotas:0,envio:0,full:0,ads:0,otros:0,flexBon:0,flexCargo:0,envML:0,det:{}};
@@ -560,7 +560,7 @@ function parseWorkbook(wb,cuenta,file){
       pubT:String(r[C.pub]||'').replace('Clássico','Clásica'),cant:num(r[C.cant])||null,log,
       psd:isVenta&&bruto>0?num(r[C.valor]):null, pcd:isVenta?bruto-ec-cc:null,
       vender:-p.vender,unidad:-p.unidad,cuotas:-p.cuotas,envio:ec+cc-p.envio,full:-p.full,ads:-p.ads,otros:-p.otros,
-      envIn:ec+cc+p.flexBon,envOut:-(p.envML+p.flexCargo),ret:num(r[C.ret]),acred:num(r[C.neto])-pos,excl:false,flex:'',flexMonto:null,nota:'',
+      envIn:ec+cc+p.flexBon,envOut:-(p.envML+p.flexCargo),ret:num(r[C.ret]),acred:num(r[C.neto])-pos,excl:false,__retFull:1,flex:'',flexMonto:null,nota:'',
       ec, esDevol:isVenta&&/cancel|devuelt|reembols|anulad/i.test(estado),
       prodTotal:Math.abs(num(r[C.valor]))-Math.abs(C.reb>=0?num(r[C.reb]):0)-Math.abs(C.dv>=0?num(r[C.dv]):0),
       fechaVenta:C.fv>=0?String(r[C.fv]||''):'',
@@ -790,6 +790,7 @@ async function borrarMes(idViejo){const d=DATA.find(x=>x.id===idViejo)||(()=>{co
   MESES_META=MESES_META.filter(x=>x.cuenta+'|'+x.periodo!==idViejo);const id=d.cuenta?idMes(d):idViejo;await borrarBloques(id);await db.collection('mlMeses').doc(id).delete();}
 function normEntry(d){
   d.rows.forEach(o=>{
+    if(!o.__retFull&&o.cd){ const v=o.cd['Cargo por retiro de stock Full']; if(v){ o.full=(o.full||0)-v; o.otros=(o.otros||0)+v; } o.__retFull=1; }
     if(o.zb===undefined&&o.flexMonto!=null){if(/^Reintegro completo|^Paga comprador/.test(o.flex))o.zb=Math.round(o.flexMonto);else if(o.flex==='Reintegro 10 %')o.zb=Math.round(o.flexMonto*10);}
     if(o.skuBase===undefined){const sp=splitSku(o.sku);o.skuBase=sp.base;o.mult=sp.mult;o.variante=sp.variante;
       o.unid=o.cant?o.cant*o.mult:null;o.pUnit=o.unid&&o.pcd>0?o.pcd/o.unid:null;}
@@ -1023,7 +1024,16 @@ function renderResumen(){
     envOut:S(eOut), cad:S(o=>o.cad), full:S(o=>o.full), ads:S(o=>o.ads), imp:S(o=>o.ret)+S(o=>o.otros)};
   const quedo=S(o=>o.neto);
   const pc=v=>recibi>0?(v/recibi*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+' %':'';
-  const row=(lbl,v,cls,sub)=>Math.round(v)===0?'':`<tr class="${cls}"><td>${lbl}${sub?`<small>${sub}</small>`:''}</td><td class="m">${fmt(v)}</td><td class="p">${pc(v)}</td></tr>`;
+  // cada renglon se despliega en sus cargos, y cada cargo en sus movimientos (fecha, venta, monto)
+  const catDe=n=>{n=String(n).trim();const c=CAT[n]||'otros';return c==='otros'?'imp':c;};
+  const detDe=cat=>{const G={};r.forEach(o=>Object.entries(o.cd||{}).forEach(([n,val])=>{if(catDe(n)!==cat||!val)return;const k=String(n).trim().replace(/^Anulación (del|de la|de) /,'');const g=G[k]=G[k]||{n:k.charAt(0).toUpperCase()+k.slice(1),tot:0,items:[]};g.tot+=-val;g.items.push({f:o.fecha,op:o.tipo==='Venta'?o.op:'',sku:o.skuBase||'',t:o.tipo,m:-val});}));
+    if(cat==='imp'){const it=r.filter(o=>o.ret).map(o=>({f:o.fecha,op:o.op,sku:o.skuBase||'',t:o.tipo,m:o.ret}));if(it.length)G.__r={n:'Retenciones de IIBB de cada venta',tot:it.reduce((a,x)=>a+x.m,0),items:it};}
+    return Object.values(G).filter(g=>Math.round(g.tot)!==0).sort((a,b)=>a.tot-b.tot);};
+  const dmy=s=>{const m=String(s||'').match(/(\d{1,2})\/(\d{1,2})/);return m?m[1].padStart(2,'0')+'/'+m[2].padStart(2,'0'):'';};
+  const subDet=cat=>{const D=detDe(cat);if(!D.length)return '';return `<tr class="desg-det" data-cat="${cat}" style="display:none;"><td colspan="3" style="padding:0 0 6px 14px;background:#FBF9F6;">${D.map(g=>{const fs=g.items.map(x=>x.f).filter(Boolean),fx=fs.map(f=>String(f).split('/').reverse().join('-')).sort(),f1=fx[0]?dmy(fx[0].split('-').reverse().join('/')):'',f2=fx.length?dmy(fx[fx.length-1].split('-').reverse().join('/')):'';
+      return `<details style="border-bottom:1px dashed #EDE6DC;"><summary style="cursor:pointer;display:flex;gap:8px;align-items:baseline;padding:7px 4px;font-size:.86rem;list-style:none;"><span>${escHtml(g.n)}</span><small class="meta">${g.items.length} ${g.items.length===1?'cargo':'cargos'}${f1?' · '+(f1===f2?f1:f1+' al '+f2):''}</small><b style="margin-left:auto;color:${g.tot<0?'#A6432F':'#2F7A47'};">${fmt(g.tot)}</b></summary>
+        <div style="max-height:260px;overflow:auto;padding:0 4px 6px 22px;">${g.items.slice().sort((a,b)=>String(b.f).split('/').reverse().join('').localeCompare(String(a.f).split('/').reverse().join(''))).map(x=>`<div style="display:flex;gap:8px;font-size:.78rem;padding:3px 0;color:#6B6258;"><span style="width:44px;">${dmy(x.f)}</span><span style="flex:1;">${x.op?'venta '+escHtml(x.op)+(x.sku?' · '+escHtml(x.sku):''):escHtml(x.t||'')}</span><span style="color:${x.m<0?'#A6432F':'#2F7A47'};">${fmt(x.m)}</span></div>`).join('')}</div></details>`;}).join('')}</td></tr>`;};
+  const row=(lbl,v,cls,sub,cat)=>{if(Math.round(v)===0)return '';const sd=cat?subDet(cat):'';return `<tr class="${cls}"${sd?` style="cursor:pointer;" onclick="const t=this.nextElementSibling;if(t&&t.classList.contains('desg-det')){const ab=t.style.display==='none';t.style.display=ab?'':'none';this.querySelector('.desg-ar').textContent=ab?'▾':'▸';}"`:''}><td>${sd?'<span class="desg-ar" style="color:#A89E90;margin-right:4px;">▸</span>':''}${lbl}${sub?`<small>${sub}</small>`:''}</td><td class="m">${fmt(v)}</td><td class="p">${pc(v)}</td></tr>${sd}`;};
   $('resTit').textContent=(cur==='todo'?'Resumen de todos los meses':'Resumen de '+(cur==='sin-fecha'?'sin fecha':mesTxt(cur).toLowerCase()))+(fc?' · '+fc:'');
   const entro=recibi+L.envIn, pague=entro-quedo;
   const wasOpen=!!(document.querySelector('#resBody details')||{}).open;
@@ -1085,14 +1095,14 @@ function renderResumen(){
     ${row('Envíos que me pagaron',L.envIn,'in','Reintegros Flex de ML y envíos que pagó el comprador')}
     <tr class="grp"><td>Lo que pagué</td><td></td><td></td></tr>
     ${row('Devoluciones y cancelaciones',L.dev,'out')}
-    ${row('Comisión de ML',L.vender,'out','Cargo por vender')}
-    ${row('Costo por unidad vendida',L.unidad,'out')}
-    ${row('Cuotas sin interés',L.cuotas,'out')}
+    ${row('Comisión de ML',L.vender,'out','Cargo por vender','vender')}
+    ${row('Costo por unidad vendida',L.unidad,'out','','unidad')}
+    ${row('Cuotas sin interés',L.cuotas,'out','','cuotas')}
     ${row('Envíos pagados a ML',L.envOut,'out')}
     ${row('Cadete Flex',L.cad,'out')}
-    ${row('Full',L.full,'out','Colecta, almacenamiento y stock antiguo')}
-    ${row('Publicidad',L.ads,'out','Product Ads')}
-    ${row('Impuestos',L.imp,'out','Retenciones y percepciones')}
+    ${row('Full',L.full,'out','Colecta, almacenamiento, retiros y stock antiguo','full')}
+    ${row('Publicidad',L.ads,'out','Product Ads','ads')}
+    ${row('Impuestos',L.imp,'out','Retenciones y percepciones','imp')}
   </table>
   <div class="res-fin"><span>Me quedó</span><div class="v"><b>${fmt(quedo)}</b><em><strong>${pc(quedo)}</strong> de lo recibido por ventas</em></div></div>
   </details>`;
