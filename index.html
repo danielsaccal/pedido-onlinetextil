@@ -1817,7 +1817,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 03/11 v478</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 03/11 v479</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -17763,19 +17763,23 @@ function abrirCompartirRubro(){
   mostrarPaso('step-compartir-rubro');
   const cont = document.getElementById('rubros-lista');
   const baseUrl = location.origin + location.pathname.replace(/index\.html$/, '').replace(/\/?$/, '/') + 'cliente/';
-  cont.innerHTML = CATALOGO.map(cat => {
-    const link = baseUrl + '?rubro=' + encodeURIComponent(cat.categoria);
-    const mensaje = `Catálogo de ${cat.categoria.toLowerCase()} — OnLineTextil:\n${link}`;
-    return `
+  window.__rubroBase = baseUrl;
+  cont.innerHTML = CATALOGO.map((cat, i) => `
       <div class="rubro-item">
         <span class="nombre">${cat.categoria.toLowerCase()}</span>
-        <div class="acciones">
-          <button class="btn-mini" onclick="window.open('https://wa.me/?text=' + encodeURIComponent(\`${mensaje}\`), '_blank')">WhatsApp</button>
-          <button class="btn-mini" onclick="navigator.clipboard.writeText(\`${mensaje}\`); alert('Mensaje copiado — pegalo donde quieras (email, etc.)');">Copiar</button>
+        <div class="acciones" style="align-items:center;">
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:.8rem;color:#6B6258;">desc. <input type="number" min="0" max="90" step="1" id="rubro-desc-${i}" placeholder="0" style="width:56px;padding:4px 6px;border:1px solid var(--line);border-radius:7px;"> %</label>
+          <button class="btn-mini" onclick="compartirRubro(${i}, 'wa')">WhatsApp</button>
+          <button class="btn-mini" onclick="compartirRubro(${i}, 'copiar')">Copiar</button>
         </div>
-      </div>
-    `;
-  }).join('');
+      </div>`).join('');
+}
+// link de una categoria, con descuento opcional solo para esa categoria
+function compartirRubro(i, como){ const cat = CATALOGO[i]; if(!cat) return; const d = Math.min(90, Math.max(0, parseFloat((document.getElementById('rubro-desc-' + i) || {}).value) || 0));
+  const link = (window.__rubroBase || '') + '?rubro=' + encodeURIComponent(cat.categoria) + (d > 0 ? '&descuento=' + d : '');
+  const mensaje = `Catálogo de ${cat.categoria.toLowerCase()}${d > 0 ? ` con ${d} % de descuento` : ''} — OnLineTextil:\n${link}`;
+  if(como === 'wa') window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank');
+  else { navigator.clipboard.writeText(mensaje); alert('Mensaje copiado — pegalo donde quieras (email, etc.)'); }
 }
 
 // ---------- fotos personalizadas (reemplazo por SKU, ahora con varias fotos por producto) ----------
@@ -23221,7 +23225,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-03-v478';
+const APP_VERSION = '2026-11-03-v479';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
