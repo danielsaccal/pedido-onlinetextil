@@ -1816,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/11 v472</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/11 v473</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -9706,7 +9706,7 @@ function renderProductosFabrico(){
           const esOtra = uv && !opts.some(o => o[0] === uv);
           return `<td style="padding:7px 8px;"><select onchange="pfUnidad('${escapeAttr(f.sku)}', this.value, this)" style="padding:4px 6px;border:1px solid var(--line);border-radius:8px;font-size:0.8rem;width:auto;">${opts.map(([v, t]) => `<option value="${v}" ${uv === v ? 'selected' : ''}>${t}</option>`).join('')}${esOtra ? `<option value="${escapeAttr(uv)}" selected>${escaparHtml(uv)} (${div})</option>` : ''}<option value="__otra">otra cantidad…</option></select></td>
             <td style="padding:7px 8px;text-align:right;white-space:nowrap;" title="${escapeAttr(textoCostoSku(f.sku))}">${x ? '$ ' + formatoPesos(Math.round(x.total)) : '<span class="note">—</span>'}</td>
-            <td style="padding:7px 8px;text-align:right;white-space:nowrap;font-weight:700;">${costo != null ? '$ ' + formatoPesos(Math.round(costo)) : '<span class="note">—</span>'}</td>
+            <td style="padding:7px 8px;text-align:right;white-space:nowrap;font-weight:700;">${costo != null ? '$ ' + formatoPesos(Math.round(costo)) : '<span class="note">—</span>'}<a href="#" title="Cambiar confección, insumos o precio de la tela de este SKU" onclick="event.preventDefault();editarSkuCompleto('${escapeAttr(f.sku)}')" style="margin-left:6px;text-decoration:none;font-size:.8rem;">✏️</a>${''}</td>
             <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${r ? pp.precio : '<span class="note">sin publicar</span>'}</td>
             <td style="padding:7px 8px;text-align:right;white-space:nowrap;">${r ? pp.pct : '—'}</td>`;
         })()}
@@ -23207,7 +23207,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-02-v472';
+const APP_VERSION = '2026-11-02-v473';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
