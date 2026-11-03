@@ -1816,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 01/11 v471</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/11 v472</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13300,7 +13300,7 @@ function costoUnidadEnFecha(S, fechaDMY){
   let c = null; for(const x of h0){ if(x.fecha <= f) c = x.costo; else break; } return c != null ? c : h0[0].costo;
 }
 function piezasRenglon(it, S){ return +it.piezas > 0 ? +it.piezas : (+it.cant || 0) * divisorVenta(S || skuDeFactura(it.codigo)); }
-function costoItemFactura(it, fa){ const s = skuDeFactura(it.codigo); const cu = fa && fa.fecha ? costoUnidadEnFecha(s, fa.fecha) : costoUnidadSku(s); if(cu == null) return null; const c = cu * piezasRenglon(it, s); return fa && fa.esNC ? (fa.devolvieron === false ? 0 : -c) : c; }
+function costoItemFactura(it, fa){ const s = skuDeFactura(it.codigo); if(it.costoManual != null && it.costoManual !== ''){ const cm = (+it.costoManual || 0) * (+it.cant || 0); return fa && fa.esNC ? (fa.devolvieron === false ? 0 : -cm) : cm; } const cu = fa && fa.fecha ? costoUnidadEnFecha(s, fa.fecha) : costoUnidadSku(s); if(cu == null) return null; const c = cu * piezasRenglon(it, s); return fa && fa.esNC ? (fa.devolvieron === false ? 0 : -c) : c; }
 function signoFact(fa){ return fa && fa.esNC ? -1 : 1; }
 async function prepararCostosFacturas(){
   if(tablaConsumo === null) await cargarTablaConsumo(); if(telasDatos === null) await cargarTelas(); if(fabricacion === null) await cargarFabricacion();
@@ -13362,6 +13362,24 @@ async function corregirUnidadesRenglon(ref, i, esNueva){
     catch(e){ it.piezas = antes; alert('No se pudo guardar: ' + e.message); return; } }
   dashCache = null; renderFacturasNuevas(); renderFacturas();
 }
+// elegir entre dos opciones (botones propios)
+function dsElegir(msg, a, b){ return new Promise(res => { const ov = document.createElement('div'); ov.style.cssText = 'position:fixed;inset:0;background:rgba(20,8,35,.55);z-index:950;display:flex;align-items:center;justify-content:center;padding:12px;';
+  ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:440px;width:100%;padding:16px 18px;"><div style="white-space:pre-line;font-size:.92rem;margin-bottom:12px;">${escaparHtml(msg)}</div><div style="display:flex;flex-direction:column;gap:8px;"><button type="button" class="btn btn-gold" data-r="a">${escaparHtml(a)}</button><button type="button" class="btn btn-ghost" data-r="b">${escaparHtml(b)}</button><button type="button" class="btn-mini" data-r="">Cancelar</button></div></div>`;
+  document.body.appendChild(ov); ov.querySelectorAll('button').forEach(x => x.onclick = () => { ov.remove(); res(x.dataset.r || null); }); }); }
+// costo de un renglon de una factura: a mano, solo en esta factura, o en la app (pantalla de costos)
+async function corregirCostoRenglon(ref, i, esNueva){
+  const fa = esNueva ? facturasNuevas[ref] : (facturas || []).find(f => (f._id || String(f.numero).replace(/\//g, '-')) === ref); if(!fa) return; const it = fa.items[i]; if(!it) return;
+  const S = skuDeFactura(it.codigo), act = (() => { const c = costoItemFactura(it, fa); return c != null ? Math.abs(c) / (it.cant || 1) : null; })();
+  const v = prompt(`Costo por unidad de este renglón (${it.codigo}, ${it.cant} u.)${act != null ? '\nHoy: ' + formatPrice(act) : ''}`, act != null ? String(Math.round(act * 100) / 100).replace('.', ',') : ''); if(v == null) return;
+  const n = numAr(v); if(!(n >= 0)){ alert('Escriba un número.'); return; }
+  const op = await dsElegir(`¿Dónde corrige el costo de ${S}?`, 'Solo en esta factura', 'En la app (el costo del producto)'); if(!op) return;
+  if(op === 'b'){ corregirCostoSku(S); dsToast('Corrija el costo de ' + S + ' en esta pantalla: la factura lo toma sola'); return; }
+  if(!esNueva && await mesBloqueado(fa.fecha)) return;
+  const antes = it.costoManual; it.costoManual = n;
+  if(!esNueva){ const id = fa._id || String(fa.numero).replace(/\//g, '-');
+    try{ const items = JSON.parse(JSON.stringify(fa.items.map(x => { const y = { ...x }; delete y._cantDB; return y; }))); await db.collection('ventas_facturadas').doc(id).set({ items }, { merge: true }); await ccLog('Costo de renglón', `${fa.tipo || ''} ${fa.numero} · ${S}: ${formatPrice(n)} por unidad (solo esta factura)`); }
+    catch(e){ if(antes == null) delete it.costoManual; else it.costoManual = antes; alert('No se pudo guardar: ' + e.message); return; } }
+  dashCache = null; renderFacturasNuevas(); renderFacturas(); dsToast(`Costo de ${S} corregido solo en esta factura`); }
 // SKU mal facturado: se cambia solo en este renglon de esta factura (queda anotado el codigo original); ajusta el stock si la factura ya lo movio
 async function cambiarSkuRenglon(ref, i, esNueva){
   const fa = esNueva ? facturasNuevas[ref] : (facturas || []).find(f => (f._id || String(f.numero).replace(/\//g, '-')) === ref); if(!fa) return; const it = fa.items[i]; if(!it) return;
@@ -13395,7 +13413,7 @@ function tablaFactura(fa, editable, refId){
     const s = skuDeFactura(it.codigo);
     return `<tr style="border-top:1px solid var(--line);${it.ok === false ? 'background:#FDEBE7;' : rev ? 'background:#FFF8E6;' : ''}"><td style="padding:6px;">${it.ok === false ? '⚠️ ' : ''}<b>${escaparHtml(it.codigo)}</b>${s !== it.codigo ? ` <span class="note">→ ${escaparHtml(s)}</span>` : ''}${it.codigoOriginal ? ` <span class="note" title="SKU corregido en esta factura">(facturado como ${escaparHtml(it.codigoOriginal)})</span>` : ''}${refId != null ? ` <button type="button" class="btn-mini" style="padding:1px 7px;font-size:.72rem;" title="Cambiar el SKU solo en esta factura" onclick="cambiarSkuRenglon(${typeof refId === 'number' ? refId : `'${refId}'`}, ${i}, ${typeof refId === 'number'})">🔁 SKU</button>` : ''}<div class="note" style="text-align:left;margin:0;">${escaparHtml(it.desc)}</div>${rev ? `<div style="font-size:.78rem;color:#8A6417;margin-top:2px;">⚠️ Para revisar: ganancia fuera de lo normal (¿costo o unidad mal cargados?). <button type="button" class="btn-mini" style="padding:2px 8px;" onclick="corregirCostoSku('${escapeAttr(s)}')">✏️ Corregir costo</button> ${refId != null ? `<button type="button" class="btn-mini" style="padding:2px 8px;" onclick="corregirUnidadesRenglon(${typeof refId === 'number' ? refId : `'${refId}'`}, ${i}, ${typeof refId === 'number'})">✏️ Unidades de esta venta</button> ` : ''}${refId != null ? `<button type="button" class="btn-mini" style="padding:2px 8px;" onclick="confirmarRenglonFactura(${typeof refId === 'number' ? refId : `'${refId}'`}, ${i}, ${typeof refId === 'number'})">✓ Está bien</button>` : ''}</div>` : ''}</td>
       <td style="padding:6px;text-align:right;">${+it.piezas > 0 ? `${it.piezas.toLocaleString('es-AR')}<div class="note" style="margin:0;">unidades (corregido)</div>` : `${it.cant.toLocaleString('es-AR')}${divisorVenta(s) > 1 ? `<div class="note" style="margin:0;">${({ 12: 'docenas', 6: 'medias doc.', 2: 'pares' })[divisorVenta(s)]}</div>` : ''}`}${refId != null ? `<a href="#" title="Corregir las unidades de este renglón" onclick="event.preventDefault();corregirUnidadesRenglon(${typeof refId === 'number' ? refId : `'${refId}'`}, ${i}, ${typeof refId === 'number'})" style="font-size:.75rem;text-decoration:none;">✏️</a>` : ''}</td><td style="padding:6px;text-align:right;">${formatPrice(v / (it.cant || 1))}</td>
-      <td style="padding:6px;text-align:right;">${c != null ? formatPrice(Math.abs(c) / (it.cant || 1)) : (editable ? `<input placeholder="código en la app" style="width:120px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;font-size:.8rem;text-transform:uppercase;" onchange="equivFactura('${escapeAttr(it.codigo)}', this.value)">` : '<span class="note">sin costo</span>')}</td>
+      <td style="padding:6px;text-align:right;">${c != null ? formatPrice(Math.abs(c) / (it.cant || 1)) + (it.costoManual != null && it.costoManual !== '' ? '<div class="note" style="margin:0;">costo corregido a mano</div>' : '') + (refId != null ? `<a href="#" title="Corregir el costo de este renglón" onclick="event.preventDefault();corregirCostoRenglon(${typeof refId === 'number' ? refId : `'${refId}'`}, ${i}, ${typeof refId === 'number'})" style="font-size:.75rem;text-decoration:none;">✏️</a>` : '') : (editable ? `<input placeholder="código en la app" style="width:120px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;font-size:.8rem;text-transform:uppercase;" onchange="equivFactura('${escapeAttr(it.codigo)}', this.value)">` : '<span class="note">sin costo</span>')}</td>
       <td style="padding:6px;text-align:right;font-weight:700;color:${g == null ? '#A89E90' : g < 0 ? '#A6432F' : '#2F7A47'};">${g != null ? formatPrice(g) + `<div class="note" style="margin:0;">${c > 0 ? Math.round(g / c * 100) + ' % s/costo' : ''}</div>` : '–'}</td></tr>`; }).join('');
   const G = tV - tC;
   return `${nRev ? `<p style="margin:4px 0;font-size:.82rem;color:#8A6417;">⚠️ ${nRev} ${nRev === 1 ? 'renglón para revisar' : 'renglones para revisar'}: se suman igual, pero conviene revisar su costo (botón ✏️ en cada renglón).</p>` : ''}<div class="tw"><table style="width:100%;border-collapse:collapse;font-size:.88rem;"><tr style="color:#8A8072;font-size:.72rem;text-transform:uppercase;"><td style="padding:6px;">Producto</td><td style="padding:6px;text-align:right;">Cant.</td><td style="padding:6px;text-align:right;">Precio ${fcModoIva === 'con' ? 'c/IVA' : 's/IVA'}<div style="text-transform:none;font-size:.68rem;">con descuentos</div></td><td style="padding:6px;text-align:right;">Costo c/u<div style="text-transform:none;font-size:.68rem;">con IVA</div></td><td style="padding:6px;text-align:right;">Ganancia</td></tr>${filas}
@@ -23189,7 +23207,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-01-v471';
+const APP_VERSION = '2026-11-02-v472';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
