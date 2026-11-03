@@ -1816,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 03/11 v480</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 03/11 v481</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6186,7 +6186,7 @@ const GRUPOS_INICIO = {
   c: { lado: 'int', titulo: '📣 Difusión y creatividad', titulosColumnas: ['1 · Catálogo a clientes', '2 · Videos', '3 · Redes y anuncios', '4 · Fotos de producto'], columnas: [
     [['📚 Armar catálogo (PDF o imágenes)', 'abrirArmarCatalogo()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()']],
     [['🎬 Crear video promocional', 'abrirCrearVideo()'], ['🎞️ Compartir video de producto', 'abrirCompartirVideoProducto()']],
-    [['🖼️ Nuevo ingreso (flyers)', 'abrirNuevoIngreso()'], ['📣 Anuncios y promociones', 'abrirAnuncio()'], ['🎨 Director de arte (IA)', 'abrirDirectorArte()']],
+    [['✨ Crear contenido (posteos, carrusel, historias, videos)', 'abrirCrearContenido()'], ['🖼️ Nuevo ingreso (flyers)', 'abrirNuevoIngreso()'], ['📣 Anuncios y promociones', 'abrirAnuncio()'], ['🎨 Director de arte (IA)', 'abrirDirectorArte()']],
     [['📸 Prompt para Gemini (un SKU)', 'abrirPromptGemini()'], ['📸 Prompts para Gemini en lote', 'abrirPromptGeminiLote()']],
   ] },
   ped: { lado: 'int', titulo: '🛒 Pedidos', titulosColumnas: ['Tomar pedido', 'Seguimiento'], columnas: [
@@ -6352,7 +6352,7 @@ const TAREAS = [
   ['t_fondos', 'Fondos', 'bank', [['Saldos', ['abrirTesoreria()', 'abrirTesoreria().then(() => tsFormCaja())']], ['Cheques y gastos', ["abrirCtaCte('cheques')", 'abrirGastos()']]]],
   ['t_stock', 'Stock y productos', 'box', [['Stock', ['abrirStock()', 'abrirFaltantes()']], ['Productos', ['abrirNuevoProducto()', 'abrirEditarProducto()', 'abrirCategorias()', 'abrirActualizarFoto()', 'abrirSubirFotosSku()', 'abrirReventa()', 'abrirLinksWeb()']], ['Precios', ['abrirListaPrecios()', 'abrirImportarExcel()', 'abrirAumentoMasivo()', 'abrirAlertasPrecio()', 'abrirHistorialPrecios()']], ['Costos', ['abrirCostosProductos()', 'abrirConfeccion()', 'abrirCalculadoraCostos()']]]],
   ['t_producir', 'Producir', 'cut', [['Qué fabrico', ['abrirTelas()', 'abrirArticulosCortes()']], ['Planificar', ['abrirAsistenteOT()', 'abrirTrabajoMedida()']], ['En el taller', ['abrirEnviosTela()', 'abrirDeudaTela()', 'abrirEnProduccion()', 'abrirIngresoTaller()']], ['Consultas', ['abrirHistorialOT()', 'abrirHistorialEntregas()', 'abrirHistorialSku()']]]],
-  ['t_difundir', 'Difundir', 'mega', [['Catálogo a clientes', ['abrirArmarCatalogo()', 'abrirEnviarCatalogo()']], ['Videos', ['abrirCrearVideo()', 'abrirCompartirVideoProducto()']], ['Redes y anuncios', ['abrirNuevoIngreso()', 'abrirAnuncio()', 'abrirDirectorArte()']], ['Fotos de producto', ['abrirPromptGemini()', 'abrirPromptGeminiLote()']]]],
+  ['t_difundir', 'Difundir', 'mega', [['Catálogo a clientes', ['abrirArmarCatalogo()', 'abrirEnviarCatalogo()']], ['Redes y videos', ['abrirCrearContenido()', 'abrirCompartirVideoProducto()']], ['Fotos de producto', ['abrirPromptGemini()', 'abrirPromptGeminiLote()']]]],
   ['t_numeros', 'Números', 'chart', [['Resultados', ['abrirResultadoNegocio()', 'abrirFugas()', 'abrirRankings()', 'abrirResultadosML()', 'abrirVentasML()']], ['Impuestos', ['abrirIVA()', 'abrirLibroIVA()', 'abrirRetenciones()', 'abrirCierreMes()', 'abrirPuntosVentaFiscales()']]]],
 ];
 const TAR_FUENTES = ['ped', 'comp', 'cli', 'art', 'prov', 'teso', 'imp', 'est', 'c', 'h', 'i', 'k', 'f', 'g', 'd', 'a'];
@@ -14023,6 +14023,68 @@ async function sfsGuardar(b){ const modo = (document.querySelector('input[name=s
       await db.collection('fotos_sku').doc(s).set({ imagenesBase64: fotos, actualizado: new Date().toISOString() }); fotosSku[s] = fotos; } catch(e){ err.push(s + ': ' + e.message); } }
   sfsLista.forEach(x => { try{ URL.revokeObjectURL(x.url); } catch(e){} }); sfsLista = [];
   cerrarPublicar(); dsToast(err.length ? `Cargadas con errores: ${err.join(' · ')}` : `Listo: fotos cargadas en ${S.length} SKU`, { ms: 7000 }); }
+// ===== Crear contenido: una sola pantalla en 3 pasos (de que · para que · listo). Usa por dentro el generador de Nuevo ingreso =====
+let ccr = { de: 'sku', para: 'post', dis: 0 };
+function abrirCrearContenido(){
+  let st = document.getElementById('step-crear');
+  if(!st){ st = document.createElement('div'); st.className = 'step'; st.id = 'step-crear'; const ref = document.getElementById('step-nuevo-ingreso'); ref.parentNode.insertBefore(st, ref); }
+  abrirNuevoIngreso(); // deja limpio el generador
+  mostrarPaso('step-crear'); ccr = { de: 'sku', para: 'post', dis: 0 };
+  const skusDL = []; (CATALOGO || []).forEach(c => (c.productos || []).forEach(pp => (pp.variantes || []).forEach(v => { if(v.sku) skusDL.push(`<option value="${escapeAttr(v.sku)}">${escaparHtml(pp.nombre + (v.desc ? ' · ' + v.desc : ''))}</option>`); })));
+  st.innerHTML = `<div class="card"><h2 style="margin:0 0 4px;">✨ Crear contenido</h2><p class="note" style="text-align:left;margin:0 0 12px;">Elija de qué y para qué: el diseño y el texto los arma la app.</p>
+    <datalist id="ccr-skus">${skusDL.join('')}</datalist>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
+      <div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;"><b style="color:#3D2B4E;">1 · ¿De qué?</b><div id="ccr-de" style="margin-top:8px;"></div></div>
+      <div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;"><b style="color:#3D2B4E;">2 · ¿Para qué?</b><div id="ccr-para" style="margin-top:8px;"></div>
+        <details style="margin-top:8px;"><summary style="cursor:pointer;font-size:.84rem;color:#6B6258;">Más (descuento y texto)</summary>
+          <div class="field" style="margin:6px 0 0;"><label>Descuento %</label><input id="ccr-desc" type="number" min="0" max="90" placeholder="0"></div>
+          <div class="field" style="margin:6px 0 0;"><label>Texto extra (opcional)</label><input id="ccr-texto" placeholder="Ej: Nuevo ingreso · Envíos a todo el país"></div></details>
+        <button type="button" class="btn btn-gold" style="margin-top:12px;" id="ccr-gen" onclick="ccrGenerar()">Generar</button></div>
+      <div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;"><b style="color:#3D2B4E;">3 · Listo</b><div id="ccr-res" style="margin-top:8px;"><p class="note" style="text-align:left;">Acá aparecen las piezas.</p></div></div>
+    </div><button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button></div>`;
+  ccrPintarDe(); ccrPintarPara(); }
+function ccrOp(on, html, fn){ return `<div onclick="${fn}" style="border:${on ? '2px solid #3D2B4E' : '1px solid var(--line)'};background:${on ? '#F1ECF5' : '#fff'};border-radius:10px;padding:9px 12px;margin-bottom:8px;font-size:.88rem;cursor:pointer;${on ? 'font-weight:700;' : ''}">${html}</div>`; }
+function ccrPintarDe(){ const b = document.getElementById('ccr-de'); if(!b) return; const d = ccr.de;
+  b.innerHTML = ccrOp(d === 'sku', 'Un producto (SKU)', "ccr.de='sku';ccrPintarDe()") + (d === 'sku' ? `<input id="ccr-sku" list="ccr-skus" placeholder="Escriba SKU o nombre" value="${escapeAttr(ccr.sku || '')}" oninput="ccr.sku=this.value.trim().toUpperCase().split(/\\s/)[0]" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--line);border-radius:9px;margin:-2px 0 6px;"><button type="button" class="btn-mini" onclick="ccrFotos()">🖼️ Elegir fotos (una o varias)</button><div id="ccr-fotos" style="margin:6px 0 8px;"></div>` : '')
+    + ccrOp(d === 'varios', 'Varios productos', "ccr.de='varios';ccrPintarDe()") + (d === 'varios' ? `<textarea id="ccr-varios" rows="3" placeholder="SKU separados por coma o renglón" oninput="ccr.varios=this.value" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--line);border-radius:9px;margin:-2px 0 8px;">${escaparHtml(ccr.varios || '')}</textarea>` : '')
+    + ccrOp(d === 'categoria', 'Una categoría', "ccr.de='categoria';ccrPintarDe()") + (d === 'categoria' ? `<select id="ccr-cat" onchange="ccr.cat=+this.value" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:9px;margin:-2px 0 8px;">${CATALOGO.map((c, i) => `<option value="${i}" ${ccr.cat === i ? 'selected' : ''}>${escaparHtml(c.categoria.toLowerCase())}</option>`).join('')}</select>` : '')
+    + ccrOp(d === 'foto', 'Una foto mía (sin producto)', "ccr.de='foto';ccrPintarDe()") + (d === 'foto' ? `<input id="ccr-foto" type="file" accept="image/*" style="margin:-2px 0 6px;"><input id="ccr-titulo" placeholder="Título" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--line);border-radius:9px;">` : ''); }
+function ccrPintarPara(){ const b = document.getElementById('ccr-para'); if(!b) return; const P = [['post', '📱 Posteo de Instagram'], ['carrusel', '🎠 Carrusel'], ['story', '⏱ Historia'], ['video', '🎬 Video / Reel'], ['wa', '💬 Flyer para WhatsApp']];
+  b.innerHTML = P.map(([k, t]) => ccrOp(ccr.para === k, t, `ccr.para='${k}';ccrPintarPara()`)).join(''); }
+function ccrFotos(){ const S = ccr.sku || ((document.getElementById('ccr-sku') || {}).value || '').trim().toUpperCase().split(/\s/)[0]; if(!S || !buscarProductoPorSku(S)){ alert('Escriba un SKU del catálogo.'); return; }
+  document.getElementById('ni-sku-cantidad').value = 1; generarCamposSku(); document.querySelector('#ni-sku-campos input').value = S;
+  const sel = document.getElementById('ni-selector-fotos'), box = document.getElementById('ccr-fotos'); if(sel && box && sel.parentNode !== box) box.appendChild(sel); mostrarSelectorFotosNI(); }
+async function ccrGenerar(){ const btn = document.getElementById('ccr-gen'), res = document.getElementById('ccr-res'), err = m => { res.innerHTML = `<p class="error" style="display:block;">${escaparHtml(m)}</p>`; };
+  // 1 · de que
+  const setModo = m => { const r = document.querySelector(`input[name=ni-modo][value=${m}]`); if(r){ r.checked = true; toggleModoNI(); } };
+  if(ccr.de === 'sku'){ const S = (ccr.sku || ((document.getElementById('ccr-sku') || {}).value || '')).trim().toUpperCase().split(/\s/)[0]; if(!S || !buscarProductoPorSku(S)) return err('Escriba un SKU del catálogo.'); setModo('sku'); document.getElementById('ni-sku-cantidad').value = 1; generarCamposSku(); document.querySelector('#ni-sku-campos input').value = S; }
+  else if(ccr.de === 'varios'){ const L = String(ccr.varios || '').split(/[\s,;]+/).map(x => x.trim().toUpperCase()).filter(Boolean).filter(x => buscarProductoPorSku(x)); if(!L.length) return err('Escriba al menos un SKU del catálogo.'); setModo('sku'); document.getElementById('ni-sku-cantidad').value = Math.min(24, L.length); generarCamposSku(); [...document.querySelectorAll('#ni-sku-campos input')].forEach((inp, i) => inp.value = L[i] || ''); }
+  else if(ccr.de === 'categoria'){ setModo('categoria'); const ci = ccr.cat != null ? ccr.cat : +((document.getElementById('ccr-cat') || {}).value || 0); document.querySelectorAll('.ni-cat-check').forEach(c => c.checked = (+c.value === ci)); const cq = document.getElementById('ni-cat-cantidad'); if(cq && !cq.value) cq.value = 6; }
+  else { const f = (document.getElementById('ccr-foto') || {}).files; if(!f || !f[0]) return err('Elija una foto.'); setModo('foto'); const dt = new DataTransfer(); dt.items.add(f[0]); document.getElementById('ni-foto-suelta').files = dt.files; document.getElementById('ni-foto-titulo').value = ((document.getElementById('ccr-titulo') || {}).value || '').trim(); }
+  // 2 · para que (solo lo pedido)
+  const para = ccr.para; ['story', 'post', 'reel', 'carrusel'].forEach(k => { const e = document.getElementById('ni-fmt-' + k); if(e) e.checked = false; });
+  if(para === 'post') document.getElementById('ni-fmt-post').checked = true; if(para === 'story') document.getElementById('ni-fmt-story').checked = true; if(para === 'carrusel') document.getElementById('ni-fmt-carrusel').checked = true; if(para === 'video') document.getElementById('ni-fmt-reel').checked = true;
+  const vid = document.getElementById('ni-video'); if(vid){ vid.checked = para === 'video'; }
+  window.__niModoMulti = para === 'carrusel' ? 'carrusel' : 'posteos';
+  document.getElementById('ni-descuento').value = (document.getElementById('ccr-desc') || {}).value || ''; document.getElementById('ni-texto').value = (document.getElementById('ccr-texto') || {}).value || '';
+  const dis = ['editorial', 'tarjeta', 'texto'][ccr.dis % 3]; { const r = document.querySelector(`input[name=ni-diseno][value=${dis}]`); if(r) r.checked = true; }
+  // 3 · generar y mostrar solo esas piezas
+  btn.disabled = true; btn.textContent = 'Generando…'; res.innerHTML = '<p class="empty-msg">Armando las piezas…</p>';
+  try{ await generarFlyersNuevoIngreso(); } catch(e){ btn.disabled = false; btn.textContent = 'Generar'; return err('No se pudo generar: ' + e.message); }
+  btn.disabled = false; btn.textContent = 'Generar';
+  const ne = document.getElementById('ni-error'); if(ne && ne.style.display === 'block') return err(ne.textContent);
+  const filtro = { post: /^Posteo/, carrusel: /^Carrusel/, story: /^Story/, video: /^Reel/, wa: /flyer WhatsApp/i }[para];
+  const P = [...document.querySelectorAll('#ni-resultado .ni-pieza')].map(w => ({ img: w.querySelector('img'), btn: w.querySelector('.ni-pieza-acciones button') })).filter(x => x.btn && filtro.test(x.btn.textContent));
+  window.__ccrPiezas = P; const copy = (document.querySelector('#ni-resultado .ni-copy-wrap textarea') || {}).value || '', video = document.querySelector('#ni-resultado video');
+  res.innerHTML = (P.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;">${P.map((x, i) => `<div onclick="window.__ccrPiezas[${i}].btn.click()" title="Tocar para compartir o descargar esta pieza" style="cursor:pointer;"><img src="${x.img.src}" style="width:100%;border-radius:8px;border:1px solid var(--line);display:block;"><div style="font-size:.72rem;color:#6B6258;margin-top:2px;">${escaparHtml(x.btn.textContent)}</div></div>`).join('')}</div>` : (video ? '' : '<p class="note">No se generaron piezas.</p>'))
+    + (video ? `<div id="ccr-video" style="margin-top:8px;"></div>` : '')
+    + (copy ? `<div class="field" style="margin:10px 0 0;"><label>Texto para el posteo (editable)</label><textarea id="ccr-copy" rows="5" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:8px;">${escaparHtml(copy)}</textarea><button type="button" class="btn-mini" onclick="copiarTexto(document.getElementById('ccr-copy').value, this)">Copiar texto</button></div>` : '')
+    + (P.length ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"><button type="button" class="btn btn-gold" style="flex:1;width:auto;" onclick="ccrCompartirTodo()">📱 Compartir todo</button><button type="button" class="btn btn-ghost" style="width:auto;" onclick="ccrDescargar()">⬇ Descargar</button><button type="button" class="btn-mini" onclick="ccr.dis++;ccrGenerar()">🎨 Otro diseño</button></div><p class="note" style="text-align:left;margin:4px 0 0;">Tocar una pieza la comparte o descarga sola.</p>` : '');
+  if(video){ const w = video.closest('div'); const box = document.getElementById('ccr-video'); if(box && w) box.appendChild(w); }
+}
+async function ccrArchivos(){ return Promise.all((window.__ccrPiezas || []).map((x, i) => fetch(x.img.src).then(r => r.blob()).then(bl => new File([bl], `pieza_${i + 1}.png`, { type: 'image/png' })))); }
+async function ccrCompartirTodo(){ try{ const files = await ccrArchivos(); if(navigator.canShare && navigator.canShare({ files })){ await navigator.share({ files, title: 'OnLineTextil' }); return; } ccrDescargar(); } catch(e){ if(e && e.name !== 'AbortError') alert('No se pudo compartir: ' + e.message); } }
+async function ccrDescargar(){ (window.__ccrPiezas || []).forEach((x, i) => setTimeout(() => { const a = document.createElement('a'); a.href = x.img.src; a.download = `pieza_${i + 1}.png`; a.click(); }, i * 300)); }
 // reportes de ML guardados (pesados): una sola lectura cada 10 minutos para toda la app
 function mlDetalleGet(){ if(window.__mlDet && Date.now() - (window.__mlDetT || 0) < 6e5) return window.__mlDet; window.__mlDetT = Date.now(); window.__mlDet = db.collection('ml_detalle').get(); window.__mlDet.catch(() => { window.__mlDet = null; }); return window.__mlDet; }
 // ===== Fugas de plata por SKU: margen negativo, reintegros, devoluciones y stock antiguo en Full =====
@@ -14706,6 +14768,7 @@ function permisoDeAccion(f){
   if(/abrirAlertasPrecio/.test(s)) return permisoDeAccion('abrirAumentoMasivo()');
   if(/abrirPedidosPrep\('facturar'\)|pdFacturar/.test(s)) return permisoDeAccion('abrirFacturas()');
   if(/abrirClientesRecuperar/.test(s)) return permisoDeAccion('abrirCtaCte()');
+  if(/abrirCrearContenido/.test(s)) return permisoDeAccion('abrirNuevoIngreso()');
   if(/abrirPedidosPrep/.test(s)) return permisoDeAccion('abrirPendientesEntrega()');
   if(/abrirUsuarios|abrirCopiaSeguridad/.test(s)) return 'dueno';
   if(/abrirResultadosML|abrirCalculadoraML/.test(s)) return 'resultadosML';
@@ -22940,7 +23003,7 @@ function mostrarSelectorFotosNI(){
     return `<p style="margin:10px 0 6px;font-weight:600;color:var(--purple);">${escaparHtml(g.producto.nombre)} <span class="note" style="margin:0;font-weight:400;">· toque para elegir una o varias, en orden</span></p>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">${g.fotos.map((f, i) => { const n = sel.indexOf(i); return `<div style="position:relative;"><img src="${f}" onclick="elegirFotoNI('${g.key}', ${i})" style="width:76px;height:76px;object-fit:cover;border-radius:8px;cursor:pointer;border:${n >= 0 ? '3px solid var(--purple)' : '1px solid var(--line)'};">${n >= 0 ? `<span style="position:absolute;top:4px;left:4px;background:#3D2B4E;color:#fff;font-size:.7rem;font-weight:700;border-radius:999px;padding:0 6px;">${n + 1}</span>` : ''}</div>`; }).join('') || '<span class="note" style="margin:0;">Sin fotos cargadas.</span>'}
         <label style="width:76px;height:76px;border:2px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:.7rem;color:#A89E90;cursor:pointer;">+ fotos de la computadora<input type="file" accept="image/*" multiple style="display:none;" onchange="agregarFotosNI('${g.key}', this)"></label></div>`; }).join('')
-    + (hayVarias ? `<div style="display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:10px;">${[['carrusel', 'Carrusel · 1 posteo con todas'], ['posteos', 'Un posteo por foto']].map(([k, t]) => `<button type="button" onclick="window.__niModoMulti='${k}';mostrarSelectorFotosNI()" style="border:none;padding:7px 12px;font-size:.8rem;font-weight:600;cursor:pointer;${modoM === k ? 'background:#3D2B4E;color:#fff;' : 'background:#fff;color:#6B6258;'}">${t}</button>`).join('')}</div><p class="note" style="text-align:left;margin:4px 0 0;">Mismo texto para todas. En carrusel, la foto 1 es la portada.</p>` : '');
+    + (hayVarias && !cont.closest('#ccr-fotos') ? `<div style="display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:10px;">${[['carrusel', 'Carrusel · 1 posteo con todas'], ['posteos', 'Un posteo por foto']].map(([k, t]) => `<button type="button" onclick="window.__niModoMulti='${k}';mostrarSelectorFotosNI()" style="border:none;padding:7px 12px;font-size:.8rem;font-weight:600;cursor:pointer;${modoM === k ? 'background:#3D2B4E;color:#fff;' : 'background:#fff;color:#6B6258;'}">${t}</button>`).join('')}</div><p class="note" style="text-align:left;margin:4px 0 0;">Mismo texto para todas. En carrusel, la foto 1 es la portada.</p>` : '');
 }
 function elegirFotoNI(key, indice){ const a = (fotosElegidasNI[key] || (fotoElegidaPorProducto[key] != null ? [fotoElegidaPorProducto[key]] : [])).slice(), k = a.indexOf(indice);
   if(k >= 0) a.splice(k, 1); else a.push(indice); fotosElegidasNI[key] = a; fotoElegidaPorProducto[key] = a.length ? a[0] : 0; mostrarSelectorFotosNI(); }
@@ -23224,7 +23287,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-03-v480';
+const APP_VERSION = '2026-11-03-v481';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
