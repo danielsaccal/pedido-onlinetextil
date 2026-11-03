@@ -1817,7 +1817,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/11 v475</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/11 v476</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -2446,10 +2446,11 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
         <select id="gs-mes" onchange="renderGastos()" style="padding:9px;border:1px solid var(--line);border-radius:10px;"></select>
         <select id="gs-fconc" onchange="renderGastos()" style="padding:9px;border:1px solid var(--line);border-radius:10px;"></select>
-        <input id="gs-buscar" placeholder="🔍 Buscar" oninput="renderGastos()" style="flex:1;min-width:150px;padding:9px;border:1px solid var(--line);border-radius:10px;">
+        <input id="gs-buscar" placeholder="🔍 Buscar" oninput="{const b=document.getElementById('gs-buscar2');if(b)b.value=this.value;}renderGastos()" style="flex:1;min-width:150px;padding:9px;border:1px solid var(--line);border-radius:10px;">
       </div>
       <div id="gs-resumen"></div>
       <button type="button" class="btn-mini" style="margin:6px 0;" onclick="enviarAAuditar(['gastos'], (document.getElementById('gs-mes') || {}).value)">🧾 Enviar a auditar</button>
+      <input id="gs-buscar2" placeholder="🔍 Buscar un gasto (proveedor, concepto, categoría o monto) en todos los meses" oninput="document.getElementById('gs-buscar').value=this.value;renderGastos();if(this.value)document.getElementById('gs-det').open=true;" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin:4px 0 8px;">
       <details id="gs-det" style="border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:#fff;"><summary style="cursor:pointer;font-weight:700;color:var(--purple);" id="gs-det-tit">📋 Ver el detalle de los gastos</summary><div id="gs-lista" style="margin-top:8px;"></div></details>
       <button class="btn btn-ghost" style="margin-top:14px;" onclick="irAtras()">← Volver</button>
     </div>
@@ -13120,7 +13121,8 @@ function verComprobante(id){
 }
 function renderGastos(){
   const mes = document.getElementById('gs-mes').value, fc = document.getElementById('gs-fconc').value, q = normBusqueda(document.getElementById('gs-buscar').value);
-  const L = (gastos || []).filter(g => (!mes || String(g.fecha).startsWith(mes)) && (!fc || g.concepto === fc) && (!q || coincideBusqueda([g.concepto, g.medio, g.quien, g.nota].join(' '), q)));
+  const qN = q ? numAr(document.getElementById('gs-buscar').value) : 0;
+  const L = (gastos || []).filter(g => ((q ? true : !mes) || String(g.fecha).startsWith(mes)) && (!fc || g.concepto === fc) && (!q || coincideBusqueda([g.concepto, g.medio, g.quien, g.nota, g.tipo, g.categoria].join(' '), q) || (qN > 0 && Math.abs((+g.monto || 0) - qN) < 1))).sort((a, b) => q ? String(b.fecha).localeCompare(String(a.fecha)) : 0);
   const tot = L.filter(g => !g.enML).reduce((a, g) => a + (+g.monto || 0), 0), totML = L.filter(g => g.enML).reduce((a, g) => a + (+g.monto || 0), 0), por = {};
   const claveC = c => normBusqueda(c).replace(/s$/, ''), nomC = {};
   L.filter(g => !g.enML).forEach(g => { const k = claveC(g.concepto); if(!nomC[k]) nomC[k] = String(g.concepto).charAt(0).toUpperCase() + String(g.concepto).slice(1); por[nomC[k]] = (por[nomC[k]] || 0) + (+g.monto || 0); });
@@ -13147,7 +13149,7 @@ function renderGastos(){
       ${L.some(g => !g.tipo && !g.enML) ? `<span style="font-size:.8rem;color:#A6432F;margin-left:auto;">⚠️ ${L.filter(g => !g.tipo && !g.enML).length} sin tipo</span>` : ''}</div>` : '') + (L.length ? L.map(g => `<div style="display:grid;grid-template-columns:22px 86px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:12px;margin-bottom:6px;background:#fff;">
       <input type="checkbox" ${gsSel.has(g._id) ? 'checked' : ''} onchange="gsSel[this.checked ? 'add' : 'delete']('${g._id}');renderGastos()">
       <span style="font-size:.82rem;color:#6B6258;">${new Date(g.fecha + 'T12:00:00').toLocaleDateString('es-AR')}</span>
-      <div><b>${escaparHtml(g.concepto || '')}</b> <span class="meta">· ${escaparHtml(g.quien || '')}</span>${g.origen === 'compra' ? ' <span style="font-size:.7rem;background:#EAF1FA;color:#2E5A8C;border-radius:999px;padding:1px 7px;">factura de compra</span>' : ''}${g.enML ? ' <span style="font-size:.7rem;background:#EEE8F7;color:#5b2a86;border-radius:999px;padding:1px 7px;">ya en Resultados ML</span>' : g.tipo ? ` <span style="font-size:.7rem;background:${g.tipo === 'fijo' ? '#EAF1FA' : '#FFF4D6'};color:${g.tipo === 'fijo' ? '#2E5A8C' : '#8A6417'};border-radius:999px;padding:1px 7px;">${g.tipo}</span>` : ' <span style="font-size:.7rem;background:#FDEBE7;color:#A6432F;border-radius:999px;padding:1px 7px;">sin tipo</span>'}<div style="font-size:.78rem;color:#8A8072;">${escaparHtml(g.medio || '')}${g.nota ? ' · ' + escaparHtml(g.nota) : ''}</div></div>
+      <div><b>${escaparHtml(g.concepto || '')}</b> <span class="meta">· ${escaparHtml(g.quien || '')}</span>${(g.creado || g.cargadoPor) ? `<span class="meta" style="font-size:.72rem;"> · cargado${g.cargadoPor ? ' por ' + escaparHtml(nomUsu(g.cargadoPor)) : ''}${g.creado ? ' el ' + new Date(g.creado).toLocaleDateString('es-AR') : ''}</span>` : ''}${g.origen === 'compra' ? ' <span style="font-size:.7rem;background:#EAF1FA;color:#2E5A8C;border-radius:999px;padding:1px 7px;">factura de compra</span>' : ''}${g.enML ? ' <span style="font-size:.7rem;background:#EEE8F7;color:#5b2a86;border-radius:999px;padding:1px 7px;">ya en Resultados ML</span>' : g.tipo ? ` <span style="font-size:.7rem;background:${g.tipo === 'fijo' ? '#EAF1FA' : '#FFF4D6'};color:${g.tipo === 'fijo' ? '#2E5A8C' : '#8A6417'};border-radius:999px;padding:1px 7px;">${g.tipo}</span>` : ' <span style="font-size:.7rem;background:#FDEBE7;color:#A6432F;border-radius:999px;padding:1px 7px;">sin tipo</span>'}<div style="font-size:.78rem;color:#8A8072;">${escaparHtml(g.medio || '')}${g.nota ? ' · ' + escaparHtml(g.nota) : ''}</div></div>
       <div style="text-align:right;white-space:nowrap;"><b>${formatPrice(+g.monto || 0)}</b><div style="display:flex;gap:4px;justify-content:flex-end;margin-top:4px;">${g.comprobante ? `<button type="button" class="btn-mini" onclick="verComprobante('${g._id}')" title="Ver comprobante">📎</button>` : ''}<button type="button" class="btn-mini" onclick="editarGasto('${g._id}')">✏️</button><button type="button" class="btn-mini" onclick="borrarGasto('${g._id}')">🗑️</button></div></div></div>`).join('') : '<p class="empty-msg">No hay gastos con este filtro.</p>');
 }
 
@@ -23216,7 +23218,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-02-v475';
+const APP_VERSION = '2026-11-02-v476';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
