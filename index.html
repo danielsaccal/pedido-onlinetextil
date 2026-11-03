@@ -725,7 +725,6 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
           <span>🔗 Compartir catálogo</span><span class="menu-cat-chev">▾</span>
         </div>
         <div class="menu-cat-body">
-          <span class="menu-item" onclick="abrirCompartirRubro()">🔗 Compartir catálogo por rubro</span>
           <span class="menu-item" onclick="abrirEnviarCatalogo()">📤 Enviar catálogo a clientes</span>
         </div>
       </div>
@@ -1817,7 +1816,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 03/11 v479</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 03/11 v480</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6185,7 +6184,7 @@ const GRUPOS_INICIO = {
     [['📷 Escanear etiqueta (SKU)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto').click()"], ['🤖 Buscar por foto (IA)', "irACatalogoDesdeInicio(); document.getElementById('escaner-foto-producto').click()"]]
   ] },
   c: { lado: 'int', titulo: '📣 Difusión y creatividad', titulosColumnas: ['1 · Catálogo a clientes', '2 · Videos', '3 · Redes y anuncios', '4 · Fotos de producto'], columnas: [
-    [['🔗 Compartir por rubro (link a la web)', 'abrirCompartirRubro()'], ['📚 Armar catálogo (PDF o imágenes)', 'abrirArmarCatalogo()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()']],
+    [['📚 Armar catálogo (PDF o imágenes)', 'abrirArmarCatalogo()'], ['📤 Enviar catálogo a clientes', 'abrirEnviarCatalogo()']],
     [['🎬 Crear video promocional', 'abrirCrearVideo()'], ['🎞️ Compartir video de producto', 'abrirCompartirVideoProducto()']],
     [['🖼️ Nuevo ingreso (flyers)', 'abrirNuevoIngreso()'], ['📣 Anuncios y promociones', 'abrirAnuncio()'], ['🎨 Director de arte (IA)', 'abrirDirectorArte()']],
     [['📸 Prompt para Gemini (un SKU)', 'abrirPromptGemini()'], ['📸 Prompts para Gemini en lote', 'abrirPromptGeminiLote()']],
@@ -6353,7 +6352,7 @@ const TAREAS = [
   ['t_fondos', 'Fondos', 'bank', [['Saldos', ['abrirTesoreria()', 'abrirTesoreria().then(() => tsFormCaja())']], ['Cheques y gastos', ["abrirCtaCte('cheques')", 'abrirGastos()']]]],
   ['t_stock', 'Stock y productos', 'box', [['Stock', ['abrirStock()', 'abrirFaltantes()']], ['Productos', ['abrirNuevoProducto()', 'abrirEditarProducto()', 'abrirCategorias()', 'abrirActualizarFoto()', 'abrirSubirFotosSku()', 'abrirReventa()', 'abrirLinksWeb()']], ['Precios', ['abrirListaPrecios()', 'abrirImportarExcel()', 'abrirAumentoMasivo()', 'abrirAlertasPrecio()', 'abrirHistorialPrecios()']], ['Costos', ['abrirCostosProductos()', 'abrirConfeccion()', 'abrirCalculadoraCostos()']]]],
   ['t_producir', 'Producir', 'cut', [['Qué fabrico', ['abrirTelas()', 'abrirArticulosCortes()']], ['Planificar', ['abrirAsistenteOT()', 'abrirTrabajoMedida()']], ['En el taller', ['abrirEnviosTela()', 'abrirDeudaTela()', 'abrirEnProduccion()', 'abrirIngresoTaller()']], ['Consultas', ['abrirHistorialOT()', 'abrirHistorialEntregas()', 'abrirHistorialSku()']]]],
-  ['t_difundir', 'Difundir', 'mega', [['Catálogo a clientes', ['abrirCompartirRubro()', 'abrirArmarCatalogo()', 'abrirEnviarCatalogo()']], ['Videos', ['abrirCrearVideo()', 'abrirCompartirVideoProducto()']], ['Redes y anuncios', ['abrirNuevoIngreso()', 'abrirAnuncio()', 'abrirDirectorArte()']], ['Fotos de producto', ['abrirPromptGemini()', 'abrirPromptGeminiLote()']]]],
+  ['t_difundir', 'Difundir', 'mega', [['Catálogo a clientes', ['abrirArmarCatalogo()', 'abrirEnviarCatalogo()']], ['Videos', ['abrirCrearVideo()', 'abrirCompartirVideoProducto()']], ['Redes y anuncios', ['abrirNuevoIngreso()', 'abrirAnuncio()', 'abrirDirectorArte()']], ['Fotos de producto', ['abrirPromptGemini()', 'abrirPromptGeminiLote()']]]],
   ['t_numeros', 'Números', 'chart', [['Resultados', ['abrirResultadoNegocio()', 'abrirFugas()', 'abrirRankings()', 'abrirResultadosML()', 'abrirVentasML()']], ['Impuestos', ['abrirIVA()', 'abrirLibroIVA()', 'abrirRetenciones()', 'abrirCierreMes()', 'abrirPuntosVentaFiscales()']]]],
 ];
 const TAR_FUENTES = ['ped', 'comp', 'cli', 'art', 'prov', 'teso', 'imp', 'est', 'c', 'h', 'i', 'k', 'f', 'g', 'd', 'a'];
@@ -23225,7 +23224,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-03-v479';
+const APP_VERSION = '2026-11-03-v480';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
