@@ -1817,7 +1817,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 03/11 v477</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 03/11 v478</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -20892,6 +20892,15 @@ async function generarFlyersNuevoIngresoBase(){
     wrap.appendChild(acciones);
     cont.appendChild(wrap);
   });
+    // carrusel: compartir todas las fotos juntas (Instagram arma un solo posteo)
+    { const car = piezas.filter(x => /^Carrusel /.test(x.etiqueta)); if(car.length > 1){ const bx = document.createElement('div'); bx.style.cssText = 'grid-column:1/-1;width:100%;margin:6px 0 10px;';
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-gold'; b.style.width = 'auto'; b.textContent = `📱 Compartir carrusel (${car.length} fotos juntas)`;
+        b.onclick = async () => { try{ const files = await Promise.all(car.map(x => new Promise(res => x.canvas.toBlob(bl => res(new File([bl], String(x.nombre).replace(/[\\/:*?"<>|]+/g, '-'), { type: 'image/png' })), 'image/png'))));
+            if(navigator.canShare && navigator.canShare({ files })){ await navigator.share({ files, title: 'OnLineTextil' }); }
+            else alert('Este navegador no permite compartir varias fotos juntas. Ábralo desde el celular (Chrome en Android o Safari en iPhone).'); }
+          catch(e){ if(e && e.name !== 'AbortError') alert('No se pudo compartir: ' + e.message); } };
+        const n = document.createElement('div'); n.className = 'note'; n.style.cssText = 'text-align:left;margin:4px 0 0;'; n.textContent = 'En el celular: elija Instagram → Feed. Las fotos van en este orden y quedan en un solo posteo.';
+        bx.appendChild(b); bx.appendChild(n); cont.insertBefore(bx, cont.firstChild); } }
 
     if(document.getElementById('ni-fmt-post').checked || document.getElementById('ni-fmt-reel').checked){
       const copyTexto = generarCopyPosteo(producto, grupos[0].variantes.map(v => ({variante: v})));
@@ -23212,7 +23221,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-03-v477';
+const APP_VERSION = '2026-11-03-v478';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
