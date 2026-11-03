@@ -929,7 +929,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
         <div id="ni-modo-sku">
           <div class="field" style="max-width:220px;"><label>¿Cuántos productos?</label><input type="number" id="ni-sku-cantidad" min="1" max="24" value="1" onchange="generarCamposSku()"></div>
           <div id="ni-sku-campos"></div>
-          <button type="button" class="btn-mini" onclick="mostrarSelectorFotosNI()" style="margin-top:6px;">🖼️ Elegir qué foto usar (si algún producto tiene varias)</button>
+          <button type="button" class="btn-mini" onclick="mostrarSelectorFotosNI()" style="margin-top:6px;">🖼️ Elegir fotos (una o varias)</button>
           <div id="ni-selector-fotos" style="margin-top:10px;"></div>
         </div>
         <div id="ni-modo-categoria" style="display:none;">
@@ -1817,7 +1817,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/11 v476</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 03/11 v477</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -20755,10 +20755,11 @@ async function generarFlyersNuevoIngresoBase(){
 
     // cargar la foto de cada producto distinto (respetando cual eligio el usuario si hay varias)
     for(const g of grupos){
-      const fotosDisponibles = (g.skus && g.skus.length === 1) ? fotosDeSkuOProducto(g.skus[0], g.ci, g.pi, g.producto) : imagenesEfectivas(g.ci, g.pi, g.producto);
-      const indiceElegido = fotoElegidaPorProducto[`${g.ci}-${g.pi}`] || 0;
-      const imgSrc = fotosDisponibles[indiceElegido] || fotosDisponibles[0] || g.producto.imagen;
-      g.img = await cargarImagenParaCanvas(imgSrc);
+      const fotosDisponibles = ((g.skus && g.skus.length === 1) ? fotosDeSkuOProducto(g.skus[0], g.ci, g.pi, g.producto) : imagenesEfectivas(g.ci, g.pi, g.producto) || []).concat(fotosExtraNI[`${g.ci}-${g.pi}`] || []);
+      const idxs = (fotosElegidasNI[`${g.ci}-${g.pi}`] || []).length ? fotosElegidasNI[`${g.ci}-${g.pi}`] : [fotoElegidaPorProducto[`${g.ci}-${g.pi}`] || 0];
+      g.imgs = [];
+      for(const ix of idxs){ const src = fotosDisponibles[ix] || (g.imgs.length ? null : (fotosDisponibles[0] || g.producto.imagen)); if(src){ try{ g.imgs.push(await cargarImagenParaCanvas(src)); } catch(e){} } }
+      g.img = g.imgs[0] || await cargarImagenParaCanvas(fotosDisponibles[0] || g.producto.imagen);
     }
 
     await document.fonts.ready;
@@ -20778,7 +20779,11 @@ async function generarFlyersNuevoIngresoBase(){
     const producto = primerProducto;
     const img = grupos[0].img;
     const diseno = document.querySelector('input[name="ni-diseno"]:checked').value;
+    const variasFotos = grupos.length === 1 && (grupos[0].imgs || []).length > 1, modoMulti = window.__niModoMulti || 'carrusel';
     formatosElegidos.forEach(([formato, etiqueta]) => {
+      // varias fotos y "un posteo por foto": un posteo con cada foto, mismo texto y diseno
+      if(formato === 'post' && variasFotos && modoMulti === 'posteos'){ grupos[0].imgs.forEach((im, k) => { let cv; if(diseno === 'tarjeta') cv = dibujarPiezaTarjeta(producto, im, 'post', textoAdicional); else if(diseno === 'texto') cv = dibujarPiezaTexto(producto, textoAdicional, 'post'); else cv = dibujarPiezaEditorial(producto, im, 'post', textoAdicional);
+          piezas.push({ canvas: cv, nombre: 'post_' + (k + 1) + '_' + producto.nombre.replace(/\s+/g, '_') + '.png', etiqueta: 'Posteo ' + (k + 1) + '/' + grupos[0].imgs.length }); }); return; }
       let canvasPieza;
       if(diseno === 'tarjeta') canvasPieza = dibujarPiezaTarjeta(producto, img, formato, textoAdicional);
       else if(diseno === 'texto') canvasPieza = dibujarPiezaTexto(producto, textoAdicional, formato);
@@ -20790,7 +20795,11 @@ async function generarFlyersNuevoIngresoBase(){
       });
     });
 
-    if(document.getElementById('ni-fmt-carrusel').checked){
+    // varias fotos del mismo producto en carrusel: un slide por foto, en el orden elegido
+    if(variasFotos && modoMulti === 'carrusel'){ const n = grupos[0].imgs.length, pals = ['violeta', 'dorado', 'crema'];
+      grupos[0].imgs.forEach((im, k) => { const cv = diseno === 'tarjeta' ? dibujarPiezaTarjeta(producto, im, 'post', textoAdicionalOriginal || null, pals[k % 3]) : dibujarPiezaEditorial(producto, im, 'post', textoAdicionalOriginal || null, pals[k % 3]);
+        piezas.push({ canvas: cv, nombre: 'carrusel_' + (k + 1) + 'de' + n + '_' + producto.nombre.replace(/\s+/g, '_') + '.png', etiqueta: 'Carrusel ' + (k + 1) + '/' + n + (k === 0 ? ' (portada)' : '') }); }); }
+    else if(document.getElementById('ni-fmt-carrusel').checked){
       const cantCarrusel = Math.min(8, Math.max(3, parseInt(document.getElementById('ni-carrusel-cant').value, 10) || 5));
       const estilosCarrusel = ['editorial', 'texto', 'tarjeta'];
       const multiProducto = grupos.length > 1;
@@ -22902,43 +22911,28 @@ function setCamposSku(arraySkus){
 
 let fotoElegidaPorProducto = {}; // key: "ci-pi" -> indice de foto elegido
 
+// fotos de cada producto para el flyer: las del SKU (si se pidio un solo SKU de ese producto) o las del producto, mas las que suba de la computadora; se pueden elegir varias, en orden
+let fotosElegidasNI = {}, fotosExtraNI = {};
+function fotosNIde(m, skusDelProd){ const base = skusDelProd.length === 1 ? fotosDeSkuOProducto(skusDelProd[0], m.ci, m.pi, m.producto) : imagenesEfectivas(m.ci, m.pi, m.producto); return (base || []).concat(fotosExtraNI[`${m.ci}-${m.pi}`] || []); }
 function mostrarSelectorFotosNI(){
   const skus = [...document.querySelectorAll('#ni-sku-campos input')].map(inp => inp.value.trim()).filter(Boolean);
   const cont = document.getElementById('ni-selector-fotos');
   const matches = skus.map(sku => buscarProductoPorSku(sku)).filter(Boolean);
-  const conVarias = [];
-  const vistos = new Set();
-  matches.forEach(m => {
-    const key = `${m.ci}-${m.pi}`;
-    if(vistos.has(key)) return;
-    vistos.add(key);
-    const fotos = imagenesEfectivas(m.ci, m.pi, m.producto);
-    if(fotos.length > 1) conVarias.push({ ci: m.ci, pi: m.pi, producto: m.producto, fotos });
-  });
-
-  if(conVarias.length === 0){
-    cont.innerHTML = '<p class="note">Ninguno de estos productos tiene más de una foto cargada.</p>';
-    return;
-  }
-
-  cont.innerHTML = conVarias.map(g => {
-    const key = `${g.ci}-${g.pi}`;
-    const elegida = fotoElegidaPorProducto[key] || 0;
-    return `
-      <p style="margin:10px 0 6px;font-weight:600;color:var(--purple);">${g.producto.nombre}</p>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;">
-        ${g.fotos.map((f, i) => `
-          <img src="${f}" onclick="elegirFotoNI('${key}', ${i})" style="width:70px;height:70px;object-fit:cover;border-radius:8px;cursor:pointer;border:${i===elegida?'3px solid var(--purple)':'1px solid var(--line)'};">
-        `).join('')}
-      </div>
-    `;
-  }).join('');
+  const grupos = [], vistos = new Set();
+  matches.forEach(m => { const key = `${m.ci}-${m.pi}`; if(vistos.has(key)) return; vistos.add(key);
+    const skusDelProd = matches.filter(x => x.ci === m.ci && x.pi === m.pi).map(x => String(x.variante.sku).toUpperCase());
+    grupos.push({ key, ci: m.ci, pi: m.pi, producto: m.producto, fotos: fotosNIde(m, skusDelProd) }); });
+  if(!grupos.length){ cont.innerHTML = '<p class="note">Escriba un SKU del catálogo.</p>'; return; }
+  const hayVarias = grupos.some(g => (fotosElegidasNI[g.key] || []).length > 1), modoM = window.__niModoMulti || 'carrusel';
+  cont.innerHTML = grupos.map(g => { const sel = fotosElegidasNI[g.key] || [fotoElegidaPorProducto[g.key] || 0];
+    return `<p style="margin:10px 0 6px;font-weight:600;color:var(--purple);">${escaparHtml(g.producto.nombre)} <span class="note" style="margin:0;font-weight:400;">· toque para elegir una o varias, en orden</span></p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">${g.fotos.map((f, i) => { const n = sel.indexOf(i); return `<div style="position:relative;"><img src="${f}" onclick="elegirFotoNI('${g.key}', ${i})" style="width:76px;height:76px;object-fit:cover;border-radius:8px;cursor:pointer;border:${n >= 0 ? '3px solid var(--purple)' : '1px solid var(--line)'};">${n >= 0 ? `<span style="position:absolute;top:4px;left:4px;background:#3D2B4E;color:#fff;font-size:.7rem;font-weight:700;border-radius:999px;padding:0 6px;">${n + 1}</span>` : ''}</div>`; }).join('') || '<span class="note" style="margin:0;">Sin fotos cargadas.</span>'}
+        <label style="width:76px;height:76px;border:2px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:.7rem;color:#A89E90;cursor:pointer;">+ fotos de la computadora<input type="file" accept="image/*" multiple style="display:none;" onchange="agregarFotosNI('${g.key}', this)"></label></div>`; }).join('')
+    + (hayVarias ? `<div style="display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:10px;">${[['carrusel', 'Carrusel · 1 posteo con todas'], ['posteos', 'Un posteo por foto']].map(([k, t]) => `<button type="button" onclick="window.__niModoMulti='${k}';mostrarSelectorFotosNI()" style="border:none;padding:7px 12px;font-size:.8rem;font-weight:600;cursor:pointer;${modoM === k ? 'background:#3D2B4E;color:#fff;' : 'background:#fff;color:#6B6258;'}">${t}</button>`).join('')}</div><p class="note" style="text-align:left;margin:4px 0 0;">Mismo texto para todas. En carrusel, la foto 1 es la portada.</p>` : '');
 }
-
-function elegirFotoNI(key, indice){
-  fotoElegidaPorProducto[key] = indice;
-  mostrarSelectorFotosNI();
-}
+function elegirFotoNI(key, indice){ const a = (fotosElegidasNI[key] || (fotoElegidaPorProducto[key] != null ? [fotoElegidaPorProducto[key]] : [])).slice(), k = a.indexOf(indice);
+  if(k >= 0) a.splice(k, 1); else a.push(indice); fotosElegidasNI[key] = a; fotoElegidaPorProducto[key] = a.length ? a[0] : 0; mostrarSelectorFotosNI(); }
+async function agregarFotosNI(key, inp){ const fs = [...(inp.files || [])]; for(const f of fs){ try{ const d = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); }); (fotosExtraNI[key] = fotosExtraNI[key] || []).push(d); } catch(e){} } inp.value = ''; mostrarSelectorFotosNI(); }
 
 function generarCamposSku(){
   const cantidad = Math.min(24, Math.max(1, parseInt(document.getElementById('ni-sku-cantidad').value, 10) || 1));
@@ -23095,7 +23089,7 @@ function poblarCategoriasNI(){
 
 function abrirNuevoIngreso(){
   mostrarPaso('step-nuevo-ingreso');
-  fotoElegidaPorProducto = {};
+  fotoElegidaPorProducto = {}; fotosElegidasNI = {}; fotosExtraNI = {}; window.__niModoMulti = 'carrusel';
   document.getElementById('ni-selector-fotos').innerHTML = '';
   document.getElementById('ni-sku-cantidad').value = '1';
   generarCamposSku();
@@ -23218,7 +23212,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-02-v476';
+const APP_VERSION = '2026-11-03-v477';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
