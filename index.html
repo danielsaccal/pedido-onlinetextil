@@ -585,6 +585,9 @@ body.con-sb #avisoCtaCte, body.con-sb #avisoCompras, body.con-sb #avisoTeso, bod
 #sb-velo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:140;}
 @media(max-width:900px){ body.sb-abierta #sb-velo{display:block;} }
 body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-sb #step-inicio .ini-sec{display:none !important;}
+/* el Inicio viejo ya no se muestra nunca (antes aparecia un instante al abrir la app) */
+#step-inicio .ini-grid, #step-inicio .ini-sub, #step-inicio .ini-sec, #ini-recientes-wrap{display:none !important;}
+body:not(.con-sb) #step-inicio .search-wrap{display:none !important;}
 #dash .d-acc{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 14px;}
 #dash .d-acc button{background:#fff;border:1px solid #E6E0D6;border-radius:999px;padding:8px 14px;font:inherit;font-size:.88rem;cursor:pointer;color:#3D2B4E;}
 #dash .d-acc button.g{background:#F4C430;border-color:#F4C430;font-weight:700;}
@@ -782,7 +785,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
 
   <!-- STEP: INICIO (iconos) -->
   <div class="step" id="step-inicio">
-    <div id="dash"></div>
+    <div id="dash"><p class="empty-msg" style="padding:40px 0;">Cargando…</p></div>
     <div id="avisoCopia" style="display:none;"></div>
     <div id="avisoCostos" style="display:none;"></div>
     <div id="avisoCtaCte" style="display:none;"></div>
@@ -1817,7 +1820,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 03/11 v485</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 03/11 v486</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -23362,7 +23365,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-03-v485';
+const APP_VERSION = '2026-11-03-v486';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
