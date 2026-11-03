@@ -539,6 +539,7 @@ details>summary{cursor:pointer;}
 #sb .sb-sub{padding:2px 8px 8px 34px!important;}
 #sb .sb-sub b{background:none!important;color:var(--ds-tx3)!important;font-size:.66rem!important;padding:8px 6px 2px!important;margin:4px 0 0!important;}
 #sb .sb-sub div{font-size:.82rem!important;color:var(--ds-tx2)!important;padding:4px 6px!important;border-radius:6px;}
+#sb .sb-sub div.sb-actual,#sb a.sb-fav.sb-actual{background:#3D2B4E!important;color:#fff!important;font-weight:700;position:relative;}#sb .sb-sub div.sb-actual::before{content:'';position:absolute;left:-7px;top:5px;bottom:5px;width:3px;border-radius:2px;background:#3D2B4E;}#sb .sb-sub div.sb-actual .sb-star{color:#fff;}
 #sb .sb-sub div:hover{background:#F7F4EF;color:#3D2B4E!important;}
 /* avisos propios (reemplazan los cuadros del navegador) */
 #ds-toasts{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:100000;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;}
@@ -1816,7 +1817,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/11 v474</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 02/11 v475</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6377,11 +6378,11 @@ function pintarBarraLateral(){
   const favs = favLeer().filter(x => puede(permisoDeAccion(x.f)) && TAREAS.some(([k]) => (sbItems(k) || []).some(c => c.items.some(([, ff]) => ff === x.f))) || /abrirDirectorArte|abrirAuditor|abrirUsuarios|abrirDatosRazones|abrirCopia|abrirListas|abrirDatosBancarios|abrirMiFirma|abrirPuntosVenta/.test(x.f));
   let recs = []; try{ recs = JSON.parse(localStorage.getItem('ot_recientes') || '[]').filter(x => puede(permisoDeAccion(x.f)) && !favs.some(y => y.f === x.f)).slice(0, 3); } catch(e){}
   const icoDe = f => { const t = TAREAS.find(([k]) => (sbItems(k) || []).some(c => c.items.some(([, ff]) => ff === f))); return t ? t[2] : 'comp'; };
-  const fila = (x, cls) => `<a class="sb-fav ${cls || ''}" onclick="sbUsar(${reg([x.t, x.f])})">${dsIco2(icoDe(x.f))} <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escaparHtml(sinEmoji(x.t).replace(/^\+\s*/, ''))}</span></a>`;
+  const fila = (x, cls) => `<a class="sb-fav ${cls || ''}${window.__sbActual === x.f ? ' sb-actual' : ''}" onclick="sbUsar(${reg([x.t, x.f])})">${dsIco2(icoDe(x.f))} <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escaparHtml(sinEmoji(x.t).replace(/^\+\s*/, ''))}</span></a>`;
   const bloqueFav = (favs.length ? `<div class="sb-sep">Favoritos</div>${favs.map(x => fila(x)).join('')}` : '') + (recs.length ? `<div class="sb-sep">Recientes</div>${recs.map(x => fila(x, 'rec')).join('')}` : '');
   const grupo = (k, ic, t) => { const cols = sbItems(k); if(!cols.length) return '';
     return `<a class="${sbAbierto === k ? 'on' : ''}" onclick="sbAbierto=sbAbierto==='${k}'?null:'${k}';pintarBarraLateral();pintarCategoria('${k}')">${/^t_/.test(k) ? dsIco2(ic) : dsIco(k)} ${t}<span style="margin-left:auto;font-size:.8rem;color:#A89E90;">${sbAbierto === k ? '▾' : '▸'}</span></a>${sbAbierto === k ? `<div class="sb-sub">${cols.map((c, ci) => { const key = k + ':' + ci, abierta = cols.length === 1 || !c.titulo || cols.reduce((s, x) => s + x.items.length, 0) <= 6 || sbSubAbiertos.has(key); /* tareas chicas: todo abierto */
-      return (cols.length > 1 && c.titulo ? `<b style="cursor:pointer;display:flex;justify-content:space-between;" onclick="sbToggleSub('${key}')"><span>${escaparHtml(c.titulo.replace(/^\d+ · /, ''))}</span><span>${abierta ? '▾' : '▸'}</span></b>` : '') + (abierta ? c.items.map(([tt, f]) => { const esFav = favLeer().some(x => x.f === f), ri = reg([tt, f]); return `<div class="${/ResultadosML|CalculadoraML|VentasML/.test(f) ? 'ml' : ''}" onclick="sbUsar(${ri})">${escaparHtml(/^➕/.test(tt) ? tt.replace(/^➕\s*/, '+ ') : tt.replace(/^\S+\s/, ''))}<span class="sb-star ${esFav ? 'on' : ''}" title="${esFav ? 'Quitar de favoritos' : 'Agregar a favoritos'}" onclick="event.stopPropagation();const it=window.__sbItems[${ri}];favToggle(it[0], it[1])">${esFav ? '★' : '☆'}</span></div>`; }).join('') : ''); }).join('')}</div>` : ''}`; };
+      return (cols.length > 1 && c.titulo ? `<b style="cursor:pointer;display:flex;justify-content:space-between;" onclick="sbToggleSub('${key}')"><span>${escaparHtml(c.titulo.replace(/^\d+ · /, ''))}</span><span>${abierta ? '▾' : '▸'}</span></b>` : '') + (abierta ? c.items.map(([tt, f]) => { const esFav = favLeer().some(x => x.f === f), ri = reg([tt, f]); return `<div class="${/ResultadosML|CalculadoraML|VentasML/.test(f) ? 'ml' : ''}${window.__sbActual === f ? ' sb-actual' : ''}" onclick="sbUsar(${ri})">${escaparHtml(/^➕/.test(tt) ? tt.replace(/^➕\s*/, '+ ') : tt.replace(/^\S+\s/, ''))}<span class="sb-star ${esFav ? 'on' : ''}" title="${esFav ? 'Quitar de favoritos' : 'Agregar a favoritos'}" onclick="event.stopPropagation();const it=window.__sbItems[${ri}];favToggle(it[0], it[1])">${esFav ? '★' : '☆'}</span></div>`; }).join('') : ''); }).join('')}</div>` : ''}`; };
   const agentes = [['🎨', 'Director de arte', 'abrirDirectorArte()'], ['🧾', 'Auditor contable', 'abrirAuditor()'], ['⚖️', 'Reclamos ML / MP', 'abrirReclamosML()']].filter(([, , f]) => puede(permisoDeAccion(f)));
   sb.innerHTML = `<div class="sb-logo">OnLineTextil</div>
     <a onclick="sbAbierto=null;irInicio();pintarBarraLateral();document.body.classList.remove('sb-abierta')">${dsIco('home')} Inicio</a>
@@ -6581,6 +6582,7 @@ function dashUsar(i){ const it = (window.__dashItems || [])[i]; if(!it) return; 
 function dashHoy(i){ const it = (window.__dashHoy || [])[i]; if(!it) return; window.__iniItems = window.__iniItems || []; window.__iniItems.push([it[0], it[1]]); usarItemInicio(window.__iniItems.length - 1); }
 let grupoInicioAbierto = null;
 function irInicio(){
+  window.__sbActual = null;
   const menu = document.querySelector('.menu-dropdown');
   if(menu) menu.classList.remove('open');
   mostrarPaso('step-inicio');
@@ -11282,7 +11284,10 @@ function usarItemInicio(i){
   const it = (window.__iniItems || [])[i]; if(!it) return;
   if(!puede(permisoDeAccion(it[1]))){ alert('No tenés permiso para entrar acá. Pedíselo al dueño.'); return; }
   registrarUsoInicio(it[0], it[1]);
+  // la barra lateral marca la seccion en la que esta (y abre su tarea)
+  window.__sbActual = it[1]; try{ const t = TAREAS.find(([k]) => (sbItems(k) || []).some(c => c.items.some(([, ff]) => ff === it[1]))); if(t) sbAbierto = t[0]; } catch(e){}
   try{ (new Function(it[1]))(); } catch(e){ console.error(e); }
+  try{ pintarBarraLateral(); } catch(e){}
 }
 function registrarUsoInicio(t, f){
   try{
@@ -23211,7 +23216,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-02-v474';
+const APP_VERSION = '2026-11-02-v475';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
