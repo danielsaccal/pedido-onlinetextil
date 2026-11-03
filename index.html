@@ -1817,7 +1817,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 03/11 v482</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 03/11 v483</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6369,7 +6369,8 @@ function favToggle(t, f){ let L = favLeer(); const i = L.findIndex(x => x.f === 
 const SB_ORDEN = [['ped', '🛒', 'Pedidos'], ['comp', '🧾', 'Comprobantes'], ['cli', '👥', 'Clientes'], ['art', '📦', 'Artículos'], ['prov', '🏭', 'Proveedores'], ['teso', '💰', 'Fondos'], ['imp', '🧮', 'Impuestos'], ['est', '📊', 'Informes'], ['c', '📣', 'Difusión y creatividad']];
 let sbAbierto = null; const sbSubAbiertos = new Set(); // subcategorias desplegadas (por defecto, contraidas)
 function sbItems(k){ const g = GRUPOS_INICIO[k]; if(!g) return []; const tit = g.titulosColumnas || []; const out = [];
-  (g.columnas || []).forEach((col, i) => { const vis = col.filter(([, f]) => puede(permisoGrupoItem(k, f)) && puede(permisoDeAccion(f))); if(vis.length) out.push({ titulo: tit[i] || '', items: vis }); }); return out; }
+  const oc = (typeof esDueno === 'function' && esDueno()) ? [] : (window.MENU_OCULTO || []);
+  (g.columnas || []).forEach((col, i) => { const vis = col.filter(([, f]) => puede(permisoGrupoItem(k, f)) && puede(permisoDeAccion(f)) && !oc.includes(f)); if(vis.length) out.push({ titulo: tit[i] || '', items: vis }); }); return out; }
 function pintarBarraLateral(){
   const sb = document.getElementById('sb'); if(!sb) return;
   if(!rolActual){ document.body.classList.remove('con-sb'); return; }
@@ -9080,6 +9081,7 @@ async function abrirPedidosPrep(tab){ await cargarNombresUsuarios(); pdTab = tab
   try{ const s = await db.collection('pedidos').get(); pdLista = s.docs.map(d => ({ _id: d.id, ...d.data() })); historialPedidos = pdLista; } catch(e){ pdLista = []; } pdPintar(); }
 function pdPintar(){ const box = document.getElementById('pub-cont'); if(!box) return; if(pdSel) return pdPintarPrep();
   const enParte = p => (p.items || []).some(i => +i.facturada > 0);
+  window.__pdNums = () => { const ab = pdLista.filter(p => pdAbierto(p)); return [ab.filter(p => (p.estado || 'pendiente') !== 'para_facturar' && !enParte(p)).length, ab.filter(p => enParte(p)).length, ab.filter(p => (p.estado || '') === 'para_facturar').length]; };
   const A = pdLista.filter(p => pdAbierto(p) && (p.estado || 'pendiente') !== 'para_facturar').sort((a, b) => (enParte(b) - enParte(a)) || String(a.fecha).localeCompare(String(b.fecha))), F = pdLista.filter(p => p.estado === 'para_facturar').sort((a, b) => String((a.prep || {}).fecha).localeCompare(String((b.prep || {}).fecha)));
   const L = pdTab === 'facturar' ? F : A, cli = p => { const c = p.cliente || {}; return c.razonSocial || `${c.nombre || ''} ${c.apellido || ''}`.trim() || 'Sin cliente'; };
   const est = { pendiente: 'Tomado', preparacion: 'En preparación', parcial: 'Entregado en parte', para_facturar: 'Listo para facturar' };
@@ -12627,7 +12629,7 @@ auth.onAuthStateChanged(async u => {
     let rol = d.exists ? d.data().rol : null;
     if(!rol && mail === DUENO_INICIAL){ rol = 'dueño'; await ref.set({ rol, nombre: u.displayName || '', alta: new Date().toISOString() }, { merge: true }); }
     if(!rol){ mostrarLogin(`La cuenta <b>${escaparHtml(mail)}</b> no tiene acceso.<br>Pedile al dueño que te agregue.`, true); return; }
-    usuarioActual = u; rolActual = rol; permisosActuales = Object.assign({}, PERMISOS_BASE, (d.exists && d.data().permisos) || {});
+    usuarioActual = u; rolActual = rol; permisosActuales = Object.assign({}, PERMISOS_BASE, (d.exists && d.data().permisos) || {}); window.MENU_OCULTO = (d.exists && d.data().menuOculto) || [];
     ref.set({ ultimoIngreso: new Date().toISOString(), uid: u.uid, nombre: u.displayName || '' }, { merge: true }).catch(() => {});
     document.getElementById('login').style.display = 'none';
     pintarUsuarioEnCabecera();
@@ -12667,7 +12669,7 @@ async function abrirUsuarios(){
   document.getElementById('pub-cont').innerHTML = `
     <div style="display:grid;gap:6px;margin-bottom:12px;">${us.map(u => `<div style="display:flex;gap:8px;align-items:center;background:var(--cream);border-radius:10px;padding:8px 10px;">
       <div style="flex:1;"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><input value="${escapeAttr(u.nombre || '')}" placeholder="Nombre de pila" onchange="guardarNombreUsuario('${escapeAttr(u.mail)}', this.value)" style="padding:6px 8px;border:1px solid ${u.nombre ? 'var(--line)' : '#E0B8B0'};border-radius:8px;width:150px;font-weight:700;"><span style="color:#8A8072;font-size:.82rem;">${escaparHtml(u.mail)}</span></div><div class="note" style="text-align:left;margin:0;">${escaparHtml(u.rol)}${u.ultimoIngreso ? ' · último ingreso ' + new Date(u.ultimoIngreso).toLocaleDateString('es-AR') : ' · todavía no ingresó'}</div>
-        ${u.rol === 'colaborador' ? `<details style="margin-top:6px;"><summary style="cursor:pointer;font-size:.85rem;font-weight:700;color:var(--purple);">🔑 Qué puede ver y hacer</summary><div style="display:grid;gap:4px;margin-top:6px;">${PERMISOS.map(([k, t]) => `<label style="display:flex;gap:8px;align-items:center;font-size:.85rem;"><input type="checkbox" ${Object.assign({}, PERMISOS_BASE, u.permisos || {})[k] ? 'checked' : ''} onchange="guardarPermiso('${escapeAttr(u.mail)}', '${k}', this.checked)"> ${t}</label>`).join('')}</div></details>` : ''}</div>
+        ${u.rol === 'colaborador' ? `<details style="margin-top:6px;"><summary style="cursor:pointer;font-size:.85rem;font-weight:700;color:var(--purple);">🔑 Qué puede ver y hacer</summary><div style="display:grid;gap:4px;margin-top:6px;">${PERMISOS.map(([k, t]) => `<label style="display:flex;gap:8px;align-items:center;font-size:.85rem;"><input type="checkbox" ${Object.assign({}, PERMISOS_BASE, u.permisos || {})[k] ? 'checked' : ''} onchange="guardarPermiso('${escapeAttr(u.mail)}', '${k}', this.checked)"> ${t}</label>`).join('')}</div></details>` : ''}${u.rol !== 'dueño' ? menuUsuarioHtml(u) : ''}</div>
       ${u.mail === DUENO_INICIAL ? '' : `<button type="button" class="btn-mini" onclick="quitarUsuario('${escapeAttr(u.mail)}')">✕ Quitar</button>`}</div>`).join('')}</div>
     <div style="display:grid;grid-template-columns:minmax(0,1fr) 150px auto auto;gap:6px;">
       <input id="us-mail" type="email" placeholder="mail de Google" style="padding:10px;border:1px solid var(--line);border-radius:10px;"><input id="us-nom" placeholder="Nombre de pila" style="padding:10px;border:1px solid var(--line);border-radius:10px;">
@@ -12676,6 +12678,15 @@ async function abrirUsuarios(){
     </div>
     <p class="note" style="text-align:left;margin-top:8px;">El <b>nombre de pila</b> es el que aparece en pedidos, confirmaciones y registros (nunca el email). Al agregar un colaborador, arranca con: pedidos, difusión, clientes y producción. Tocá <b>🔑 Qué puede ver y hacer</b> para cambiarlo. El dueño ve todo.</p>`;
 }
+// menu por usuario: el duenio tilda que opciones ve cada uno (lo que no se tilda, no aparece en su barra lateral)
+function menuUsuarioHtml(u){ if(!GRUPOS_INICIO.t_vender) armarTareas(); const oc = u.menuOculto || [], m = escapeAttr(u.mail), nom = escaparHtml(u.nombre || 'este usuario');
+  return `<details style="margin-top:6px;"><summary style="cursor:pointer;font-size:.85rem;font-weight:700;color:var(--purple);">🧭 Menú de ${nom}</summary><p class="note" style="text-align:left;margin:4px 0;">Lo que no tilde, no lo ve en su barra lateral.</p><div style="display:grid;gap:2px;">${TAREAS.map(([k, t]) => { const g = GRUPOS_INICIO[k]; if(!g) return ''; const fs = (g.columnas || []).flat().map(([tt, f]) => [tt, f]); if(!fs.length) return '';
+      const todos = fs.every(([, f]) => !oc.includes(f)); return `<label style="display:flex;gap:8px;align-items:center;font-size:.86rem;font-weight:700;margin-top:6px;"><input type="checkbox" ${todos ? 'checked' : ''} onchange="menuUsuarioTarea('${m}', '${k}', this.checked)"> ${escaparHtml(t)}</label>`
+        + fs.map(([tt, f]) => `<label style="display:flex;gap:8px;align-items:center;font-size:.8rem;padding-left:22px;color:#6B6258;"><input type="checkbox" ${!oc.includes(f) ? 'checked' : ''} data-f="${escaparHtml(f)}" onchange="menuUsuarioItem('${m}', this.dataset.f, this.checked)"> ${escaparHtml(sinEmoji(tt))}</label>`).join(''); }).join('')}</div></details>`; }
+async function menuUsuarioGuardar(mail, oc){ try{ await db.collection('usuarios').doc(mail).set({ menuOculto: oc }, { merge: true }); dsToast('Menú guardado'); } catch(e){ alert('No se pudo guardar: ' + e.message); } }
+async function menuUsuarioItem(mail, f, ver){ const d = await db.collection('usuarios').doc(mail).get(); let oc = (d.exists && d.data().menuOculto) || []; oc = ver ? oc.filter(x => x !== f) : [...new Set([...oc, f])]; await menuUsuarioGuardar(mail, oc); }
+async function menuUsuarioTarea(mail, k, ver){ const g = GRUPOS_INICIO[k]; if(!g) return; const fs = (g.columnas || []).flat().map(([, f]) => f), d = await db.collection('usuarios').doc(mail).get(); let oc = (d.exists && d.data().menuOculto) || [];
+  oc = ver ? oc.filter(x => !fs.includes(x)) : [...new Set([...oc, ...fs])]; await menuUsuarioGuardar(mail, oc); abrirUsuarios(); }
 async function agregarUsuario(){
   const mail = document.getElementById('us-mail').value.trim().toLowerCase(), rol = document.getElementById('us-rol').value;
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){ alert('Escribí un mail válido.'); return; }
@@ -14024,6 +14035,21 @@ async function sfsGuardar(b){ const modo = (document.querySelector('input[name=s
       await db.collection('fotos_sku').doc(s).set({ imagenesBase64: fotos, actualizado: new Date().toISOString() }); fotosSku[s] = fotos; } catch(e){ err.push(s + ': ' + e.message); } }
   sfsLista.forEach(x => { try{ URL.revokeObjectURL(x.url); } catch(e){} }); sfsLista = [];
   cerrarPublicar(); dsToast(err.length ? `Cargadas con errores: ${err.join(' · ')}` : `Listo: fotos cargadas en ${S.length} SKU`, { ms: 7000 }); }
+// listas que se pliegan: cuentas de clientes y de proveedores (en la vista de la lista, no en la ficha) y stock
+document.addEventListener('DOMContentLoaded', () => { try{
+  const envolver = (nom, fn) => { const orig = window[nom]; if(typeof orig !== 'function') return; window[nom] = function(){ const r = orig.apply(this, arguments); try{ fn(); } catch(e){} return r; }; };
+  envolver('renderCtaCte', () => { const b = document.getElementById('cc-body'); if(!b) return; const enFicha = !!(typeof ccCli !== 'undefined' && ccCli); const n = b.querySelectorAll('table tr').length - 1; if(enFicha){ const d = b.parentElement; if(d && d.classList.contains('plgB')) d.open = true; return; } plegarB('cc-body', 'Ver el detalle', n > 0 ? n : null); });
+  envolver('renderCompras', () => { const b = document.getElementById('pv-body'); if(!b) return; const enFicha = !!(typeof pvSel !== 'undefined' && pvSel); const n = b.querySelectorAll('table tr').length - 1; if(enFicha){ const d = b.parentElement; if(d && d.classList.contains('plgB')) d.open = true; return; } plegarB('pv-body', 'Ver el detalle', n > 0 ? n : null); });
+  envolver('pdPintar', () => { if(typeof pdSel !== 'undefined' && pdSel) return; const box = document.getElementById('pub-cont'); if(!box || !window.__pdNums) return; const L = box.querySelector(':scope > div[style*="overflow:hidden"]'); const [a, b, c] = window.__pdNums();
+    box.insertAdjacentHTML('afterbegin', `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">${[['Por preparar', a], ['Entregados en parte', b], ['Para facturar', c]].map(([t, v]) => `<div style="border:1px solid var(--line);border-radius:12px;padding:8px 12px;background:#fff;"><small class="note" style="margin:0;">${t}</small><div style="font-weight:800;font-size:1.2rem;">${v}</div></div>`).join('')}</div>`);
+    if(L){ L.id = 'pd-lista'; plegarB('pd-lista', 'Ver los pedidos', L.children.length); } });
+  envolver('renderStock', () => { const q = (document.getElementById('sk-buscar') || {}).value; plegarB('sk-lista', 'Ver el stock por SKU', document.querySelectorAll('#sk-lista .sk-fila, #sk-lista tr').length || null, !!q); });
+} catch(e){} });
+// ===== Pantalla B: el detalle de cada lista va plegado (los numeros quedan arriba); se recuerda si lo deja abierto =====
+function plegarB(id, etiqueta, n, abrir){ const el = document.getElementById(id); if(!el) return; let d = el.parentElement && el.parentElement.classList.contains('plgB') ? el.parentElement : null;
+  if(!d){ d = document.createElement('details'); d.className = 'plgB'; d.style.cssText = 'margin-top:8px;'; d.innerHTML = '<summary style="cursor:pointer;font-weight:700;color:#3D2B4E;padding:6px 2px;"></summary>'; el.before(d); d.appendChild(el);
+    try{ if(localStorage.getItem('plgB:' + id) === '1') d.open = true; } catch(e){} d.addEventListener('toggle', () => { try{ localStorage.setItem('plgB:' + id, d.open ? '1' : '0'); } catch(e){} }); }
+  d.querySelector('summary').textContent = etiqueta + (n != null ? ' (' + n + ')' : ''); if(abrir) d.open = true; }
 // ===== Paso a paso para los formularios de carga: divide el formulario en pasos por sus separadores (.sep), sin cambiar como se guarda =====
 function wizFx(titulos, validar, resumen){ const fx = document.querySelector('#pub-cont .fx'); if(!fx) return; const kids = [...fx.children], pasos = [[]]; kids.forEach(k => { if(k.classList.contains('sep')){ k.style.display = 'none'; pasos.push([]); } else pasos[pasos.length - 1].push(k); });
   if(pasos.length < 2) return; const N = pasos.length, botones = pasos[N - 1][pasos[N - 1].length - 1]; let paso = 0;
@@ -14563,11 +14589,13 @@ function renderFacturas(){
   const GAN = TV - C;
   document.getElementById('fc-resumen').innerHTML = L.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px;">
     <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;"><small class="note">Facturado ${fcModoIva === 'con' ? '(con IVA)' : '(sin IVA)'}</small><div style="font-weight:800;font-size:1.2rem;">${formatPrice(T)}</div><small class="note">${fcModoIva === 'con' ? 'sin IVA ' + formatPrice((T - TnoF) / 1.21 + TnoF) : 'con IVA ' + formatPrice((T - TnoF) * 1.21 + TnoF)}${TnoF ? ` · incluye ${formatPrice(TnoF)} sin CAE` : ''}</small></div>
-    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;"><small class="note">Costo de los productos</small><div style="font-weight:800;font-size:1.2rem;color:#D97A3A;">${formatPrice(C)}</div><small class="note">sin impuestos ni costos de logística</small></div>
-    <div style="background:${GAN < 0 ? '#FDEBE7' : '#EEF6F0'};border-radius:12px;padding:10px;"><small class="note">Ganancia ${fcModoIva === 'con' ? '(con IVA)' : '(sin IVA)'}</small><div style="font-weight:800;font-size:1.2rem;color:${GAN < 0 ? '#A6432F' : '#2F7A47'};">${formatPrice(GAN)}</div><small class="note">${C > 0 ? Math.round(GAN / C * 100) + ' % sobre el costo' : ''}${nRevT ? ` · ⚠️ ${nRevT} renglones para revisar (incluidos)` : ''}</small></div></div>` : '';
+
+    <div style="background:${GAN < 0 ? '#FDEBE7' : '#EEF6F0'};border-radius:12px;padding:10px;"><small class="note">Ganancia ${fcModoIva === 'con' ? '(con IVA)' : '(sin IVA)'}</small><div style="font-weight:800;font-size:1.2rem;color:${GAN < 0 ? '#A6432F' : '#2F7A47'};">${formatPrice(GAN)}</div><small class="note">${C > 0 ? Math.round(GAN / C * 100) + ' % sobre el costo de ' + formatPrice(C) : ''}${nRevT ? ` · ⚠️ ${nRevT} renglones para revisar (incluidos)` : ''}</small></div></div>` : '';
   setTimeout(() => { const bar = document.getElementById('fc-barra'); if(bar) bar.style.display = L.length ? 'flex' : 'none'; actualizarSelFact(); }, 0);
   document.getElementById('fc-lista').innerHTML = L.length ? L.map(f => `<details data-mes="${ccFechaISO(f.fecha).slice(0, 7)}" style="border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:6px;background:#fff;"><summary style="cursor:pointer;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><input type="checkbox" class="fc-sel" value="${escapeAttr(f._id || String(f.numero).replace(/\//g, '-'))}" onclick="event.stopPropagation();" onchange="actualizarSelFact()" style="width:18px;height:18px;">${chipRZ(f.razon)}${etiquetaComp(f.esNC ? 'ncv' : f.esND ? 'ndv' : 'venta', f.tipo || '', esFiscalVenta(f))}<b style="flex:1;">▸ ${f.esNC ? '<span style="color:#A6432F;">NC</span> ' : ''}${escaparHtml(f.tipo || '')} ${escaparHtml(f.numero)} · ${escaparHtml(f.fecha)}</b><span class="note" style="margin:0;">${escaparHtml(f.cliente || '')}</span><span style="text-align:right;"><b style="font-size:.9rem;">${formatPrice(f.total || (f.neto || 0) * 1.21)}</b>${esFiscalVenta(f) ? `<small class="note" style="display:block;margin:0;">sin IVA ${formatPrice((f.total || (f.neto || 0) * 1.21) / 1.21)}</small>` : ''}</span><button type="button" class="btn-mini" title="Quitar de la app" onclick="event.preventDefault();event.stopPropagation();borrarFactura('${escapeAttr(f._id || f.numero)}')">🗑️</button></summary>${`<div style="text-align:right;margin:4px 0;"><button type="button" class="btn-mini" onclick="imprimirFacturaGuardadaAsync('${escapeAttr(f._id || String(f.numero).replace(/\//g, '-'))}')">🖨️ Imprimir</button></div>` + tablaFactura(f, true, (f._id || String(f.numero).replace(/\//g, '-')))}</details>`).join('') : '<p class="empty-msg">Todavía no guardaste facturas.</p>';
   if(!mes && !fq) fcAgruparPorMes();
+  { const r = document.getElementById('fc-resumen'), g = r && r.firstElementChild; if(g && !g.querySelector('.fc-cant')) g.insertAdjacentHTML('beforeend', `<div class="fc-cant" style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;"><small class="note">Comprobantes</small><div style="font-weight:800;font-size:1.2rem;">${L.length.toLocaleString('es-AR')}</div><small class="note">${escaparHtml((document.getElementById('fc-mes').selectedOptions[0] || {}).textContent || '')}</small></div>`); }
+  plegarB('fc-lista', 'Ver los comprobantes', L.length, !!fq);
 }
 
 // facturas de meses anteriores: plegadas por mes (el mes actual queda a la vista)
@@ -23304,7 +23332,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-03-v482';
+const APP_VERSION = '2026-11-03-v483';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
