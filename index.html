@@ -539,6 +539,7 @@ details>summary{cursor:pointer;}
 #sb .sb-sub{padding:2px 8px 8px 34px!important;}
 #sb .sb-sub b{background:none!important;color:var(--ds-tx3)!important;font-size:.66rem!important;padding:8px 6px 2px!important;margin:4px 0 0!important;}
 #sb .sb-sub div{font-size:.82rem!important;color:var(--ds-tx2)!important;padding:4px 6px!important;border-radius:6px;}
+.wiz-oculto{display:none!important;}
 #sb .sb-sub div.sb-actual,#sb a.sb-fav.sb-actual{background:#3D2B4E!important;color:#fff!important;font-weight:700;position:relative;}#sb .sb-sub div.sb-actual::before{content:'';position:absolute;left:-7px;top:5px;bottom:5px;width:3px;border-radius:2px;background:#3D2B4E;}#sb .sb-sub div.sb-actual .sb-star{color:#fff;}
 #sb .sb-sub div:hover{background:#F7F4EF;color:#3D2B4E!important;}
 /* avisos propios (reemplazan los cuadros del navegador) */
@@ -1816,7 +1817,7 @@ body.con-sb #step-inicio .ini-grid, body.con-sb #step-inicio .ini-sub, body.con-
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 03/11 v481</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 03/11 v482</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -14023,6 +14024,19 @@ async function sfsGuardar(b){ const modo = (document.querySelector('input[name=s
       await db.collection('fotos_sku').doc(s).set({ imagenesBase64: fotos, actualizado: new Date().toISOString() }); fotosSku[s] = fotos; } catch(e){ err.push(s + ': ' + e.message); } }
   sfsLista.forEach(x => { try{ URL.revokeObjectURL(x.url); } catch(e){} }); sfsLista = [];
   cerrarPublicar(); dsToast(err.length ? `Cargadas con errores: ${err.join(' · ')}` : `Listo: fotos cargadas en ${S.length} SKU`, { ms: 7000 }); }
+// ===== Paso a paso para los formularios de carga: divide el formulario en pasos por sus separadores (.sep), sin cambiar como se guarda =====
+function wizFx(titulos, validar, resumen){ const fx = document.querySelector('#pub-cont .fx'); if(!fx) return; const kids = [...fx.children], pasos = [[]]; kids.forEach(k => { if(k.classList.contains('sep')){ k.style.display = 'none'; pasos.push([]); } else pasos[pasos.length - 1].push(k); });
+  if(pasos.length < 2) return; const N = pasos.length, botones = pasos[N - 1][pasos[N - 1].length - 1]; let paso = 0;
+  const bar = document.createElement('div'); bar.className = 'wiz-bar'; fx.insertBefore(bar, fx.firstChild);
+  const nav = document.createElement('div'); nav.className = 'wiz-nav'; nav.style.cssText = 'display:flex;gap:8px;justify-content:space-between;margin-top:16px;'; fx.appendChild(nav);
+  const res = document.createElement('div'); res.className = 'wiz-res'; res.style.cssText = 'background:#FAF8F5;border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:.86rem;'; if(pasos[N - 1][0]) pasos[N - 1][0].before(res); else fx.insertBefore(res, nav);
+  const err = document.createElement('p'); err.className = 'error'; err.style.display = 'none'; nav.before(err);
+  const ir = n => { paso = n; pasos.forEach((ks, i) => ks.forEach(k => k.classList.toggle('wiz-oculto', i !== paso))); res.style.display = paso === N - 1 && resumen ? '' : 'none'; if(paso === N - 1 && resumen) res.innerHTML = resumen(); err.style.display = 'none';
+    bar.innerHTML = `<div style="display:flex;gap:6px;margin-bottom:8px;">${pasos.map((_, i) => `<span style="flex:1;height:5px;border-radius:3px;background:${i <= paso ? '#3D2B4E' : '#E6DDF0'};"></span>`).join('')}</div><div style="font:700 1.05rem Arial;color:#2B2233;margin-bottom:10px;">${paso + 1} · ${escaparHtml(titulos[paso] || '')}</div>`;
+    nav.innerHTML = `${paso > 0 ? '<button type="button" class="btn btn-ghost" style="width:auto;padding:10px 18px;" data-w="atras">← Anterior</button>' : '<span></span>'}${paso < N - 1 ? '<button type="button" class="btn btn-gold" style="width:auto;padding:10px 22px;" data-w="sig">Siguiente →</button>' : ''}`;
+    nav.querySelectorAll('button').forEach(b => b.onclick = () => { if(b.dataset.w === 'atras') return ir(paso - 1); const m = validar && validar[paso] ? validar[paso]() : ''; if(m){ err.textContent = m; err.style.display = 'block'; return; } ir(paso + 1); });
+    const caja = document.getElementById('pub-caja'); if(caja) caja.scrollTop = 0; };
+  ir(0); window.__wizIr = ir; }
 // ===== Crear contenido: una sola pantalla en 3 pasos (de que · para que · listo). Usa por dentro el generador de Nuevo ingreso =====
 let ccr = { de: 'sku', para: 'post', dis: 0 };
 function abrirCrearContenido(){
@@ -14436,6 +14450,9 @@ function fvManual(tipo){ window.__fvTipo = tipo; cargarDatosRZ().then(() => { tr
     <div class="tot"><div class="l"><span>Descuento general</span><span>${dtoSeg('fv-dg-m', 'fvTot()')} <input id="fv-dg" inputmode="decimal" placeholder="0" oninput="this.dataset.auto='';fvTot()" style="width:90px;height:30px;text-align:right;"></span></div><div id="fv-tot"></div></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;"><button class="btn btn-ghost" style="width:auto;padding:10px 18px;" onclick="cerrarPublicar()">Cancelar</button><button class="btn btn-ghost" style="width:auto;padding:10px 18px;" onclick="vistaPrevia('factura','${tipo}')">👁️ Vista previa</button><button class="btn btn-gold" style="width:auto;padding:10px 28px;" onclick="fvGuardar('${tipo}')">Guardar</button></div></div>`);
   fvFila();
+  wizFx([tipo === 'f' ? '¿A quién?' : '¿A quién y sobre qué comprobante?', tipo === 'f' ? '¿Qué le vende?' : '¿Qué incluye?', 'Revisar y guardar'],
+    [() => document.getElementById('fv-c').value.trim() ? '' : 'Elija el cliente.', () => [...document.querySelectorAll('#fv-rows .fv-r')].some(r => (r.querySelector('.fv-s') || {}).value && numAr((r.querySelector('.fv-i') || {}).value) > 0) ? '' : 'Agregue al menos un renglón con importe.'],
+    () => { const n = [...document.querySelectorAll('#fv-rows .fv-r')].filter(r => (r.querySelector('.fv-s') || {}).value).length, u = [...document.querySelectorAll('#fv-rows .fv-r .fv-q')].reduce((a, e) => a + (numAr(e.value) || 0), 0); return `<b>${escaparHtml(document.getElementById('fv-c').value)}</b> · ${n} ${n === 1 ? 'renglón' : 'renglones'} · ${u.toLocaleString('es-AR')} u.`; });
 }
 function fvFila(x){ x = x || {}; const d = document.createElement('div'); d.className = 'fv-r'; d.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;align-items:center;'; if(x.unit) d.dataset.unit = x.unit; if(x.max) d.dataset.max = x.max;
   d.innerHTML = `<input class="fv-s" list="fv-skus" placeholder="SKU" value="${escapeAttr(x.sku || '')}" onchange="fvPrecioFila(this.parentNode)" style="flex:2 1 160px;min-width:0;text-transform:uppercase;"><input class="fv-q" inputmode="decimal" placeholder="Cant." value="${x.cant != null ? x.cant : ''}" oninput="fvCant(this)" style="flex:0 0 80px;width:80px;"><input class="fv-b" inputmode="decimal" placeholder="% bonif." title="Descuento de este renglón (%)" value="${x.bonif ? x.bonif : ''}" oninput="fvCant(this)" style="flex:0 0 80px;width:80px;"><input class="fv-i" inputmode="decimal" placeholder="Importe $" value="${x.imp ? formatoPesos(Math.round(x.imp * 100) / 100) : ''}" oninput="this.dataset.auto='';fvTot()" style="flex:1 1 140px;min-width:120px;"><button type="button" title="Quitar renglón" onclick="this.parentNode.remove();fvTot()" style="flex:0 0 34px;width:34px;height:36px;padding:0;border:none;background:none;color:#B5AB9C;cursor:pointer;font-size:1rem;">✕</button><small class="fv-iva" style="flex:1 0 100%;text-align:right;margin:-2px 40px 0 0;font-size:.72rem;color:#8A8072;"></small>`;
@@ -23287,7 +23304,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-03-v481';
+const APP_VERSION = '2026-11-03-v482';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
