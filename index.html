@@ -1820,7 +1820,7 @@ body:not(.con-sb) #step-inicio .search-wrap{display:none !important;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 04/11 v488</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 04/11 v489</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6511,7 +6511,7 @@ async function pintarDash(){
   const acc = [['➕ Pedido', 'pdNuevo()', 'g'], ['➕ Presupuesto', 'abrirPresupuestos().then(() => nuevoPresupuesto())'], ['➕ Recibo', "abrirCtaCte('recibos').then(() => ccElegirCliente())"], ['➕ Factura de compra', "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'f'))"], ['➕ Orden de pago', "abrirCompras('pagos').then(() => pvElegirProveedor('pago'))"], ['🧾 Caja del día', 'abrirTesoreria().then(() => tsFormCaja())']].filter(([, f]) => puede(permisoDeAccion(f)));
   window.__dashItems = acc.map(([t, f]) => [t, f]);
   const hora = new Date().getHours(), saludo = hora < 12 ? 'Buenos días' : hora < 20 ? 'Buenas tardes' : 'Buenas noches', nombre = ((firebase.auth().currentUser || {}).displayName || '').split(' ')[0];
-  const pintar = V => { if(run !== dashRun) return;
+  const pintar = V => { if(run !== dashRun) return; if(!V){ box.innerHTML = '<p class="empty-msg" style="padding:40px 0;">Cargando…</p>'; return; }
     const dueno = esDueno(), H = V ? V.hoy : [];
     const icoT = g => ({ plata: ['#FBEDEA', '#A6432F', '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'], costos: ['#FFF8E1', '#9A7B12', '<path d="M4 4h10l6 6-10 10-6-6z"/><circle cx="9" cy="9" r="1.5"/>'], stock: ['#EEF3FA', '#2E5A8C', '<path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/>'] }[g || 'stock']);
     const tareas = H.length ? H.map((x, i) => { const [bg, col, ic] = icoT(x[3]), t = sinEmoji(x[0]); return `<div class="dh-task"><span class="dh-ic" style="background:${bg};color:${col};"><svg viewBox="0 0 24 24">${ic}</svg></span><div class="dh-tx">${escaparHtml(t)}</div><button type="button" class="btn btn-ghost" style="width:auto;margin-left:auto;${x[2] ? 'background:#FFE600!important;border-color:#E6CF00!important;color:#2D3277!important;' : ''}" onclick="dashHoy(${i})">${/pago/i.test(t) ? 'Pagar' : /cobro|vencid/i.test(t) ? 'Cobrar' : /pedido/i.test(t) ? 'Entregar' : /devoluc|revisar/i.test(t) ? 'Revisar' : 'Ver'}</button></div>`; }).join('') : `<div class="dh-task" style="justify-content:center;color:#2F7A47;font-weight:600;">✓ Todo al día</div>`;
@@ -6557,7 +6557,9 @@ async function pintarDash(){
       const L = V.fact12, iM = Math.max(1, L.findIndex(x => x.m === V.mes)), a = L[iM] || L[L.length - 1] || { tot: 0 }, nm = new Date((a.m || V.mes) + '-15').toLocaleDateString('es-AR', { month: 'long' });
       const card = (t, v, sub, on) => `<div ${on ? `onclick="${on}" style="cursor:pointer;` : 'style="'}background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;"><div class="dh-mut" style="font-weight:600;">${t}</div><div style="font:800 1.45rem Arial;color:#2B2233;margin:2px 0;">${v}</div><div class="dh-mut" style="font-size:.76rem;">${sub || ''}</div></div>`;
       const fila = document.createElement('div'); fila.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:6px 0 14px;';
-      fila.innerHTML = card('Facturado en ' + nm, formatPrice(a.tot || 0), 'todas las razones sociales', '') + card('Ganancia de Mercado Libre', V.ganML != null ? formatPrice(V.ganML) : '—', V.ganML != null ? (V.ganMLsinCosto ? V.ganMLsinCosto + ' ventas sin costo' : nm) : 'falta cargar el reporte del mes', 'abrirResultadosML()') + card('A cobrar', V.cobrar != null ? formatPrice(V.cobrar) : '—', V.venc ? formatPrice(V.venc) + ' vencido' : '', "abrirCtaCte('venc')");
+      const bM = L[iM - 1], pML = x => x && x.tot ? ((x.alberto || 0) + (x.rita || 0)) / x.tot * 100 : null, pa = pML(a), pb = pML(bM), metaML = pb != null ? Math.max(0, pb - 1) : null, f0 = v => Math.round(v).toLocaleString('es-AR');
+      const cardML = pa != null ? `<div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;"><div class="dh-mut" style="font-weight:600;">Peso de Mercado Libre</div><div style="font:800 1.45rem Arial;color:${metaML == null ? '#2B2233' : pa <= metaML + 0.05 ? '#2F7A47' : '#A6432F'};margin:2px 0;">${f0(pa)} %</div><div class="dh-mut" style="font-size:.76rem;">${formatPrice((a.alberto || 0) + (a.rita || 0))} de ${formatPrice(a.tot)}${metaML != null ? ' · meta ' + f0(metaML) + ' %' : ''}</div></div>` : '';
+      fila.innerHTML = card('Facturado en ' + nm, formatPrice(a.tot || 0), 'todas las razones sociales', '') + cardML + card('Ganancia de Mercado Libre', V.ganML != null ? formatPrice(V.ganML) : '—', V.ganML != null ? (V.ganMLsinCosto ? V.ganMLsinCosto + ' ventas sin costo' : nm) : 'falta cargar el reporte del mes', 'abrirResultadosML()') + card('A cobrar', V.cobrar != null ? formatPrice(V.cobrar) : '—', V.venc ? formatPrice(V.venc) + ' vencido' : '', "abrirCtaCte('venc')");
       if(top) top.after(fila);
       const mas = document.createElement('details'); mas.className = 'plgB'; mas.style.cssText = 'margin-top:14px;'; mas.innerHTML = '<summary style="cursor:pointer;font-weight:700;color:#3D2B4E;padding:6px 2px;">IVA, margen, fuera de Mercado Libre e informes</summary>';
       try{ if(localStorage.getItem('plgB:inicio') === '1') mas.open = true; } catch(e){} mas.addEventListener('toggle', () => { try{ localStorage.setItem('plgB:inicio', mas.open ? '1' : '0'); } catch(e){} });
@@ -23398,7 +23400,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-04-v488';
+const APP_VERSION = '2026-11-04-v489';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
