@@ -1820,7 +1820,7 @@ body:not(.con-sb) #step-inicio .search-wrap{display:none !important;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 04/11 v487</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 04/11 v488</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6566,6 +6566,9 @@ async function pintarDash(){
       bloques.forEach(hh => { const t = (hh.querySelector('h3') || {}).textContent || ''; if(/Fuera de Mercado Libre/.test(t)){ mover.push(hh); if(hh.nextElementSibling) mover.push(hh.nextElementSibling); }
         if(/Informes para cargar/.test(t)){ const pend = /pendiente/.test(hh.textContent), lst = hh.nextElementSibling; if(pend && cols){ cols.after(hh); if(lst) hh.after(lst); } else { mover.push(hh); if(lst) mover.push(lst); } } });
       if(cols && cols.children[1]){ mover.push(cols.children[1]); cols.classList.add('uno'); } if(cols) cols.style.gridTemplateColumns = '1fr';
+      // "Para hacer hoy" en una sola linea: al tocarla se abre la lista
+      if(cols){ const lista = cols.querySelector('.dh-list'), n = (V.hoy || []).length; window.__hoyHtml = lista ? lista.outerHTML : '';
+        cols.innerHTML = n ? `<div onclick="abrirHoyModal()" style="cursor:pointer;background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 16px;display:flex;justify-content:space-between;align-items:center;font-size:.95rem;"><span><b style="color:#3D2B4E;">${n} ${n === 1 ? 'cosa' : 'cosas'}</b> para hoy</span><b style="color:#3D2B4E;">Ver ›</b></div>` : `<div style="color:#A89E90;font-size:.9rem;padding:6px 2px;">✓ Nada pendiente para hoy</div>`; }
       mas.querySelector('summary').textContent = 'IVA, margen, fuera de Mercado Libre, últimas actividades' + (mover.some(x => /Informes para cargar/.test(x.textContent || '')) ? ' e informes' : '');
       mover.forEach(x => mas.appendChild(x)); box.appendChild(mas); } } catch(e){ console.error(e); } };
   pintar(dashCache); // lo ultimo calculado al instante
@@ -14098,6 +14101,7 @@ async function pdGuardarNuevo(b){ const nom = (document.getElementById('fv-c').v
       items: filas, descuentoPct: Math.round(dPct * 100) / 100, observaciones: [ent === 'envio' ? 'Envío' : 'Retira en el local', para ? 'para el ' + para.split('-').reverse().join('/') : '', nota].filter(Boolean).join(' · '), entrega: ent, paraFecha: para || null, subtotal: sub, total: Math.round(sub * (1 - dPct / 100) * 100) / 100, bultos: 1, origen: 'formulario' });
     window.__fvModoPedido = false; cerrarPublicar(); dsToast(`Pedido ${num} guardado: está en Pedidos a preparar`); }
   catch(e){ b.disabled = false; b.textContent = 'Guardar pedido'; alert('No se pudo guardar: ' + e.message); } }
+function abrirHoyModal(){ pvModal('Para hacer hoy', window.__hoyHtml || ''); const c = document.getElementById('pub-cont'); if(c) c.addEventListener('click', e => { if(e.target.closest('button,a')) cerrarPublicar(); }, { capture: true, once: true }); }
 // ===== Paso a paso para los formularios de carga: divide el formulario en pasos por sus separadores (.sep), sin cambiar como se guarda =====
 function wizFx(titulos, validar, resumen){ const fx = document.querySelector('#pub-cont .fx'); if(!fx) return; const kids = [...fx.children], pasos = [[]]; kids.forEach(k => { if(k.classList.contains('sep')){ k.style.display = 'none'; pasos.push([]); } else pasos[pasos.length - 1].push(k); });
   if(pasos.length < 2) return; const N = pasos.length, botones = pasos[N - 1][pasos[N - 1].length - 1]; let paso = 0;
@@ -23394,7 +23398,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-04-v487';
+const APP_VERSION = '2026-11-04-v488';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
