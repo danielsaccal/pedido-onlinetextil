@@ -539,7 +539,7 @@ details>summary{cursor:pointer;}
 #sb .sb-sub{padding:2px 8px 8px 34px!important;}
 #sb .sb-sub b{background:none!important;color:var(--ds-tx3)!important;font-size:.66rem!important;padding:8px 6px 2px!important;margin:4px 0 0!important;}
 #sb .sb-sub div{font-size:.82rem!important;color:var(--ds-tx2)!important;padding:4px 6px!important;border-radius:6px;}
-.wiz-oculto{display:none!important;}
+.wiz-oculto,.pd-oculto{display:none!important;}
 #sb .sb-sub div.sb-actual,#sb a.sb-fav.sb-actual{background:#3D2B4E!important;color:#fff!important;font-weight:700;position:relative;}#sb .sb-sub div.sb-actual::before{content:'';position:absolute;left:-7px;top:5px;bottom:5px;width:3px;border-radius:2px;background:#3D2B4E;}#sb .sb-sub div.sb-actual .sb-star{color:#fff;}
 #sb .sb-sub div:hover{background:#F7F4EF;color:#3D2B4E!important;}
 /* avisos propios (reemplazan los cuadros del navegador) */
@@ -1820,7 +1820,7 @@ body:not(.con-sb) #step-inicio .search-wrap{display:none !important;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 03/11 v486</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 04/11 v487</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6194,7 +6194,7 @@ const GRUPOS_INICIO = {
     [['📸 Prompt para Gemini (un SKU)', 'abrirPromptGemini()'], ['📸 Prompts para Gemini en lote', 'abrirPromptGeminiLote()']],
   ] },
   ped: { lado: 'int', titulo: '🛒 Pedidos', titulosColumnas: ['Tomar pedido', 'Seguimiento'], columnas: [
-    [['📚 Tomar pedido (catálogo)', "irACatalogoDesdeInicio()"], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()']],
+    [['➕ Nuevo pedido (paso a paso)', 'pdNuevo()'], ['📚 Tomar pedido (catálogo)', "irACatalogoDesdeInicio()"], ['🤖 Pedido con IA (texto o foto)', 'abrirPedidoIA()']],
     [['📋 Historial de pedidos', 'abrirHistorial()'], ['📦 Pedidos a preparar', "abrirPedidosPrep('preparar')"], ['🧾 Pedidos para facturar', "abrirPedidosPrep('facturar')"], ['🚚 Pendientes de entrega', 'abrirPendientesEntrega()']],
   ] },
   comp: { lado: 'int', titulo: '🧾 Comprobantes', titulosColumnas: ['Presupuestos', 'Remitos', 'Ventas', 'Cobros', 'Compras', 'Pagos'], columnas: [
@@ -6349,7 +6349,7 @@ function normCondIva(v){ const s = normBusqueda(v || ''); if(!s) return ''; if(/
 function selCondIva(id, val, estilo){ const v = normCondIva(val); return `<select id="${id}" style="${estilo || ''}"><option value="">— elegir —</option>${COND_IVA.map(x => `<option ${v === x ? 'selected' : ''}>${x}</option>`).join('')}${v && !COND_IVA.includes(v) ? `<option selected>${escaparHtml(v)}</option>` : ''}</select>`; }
 // ===== Etapa 3: menu por tareas (usa las mismas opciones y permisos de siempre) =====
 const TAREAS = [
-  ['t_vender', 'Vender', 'sell', [['Antes de vender', ['irACatalogoDesdeInicio()', 'abrirPedidoIA()', 'abrirPresupuestos()', 'abrirClientesRecuperar()']], ['Entregar y facturar', ["abrirPedidosPrep('preparar')", "abrirPedidosPrep('facturar')", 'abrirPendientesEntrega()', 'abrirRemitos().then(() => rmForm())', 'abrirRemitos()', "abrirFacturas().then(() => fvManual('f'))", "abrirFacturas().then(() => fvManual('nc'))", "abrirFacturas().then(() => fvManual('nd'))", "abrirFacturas().then(() => document.getElementById('fc-rz-se", 'abrirFacturas()', 'abrirHistorial()']], ['Clientes', ['abrirClientes(); setTimeout(() => cliForm()', 'abrirClientes()', 'abrirListasPrecios()']]]],
+  ['t_vender', 'Vender', 'sell', [['Antes de vender', ['pdNuevo()', 'irACatalogoDesdeInicio()', 'abrirPedidoIA()', 'abrirPresupuestos()', 'abrirClientesRecuperar()']], ['Entregar y facturar', ["abrirPedidosPrep('preparar')", "abrirPedidosPrep('facturar')", 'abrirPendientesEntrega()', 'abrirRemitos().then(() => rmForm())', 'abrirRemitos()', "abrirFacturas().then(() => fvManual('f'))", "abrirFacturas().then(() => fvManual('nc'))", "abrirFacturas().then(() => fvManual('nd'))", "abrirFacturas().then(() => document.getElementById('fc-rz-se", 'abrirFacturas()', 'abrirHistorial()']], ['Clientes', ['abrirClientes(); setTimeout(() => cliForm()', 'abrirClientes()', 'abrirListasPrecios()']]]],
   ['t_cobrar', 'Cobrar', 'cash', [['Cobros', ["abrirCtaCte('recibos').then(", "abrirCtaCte('recibos')"]], ['Cuentas', ['abrirCtaCte()', "abrirCtaCte('venc')"]]]],
   ['t_comprar', 'Comprar', 'buy', [['Comprobantes de compra', ["abrirCompras('compras').then(() => pvElegirProveedor('compra'", "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nc'", "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'nd'", "abrirCompras('compras')"]], ['Proveedores', ["abrirCompras('proveedores').then("]], ['Talleres', ["abrirCompras('talleres')"]]]],
   ['t_pagar', 'Pagar', 'pay', [['Pagos', ["abrirCompras('pagos').then(", "abrirCompras('pagos')"]], ['Cuentas', ['abrirCompras()', "abrirCompras('venc')"]]]],
@@ -6508,7 +6508,7 @@ const dashM = x => x >= 1e6 ? '$ ' + (x / 1e6).toLocaleString('es-AR', { maximum
 const dashCard = (t, v, extra, f) => `<div class="d-card" ${f ? `onclick="${f}"` : 'style="cursor:default;"'}><small>${t}</small><div>${v}${extra ? ` <span style="color:#A6432F;font-size:.85rem;">· ${extra}</span>` : ''}</div></div>`;
 async function pintarDash(){
   const box = document.getElementById('dash'); if(!box || !rolActual) return; const run = ++dashRun; sbCategoria = null;
-  const acc = [['➕ Pedido', 'irACatalogoDesdeInicio()', 'g'], ['➕ Presupuesto', 'abrirPresupuestos().then(() => nuevoPresupuesto())'], ['➕ Recibo', "abrirCtaCte('recibos').then(() => ccElegirCliente())"], ['➕ Factura de compra', "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'f'))"], ['➕ Orden de pago', "abrirCompras('pagos').then(() => pvElegirProveedor('pago'))"], ['🧾 Caja del día', 'abrirTesoreria().then(() => tsFormCaja())']].filter(([, f]) => puede(permisoDeAccion(f)));
+  const acc = [['➕ Pedido', 'pdNuevo()', 'g'], ['➕ Presupuesto', 'abrirPresupuestos().then(() => nuevoPresupuesto())'], ['➕ Recibo', "abrirCtaCte('recibos').then(() => ccElegirCliente())"], ['➕ Factura de compra', "abrirCompras('compras').then(() => pvElegirProveedor('compra', 'f'))"], ['➕ Orden de pago', "abrirCompras('pagos').then(() => pvElegirProveedor('pago'))"], ['🧾 Caja del día', 'abrirTesoreria().then(() => tsFormCaja())']].filter(([, f]) => puede(permisoDeAccion(f)));
   window.__dashItems = acc.map(([t, f]) => [t, f]);
   const hora = new Date().getHours(), saludo = hora < 12 ? 'Buenos días' : hora < 20 ? 'Buenas tardes' : 'Buenas noches', nombre = ((firebase.auth().currentUser || {}).displayName || '').split(' ')[0];
   const pintar = V => { if(run !== dashRun) return;
@@ -14070,6 +14070,34 @@ function plegarB(id, etiqueta, n, abrir){ const el = document.getElementById(id)
   if(!d){ d = document.createElement('details'); d.className = 'plgB'; d.style.cssText = 'margin-top:8px;'; d.innerHTML = '<summary style="cursor:pointer;font-weight:700;color:#3D2B4E;padding:6px 2px;"></summary>'; el.before(d); d.appendChild(el);
     try{ if(localStorage.getItem('plgB:' + id) === '1') d.open = true; } catch(e){} d.addEventListener('toggle', () => { try{ localStorage.setItem('plgB:' + id, d.open ? '1' : '0'); } catch(e){} }); }
   d.querySelector('summary').textContent = etiqueta + (n != null ? ' (' + n + ')' : ''); if(abrir) d.open = true; }
+// ===== Nuevo pedido paso a paso: el mismo formulario que la factura (cliente, renglones con precio de lista, totales), guarda un pedido para preparar =====
+async function pdNuevo(){
+  fvManual('f'); const fx = document.querySelector('#pub-cont .fx'); if(!fx) return; window.__fvModoPedido = true;
+  const t = document.getElementById('pub-titulo'); if(t) t.textContent = '➕ Nuevo pedido';
+  fx.dataset.titulos = JSON.stringify(['¿A quién?', '¿Qué pide?', 'Revisar y guardar']);
+  // lo que es solo de factura no se muestra
+  ['fv-etq', 'fv-rz-av'].forEach(id => { const e = document.getElementById(id); if(e) e.classList.add('pd-oculto'); });
+  const rz = document.getElementById('fv-rz'); if(rz){ const row = rz.closest('div[style*="justify-content:space-between"]'); if(row) row.classList.add('pd-oculto'); }
+  const l = document.getElementById('fv-l'); if(l){ const row = l.closest('.fila'); if(row) row.classList.add('pd-oculto'); } const cae = document.getElementById('fv-cae'); if(cae){ const d = cae.closest('details'); if(d) d.classList.add('pd-oculto'); }
+  // paso 3: entrega, fecha y nota; y el boton de guardar el pedido
+  const tot = fx.querySelector('.tot'); if(tot) tot.insertAdjacentHTML('beforebegin', `<div id="pdn-extra" data-wiz-paso="2" style="display:grid;gap:8px;margin-bottom:10px;"><div class="seg"><label><input type="radio" name="pdn-ent" value="retira" checked><span>Retira en el local</span></label><label><input type="radio" name="pdn-ent" value="envio"><span>Envío</span></label></div>
+    <div class="fila" style="grid-template-columns:180px 1fr;"><div><span class="fl">Para el</span><input type="date" id="pdn-fecha"></div><div><span class="fl">Nota</span><input id="pdn-nota" placeholder="Ej: surtido de colores"></div></div></div>`);
+  const bt = [...fx.querySelectorAll('button')].find(b => /fvGuardar/.test(b.getAttribute('onclick') || '')); if(bt){ const box = bt.parentElement; box.innerHTML = `<button class="btn btn-ghost" style="width:auto;padding:10px 18px;" onclick="window.__fvModoPedido=false;cerrarPublicar()">Cancelar</button><button class="btn btn-gold" style="width:auto;padding:10px 28px;" onclick="pdGuardarNuevo(this)">Guardar pedido</button>`; }
+  // resumen del paso 3 con la entrega
+  if(window.__wizIr) window.__wizIr(0); }
+async function pdGuardarNuevo(b){ const nom = (document.getElementById('fv-c').value || '').trim(); if(!nom){ alert('Elija el cliente.'); return; }
+  const filas = [...document.querySelectorAll('#fv-rows .fv-r')].map(r => { const S = String((r.querySelector('.fv-s') || {}).value || '').trim().toUpperCase(), q = numAr((r.querySelector('.fv-q') || {}).value) || 0, imp = numAr((r.querySelector('.fv-i') || {}).value) || 0, x = S ? buscarProductoPorSku(S) : null;
+    return { sku: S, cantidad: q, precio: q ? Math.round(imp / q * 100) / 100 : 0, desc: x ? (x.variante.desc || '') : '', nombreProducto: x ? x.producto.nombre : '', nota: '', descuentoItemPct: 0 }; }).filter(i => i.sku && i.cantidad > 0);
+  if(!filas.length){ alert('Agregue al menos un renglón.'); return; }
+  b.disabled = true; b.textContent = 'Guardando…';
+  try{ const c = clientePorNombre(nom) || {}, n = await siguienteNumeroPedido(), num = 'OT-' + String(n).padStart(5, '0');
+    const ent = (document.querySelector('input[name=pdn-ent]:checked') || {}).value || 'retira', para = (document.getElementById('pdn-fecha') || {}).value || '', nota = ((document.getElementById('pdn-nota') || {}).value || '').trim();
+    const sub = filas.reduce((a, i) => a + i.precio * i.cantidad, 0), dgV = numAr((document.getElementById('fv-dg') || {}).value) || 0, dgM = (document.getElementById('fv-dg-m') || {}).value || 'pct', dPct = dgV > 0 ? (dgM === 'monto' ? (sub ? dgV / sub * 100 : 0) : dgV) : 0;
+    await db.collection('pedidos').doc(num).set({ historial: [pdPaso('Tomado')], tomadoPor: ((firebase.auth().currentUser || {}).email) || '', numero: num, fecha: new Date().toISOString(), estado: 'pendiente',
+      cliente: { nombre: c.nombre || nom, apellido: c.apellido || '', razonSocial: c.razonSocial || nom, cuit: c.cuit || '', telefono: c.telefono || '', email: c.email || '', localidad: c.localidad || '', provincia: c.provincia || '', transporte: ent === 'envio' ? (c.transporte || 'Envío') : 'Retira en el local' },
+      items: filas, descuentoPct: Math.round(dPct * 100) / 100, observaciones: [ent === 'envio' ? 'Envío' : 'Retira en el local', para ? 'para el ' + para.split('-').reverse().join('/') : '', nota].filter(Boolean).join(' · '), entrega: ent, paraFecha: para || null, subtotal: sub, total: Math.round(sub * (1 - dPct / 100) * 100) / 100, bultos: 1, origen: 'formulario' });
+    window.__fvModoPedido = false; cerrarPublicar(); dsToast(`Pedido ${num} guardado: está en Pedidos a preparar`); }
+  catch(e){ b.disabled = false; b.textContent = 'Guardar pedido'; alert('No se pudo guardar: ' + e.message); } }
 // ===== Paso a paso para los formularios de carga: divide el formulario en pasos por sus separadores (.sep), sin cambiar como se guarda =====
 function wizFx(titulos, validar, resumen){ const fx = document.querySelector('#pub-cont .fx'); if(!fx) return; const kids = [...fx.children], pasos = [[]]; kids.forEach(k => { if(k.classList.contains('sep')){ k.style.display = 'none'; pasos.push([]); } else pasos[pasos.length - 1].push(k); });
   if(pasos.length < 2) return; const N = pasos.length, botones = pasos[N - 1][pasos[N - 1].length - 1]; let paso = 0;
@@ -14077,8 +14105,8 @@ function wizFx(titulos, validar, resumen){ const fx = document.querySelector('#p
   const nav = document.createElement('div'); nav.className = 'wiz-nav'; nav.style.cssText = 'display:flex;gap:8px;justify-content:space-between;margin-top:16px;'; fx.appendChild(nav);
   const res = document.createElement('div'); res.className = 'wiz-res'; res.style.cssText = 'background:#FAF8F5;border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:.86rem;'; if(pasos[N - 1][0]) pasos[N - 1][0].before(res); else fx.insertBefore(res, nav);
   const err = document.createElement('p'); err.className = 'error'; err.style.display = 'none'; nav.before(err);
-  const ir = n => { paso = n; pasos.forEach((ks, i) => ks.forEach(k => k.classList.toggle('wiz-oculto', i !== paso))); res.style.display = paso === N - 1 && resumen ? '' : 'none'; if(paso === N - 1 && resumen) res.innerHTML = resumen(); err.style.display = 'none';
-    bar.innerHTML = `<div style="display:flex;gap:6px;margin-bottom:8px;">${pasos.map((_, i) => `<span style="flex:1;height:5px;border-radius:3px;background:${i <= paso ? '#3D2B4E' : '#E6DDF0'};"></span>`).join('')}</div><div style="font:700 1.05rem Arial;color:#2B2233;margin-bottom:10px;">${paso + 1} · ${escaparHtml(titulos[paso] || '')}</div>`;
+  const ir = n => { paso = n; pasos.forEach((ks, i) => ks.forEach(k => k.classList.toggle('wiz-oculto', i !== paso))); fx.querySelectorAll('[data-wiz-paso]').forEach(k => k.classList.toggle('wiz-oculto', +k.dataset.wizPaso !== paso)); res.style.display = paso === N - 1 && resumen ? '' : 'none'; if(paso === N - 1 && resumen) res.innerHTML = resumen(); err.style.display = 'none';
+    bar.innerHTML = `<div style="display:flex;gap:6px;margin-bottom:8px;">${pasos.map((_, i) => `<span style="flex:1;height:5px;border-radius:3px;background:${i <= paso ? '#3D2B4E' : '#E6DDF0'};"></span>`).join('')}</div><div style="font:700 1.05rem Arial;color:#2B2233;margin-bottom:10px;">${paso + 1} · ${escaparHtml((fx.dataset.titulos ? JSON.parse(fx.dataset.titulos) : titulos)[paso] || '')}</div>`;
     nav.innerHTML = `${paso > 0 ? '<button type="button" class="btn btn-ghost" style="width:auto;padding:10px 18px;" data-w="atras">← Anterior</button>' : '<span></span>'}${paso < N - 1 ? '<button type="button" class="btn btn-gold" style="width:auto;padding:10px 22px;" data-w="sig">Siguiente →</button>' : ''}`;
     nav.querySelectorAll('button').forEach(b => b.onclick = () => { if(b.dataset.w === 'atras') return ir(paso - 1); const m = validar && validar[paso] ? validar[paso]() : ''; if(m){ err.textContent = m; err.style.display = 'block'; return; } ir(paso + 1); });
     const caja = document.getElementById('pub-caja'); if(caja) caja.scrollTop = 0; };
@@ -14834,6 +14862,7 @@ function permisoDeAccion(f){
   if(/abrirPedidosPrep\('facturar'\)|pdFacturar/.test(s)) return permisoDeAccion('abrirFacturas()');
   if(/abrirClientesRecuperar/.test(s)) return permisoDeAccion('abrirCtaCte()');
   if(/abrirCrearContenido/.test(s)) return permisoDeAccion('abrirNuevoIngreso()');
+  if(/pdNuevo/.test(s)) return permisoDeAccion('irACatalogoDesdeInicio()');
   if(/abrirPedidosPrep/.test(s)) return permisoDeAccion('abrirPendientesEntrega()');
   if(/abrirUsuarios|abrirCopiaSeguridad/.test(s)) return 'dueno';
   if(/abrirResultadosML|abrirCalculadoraML/.test(s)) return 'resultadosML';
@@ -23365,7 +23394,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-03-v486';
+const APP_VERSION = '2026-11-04-v487';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
