@@ -489,7 +489,9 @@ body.con-sb .app{max-width:1120px;}
   /* ventanas de comprobantes: pantalla completa */
   #pub-modal,.pub-modal{padding:0!important;align-items:stretch!important;}
   #pub-caja{max-width:100vw!important;width:100vw!important;min-height:100vh;margin:0!important;border-radius:0!important;padding:14px 12px 90px!important;box-sizing:border-box;}
-  #pub-cont [style*="grid-template-columns"]:not(.cfr-r):not(.fv-r){grid-template-columns:1fr!important;}
+  #pub-cont [style*="grid-template-columns"]:not(.cfr-r):not(.fv-r):not(.as-r){grid-template-columns:1fr!important;}
+  #pub-cont .as-r{grid-template-columns:minmax(0,1fr) 78px 22px!important;}
+  #pub-cont input,#pub-cont select,#pub-cont textarea{box-sizing:border-box;max-width:100%;}
   #pub-cont label{min-width:0;}
   #pub-cont .fx .fila{grid-template-columns:1fr!important;}
   #pub-cont input,#pub-cont select{font-size:16px!important;} /* evita el zoom del celular */
@@ -1820,7 +1822,7 @@ body:not(.con-sb) #step-inicio .search-wrap{display:none !important;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 04/11 v489</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 05/11 v490</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -11995,8 +11997,9 @@ function pintarAsistenteOT(){
   } else if(a.paso === 3){
     const arts = articulosAC().sort((x, y) => x.localeCompare(y, 'es'));
     c.innerHTML = asPasos(3) + `<b style="font-size:1.1rem;color:var(--purple);">3. ¿Qué hay que fabricar?</b> <span class="note">(${escaparHtml(a.tela)})</span>
-      <div style="margin-top:10px;">${a.prods.map((pr, i) => `<div style="display:grid;grid-template-columns:minmax(0,1fr) 90px 26px;gap:6px;align-items:center;">
-        <select class="as-art" onchange="asOT.prods[${i}].articulo=this.value; asSugerencias()"><option value="">Artículo…</option>${arts.map(x => `<option value="${escapeAttr(x)}" ${x === pr.articulo ? 'selected' : ''}>${escaparHtml(x)}</option>`).join('')}</select>
+      ${asRepartirHtml()}
+      <div style="margin-top:10px;">${a.prods.map((pr, i) => `<div class="as-r" style="display:grid;grid-template-columns:minmax(0,1fr) 90px 26px;gap:6px;align-items:center;">
+        <select class="as-art" onchange="asOT.prods[${i}].articulo=this.value; asSugerencias(); { const r = asRepartirHtml(); if(!!r !== !!document.querySelector('#pub-cont .as-rep-x')) pintarAsistenteOT(); }"><option value="">Artículo…</option>${arts.map(x => `<option value="${escapeAttr(x)}" ${x === pr.articulo ? 'selected' : ''}>${escaparHtml(x)}</option>`).join('')}</select>
         <input type="number" min="1" placeholder="Cant." value="${escapeAttr(pr.cantidad)}" oninput="asOT.prods[${i}].cantidad=this.value; asSugerencias()" class="as-cant" style="padding:10px;border:1px solid var(--line);border-radius:10px;font-size:16px;width:100%;box-sizing:border-box;">
         <button type="button" onclick="asOT.prods.splice(${i},1); if(!asOT.prods.length) asOT.prods.push({articulo:'',cantidad:''}); pintarAsistenteOT()" style="border:none;background:none;cursor:pointer;color:#8A8072;">✕</button></div>
         <div id="as-sug-${i}" style="font-size:0.8rem;color:#2F7A47;margin:3px 0 10px;"></div>`).join('')}
@@ -12021,6 +12024,18 @@ function asTelaOtra(){
   if(!t || !(+m > 0)){ alert('Complete el código de tela y los metros.'); return; }
   asOT.tela = t; asOT.metros = m; asOT.comprobante = document.getElementById('as-comp').value.trim(); asOT.paso = 3; pintarAsistenteOT();
 }
+// repartir la tela entre los productos: mismas unidades, mismos metros o por proporcion (%)
+function asRepartirHtml(){ const ok = (asOT.prods || []).filter(p => p.articulo && asConsumo(p.articulo)); if(ok.length < 2) return ''; const m = asOT.rep || '';
+  const b = (k, t) => `<button type="button" class="btn-mini" onclick="asRepartir('${k}')" style="${m === k ? 'background:#3D2B4E!important;color:#fff!important;border-color:#3D2B4E!important;' : ''}">${t}</button>`;
+  return `<div class="as-rep-x" style="background:#FAF8F5;border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-top:10px;"><div style="font-size:.84rem;font-weight:700;color:#3D2B4E;margin-bottom:6px;">Repartir la tela</div><div style="display:flex;gap:6px;flex-wrap:wrap;">${b('unidades', 'Mismas unidades')}${b('metros', 'Mismos metros')}${b('proporcion', 'Por proporción')}</div>
+    ${m === 'proporcion' ? `<div style="display:grid;gap:4px;margin-top:8px;">${asOT.prods.map((p, i) => p.articulo && asConsumo(p.articulo) ? `<label style="display:flex;gap:8px;align-items:center;font-size:.82rem;"><span style="flex:1;min-width:0;">${escaparHtml(p.articulo)}</span><input type="number" min="0" max="100" value="${escapeAttr(String(p.pct != null ? p.pct : Math.round(100 / ok.length)))}" oninput="asOT.prods[${i}].pct=+this.value" style="width:70px;padding:6px;border:1px solid var(--line);border-radius:8px;"> %</label>` : '').join('')}<button type="button" class="btn-mini" style="justify-self:start;font-weight:700;" onclick="asRepartir('proporcion', true)">Aplicar proporción</button></div>` : ''}<div class="note" style="text-align:left;margin:6px 0 0;">Completa las cantidades; después las puede corregir.</div></div>`; }
+function asRepartir(modo, aplicar){ asOT.rep = modo; const total = parseFloat(String(asOT.metros).replace(',', '.')) || 0, L = asOT.prods.map((p, i) => ({ i, c: p.articulo ? asConsumo(p.articulo) : null })).filter(x => x.c > 0);
+  if(!total || L.length < 2){ pintarAsistenteOT(); return; }
+  if(modo === 'unidades'){ const n = Math.floor(total / L.reduce((a, x) => a + x.c, 0) + 1e-9); L.forEach(x => asOT.prods[x.i].cantidad = String(n)); }
+  else if(modo === 'metros'){ const m = total / L.length; L.forEach(x => asOT.prods[x.i].cantidad = String(Math.floor(m / x.c + 1e-9))); }
+  else if(modo === 'proporcion'){ if(!aplicar){ pintarAsistenteOT(); return; } const pcts = L.map(x => { const v = asOT.prods[x.i].pct; return v != null ? +v : 100 / L.length; }), s = pcts.reduce((a, b) => a + b, 0);
+    if(Math.abs(s - 100) > 0.5){ alert(`Los porcentajes suman ${Math.round(s)} %: tienen que sumar 100 %.`); return; } L.forEach((x, k) => asOT.prods[x.i].cantidad = String(Math.floor(total * pcts[k] / 100 / x.c + 1e-9))); }
+  pintarAsistenteOT(); }
 // consumo por unidad de un articulo en el ancho de la tela elegida
 function asConsumo(art){
   const t = datosTela(asOT.tela), W = t && +t.ancho;
@@ -23400,7 +23415,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-04-v489';
+const APP_VERSION = '2026-11-05-v490';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
