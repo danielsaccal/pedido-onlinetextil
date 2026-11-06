@@ -1822,7 +1822,7 @@ body:not(.con-sb) #step-inicio .search-wrap{display:none !important;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 05/11 v491</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 05/11 v492</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6873,8 +6873,9 @@ function itBalance(id){ const o = (historialOT || []).find(x => x._docId === id)
     if(hoy && c) det.push(`${hoy} × ${fmtMetros(c)} m`);
     const m = document.querySelector(`.it-mas[data-o="${id}"][data-i="${i}"]`); if(m) m.textContent = hoy + x > pend ? `+${hoy + x - pend} más de lo pedido` : (hoy && hoy < pend && !x ? `faltan ${pend - hoy}` : ''); });
   if(!T){ box.innerHTML = ''; return; }
-  const usado = usPrev + usHoy, bal = T - usado - falta, r2 = v => fmtCm(Math.round(Math.abs(v) * 100) / 100);
-  box.innerHTML = `<div style="background:#FAF8F5;border:1px solid var(--line);border-radius:10px;padding:8px 10px;">Tela de esta orden: <b>${r2(T)} m</b>${usPrev ? ` · ya usados antes: ${r2(usPrev)} m` : ''}<br>Esta entrega: ${det.length ? det.join(' + ') + ' = ' : ''}<b>${r2(usHoy)} m</b>${falta ? ` · lo que falta entregar usa ${r2(falta)} m` : ''}<br>`
+  // solo lo entregado: si compenso con otro producto, el balance lo refleja sin contar lo pendiente
+  const usado = usPrev + usHoy, bal = T - usado, r2 = v => fmtCm(Math.round(Math.abs(v) * 100) / 100);
+  box.innerHTML = `<div style="background:#FAF8F5;border:1px solid var(--line);border-radius:10px;padding:8px 10px;">Tela de esta orden: <b>${r2(T)} m</b>${usPrev ? ` · ya usados antes: ${r2(usPrev)} m` : ''}<br>Esta entrega: ${det.length ? det.join(' + ') + ' = ' : ''}<b>${r2(usHoy)} m</b> · usó <b>${r2(usado)} de ${r2(T)} m</b><br>`
     + (Math.abs(bal) < 0.05 ? '<b style="color:#2F7A47;">La tela cierra justo.</b>' : bal > 0 ? `<b style="color:#2F7A47;">Sobran ${r2(bal)} m</b> <span class="note" style="margin:0;">(el taller debería devolverlos)</span>` : `<b style="color:#A6432F;">Faltan ${r2(bal)} m</b> <span class="note" style="margin:0;">(usó más tela de la calculada)</span>`) + '</div>';
   box.dataset.bal = String(Math.round(bal * 100) / 100); box.dataset.us = String(Math.round(usHoy * 100) / 100); }
 async function registrarIngresoTaller(){
@@ -23432,7 +23433,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-05-v491';
+const APP_VERSION = '2026-11-05-v492';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
