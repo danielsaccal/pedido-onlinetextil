@@ -1822,7 +1822,7 @@ body:not(.con-sb) #step-inicio .search-wrap{display:none !important;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 05/11 v492</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 05/11 v493</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13786,10 +13786,16 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
     `• FABRIC: ${esToalla ? 'terry loop pile (soft cotton loops), never waffle or flat weave' : 'the same weave and texture as in the photo, never another weave'}.`,
     `• DESIGN: the same lines, stripes, borders and prints, in the same places, same direction and thickness; nothing added, removed or moved; no invented bands, stitching or fringes.`,
     `• REALISM: the product must look exactly as it really is — same quality, thickness and finishing; never embellish it or make it look more luxurious than it is.`,
+    `• COPY, DO NOT INTERPRET: reproduce every visible detail of the photo as it is; never improve, simplify or "fix" anything.`,
+    `• COUNT: count the bands, stripes, stitch lines, buttons, labels and printed motifs in the photo and use exactly the same number on every piece shown (a larger piece of the same set has the same number, not fewer or more).`,
+    `• PROPORTION: every detail keeps its size and spacing relative to the piece and to the edges, as in the photo; on a larger piece it scales up in proportion, and the spacing between details is the same on all pieces.`,
+    `• TEXTURE AT REAL SCALE: pile height, loops, nap, weave and sheen exactly as in the photo — never fluffier, shaggier, curlier or smoother than the real product.`,
+    `• DETAIL PHOTO: if a second close-up photo is attached, it is the exact reference for that detail (band, texture, label, print); follow it over your own judgement.`,
     esToalla ? `• BORDER: study the border of the photo from the towel end inward and copy it element by element — number of bands, width of each band, terry gaps between bands, end hem and texture of each band (ribbed, flat, jacquard, lines). Same count and same relative widths; never merge, add, remove or simplify bands.` : '',
     tamano ? `• REAL SIZE: ${tamano}; keep this size relative to ${refTam}.` : '',
     conFunda ? `• PILLOWCASE CONSTRUCTION (always, even if the photo shows only the fabric): ${CONF_FUNDA}.` : '',
-    packN > 1 ? `• SALES UNIT: pack of ${packN} units${packN === 12 ? ' (one dozen)' : ''}. ${/^lista:/.test(pc) ? `Use ONLY these colors, ${(() => { const cs = pc.slice(6).split(',').map(s => s.trim()).filter(Boolean); const rep = Math.max(1, Math.floor(packN / cs.length)); return cs.length ? `${rep} unit${rep > 1 ? 's' : ''} of each: ${cs.join(', ')}` : ''; })()} — no other colors; each unit ONE solid color.` : pc === 'blancas' ? `All ${packN} units are pure white and identical.` : pc === 'surtidas' ? `The ${packN} units are in ${packN} clearly different solid colors (no white, no two alike); each unit is ONE solid color, never two-tone; the design lines stay as in the photo.` : 'The units have the colors and prints of the photo.'}` : ''
+    packN > 1 ? `• SALES UNIT: pack of ${packN} units${packN === 12 ? ' (one dozen)' : ''}. ${/^lista:/.test(pc) ? `Use ONLY these colors, ${(() => { const cs = pc.slice(6).split(',').map(s => s.trim()).filter(Boolean); const rep = Math.max(1, Math.floor(packN / cs.length)); return cs.length ? `${rep} unit${rep > 1 ? 's' : ''} of each: ${cs.join(', ')}` : ''; })()} — no other colors; each unit ONE solid color.` : pc === 'blancas' ? `All ${packN} units are pure white and identical.` : pc === 'surtidas' ? `The ${packN} units are in ${packN} clearly different solid colors (no white, no two alike); each unit is ONE solid color, never two-tone; the design lines stay as in the photo.` : 'The units have the colors and prints of the photo.'}` : '',
+    `• FINAL CHECK before answering: compare your image with the photo — number of bands and details, their spacing, texture, color and folding. If anything differs, fix it before delivering.`
   ].filter(Boolean).join('\n');
   const L = []; // [titulo, lineas, formatoExtra]
   // IMAGEN 1 · PRINCIPAL
@@ -13846,12 +13852,13 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
     `Photorealistic product photography: it must look like a real photo of a real product. Pure white background, soft even studio light, soft contact shadow, the package filling about 90% of the frame height.`], 'No other text or logo except the "Lexington" label. No watermark.']);
   const N = L.length;
   // cada mensaje es completo por si solo (sirve en el mismo chat o en uno nuevo): siempre lleva el producto y las reglas
-  return L.map(([tit, lin, ext, uso], k) => `Generate ONE image (image ${k + 1} of ${N}). Attach the photo of the real product to this message if it is not already in this chat.\n\n${reglas}\n\nIMAGE ${k + 1} of ${N} – ${tit}\n${lin.filter(Boolean).join('\n')}\n\n${fmt(ext, uso)}`).join(SEP);
+  return L.map(([tit, lin, ext, uso], k) => `Generate ONE image (image ${k + 1} of ${N}). Attach the photo of the real product to this message if it is not already in this chat (and, if you have it, a close-up photo of its detail: band, texture or label).\n\n${reglas}\n\nIMAGE ${k + 1} of ${N} – ${tit}\n${lin.filter(Boolean).join('\n')}\n\n${fmt(ext, uso)}`).join(SEP);
 }
 function copiarTexto(t, btn){ navigator.clipboard.writeText(t).then(() => { if(btn){ const o = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(() => btn.textContent = o, 1500); } }).catch(() => prompt('Copie el texto:', t)); }
 async function abrirPromptGemini(S){ await cargarDatosFabricacion(); try{ if(telasDatos === null) await cargarTelas(); } catch(e){} try{ if(kitsDatos === null) await cargarKits(); } catch(e){}
   pvModal('📸 Prompt para Gemini', `<input id="pg-s" data-ac="sku" value="${escapeAttr(S || '')}" placeholder="SKU o nombre del producto" autocomplete="off" oninput="pgPintar()" onchange="pgPintar()" style="padding:9px;border:1px solid var(--line);border-radius:10px;width:100%;box-sizing:border-box;">
     <div style="display:flex;gap:6px;margin:8px 0;"><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pg-c" value="ml" checked onchange="pgPintar()"> Mercado Libre</label><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pg-c" value="tn" onchange="pgPintar()"> Tienda Nube</label></div>
+    <p class="note" style="text-align:left;margin:0 0 8px;">📷 En Gemini adjunte la foto real del producto y, si puede, <b>una foto de cerca del detalle</b> (guarda, textura o etiqueta): sale mucho más fiel.</p>
     <div id="pg-res"></div>`);
   pgPintar();
 }
@@ -23433,7 +23440,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-05-v492';
+const APP_VERSION = '2026-11-05-v493';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
