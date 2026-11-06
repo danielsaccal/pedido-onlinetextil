@@ -636,8 +636,15 @@ function autoZonas(){
   if(changed)saveZ();
 }
 function applyCadete(){
-  aplicarEquivalencias();applyCadeteBase();aplicarCostos();marcarSospechosas();marcarRaros();
+  aplicarEquivalencias();applyCadeteBase();aplicarCostos();marcarSospechosas();marcarRaros();marcarAnuladas();
 }
+// venta anulada por completo: la operacion tiene anulacion y lo cobrado neto queda en cero (o casi). Resultado real = neto de la operacion - costo neto
+function marcarAnuladas(){ const R=allRows(), G={}; R.forEach(o=>{ if(o.excl||!o.op)return; const k=o.cuenta+'|'+o.op; (G[k]=G[k]||[]).push(o); });
+  R.forEach(o=>{ o.anulada=null; });
+  Object.values(G).forEach(L=>{ const pos=L.filter(o=>o.tipo==='Venta'&&o.pcd>0), neg=L.filter(o=>(+o.pcd||0)<0); if(!pos.length||!neg.length)return;
+    const P=pos.reduce((a,o)=>a+o.pcd,0), N=-neg.reduce((a,o)=>a+(+o.pcd||0),0); if(N<P*0.99)return; // reintegro parcial: no es anulacion
+    const neto=L.reduce((a,o)=>a+(o.neto||0),0), costo=pos.reduce((a,o)=>a+(o.costo||0),0)+L.reduce((a,o)=>a+(o.costoAj||0),0), res=neto-costo;
+    pos.forEach(o=>{ o.anulada={neto,res,fecha:(neg[0]||{}).fecha||''}; o.raro=null; o.revisar=null; }); }); }
 // precios raros: venta con precio por unidad 25 % o mas por debajo de lo habitual de ese SKU (mediana del mes; si hay pocas, de todos los meses)
 function marcarRaros(){
   const med=a=>{const s=a.slice().sort((x,y)=>x-y),m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;};
@@ -913,7 +920,7 @@ function allRows(){return DATA.flatMap(d=>d.rows);}
 function filtered(sinMes){
   const fm=sinMes?'':$('fMes').value;
   const fc=$('fCuenta').value, ft=$('fTipo').value, fl=$('fLog').value, ff=$('fFlex').value, {raw,q,qd,isNum}=searchQ();
-  let r=allRows().filter(o=>(!fm||o.periodo===fm)&&(!fc||o.cuenta===fc)&&(isNum||ft==='todo'||(o.tipo==='Venta'&&o.pcd>0&&(ft!=='raros'||o.raro)&&(ft!=='pierden'||(o.gan!=null&&o.gan<0))&&(ft!=='bajo20'||(o.gan!=null&&o.gan>=0&&o.costo>0&&o.gan/o.costo<0.2))&&(ft!=='sobre20'||(o.gan!=null&&o.gan>=0&&!(o.costo>0&&o.gan/o.costo<0.2)))))&&(!fl||o.log===fl)&&(!ff||o.flex===ff)
+  let r=allRows().filter(o=>(!fm||o.periodo===fm)&&(!fc||o.cuenta===fc)&&(isNum||ft==='todo'||(o.tipo==='Venta'&&o.pcd>0&&(ft!=='raros'||o.raro)&&(!['pierden','bajo20','sobre20','raros'].includes(ft)||!o.anulada)&&(ft!=='pierden'||(o.gan!=null&&o.gan<0))&&(ft!=='bajo20'||(o.gan!=null&&o.gan>=0&&o.costo>0&&o.gan/o.costo<0.2))&&(ft!=='sobre20'||(o.gan!=null&&o.gan>=0&&!(o.costo>0&&o.gan/o.costo<0.2)))))&&(!fl||o.log===fl)&&(!ff||o.flex===ff)
     &&(!raw||(isNum?(o.op===qd||o.envNum===qd||o.paq===qd||o.mp===qd||o.op.includes(qd))
       :(norm(o.sku).includes(q)||norm(o.skuBase).includes(q)||norm(NAMES[o.skuBase]).includes(q)))));
   const ord=$('fOrden').value, d=s=>{const [a,b,c]=s.split('/');return c+b+a;};
@@ -1078,7 +1085,7 @@ function renderResumen(){
       ${cc.length?L1('Resultado',res,'','tot'):''}
       ${cc.length&&Math.round(percT)?L1('Resultado sin contemplar percepciones',resSP,`suma ${fmt(-percT)} de percepciones de IVA e IIBB (anticipos de impuestos, a favor en sus declaraciones)`,''):''}
     </div>
-    ${cc.length?(()=>{const P=cc.filter(o=>o.gan<0),B=cc.filter(o=>o.gan>=0&&o.costo>0&&o.gan/o.costo<0.2),OK=cc.filter(o=>o.gan>=0&&!(o.costo>0&&o.gan/o.costo<0.2));
+    ${cc.length?(()=>{const cv=cc.filter(o=>!o.anulada),P=cv.filter(o=>o.gan<0),B=cv.filter(o=>o.gan>=0&&o.costo>0&&o.gan/o.costo<0.2),OK=cv.filter(o=>o.gan>=0&&!(o.costo>0&&o.gan/o.costo<0.2));
       const caja=(col,bg,t,arr,f)=>`<a href="#" onclick="event.preventDefault();verVentasTipo('${f}')" style="text-decoration:none;color:inherit;flex:1;min-width:180px;display:flex;align-items:baseline;gap:6px;padding:9px 14px;border-right:1px solid var(--line,#E3DCD2);font-size:.86rem;"><span style="width:8px;height:8px;border-radius:50%;background:${col};flex:0 0 8px;transform:translateY(-1px);"></span><b>${arr.length.toLocaleString('es-AR')}</b><span style="color:#6B6258;">${t}</span><span style="margin-left:auto;color:${col};font-weight:600;">${fmt(arr.reduce((a,o)=>a+o.gan,0))}</span></a>`;
       return `<div style="grid-column:1/-1;order:9;"><b style="font-size:.9rem;color:#3d1466;">¿Cómo les fue a las ventas?</b> <small class="meta">(ganancia sobre el costo, de las ventas con costo)</small><div style="display:flex;flex-wrap:wrap;margin-top:6px;background:#fff;border:1px solid var(--line,#E3DCD2);border-radius:12px;overflow:hidden;">
         ${caja('#A6432F','','pierden plata',P,'pierden')}${caja('#B08A2E','','ganan menos del 20 %',B,'bajo20')}${caja('#2F7A47','','ganan 20 % o más',OK,'sobre20')}</div></div>`;})():''}
@@ -2408,12 +2415,12 @@ function card(o){
       ${o.costo!=null?chip('Ganancia',fmt(o.gan)+(o.ganPct!=null?` · ${pctf(o.ganPct)} s/costo`:''),o.gan<0?'#A6432F':'#2F7A47'):(o.costoRev!=null?chip('Ganancia (para revisar)',fmt(o.ganRev)+(o.ganPctRev!=null?` · ${pctf(o.ganPctRev)} s/costo`:''),'#A6432F')+`<button type="button" onclick="event.stopPropagation();confirmarVenta('${o.op}','${String(o.skuBaseML||o.skuBase).replace(/'/g,'')}')" style="align-self:center;padding:8px 12px;border-radius:10px;border:1px solid #BFDCC8;background:#EEF6F0;color:#2F7A47;font-weight:700;cursor:pointer;">✓ Está bien, contarla</button>`:(o.tipo==='Venta'&&o.pcd>0?chip('Ganancia','sin costo cargado','#8A8072'):''))}
     </div>
     ${o.mp?`<p class="mpbox">Para buscar en Mercado Pago: <b>ID de pago ${o.mp}</b>${o.mpFecha?' · pagado el '+o.mpFecha.split('-').reverse().join('/'):''}${o.mpMedio&&o.mpMedio!=='-'?' · '+o.mpMedio:''}<br>Monto que debería figurar acreditado: <b>${fmt2(o.acred)}</b></p>`:''}<p class="note">Operación ${o.op} · ${o.cuenta}${o.cant?' · Publicación: '+o.sku+(o.cant>1?' × '+o.cant:''):''}${o.psd?' · Precio sin descuento '+fmt2(o.psd):''}${o.flexMonto!=null?' · Monto envío Flex '+fmt2(o.flexMonto):''}${o.nota?'<br>'+o.nota:''}</p></div>`;
-  const skuCell=o.sku?`<span class="base">${o.raro?'<span title="Precio por unidad muy por debajo de lo habitual" style="font-size:.72rem;background:#FDEBE7;color:#A6432F;border-radius:6px;padding:1px 5px;margin-right:4px;">⚠️ precio</span>':''}${o.skuBase}${o.rep?' <span title="Envío compartido: el reintegro y el cadete se reparten entre los productos del envío" style="font-size:.72rem;background:#E3F0FF;color:#1F4E8C;border-radius:6px;padding:1px 5px;">🔀 '+o.rep.n+'</span>':''}</span>${NAMES[o.skuBase]?`<span class="var">${NAMES[o.skuBase]}</span>`:''}${o.variante?`<span class="var">${o.variante}</span>`:''}`:`<span class="base">${o.tipo}</span>`;
+  const skuCell=o.sku?`<span class="base">${o.anulada?`<span title="La venta se anuló después${o.anulada.fecha?' ('+o.anulada.fecha+')':''}: no cuenta como venta" style="font-size:.72rem;background:#ECE6DD;color:#6B6258;border-radius:6px;padding:1px 5px;margin-right:4px;">Anulada</span>`:''}${o.raro?'<span title="Precio por unidad muy por debajo de lo habitual" style="font-size:.72rem;background:#FDEBE7;color:#A6432F;border-radius:6px;padding:1px 5px;margin-right:4px;">⚠️ precio</span>':''}${o.skuBase}${o.rep?' <span title="Envío compartido: el reintegro y el cadete se reparten entre los productos del envío" style="font-size:.72rem;background:#E3F0FF;color:#1F4E8C;border-radius:6px;padding:1px 5px;">🔀 '+o.rep.n+'</span>':''}</span>${NAMES[o.skuBase]?`<span class="var">${NAMES[o.skuBase]}</span>`:''}${o.variante?`<span class="var">${o.variante}</span>`:''}`:`<span class="base">${o.tipo}</span>`;
   return `<tr class="v" tabindex="0" style="box-shadow:inset 4px 0 0 ${colorCta(o.cuenta)};"><td>${o.fecha}</td><td>${skuCell}</td><td>${o.unid??''}</td>
     <td>${o.pcd!=null?fmt(o.pcd):''}</td><td>${fmt(o.neto)}</td><td>${o.aUnit!=null?fmt(o.aUnit):''}</td>
     <td class="pct ${cls(o.pct)}">${o.pct==null?'–':pctf(o.pct)}</td>
     <td>${o.tipo==='Venta'&&o.pcd>0?(o.costo!=null?fmt(o.costo):'<span class="meta">sin costo</span>'):''}</td>
-    <td class="${o.gan!=null&&o.gan<0?'neg':''}">${o.gan!=null?fmt(o.gan)+` <small class="meta">${pctf(o.ganPct)}</small>`:''}</td></tr>
+    <td class="${(o.anulada?o.anulada.res:o.gan)!=null&&(o.anulada?o.anulada.res:o.gan)<0?'neg':''}">${o.anulada?fmt(o.anulada.res)+' <small class="meta">real (anulada)</small>':o.gan!=null?fmt(o.gan)+` <small class="meta">${pctf(o.ganPct)}</small>`:''}</td></tr>
     <tr class="d"><td colspan="9">${det}</td></tr>`;
 }
 
