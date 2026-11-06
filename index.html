@@ -1822,7 +1822,7 @@ body:not(.con-sb) #step-inicio .search-wrap{display:none !important;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 05/11 v493</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 05/11 v494</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -13650,6 +13650,8 @@ function pgDims(t){ const m = String(t || '').replace(/,/g, '.').match(/(\d+(?:\
 function pgSetToallas(S, r){
   const tx = normBusqueda(r ? (r.variante.desc || '') + ' ' + r.producto.nombre : ''), mb = tx.match(/toallon\s*(\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?)/), mc = tx.match(/toalla\b\s*(\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?)/);
   let b = mb ? pgDims(mb[1]) : null, c = mc ? pgDims(mc[1]) : null;
+  if(!(b && c) && /toallon/.test(tx) && /toalla\b/.test(tx)){ const dd = [...tx.matchAll(/(\d+(?:[.,]\d+)?)\s*[x×]\s*(\d+(?:[.,]\d+)?)/g)].map(m => [parseFloat(m[1].replace(',', '.')), parseFloat(m[2].replace(',', '.'))]);
+    if(dd.length >= 2){ dd.sort((x, y) => y[0] * y[1] - x[0] * x[1]); b = b || dd[0]; c = c || dd[1]; } }
   if(!(b && c) && typeof kitsDatos !== 'undefined' && kitsDatos && kitsDatos[String(S).toUpperCase()]){
     partesKit(kitsDatos[String(S).toUpperCase()]).forEach(p => { const q = buscarProductoPorSku(p.sku); if(!q) return; const d = normBusqueda((q.variante.desc || '') + ' ' + q.producto.nombre), dm = pgDims(q.variante.desc || '');
       if(!dm) return; if(/toallon/.test(d) && !b) b = dm; else if(/toalla\b/.test(d) && !c) c = dm; });
@@ -13774,7 +13776,7 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
   const pack = packN > 1 ? ` SALES UNIT: this product is sold as a pack of ${packN} units${packN === 12 ? ' (one dozen)' : packN === 6 ? ' (half a dozen)' : ''}. In IMAGE 1, use the photo only as an exact reference of ONE unit (same fabric, size, finishing) and show EXACTLY ${numTxt} (${packN}) units, all the same product and size, neatly arranged together (folded and stacked or fanned out in tidy rows) so all ${packN} can be counted: exactly ${packN}, no more, no less. ${pc === 'blancas' ? `All ${packN} units are natural clean WHITE (#FFFFFF), identical.` : pc === 'surtidas' ? `The ${packN} units are in ASSORTED colors: ${packN} clearly different solid colors chosen at random (no two alike, no white). Each unit is ONE single solid color, never two-tone, striped in other colors or color-blocked; only the design lines of the photo (in white) are kept. Each unit keeps exactly the same design and size as the photo.` : `The units have exactly the colors and prints shown in the photo.`} In IMAGE 2 show several units in use (not just one).` : '';
   // ===== Armado final: un mensaje por imagen, ordenado y corto (Gemini trabaja mejor de a una) =====
   const SEP = '\n\n──────────\n\n', esToalla = t === 'toalla' || /toall|rizo|felpa|toallon/.test(normBusqueda(nombre + ' ' + comp));
-  const fmt = (extra, escenaUso) => escenaUso ? `FORMAT: square 1:1, ${px}. Realistic photo of the real scene (not a white background), natural soft daylight, the product as the clear protagonist. ${extra || 'No text, no logos, no watermark.'}` : `FORMAT: square 1:1, ${px}. ${fondo === 'pure white seamless background #FFFFFF' ? 'Pure white seamless background (#FFFFFF)' : 'Background: ' + fondo}, soft diffused studio light, no hard shadows, soft contact shadow, product centered filling 85–95% of the frame. ${extra || 'No text, no logos, no watermark, no props.'}`;
+  const fmt = (extra, escenaUso) => escenaUso === 'detalle' ? `FORMAT: square 1:1, ${px}. The fabric fills the whole frame edge to edge: no background, no product outline. ${extra || 'No text, no logos, no watermark.'}` : escenaUso ? `FORMAT: square 1:1, ${px}. Realistic photo of the real scene (not a white background), natural soft daylight, the product as the clear protagonist. ${extra || 'No text, no logos, no watermark.'}` : `FORMAT: square 1:1, ${px}. ${fondo === 'pure white seamless background #FFFFFF' ? 'Pure white seamless background (#FFFFFF)' : 'Background: ' + fondo}, soft diffused studio light, no hard shadows, soft contact shadow, product centered filling 85–95% of the frame. ${extra || 'No text, no logos, no watermark, no props.'}`;
   const tamano = setT ? `bath towel ${setT.b} and hand towel ${setT.c}` : dimsM.length ? `${dimsM[0]} × ${dimsM[1]} cm${chica ? (ladoMax >= 25 ? ', about the size of an A4 sheet of paper' : ', smaller than an adult hand') : ''}` : '';
   if(t === 'cubrecama'){ const nq = normBusqueda(nombre); prod = /frazad|polar|manta|plaid|frazabella/.test(nq) ? 'blanket' : /edredon|acolchado|nordic|duvet/.test(nq) ? 'comforter' : /colcha|pique|cover/.test(nq) ? 'bedspread' : 'quilt'; }
   const CONF_FUNDA = 'open end finished with a simple folded hem about 4–5 cm wide, held by ONE straight line of stitching (single topstitch) along the inner edge of the hem; NO flap, NO envelope, NO buttons, NO zipper, NO piping; the other three sides are closed with plain seams on the inside (not visible), with sharp straight edges';
@@ -13836,7 +13838,7 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
   // IMAGEN 2 · EN USO
   L.push(['IN USE', [`Use the photo only as the exact reference for fabric, color and print.`, escena, `The print keeps its real scale; nothing invented (no seams, borders, trims or embroidery that are not in the photo).`, `Simple bright room, neutral colors, soft daylight, no brand names.`], 'No text, no logos, no watermark.', true]);
   // IMAGEN 3 · DETALLE
-  L.push(['DETAIL', [`EDIT the photo — do not redraw the fabric.`, `Close-up cropped from the CENTER of the fabric: no edges, no hems, no corners, no stitching.`, `The weave and the print sharp, even neutral white light, same colors. The fabric fills the WHOLE frame (no background visible).`], 'No text, no logos, no watermark.']);
+  L.push(['DETAIL', [`EDIT the photo — do not redraw the fabric.`, `Close-up cropped from the CENTER of the fabric: no edges, no hems, no corners, no stitching.`, `The weave and the print sharp, even neutral white light, same colors. The fabric fills the WHOLE frame (no background visible).`], 'No text, no logos, no watermark.', 'detalle']);
   // IMAGEN 4 · BOLSA LEXINGTON (fabricacion propia)
   if(fab) L.push(['PACKAGING (Lexington bag)', [
     `PACKAGE: the same ${prod} folded into a flat, firm, rectangular block inside a clear, glossy, transparent polypropylene bag. PORTRAIT: the height is 1.3 × the width. Straight front view, upright.`,
@@ -13852,12 +13854,14 @@ IMAGE 4 – PACKAGING (attach now a second photo: the real Lexington package, PH
     `Photorealistic product photography: it must look like a real photo of a real product. Pure white background, soft even studio light, soft contact shadow, the package filling about 90% of the frame height.`], 'No other text or logo except the "Lexington" label. No watermark.']);
   const N = L.length;
   // cada mensaje es completo por si solo (sirve en el mismo chat o en uno nuevo): siempre lleva el producto y las reglas
-  return L.map(([tit, lin, ext, uso], k) => `Generate ONE image (image ${k + 1} of ${N}). Attach the photo of the real product to this message if it is not already in this chat (and, if you have it, a close-up photo of its detail: band, texture or label).\n\n${reglas}\n\nIMAGE ${k + 1} of ${N} – ${tit}\n${lin.filter(Boolean).join('\n')}\n\n${fmt(ext, uso)}`).join(SEP);
+  const gond = window.__pgFoto === 'gondola', aRef = l => !gond ? l : String(l).replace(/^EDIT the photo — do not redraw the (product|fabric)\.$/, 'CREATE a new photo using the attached photo ONLY as reference: it shows this product among other items (a shelf or piles). Recreate exactly this product alone — same fabric, color, border, proportions and finishing.').replace(/^Keep the (.*) exactly as it is: same shape, folds, print and finishing\.$/, 'Show the $1 neatly folded as a product photo, with the same print and finishing as in the reference.').replace(/^Only: remove room shadows.*$/, '');
+return L.map(([tit, lin, ext, uso], k) => `Generate ONE image (image ${k + 1} of ${N}). Attach the photo of the real product to this message if it is not already in this chat (and, if you have it, a close-up photo of its detail: band, texture or label).\n\n${reglas}\n\nIMAGE ${k + 1} of ${N} – ${tit}\n${lin.map(aRef).filter(Boolean).join('\n')}\n\n${fmt(ext, uso)}`).join(SEP);
 }
 function copiarTexto(t, btn){ navigator.clipboard.writeText(t).then(() => { if(btn){ const o = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(() => btn.textContent = o, 1500); } }).catch(() => prompt('Copie el texto:', t)); }
 async function abrirPromptGemini(S){ await cargarDatosFabricacion(); try{ if(telasDatos === null) await cargarTelas(); } catch(e){} try{ if(kitsDatos === null) await cargarKits(); } catch(e){}
   pvModal('📸 Prompt para Gemini', `<input id="pg-s" data-ac="sku" value="${escapeAttr(S || '')}" placeholder="SKU o nombre del producto" autocomplete="off" oninput="pgPintar()" onchange="pgPintar()" style="padding:9px;border:1px solid var(--line);border-radius:10px;width:100%;box-sizing:border-box;">
     <div style="display:flex;gap:6px;margin:8px 0;"><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pg-c" value="ml" checked onchange="pgPintar()"> Mercado Libre</label><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pg-c" value="tn" onchange="pgPintar()"> Tienda Nube</label></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 8px;font-size:.84rem;"><span>Mi foto es:</span><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pg-f" value="solo" ${window.__pgFoto !== 'gondola' ? 'checked' : ''} onchange="window.__pgFoto=this.value;pgPintar()"> del producto solo</label><label class="btn-mini" style="cursor:pointer;"><input type="radio" name="pg-f" value="gondola" ${window.__pgFoto === 'gondola' ? 'checked' : ''} onchange="window.__pgFoto=this.value;pgPintar()"> de góndola o con varias piezas</label></div>
     <p class="note" style="text-align:left;margin:0 0 8px;">📷 En Gemini adjunte la foto real del producto y, si puede, <b>una foto de cerca del detalle</b> (guarda, textura o etiqueta): sale mucho más fiel.</p>
     <div id="pg-res"></div>`);
   pgPintar();
@@ -23440,7 +23444,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-05-v493';
+const APP_VERSION = '2026-11-05-v494';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
