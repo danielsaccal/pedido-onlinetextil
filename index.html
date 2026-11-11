@@ -1822,7 +1822,7 @@ body:not(.con-sb) #step-inicio .search-wrap{display:none !important;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 05/11 v494</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 08/11 v495</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -9142,8 +9142,8 @@ function pdPintarPrep(){ const box = document.getElementById('pub-cont'), p = pd
   box.innerHTML = `<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px;"><a href="#" onclick="event.preventDefault();pdSel=null;pdPintar()" style="font-size:.82rem;">← Pedidos</a><b>Pedido ${escaparHtml(p.numero)}</b><span style="color:#A89E90;font-size:.8rem;">${escaparHtml(cli)}${p.tomadoPor ? ' · tomado por ' + escaparHtml(nomUsu(p.tomadoPor)) : ''}</span></div>
     <div style="display:flex;margin:4px 0 12px;font-size:.74rem;font-weight:700;">${pasos.map(([k, t], i) => `<span style="padding:5px 10px;border:1px solid var(--line);${i === 0 ? 'border-radius:999px 0 0 999px;' : i === pasos.length - 1 ? 'border-radius:0 999px 999px 0;' : ''}${i < ie ? 'background:#E9F5EC;color:#2F7A47;' : i === ie ? 'background:#3D2B4E;color:#fff;' : 'background:#fff;color:#A89E90;'}">${i < ie ? '✓ ' : ''}${t}</span>`).join('')}</div>
     <div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;"><div style="display:grid;grid-template-columns:1fr 70px 70px 150px 110px;gap:8px;padding:7px 12px;font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:#A89E90;font-weight:700;border-bottom:1px solid var(--line);"><span>SKU · producto</span><span style="text-align:right;">Pidió</span><span style="text-align:right;">Falta</span><span>Preparado</span><span></span></div>
-      ${(p.items || []).map((it, i) => { const f = pdFalta(it); return `<div style="display:grid;grid-template-columns:1fr 70px 70px 150px 110px;gap:8px;padding:8px 12px;border-bottom:1px solid #F3EFE8;font-size:.84rem;align-items:center;${f ? '' : 'opacity:.5;'}"><div><b>${escaparHtml(it.sku)}</b> <span style="color:#A89E90;font-size:.76rem;">${escaparHtml((it.nombreProducto || '') + ' ' + (it.desc || ''))}</span></div><span style="text-align:right;">${it.cantidad}</span><span style="text-align:right;">${f}</span>
-        ${f ? `<span style="display:inline-flex;gap:4px;align-items:center;"><button type="button" class="btn-mini" onclick="pdCant(${i},-1)">−</button><input id="pd-q-${i}" type="number" min="0" max="${f}" value="${window.__pdPrep[i]}" oninput="pdCant(${i},0,this.value)" style="width:56px;padding:5px;border:1px solid var(--line);border-radius:7px;text-align:center;font-weight:700;"><button type="button" class="btn-mini" onclick="pdCant(${i},1)">+</button></span><span id="pd-e-${i}" style="font-size:.74rem;font-weight:700;"></span>` : '<span style="color:#2F7A47;font-size:.76rem;">✓ ya facturado</span><span></span>'}</div>`; }).join('')}</div>
+      ${(p.items || []).map((it, i) => { const f = pdFalta(it); return `<div style="display:grid;grid-template-columns:1fr 70px 70px 150px 110px;gap:8px;padding:8px 12px;border-bottom:1px solid #F3EFE8;font-size:.84rem;align-items:center;${f ? '' : 'opacity:.5;'}"><div><b>${escaparHtml(it.sku)}</b> <span style="color:#A89E90;font-size:.76rem;">${escaparHtml((it.nombreProducto || '') + ' ' + (it.desc || ''))}</span>${pdCostoLinea(it, p)}</div><span style="text-align:right;">${it.cantidad}</span><span style="text-align:right;">${f}</span>
+        ${f ? `<span style="display:inline-flex;gap:4px;align-items:center;"><button type="button" class="btn-mini" onclick="pdCant(${i},-1)">−</button><input id="pd-q-${i}" type="number" min="0" max="${f}" value="${window.__pdPrep[i]}" oninput="pdCant(${i},0,this.value)" style="width:56px;padding:5px;border:1px solid var(--line);border-radius:7px;text-align:center;font-weight:700;"><button type="button" class="btn-mini" onclick="pdCant(${i},1)">+</button></span><span id="pd-e-${i}" style="font-size:.74rem;font-weight:700;"></span>` : '<span style="color:#2F7A47;font-size:.76rem;">✓ ya facturado</span><span></span>'}</div>`; }).join('')}</div>${pdCostoTotal(p)}
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;"><button type="button" class="btn-mini" onclick="pdTodo()">Todo completo</button><button type="button" class="btn-mini" style="color:#A6432F!important;" onclick="pdCerrar('${escapeAttr(p.numero)}')">Cerrar pedido (sin pendientes)</button><span class="note" style="margin:0;">Lo que falta queda como pendiente de entrega.</span>
       ${p.estado === 'para_facturar' ? `<button type="button" class="btn-mini" style="margin-left:auto;" onclick="pdControlar('${escapeAttr(p.numero)}')">${p.control ? '✓ Controlado por ' + escaparHtml(nomUsu(p.control.por)) : 'Marcar controlado'}</button>` : ''}<button type="button" class="btn btn-gold" style="width:auto;${p.estado === 'para_facturar' ? '' : 'margin-left:auto;'}" onclick="pdListo('${escapeAttr(p.numero)}')">✓ Listo para facturar</button></div>${pdHistHtml(p)}`;
   (p.items || []).forEach((it, i) => pdEtiqueta(i)); }
@@ -14119,6 +14119,15 @@ function plegarB(id, etiqueta, n, abrir){ const el = document.getElementById(id)
   if(!d){ d = document.createElement('details'); d.className = 'plgB'; d.style.cssText = 'margin-top:8px;'; d.innerHTML = '<summary style="cursor:pointer;font-weight:700;color:#3D2B4E;padding:6px 2px;"></summary>'; el.before(d); d.appendChild(el);
     try{ if(localStorage.getItem('plgB:' + id) === '1') d.open = true; } catch(e){} d.addEventListener('toggle', () => { try{ localStorage.setItem('plgB:' + id, d.open ? '1' : '0'); } catch(e){} }); }
   d.querySelector('summary').textContent = etiqueta + (n != null ? ' (' + n + ')' : ''); if(abrir) d.open = true; }
+// ===== Costo y ganancia de un pedido (solo duenio): costo por unidad de venta y % sobre el costo, como en Precios y Facturas =====
+function pdItemCosto(it, pedido){ const S = String(it.sku || '').toUpperCase(); let c = null; try{ c = costoVentaSku(S); } catch(e){} if(!(c > 0)) return null;
+  const q = +it.cantidad || 0, pu = (+it.precio || 0) * (1 - (+it.descuentoItemPct || 0) / 100) * (1 - (+((pedido || {}).descuentoPct) || 0) / 100), fab = (() => { try{ const r = buscarProductoPorSku(S); return esFabricadoSku(S, r ? r.producto.nombre : ''); } catch(e){ return false; } })();
+  const min = fab ? +MARGEN_MIN.fabricacion : +MARGEN_MIN.reventa, pct = pu > 0 ? (pu / c - 1) * 100 : null; return { c, q, pu, tot: c * q, venta: pu * q, pct, min }; }
+function pdCostoLinea(it, pedido){ if(!esDueno()) return ''; const x = pdItemCosto(it, pedido); if(!x) return '<div style="font-size:.72rem;color:#A89E90;margin-top:2px;">sin costo cargado</div>';
+  return `<div style="font-size:.72rem;color:#A89E90;margin-top:2px;">costo ${formatPrice(x.c)} c/u · costo ${formatPrice(x.tot)} · <b style="color:${x.pct != null && x.pct < x.min ? '#A6432F' : '#2F7A47'};">${x.pct != null ? Math.round(x.pct) + ' % s/costo' : '–'}</b>${x.pct != null && x.pct < x.min ? ` (por debajo del mínimo de ${x.min} %)` : ''}</div>`; }
+function pdCostoTotal(pedido, items){ if(!esDueno()) return ''; const L = (items || pedido.items || []).map(it => pdItemCosto(it, pedido)), ok = L.filter(Boolean); if(!ok.length) return '';
+  const venta = ok.reduce((a, x) => a + x.venta, 0), costo = ok.reduce((a, x) => a + x.tot, 0), gan = venta - costo, pct = costo > 0 ? gan / costo * 100 : null, sin = L.length - ok.length;
+  return `<div style="border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-top:8px;background:#fff;font-size:.86rem;"><div style="display:flex;justify-content:space-between;"><span>Costo total</span><b>${formatPrice(costo)}</b></div><div style="display:flex;justify-content:space-between;"><span>Ganancia</span><b style="color:${gan < 0 ? '#A6432F' : '#2F7A47'};">${formatPrice(gan)}${pct != null ? ' · ' + Math.round(pct) + ' % s/costo' : ''}</b></div>${sin ? `<div style="font-size:.72rem;color:#A89E90;">${sin} renglón${sin > 1 ? 'es' : ''} sin costo: no entra${sin > 1 ? 'n' : ''} en el cálculo</div>` : ''}<div style="font-size:.7rem;color:#A89E90;margin-top:2px;">🔒 Solo lo ve usted.</div></div>`; }
 // ===== Nuevo pedido paso a paso: el mismo formulario que la factura (cliente, renglones con precio de lista, totales), guarda un pedido para preparar =====
 async function pdNuevo(){
   fvManual('f'); const fx = document.querySelector('#pub-cont .fx'); if(!fx) return; window.__fvModoPedido = true;
@@ -14132,8 +14141,12 @@ async function pdNuevo(){
   const tot = fx.querySelector('.tot'); if(tot) tot.insertAdjacentHTML('beforebegin', `<div id="pdn-extra" data-wiz-paso="2" style="display:grid;gap:8px;margin-bottom:10px;"><div class="seg"><label><input type="radio" name="pdn-ent" value="retira" checked><span>Retira en el local</span></label><label><input type="radio" name="pdn-ent" value="envio"><span>Envío</span></label></div>
     <div class="fila" style="grid-template-columns:180px 1fr;"><div><span class="fl">Para el</span><input type="date" id="pdn-fecha"></div><div><span class="fl">Nota</span><input id="pdn-nota" placeholder="Ej: surtido de colores"></div></div></div>`);
   const bt = [...fx.querySelectorAll('button')].find(b => /fvGuardar/.test(b.getAttribute('onclick') || '')); if(bt){ const box = bt.parentElement; box.innerHTML = `<button class="btn btn-ghost" style="width:auto;padding:10px 18px;" onclick="window.__fvModoPedido=false;cerrarPublicar()">Cancelar</button><button class="btn btn-gold" style="width:auto;padding:10px 28px;" onclick="pdGuardarNuevo(this)">Guardar pedido</button>`; }
-  // resumen del paso 3 con la entrega
+  // paso 3: costo y ganancia (solo duenio), se recalcula al llegar al paso
+  if(esDueno()){ const ex = document.getElementById('pdn-extra'); if(ex) ex.insertAdjacentHTML('afterend', '<div id="pdn-costo" data-wiz-paso="2" style="margin-bottom:10px;"></div>'); fx.addEventListener('click', e => { if(e.target.closest('[data-w=sig]')) setTimeout(pdNuevoCostos, 0); }); }
   if(window.__wizIr) window.__wizIr(0); }
+function pdNuevoCostos(){ const box = document.getElementById('pdn-costo'); if(!box) return; const its = [...document.querySelectorAll('#fv-rows .fv-r')].map(r => { const S = String((r.querySelector('.fv-s') || {}).value || '').trim().toUpperCase(), q = numAr((r.querySelector('.fv-q') || {}).value) || 0, imp = numAr((r.querySelector('.fv-i') || {}).value) || 0; return { sku: S, cantidad: q, precio: q ? imp / q : 0 }; }).filter(i => i.sku && i.cantidad > 0);
+  const dgV = numAr((document.getElementById('fv-dg') || {}).value) || 0, dgM = (document.getElementById('fv-dg-m') || {}).value || 'pct', sub = its.reduce((a, i) => a + i.precio * i.cantidad, 0), dPct = dgV > 0 ? (dgM === 'monto' ? (sub ? dgV / sub * 100 : 0) : dgV) : 0;
+  const ped = { descuentoPct: dPct }; box.innerHTML = its.map(it => `<div style="font-size:.78rem;margin-top:4px;"><b>${escaparHtml(it.sku)}</b> × ${it.cantidad}${pdCostoLinea(it, ped)}</div>`).join('') + pdCostoTotal(ped, its); }
 async function pdGuardarNuevo(b){ const nom = (document.getElementById('fv-c').value || '').trim(); if(!nom){ alert('Elija el cliente.'); return; }
   const filas = [...document.querySelectorAll('#fv-rows .fv-r')].map(r => { const S = String((r.querySelector('.fv-s') || {}).value || '').trim().toUpperCase(), q = numAr((r.querySelector('.fv-q') || {}).value) || 0, imp = numAr((r.querySelector('.fv-i') || {}).value) || 0, x = S ? buscarProductoPorSku(S) : null;
     return { sku: S, cantidad: q, precio: q ? Math.round(imp / q * 100) / 100 : 0, desc: x ? (x.variante.desc || '') : '', nombreProducto: x ? x.producto.nombre : '', nota: '', descuentoItemPct: 0 }; }).filter(i => i.sku && i.cantidad > 0);
@@ -17425,7 +17438,7 @@ function renderHistorial(filtro){
     const estado = p.estado || 'pendiente';
     const itemsRows = (p.items||[]).map(i => `
       <tr>
-        <td>${i.cantidad} × ${i.sku}<br><span style="color:#8A8072;font-size:0.78rem;">${i.nombreProducto||''} — ${i.desc||''}</span>${i.descuentoItemPct > 0 ? `<br><span style="color:var(--sage);font-size:0.75rem;">Desc. ítem: ${i.descuentoItemPct}%</span>` : ''}${i.nota ? `<br><span style="color:var(--sage);font-size:0.75rem;">Nota: ${i.nota}</span>` : ''}</td>
+        <td>${i.cantidad} × ${i.sku}<br><span style="color:#8A8072;font-size:0.78rem;">${i.nombreProducto||''} — ${i.desc||''}</span>${pdCostoLinea(i, p)}${i.descuentoItemPct > 0 ? `<br><span style="color:var(--sage);font-size:0.75rem;">Desc. ítem: ${i.descuentoItemPct}%</span>` : ''}${i.nota ? `<br><span style="color:var(--sage);font-size:0.75rem;">Nota: ${i.nota}</span>` : ''}</td>
         <td class="n">${formatPrice(precioLineaItem(i))}</td>
       </tr>`).join('');
     return `
@@ -17449,7 +17462,7 @@ function renderHistorial(filtro){
             <b>Transporte:</b> ${p.cliente?.transporte||''}
             ${p.observaciones ? `<br><b>Observaciones:</b> ${p.observaciones}` : ''}
           </div>
-          <table>${itemsRows}</table>${pdHistHtml(p)}
+          <table>${itemsRows}</table>${pdCostoTotal(p)}${pdHistHtml(p)}
           ${p.descuentoPct > 0 ? `<p style="text-align:right;margin:6px 0 0;">Subtotal: ${formatPrice(p.subtotal)} — Descuento ${p.descuentoPct}%</p>` : ''}
           <div class="hist-acciones">
             <button class="btn-mini" onclick="event.stopPropagation(); remitoDesdePedido('${p.numero}')">🚚 Remito</button>
@@ -23444,7 +23457,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-05-v494';
+const APP_VERSION = '2026-11-08-v495';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
