@@ -1822,7 +1822,7 @@ body:not(.con-sb) #step-inicio .search-wrap{display:none !important;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 12/11 v497</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 16/11 v498</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -21062,8 +21062,8 @@ async function generarFlyersNuevoIngresoBase(){
     const variasFotos = grupos.length === 1 && (grupos[0].imgs || []).length > 1, modoMulti = window.__niModoMulti || 'carrusel';
     formatosElegidos.forEach(([formato, etiqueta]) => {
       // varias fotos y "un posteo por foto": un posteo con cada foto, mismo texto y diseno
-      if(formato === 'post' && variasFotos && modoMulti === 'posteos'){ grupos[0].imgs.forEach((im, k) => { let cv; if(diseno === 'tarjeta') cv = dibujarPiezaTarjeta(producto, im, 'post', textoAdicional); else if(diseno === 'texto') cv = dibujarPiezaTexto(producto, textoAdicional, 'post'); else cv = dibujarPiezaEditorial(producto, im, 'post', textoAdicional);
-          piezas.push({ canvas: cv, nombre: 'post_' + (k + 1) + '_' + producto.nombre.replace(/\s+/g, '_') + '.png', etiqueta: 'Posteo ' + (k + 1) + '/' + grupos[0].imgs.length }); }); return; }
+      if((formato === 'post' || formato === 'story') && variasFotos && modoMulti === 'posteos'){ grupos[0].imgs.forEach((im, k) => { let cv; if(diseno === 'tarjeta') cv = dibujarPiezaTarjeta(producto, im, formato, textoAdicional); else if(diseno === 'texto') cv = dibujarPiezaTexto(producto, textoAdicional, formato); else cv = dibujarPiezaEditorial(producto, im, formato, textoAdicional);
+          piezas.push({ canvas: cv, nombre: formato + '_' + (k + 1) + '_' + producto.nombre.replace(/\s+/g, '_') + '.png', etiqueta: etiqueta + ' ' + (k + 1) + '/' + grupos[0].imgs.length }); }); return; }
       let canvasPieza;
       if(diseno === 'tarjeta') canvasPieza = dibujarPiezaTarjeta(producto, img, formato, textoAdicional);
       else if(diseno === 'texto') canvasPieza = dibujarPiezaTexto(producto, textoAdicional, formato);
@@ -23501,7 +23501,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-12-v497';
+const APP_VERSION = '2026-11-16-v498';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
