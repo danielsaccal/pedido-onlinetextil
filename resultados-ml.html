@@ -1709,11 +1709,13 @@ let __resGuardado = '';
 function resumenMensualML(){
   const out={}, eIn=o=>o.envIn!==undefined?o.envIn:Math.max(o.envio||0,0);
   const claves=new Set(); allRows().forEach(o=>{ if(o.periodo&&o.periodo!=='sin-fecha'&&!o.excl) claves.add(o.periodo+'|'+o.cuenta); });
+  // devuelto = reintegros de ventas que se contaron como vendidas; si la venta figura cancelada, nunca se sumo y su reintegro no se resta
+  const noContadas=new Set(allRows().filter(o=>o.pcd!=null&&o.pcd>=0&&o.tipo!=='Venta'&&/^Venta/.test(o.tipo)).map(o=>o.cuenta+'|'+o.op));
   claves.forEach(k=>{ const [p,c]=k.split('|'); const r=allRows().filter(o=>!o.excl&&o.periodo===p&&o.cuenta===c), v=r.filter(o=>o.tipo==='Venta'&&o.pcd>0);
     const S=(a,f)=>a.reduce((x,o)=>x+(f(o)||0),0);
     const vend=S(v,o=>o.pcd), envIn=S(r,eIn), quedo=S(r,o=>o.neto), costo=S(v.filter(o=>o.costo!=null),o=>o.costo)+S(r,o=>o.costoAj);
     let C={}; try{ C=desgloseLineaML(p,c).C; }catch(e){}
-    out[k]={periodo:p,cuenta:c,vendido:Math.round(vend),envios:Math.round(envIn),quedo:Math.round(quedo),cargosML:Math.round(vend+envIn-quedo),costo:Math.round(costo),devuelto:Math.round(-S(r.filter(o=>o.pcd<0&&!esCargoDevol(o)),o=>o.pcd)),
+    out[k]={periodo:p,cuenta:c,vendido:Math.round(vend),envios:Math.round(envIn),quedo:Math.round(quedo),cargosML:Math.round(vend+envIn-quedo),costo:Math.round(costo),devuelto:Math.round(-S(r.filter(o=>o.pcd<0&&!esCargoDevol(o)&&!noContadas.has(o.cuenta+'|'+o.op)),o=>o.pcd)),
       sinCosto:v.filter(o=>o.costo==null&&o.costoRev==null).length, vendSinCosto:Math.round(S(v.filter(o=>o.costo==null),o=>o.pcd)), revisar:v.filter(o=>o.costoRev!=null).length,
       desglose:Object.fromEntries(Object.entries(C).map(([a,b])=>[a,Math.round(b)]))}; });
   return out;
