@@ -1822,7 +1822,7 @@ body:not(.con-sb) #step-inicio .search-wrap{display:none !important;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 16/11 v498</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 19/11 v499</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6418,7 +6418,7 @@ async function dashDatos(forzar){
     t((async () => { if(stockDatos === null) await cargarStock(); const X = Object.values(stockDatos.skus || {}); V.bajo = X.filter(x => (+x.minimo || 0) > 0 && (+x.stock || 0) < +x.minimo).length; V.neg = X.filter(x => (+x.stock || 0) < 0 || (+x.full || 0) < 0).length; })().catch(e => console.error(e)))
   ]);
   let vPropia = 0, nFact = 0; if(vf) vf.docs.forEach(d => { const f = d.data(); if(f.razon && f.razon !== 'propia') return; if(ccFechaISO(f.fecha).slice(0, 7) !== mes) return; vPropia += (f.esNC ? -1 : 1) * (+f.total || 0); nFact++; });
-  const ml = k => Object.values(res).filter(x => x.periodo === mes && String(x.cuenta).toLowerCase() === k).reduce((a, x) => a + (x.vendido || 0) + (x.envios || 0), 0);
+  const ml = k => Object.values(res).filter(x => x.periodo === mes && String(x.cuenta).toLowerCase() === k).reduce((a, x) => a + (x.vendido || 0) - (x.devuelto || 0) + (x.envios || 0), 0); // neto: sin cancelaciones ni devoluciones
   { const Rm = Object.values(res).filter(x => x.periodo === mes); V.ganML = Rm.length ? Rm.reduce((a, x) => a + (x.quedo || 0) - (x.costo || 0), 0) : null; V.ganMLsinCosto = Rm.reduce((a, x) => a + (x.sinCosto || 0), 0); }
   Object.assign(V, { vPropia, nFact, vA: ml('alberto'), vR: ml('rita') }); V.tot = vPropia + V.vA + V.vR;
   V.nSku = 0; CATALOGO.forEach(c => (c.productos || []).forEach(p => V.nSku += (p.variantes || []).length));
@@ -6482,7 +6482,7 @@ async function dashDatos(forzar){
     if(vf) vf.docs.forEach(d => { const f = normFactura(d.data()), iso = ccFechaISO(f.fecha), m = iso.slice(0, 7), rz = f.razon || 'propia'; if(F[m] && rz === 'propia'){ const imp = (f.esNC ? -1 : 1) * (+f.total || 0); F[m].propia += imp; F[m][/cta|corriente/i.test(String(f.condicion || '')) ? 'ctacte' : 'ctdo'] += imp; }
       if(m === mes && rz === 'propia') (f.items || []).forEach(it => { try{ const c = costoItemFactura(it, f); if(c == null) return; vM += (it.neto || 0) * factorIvaFactura(f) * signoFact(f); cM += c; } catch(e){} });
       act.push({ f: iso, t: f.creado || '', fam: f.esNC ? 'ncv' : f.esND ? 'ndv' : 'venta', l: f.tipo || '', fis: esFiscalVenta(f), tit: f.esNC ? 'Nota de crédito' : f.esND ? 'Nota de débito' : 'Factura de venta', quien: String(f.cliente || '').replace(/^\s*\d+\s*-\s*/, ''), num: f.numero || '', imp: (f.esNC ? -1 : 1) * (+f.total || 0), go: 'abrirFacturas()' }); });
-    Object.values(res).forEach(x => { const k = String(x.cuenta || '').toLowerCase(); if(F[x.periodo] && (k === 'alberto' || k === 'rita')) F[x.periodo][k] += (x.vendido || 0) + (x.envios || 0); if(x.periodo === mes && (k === 'alberto' || k === 'rita') && x.vendido){ vM += x.vendido - (x.vendSinCosto || 0); cM += x.costo || 0; } });
+    Object.values(res).forEach(x => { const k = String(x.cuenta || '').toLowerCase(); if(F[x.periodo] && (k === 'alberto' || k === 'rita')) F[x.periodo][k] += (x.vendido || 0) - (x.devuelto || 0) + (x.envios || 0); if(x.periodo === mes && (k === 'alberto' || k === 'rita') && x.vendido){ vM += x.vendido - (x.vendSinCosto || 0); cM += x.costo || 0; } });
     V.fact12 = meses.map(m => ({ m, ...F[m], tot: F[m].propia + F[m].alberto + F[m].rita }));
     V.margen = vM > 0 ? (vM - cM) / vM * 100 : null;
     // posicion de IVA del mes, por razon social
@@ -9579,7 +9579,7 @@ function calcResultadoMes(mes, cta){
     f.items.forEach((it, i) => { const v = it.neto * fx * sg; R.vF += v; const c = costoItemFactura(it, f);
       if(c == null){ R.sinCF++; R.vtaSinCF += v; } else { if(renglonRevFactura(f, i, v, c)) R.revF++; R.cF += c; } }); });
   Object.values(rnDatos.ml).forEach(x => { if(x.periodo !== mes || (cta && x.cuenta !== cta)) return; R.hayML = true;
-    R.vML += x.vendido; R.envML += x.envios; R.cML += x.costo; R.cargosML += x.cargosML; R.sinCML += x.sinCosto; R.revML += x.revisar;
+    R.vML += x.vendido - (x.devuelto || 0); R.envML += x.envios; R.cML += x.costo; R.cargosML += x.cargosML - (x.devuelto || 0); R.sinCML += x.sinCosto; R.revML += x.revisar;
     Object.entries(x.desglose || {}).forEach(([k, v]) => R.desglose[k] = (R.desglose[k] || 0) + v); });
   R.gFijos = 0; R.gVar = 0; R.gSinTipo = 0;
   rnDatos.gastos.forEach(g => { if(String(g.fecha || '').slice(0, 7) !== mes || g.enML) return; const m = +g.monto || 0; R.gastos += m;
@@ -23501,7 +23501,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-16-v498';
+const APP_VERSION = '2026-11-19-v499';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
