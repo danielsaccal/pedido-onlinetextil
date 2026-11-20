@@ -1822,7 +1822,7 @@ body:not(.con-sb) #step-inicio .search-wrap{display:none !important;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 19/11 v499</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 20/11 v500</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6977,7 +6977,8 @@ function datosPartida(e){
   const sinAsignar = Math.max(0, e.metros - asignado);
   const enTrabajo = Math.max(0, asignado - recibido);
   const dias = Math.max(0, Math.floor((Date.now() - new Date(String(e.fecha).slice(0, 10) + 'T12:00:00').getTime()) / 86400000));
-  return { ots, sinAsignar, enTrabajo, debe: sinAsignar + enTrabajo, dias };
+  const saldo = e.metros - recibido; // con signo: negativo = entrego productos que usan mas tela de la enviada en esta partida
+  return { ots, sinAsignar, enTrabajo, debe: sinAsignar + enTrabajo, saldo, dias };
 }
 // dias desde que se armo la orden hasta la ultima entrega (ordenes terminadas)
 function tiemposDeTaller(taller){
@@ -6992,7 +6993,10 @@ function tiemposDeTaller(taller){
   return { completo: prom(dias), nCompleto: dias.length, primera: prom(primera), nPrimera: primera.length };
 }
 function renderDeudaTela(){
-  const abiertas = partidasEnTalleres().filter(e => !e.cerrado).map(e => ({ ...e, ...datosPartida(e) })).filter(e => e.debe > 0.5);
+  // se compensa por taller y tela: lo entregado de mas en una partida abierta descuenta lo que se debe de esa misma tela
+  const todas = partidasEnTalleres().filter(e => !e.cerrado).map(e => ({ ...e, ...datosPartida(e) }));
+  const netoTT = new Map(); todas.forEach(e => { const k = e.taller + '|' + e.skuTela; netoTT.set(k, (netoTT.get(k) || 0) + e.saldo); });
+  const abiertas = todas.filter(e => (netoTT.get(e.taller + '|' + e.skuTela) || 0) > 0.5 && Math.abs(e.saldo) > 0.5);
   const talleres = [...new Set(abiertas.map(e => e.taller))].sort();
   const chip = (v, t) => `<span onclick="dtFiltro='${escapeAttr(v)}'; renderDeudaTela();" style="cursor:pointer;font-size:0.82rem;padding:5px 12px;border-radius:14px;border:1px solid var(--line);${dtFiltro === v ? 'background:var(--purple);color:#fff;border-color:var(--purple);' : ''}">${escaparHtml(t)}</span>`;
   document.getElementById('dt-filtros').innerHTML = chip('todos', 'Todos los talleres') + talleres.map(t => chip(t, t)).join('');
@@ -7002,12 +7006,12 @@ function renderDeudaTela(){
   const m = x => fmtCm(Math.round(x));
   cont.innerHTML = lista.map(t => {
     const ps = abiertas.filter(e => e.taller === t).sort((a, b) => b.dias - a.dias);
-    const total = ps.reduce((s, e) => s + e.debe, 0);
+    const telasT = [...new Set(ps.map(e => e.skuTela))].sort();
+    const total = telasT.reduce((s, x) => s + netoTT.get(t + '|' + x), 0);
     const tm = tiemposDeTaller(t);
     const tiempo = tm.completo !== null ? `tarda ≈ ${tm.completo} días en entregar todo (${tm.nCompleto} orden${tm.nCompleto === 1 ? '' : 'es'})` : (tm.primera !== null ? `primera entrega a los ≈ ${tm.primera} días` : 'todavía sin entregas registradas');
     // por tela
-    const porTela = new Map();
-    ps.forEach(e => porTela.set(e.skuTela, (porTela.get(e.skuTela) || 0) + e.debe));
+    const porTela = new Map(telasT.map(x => [x, netoTT.get(t + '|' + x)]));
     return `<div style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;">
       <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline;">
         <b style="font-size:1.05rem;">${escaparHtml(t)}</b><b>debe ≈ ${m(total)} m</b>
@@ -7015,19 +7019,21 @@ function renderDeudaTela(){
       <div style="font-size:0.8rem;color:#8A8072;margin-bottom:8px;">⏱️ ${tiempo} · por tela: ${[...porTela].map(([s, x]) => `${escaparHtml(s)} ${m(x)} m`).join(' · ')}</div>
       <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.86rem;">
         <thead><tr style="background:var(--cream);"><th style="padding:6px;text-align:left;">Tela</th><th style="padding:6px;">Enviada</th><th style="padding:6px;text-align:right;">Sin asignar</th><th style="padding:6px;text-align:right;">En trabajo</th><th style="padding:6px;text-align:right;">Debe</th></tr></thead>
-        <tbody>${ps.map(e => {
+        <tbody>${telasT.map(tela => { const pt = ps.filter(e => e.skuTela === tela);
+          const cuenta = pt.length > 1 ? pt.slice().sort((a, b) => b.saldo - a.saldo).map((e, i) => (e.saldo < 0 ? ' − ' : (i ? ' + ' : '')) + m(Math.abs(e.saldo))).join('') + ' = ' : '';
+          return `<tr style="border-top:1px solid var(--line);background:#FAF8F4;"><td colspan="5" style="padding:6px;font-size:0.82rem;"><b>${escaparHtml(tela)}</b> · ${cuenta}<b>${m(netoTT.get(t + '|' + tela))} m</b></td></tr>` + pt.map(e => {
           const color = e.dias > DIAS_ALERTA_ENVIO ? '#A6432F' : '#6B6258';
           return `<tr style="border-top:1px solid var(--line);cursor:pointer;" onclick="toggleDetallePartida('${e._id}')" title="Ver opciones">
             <td style="padding:6px;"><b>${escaparHtml(e.skuTela)}</b> <span style="color:#B0A698;font-size:0.75rem;">▾</span><br><span style="font-size:0.74rem;color:#8A8072;">${e.ots.length ? e.ots.map(o => escaparHtml(o.numero)).join(', ') : 'sin orden'}</span></td>
             <td style="padding:6px;text-align:center;color:${color};white-space:nowrap;">hace ${e.dias} d<br><span style="font-size:0.74rem;color:#8A8072;">${new Date(String(e.fecha).slice(0, 10) + 'T12:00:00').toLocaleDateString('es-AR')}</span></td>
             <td style="padding:6px;text-align:right;${e.sinAsignar > 0.5 ? 'color:#8A6417;font-weight:700;' : 'color:#B0A698;'}">${e.sinAsignar > 0.5 ? m(e.sinAsignar) + ' m' : '—'}</td>
             <td style="padding:6px;text-align:right;">${e.enTrabajo > 0.5 ? m(e.enTrabajo) + ' m' : '—'}</td>
-            <td style="padding:6px;text-align:right;font-weight:700;">${m(e.debe)} m</td></tr>
+            <td style="padding:6px;text-align:right;font-weight:700;${e.saldo < 0 ? 'color:#2F7A47;' : ''}">${e.saldo < 0 ? m(-e.saldo) + ' m de más' : m(e.saldo) + ' m'}</td></tr>
             <tr id="dt-det-${e._id.replace(':', '_')}" style="display:${dtAbierta === e._id ? 'table-row' : 'none'};"><td colspan="5" style="padding:0 6px 10px;">${dtAbierta === e._id ? detallePartidaHTML(e) : ''}</td></tr>`;
-        }).join('')}</tbody>
+        }).join(''); }).join('')}</tbody>
       </table></div>
     </div>`;
-  }).join('') + `<p class="note">"Sin asignar" = tela del envío que todavía no tiene productos asignados en una orden (incluye lo que sobra de cada orden). "En trabajo" = tela de productos asignados que el taller todavía no entregó.</p>`;
+  }).join('') + `<p class="note">"Sin asignar" = tela del envío que todavía no tiene productos asignados en una orden (incluye lo que sobra de cada orden). "En trabajo" = tela de productos asignados que el taller todavía no entregó. "De más" = entregó productos que usan más tela de la enviada en esa partida: se descuenta de lo que debe de la misma tela (solo partidas abiertas).</p>`;
 }
 
 // ===== Producto generico en la orden =====
@@ -9951,9 +9957,96 @@ function renderHistorialEntregas(){
         <div class="he-sub">${x.remitoFoto ? `<a href="#" onclick="event.preventDefault(); verRemitoEntrega('${x._id}')">📷 remito</a> · ` : ''}${f.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })} h${ordenes.length ? ' · ' + escaparHtml(ordenes.join(', ')) : ''}${x.nota && !/historial de órdenes/i.test(x.nota) ? ' · 📄 ' + escaparHtml(x.nota) : ''}</div>
         <div class="he-prods">${prods}</div>
       </div>
-      <div class="he-tot"><b>${b}</b><span>buenas</span>${fa ? `<div class="f">${fa} falladas</div>` : ''}</div>
+      <div class="he-tot"><b>${b}</b><span>buenas</span>${fa ? `<div class="f">${fa} falladas</div>` : ''}${esDueno() ? `<div><a href="#" style="font-size:0.78rem;" onclick="event.preventDefault(); modificarEntregaTaller('${x._id}')">✏️ Modificar</a></div>` : ''}</div>
     </div>`;
   }).join('');
+}
+
+// ===== Modificar o anular una entrega del taller =====
+// Corrige cantidades (buenas, falladas, no entrega): ajusta las ordenes, el stock y el registro de la entrega.
+function heModCerrar(){ const m = document.getElementById('he-mod'); if(m) m.remove(); }
+async function modificarEntregaTaller(id){
+  const x = (entregasTaller || []).find(e => e._id === id); if(!x) return;
+  await cargarHistorialOT();
+  const C = [['buenas', 'Buenas'], ['falladas', 'Falladas'], ['faltantes', 'No entrega']];
+  const filas = (x.detalle || []).map((d, k) => `<tr style="border-top:1px solid var(--line);"><td style="padding:5px 4px;">${escaparHtml(d.articulo || '')} <span style="font-size:0.75rem;color:#8A8072;">${escaparHtml(d.sku || '')}${d.orden ? ' · ' + escaparHtml(d.orden) : ''}</span></td>`
+    + C.map(([c]) => `<td style="padding:5px 4px;text-align:right;"><input type="number" min="0" class="hem-i" data-k="${k}" data-c="${c}" data-v="${+d[c] || 0}" value="${+d[c] || 0}" oninput="heModResumen()" style="width:76px;text-align:right;padding:5px;border:1px solid var(--line);border-radius:6px;"></td>`).join('') + '</tr>').join('');
+  heModCerrar();
+  const m = document.createElement('div'); m.id = 'he-mod';
+  m.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(30,22,40,.35);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:24px 12px;';
+  m.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:680px;width:100%;padding:18px 20px;box-shadow:0 18px 50px rgba(0,0,0,.2);">
+    <div style="font-weight:700;font-size:1.1rem;">Modificar entrega</div>
+    <div style="font-size:0.8rem;color:#8A8072;margin:2px 0 8px;">${escaparHtml(x.taller || '')} · ${new Date(x.fecha).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}${x.nota && !/historial de órdenes/i.test(x.nota) ? ' · ' + escaparHtml(x.nota) : ''}</div>
+    ${x.liquidacion ? '<div style="color:#A6432F;font-size:0.85rem;margin-bottom:6px;">De esta entrega ya se cargó la factura de compra del taller: si cambia cantidades, corríjala a mano.</div>' : ''}
+    <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.9rem;"><thead><tr><th style="text-align:left;font-weight:400;color:#8A8072;font-size:0.78rem;">Producto</th>${C.map(([, t]) => `<th style="text-align:right;font-weight:400;color:#8A8072;font-size:0.78rem;">${t}</th>`).join('')}</tr></thead><tbody>${filas}</tbody></table></div>
+    <div id="hem-res" style="background:#F7F4EF;border-radius:8px;padding:8px 10px;font-size:0.85rem;margin-top:10px;">Sin cambios.</div>
+    <div id="hem-err" style="display:none;color:#A6432F;font-size:0.85rem;margin-top:6px;"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;"><button type="button" class="btn btn-gold" style="width:auto;" onclick="guardarModEntrega('${id}', false)">Guardar cambios</button><button type="button" class="btn btn-ghost" style="width:auto;" onclick="heModCerrar()">Cancelar</button><span style="flex:1;"></span><button type="button" class="btn" style="width:auto;color:#A6432F;border:1px solid #E6C4BC;background:#fff;" onclick="guardarModEntrega('${id}', true)">Anular entrega</button></div></div>`;
+  m.addEventListener('click', e => { if(e.target === m) heModCerrar(); });
+  document.body.appendChild(m);
+}
+function heModValores(){ const v = {}; document.querySelectorAll('#he-mod .hem-i').forEach(i => { const k = i.dataset.k; v[k] = v[k] || {}; v[k][i.dataset.c] = Math.max(0, parseInt(i.value, 10) || 0); i.style.background = (Math.max(0, parseInt(i.value, 10) || 0) !== +i.dataset.v) ? '#FFF4D6' : ''; }); return v; }
+function heModCambios(x, anular){
+  const v = heModValores(), C = ['buenas', 'falladas', 'faltantes'];
+  return (x.detalle || []).map((d, k) => { const n = {}; C.forEach(c => { n[c] = anular ? 0 : (v[k] ? v[k][c] : (+d[c] || 0)); }); return { d, k, n, db: n.buenas - (+d.buenas || 0), df: n.falladas - (+d.falladas || 0), dx: n.faltantes - (+d.faltantes || 0) }; });
+}
+function heModResumen(){
+  const id = (document.querySelector('#he-mod button[onclick^="guardarModEntrega"]') || { getAttribute: () => '' }).getAttribute('onclick').split("'")[1];
+  const x = (entregasTaller || []).find(e => e._id === id); if(!x) return;
+  const ch = heModCambios(x, false).filter(c => c.db || c.df || c.dx);
+  const t = { buenas: 'buenas', falladas: 'falladas', faltantes: '"no entrega"' };
+  document.getElementById('hem-res').innerHTML = !ch.length ? 'Sin cambios.' : '<b>Al guardar se corrige:</b> ' + ch.map(c => `${escaparHtml(c.d.articulo || '')}${c.d.orden ? ' (' + escaparHtml(c.d.orden) + ')' : ''}: ` + ['buenas', 'falladas', 'faltantes'].filter(k => c.n[k] !== (+c.d[k] || 0)).map(k => `${t[k]} ${+c.d[k] || 0} → ${c.n[k]}`).join(', ') + (c.db && c.d.sku ? ` · stock ${escaparHtml(c.d.sku)} ${c.db > 0 ? '+' : ''}${c.db}` : '')).join(' · ');
+}
+async function guardarModEntrega(id, anular){
+  const x = (entregasTaller || []).find(e => e._id === id); if(!x) return;
+  const err = document.getElementById('hem-err'); err.style.display = 'none';
+  const todos = heModCambios(x, anular), ch = todos.filter(c => c.db || c.df || c.dx);
+  if(!ch.length && !anular){ heModCerrar(); return; }
+  // ubicar cada renglon en su orden antes de escribir nada
+  const porOT = new Map();
+  for(const c of ch){
+    const o = (historialOT || []).find(z => z.numero === c.d.orden && (!x.taller || z.taller === x.taller)) || (historialOT || []).find(z => z.numero === c.d.orden);
+    if(!o){ err.textContent = `No encontré la orden ${c.d.orden || '(sin número)'}: no se cambió nada.`; err.style.display = 'block'; return; }
+    const g = porOT.get(o._docId) || { o, cs: [] }; g.cs.push(c); porOT.set(o._docId, g);
+  }
+  for(const { o, cs } of porOT.values()){
+    const usados = new Set();
+    for(const c of cs.slice().sort((p, q) => ((+q.d.buenas || 0) + (+q.d.falladas || 0) + (+q.d.faltantes || 0)) - ((+p.d.buenas || 0) + (+p.d.falladas || 0) + (+p.d.faltantes || 0)))){
+      const mismo = r => (r.articulo || '') === (c.d.articulo || '') && String(r.sku || '') === String(c.d.sku || '');
+      const cand = (o.renglones || []).map((r, i) => ({ r, i })).filter(z => mismo(z.r) && !usados.has(z.i));
+      const z = cand.find(z => (+z.r.entregado || 0) >= (+c.d.buenas || 0) && (+z.r.fallados || 0) >= (+c.d.falladas || 0) && (+z.r.faltantes || 0) >= (+c.d.faltantes || 0)) || cand[0];
+      if(!z){ err.textContent = `No encontré "${c.d.articulo}" en la orden ${o.numero}: no se cambió nada.`; err.style.display = 'block'; return; }
+      usados.add(z.i); c.i = z.i;
+    }
+  }
+  const lineas = ch.map(c => `${c.d.articulo}${c.d.orden ? ' (' + c.d.orden + ')' : ''}: buenas ${+c.d.buenas || 0} → ${c.n.buenas}${c.n.falladas !== (+c.d.falladas || 0) ? `, falladas ${+c.d.falladas || 0} → ${c.n.falladas}` : ''}${c.n.faltantes !== (+c.d.faltantes || 0) ? `, no entrega ${+c.d.faltantes || 0} → ${c.n.faltantes}` : ''}`);
+  if(!await dsConfirm((anular ? `Anular la entrega de ${x.taller}` : `Guardar los cambios de la entrega de ${x.taller}`) + '\n\n' + lineas.join('\n') + '\n\nSe ajustan las órdenes y el stock.' + (x.liquidacion ? '\nLa factura de compra del taller no se toca: corríjala a mano.' : ''))) return;
+  try{
+    const ahora = new Date().toISOString(), por = (firebase.auth().currentUser || {}).email || '';
+    for(const { o, cs } of porOT.values()){
+      const ren = (o.renglones || []).map(r => ({ ...r }));
+      cs.forEach(c => { const r = ren[c.i]; r.entregado = Math.max(0, (+r.entregado || 0) + c.db); r.fallados = Math.max(0, (+r.fallados || 0) + c.df); r.faltantes = Math.max(0, (+r.faltantes || 0) + c.dx); });
+      // la entrega dentro de la orden: se actualizan sus unidades o se quita si quedo en cero
+      const unid = todos.filter(c => c.d.orden === o.numero).reduce((s, c) => s + c.n.buenas + c.n.falladas, 0);
+      let entregas = (o.entregas || []).map(e => ({ ...e }));
+      const ie = entregas.findIndex(e => e.fecha === x.fecha);
+      if(ie >= 0){ if(unid > 0){ entregas[ie].unidades = unid; delete entregas[ie].metrosUsados; delete entregas[ie].balanceTela; entregas[ie].modificada = ahora; } else entregas.splice(ie, 1); }
+      await db.collection('ordenes_trabajo').doc(o._docId).update({ renglones: ren, entregas });
+      o.renglones = ren; o.entregas = entregas;
+    }
+    for(const c of ch){ if(c.d.sku && c.db){ try{ await moverStock(c.d.sku, c.db, anular ? 'anulación entrega del taller' : 'corrección entrega del taller', `${x.taller} · ${c.d.orden || ''}`); } catch(e){ console.error('stock', e); } } }
+    if(anular){
+      await db.collection('ingresos_taller').doc(id).delete();
+      entregasTaller = entregasTaller.filter(e => e._id !== id);
+    } else {
+      const detalle = todos.map(c => ({ ...c.d, buenas: c.n.buenas, falladas: c.n.falladas, faltantes: c.n.faltantes })).filter(d => d.buenas || d.falladas || d.faltantes);
+      const hist = [...(x.modificaciones || []), { fecha: ahora, por, antes: x.detalle }];
+      await db.collection('ingresos_taller').doc(id).update({ detalle, modificaciones: hist });
+      x.detalle = detalle; x.modificaciones = hist;
+    }
+    heModCerrar(); renderHistorialEntregas();
+    alert(anular ? 'Entrega anulada: órdenes y stock quedaron como antes de cargarla.' : 'Entrega corregida: órdenes y stock ajustados.');
+  } catch(e){ err.textContent = 'No se pudo guardar: ' + e.message + ' — revise la entrega antes de reintentar.'; err.style.display = 'block'; }
 }
 
 // ===== Costo de fabricacion =====
@@ -23501,7 +23594,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-19-v499';
+const APP_VERSION = '2026-11-20-v500';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
