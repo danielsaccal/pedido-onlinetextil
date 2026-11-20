@@ -1822,7 +1822,7 @@ body:not(.con-sb) #step-inicio .search-wrap{display:none !important;}
       <p class="error" id="ic-error" style="display:none;"></p>
 
       <p class="ni-seccion-tit" style="margin-top:22px;">Ya cargadas</p>
-      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 20/11 v500</p>
+      <p style="font-size:11px;color:var(--muted,#999);text-align:right;margin:0;">Versión corte: 20/11 v501</p>
       <div class="field" style="margin-top:8px;"><input type="text" id="ic-lista-buscar" placeholder="🔍 Buscar artículo (ej: King)" oninput="renderListaInstrucciones()"></div>
       <div id="ic-lista" style="margin-top:4px;"></div>
 
@@ -6952,7 +6952,8 @@ async function cerrarOrdenOT(docId){
   const o = (historialOT || []).find(x => x._docId === docId);
   if(!o) return;
   const m = calcularMerma([o]);
-  if(!await dsConfirm(`Cerrar ${o.numero}\n\nMerma: ${textoMerma(m)}\n\nLo que no llegó deja de figurar como pendiente. ¿Cerrar?`)) return;
+  const bt = balanceTelaOT(o);
+  if(!await dsConfirm(`Cerrar ${o.numero}\n\n${bt && bt.neto < -0.05 ? `Faltaron ${bt.uFalta} u (${fmtM(-bt.neto)} m de ${o.skuTela || 'tela'}).\n` : ''}Merma: ${textoMerma(m)}\n\nLo que no llegó deja de figurar como pendiente y deja de sumar en la tela que debe ${o.taller || 'el taller'}. ¿Cerrar?`)) return;
   try{
     await db.collection('ordenes_trabajo').doc(docId).update({ cerrada: true, cerradaFecha: new Date().toISOString(), merma: m });
     o.cerrada = true; o.merma = m;
@@ -6972,12 +6973,13 @@ async function abrirDeudaTela(){
 }
 function datosPartida(e){
   const ots = ordenesDeEnvio(e._id);
-  let asignado = 0, recibido = 0;
-  ots.forEach(o => (o.renglones || []).forEach(r => { const c = +r.consumo || 0; asignado += (+r.cantidad || 0) * c; recibido += ((+r.entregado || 0) + (+r.fallados || 0)) * c; }));
+  let asignado = 0, recibido = 0, mermaCerrada = 0;
+  ots.forEach(o => (o.renglones || []).forEach(r => { const c = +r.consumo || 0; asignado += (+r.cantidad || 0) * c; recibido += ((+r.entregado || 0) + (+r.fallados || 0)) * c;
+    if(o.cerrada) mermaCerrada += Math.max(0, (+r.cantidad || 0) - (+r.entregado || 0) - (+r.fallados || 0)) * c; })); // orden cerrada: lo que no llego es merma, el taller no lo debe
   const sinAsignar = Math.max(0, e.metros - asignado);
-  const enTrabajo = Math.max(0, asignado - recibido);
+  const enTrabajo = Math.max(0, asignado - recibido - mermaCerrada);
   const dias = Math.max(0, Math.floor((Date.now() - new Date(String(e.fecha).slice(0, 10) + 'T12:00:00').getTime()) / 86400000));
-  const saldo = e.metros - recibido; // con signo: negativo = entrego productos que usan mas tela de la enviada en esta partida
+  const saldo = e.metros - recibido - mermaCerrada; // con signo: negativo = entrego productos que usan mas tela de la enviada en esta partida
   return { ots, sinAsignar, enTrabajo, debe: sinAsignar + enTrabajo, saldo, dias };
 }
 // dias desde que se armo la orden hasta la ultima entrega (ordenes terminadas)
@@ -16679,6 +16681,14 @@ async function abrirHistorialOT(){
   renderHistorialOT('');
 }
 
+// saldo de tela de una orden, ponderado por el consumo de cada producto: + sobro, - falta (null si todavia no entrego nada)
+function balanceTelaOT(o){
+  let mov = 0, neto = 0, uFalta = 0;
+  (o.renglones || []).forEach(r => { const c = +r.consumo || 0, q = +r.cantidad || 0, llego = (+r.entregado || 0) + (+r.fallados || 0);
+    mov += llego + (+r.faltantes || 0); neto += (llego - q) * c; uFalta += Math.max(0, q - llego); });
+  return mov > 0 ? { neto: Math.round(neto * 100) / 100, uFalta } : null;
+}
+function fmtM(n){ return (Math.round(n * 10) / 10).toLocaleString('es-AR', { maximumFractionDigits: 1 }); }
 function renderHistorialOT(filtro){
   filtro = (filtro||'').trim().toLowerCase();
   const cont = document.getElementById('hot-lista');
@@ -16702,6 +16712,7 @@ function renderHistorialOT(filtro){
     const fecha = o.fecha ? new Date(o.fecha).toLocaleString('es-AR') : '';
     const estado = estadoOrdenTrabajo(o);
     const etiquetaEstado = o.cerrada ? 'Cerrada' : estado === 'entregado' ? 'Entregado' : estado === 'parcial' ? 'Parcial' : 'Pendiente';
+    const bt = balanceTelaOT(o);
     const renglonesFilas = (o.renglones||[]).map((r, i) => {
       const pendiente = pendienteRenglon(r);
       const metrosPendientes = Math.round(pendiente * r.consumo * 100) / 100;
@@ -16729,6 +16740,7 @@ function renderHistorialOT(filtro){
             <div class="meta">${escaparHtml(o.taller||'(sin taller)')} · ${fecha} · entregó ${(o.renglones||[]).reduce((s,r) => s + (r.entregado||0), 0)} de ${(o.renglones||[]).reduce((s,r) => s + (r.cantidad||0), 0)}</div>
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
+            ${bt ? `<div style="text-align:right;font-size:0.8rem;line-height:1.3;"><span style="color:#8A8072;">${escaparHtml(o.skuTela || '')}</span><br>${Math.abs(bt.neto) < 0.05 ? '<b style="color:#2F7A47;">cerró justo</b>' : bt.neto < 0 ? `<b style="color:#A6432F;">${o.cerrada || estado === 'entregado' ? 'faltó' : 'falta'} ${fmtM(-bt.neto)} m</b>${bt.uFalta ? `<br><span style="color:#8A8072;">${bt.uFalta} u sin entregar</span>` : ''}` : `<b style="color:#2F7A47;">sobró ${fmtM(bt.neto)} m</b>`}</div>` : ''}
             <span class="estado-pedido estado-${estado}">${etiquetaEstado}</span>
             <span class="hist-chev">▾</span>
           </div>
@@ -16748,7 +16760,7 @@ function renderHistorialOT(filtro){
             <button class="btn-mini" onclick="event.stopPropagation(); compartirTextoOrdenGuardada('${o._docId}', 'whatsapp')">📤 Reenviar por WhatsApp</button>
             <button class="btn-mini" onclick="event.stopPropagation(); pdfOrdenGuardada('${o._docId}')">📄 PDF</button>
             <button class="btn-mini" onclick="event.stopPropagation(); etiquetasOrdenGuardada('${o._docId}')">🏷️ Etiquetas</button>
-            ${o.cerrada || o.envioId ? '' : `<button class="btn-mini" onclick="event.stopPropagation(); cerrarOrdenOT('${o._docId}')">✔️ Cerrar orden</button>`}
+            ${o.cerrada ? '' : `<button class="btn-mini" onclick="event.stopPropagation(); cerrarOrdenOT('${o._docId}')">✔️ Cerrar orden</button>`}
             <button class="btn-mini" onclick="event.stopPropagation(); modificarOrdenOT('${o._docId}')">✏️ Modificar</button>
             <button class="btn-mini" onclick="event.stopPropagation(); borrarOrdenOT('${o._docId}')">🗑️ Borrar</button>
           </div>
@@ -23594,7 +23606,7 @@ sesionLista.then(() => cargarCategoriasCfg()).then(() => Promise.all([cargarFoto
 // ===== Aviso de version nueva =====
 // El navegador a veces sigue mostrando la version vieja de la pagina. Cada 3 minutos (y al volver a la
 // pestaña) se compara esta version con la publicada; si cambio, aparece un aviso para recargar.
-const APP_VERSION = '2026-11-20-v500';
+const APP_VERSION = '2026-11-20-v501';
 async function revisarVersionNueva(){
   try{
     const r = await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' });
